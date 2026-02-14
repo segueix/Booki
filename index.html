@@ -577,9 +577,160 @@
   document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeModal(); });
 
   // Placeholder functions per prompts 3-4
-  function generarGlossari() { showStatus('Funció pendent d\'implementar (Prompt 3)', 'error'); }
-  function revisarSeleccio() { showStatus('Funció pendent d\'implementar (Prompt 3)', 'error'); }
-  function renderTranslations() {}
+  function generarGlossari() {
+    var model = document.getElementById('model').value.trim();
+    var apiKey = document.getElementById('apiKey').value.trim();
+    var proveidor = document.getElementById('proveidor').value;
+    
+    if (!model || !apiKey) {
+      showStatus('Cal emplenar el Model i l\'API Key.', 'error');
+      return;
+    }
+    if (state.original.chapters.length === 0 || state.traduccio.chapters.length === 0) {
+      showStatus('Cal pujar els dos documents primer.', 'error');
+      return;
+    }
+    
+    var btn = document.getElementById('btnGlossari');
+    btn.disabled = true;
+    btn.textContent = '⏳ Generant...';
+    
+    // Agafar els primers 3 capítols (o menys si n'hi ha menys)
+    var numCaps = Math.min(3, state.original.chapters.length, state.traduccio.chapters.length);
+    var origText = '';
+    var tradText = '';
+    for (var i = 0; i < numCaps; i++) {
+      origText += state.original.chapters[i].contingut + '\n\n';
+      tradText += state.traduccio.chapters[i].contingut + '\n\n';
+    }
+    
+    // Limitar text per no superar límits de tokens
+    origText = origText.substring(0, 15000);
+    tradText = tradText.substring(0, 15000);
+    
+    google.script.run
+      .withSuccessHandler(function(result) {
+        state.glossari = result;
+        document.getElementById('glossariContent').textContent = result;
+        document.getElementById('glossariContent').classList.remove('empty');
+        btn.disabled = false;
+        btn.textContent = '🔍 Regenerar Glossari';
+        showStatus('Glossari generat correctament!', 'success');
+      })
+      .withFailureHandler(function(err) {
+        showStatus('Error generant glossari: ' + err.message, 'error');
+        btn.disabled = false;
+        btn.textContent = '🔍 Generar Glossari';
+      })
+      .generarGlossari(origText, tradText, model, apiKey, proveidor);
+  }
+
+  function revisarSeleccio() {
+    var iOrig = state.selectedOriginal;
+    var iTrad = state.selectedTraduccio;
+    
+    if (iOrig === null || iTrad === null) return;
+    
+    var model = document.getElementById('model').value.trim();
+    var apiKey = document.getElementById('apiKey').value.trim();
+    var proveidor = document.getElementById('proveidor').value;
+    
+    if (!model || !apiKey) {
+      showStatus('Cal emplenar el Model i l\'API Key.', 'error');
+      return;
+    }
+    
+    var origChapter = state.original.chapters[iOrig];
+    var tradChapter = state.traduccio.chapters[iTrad];
+    
+    // Marcar com a processant
+    state.processing['o' + iOrig] = true;
+    state.processing['t' + iTrad] = true;
+    renderIndexes();
+    
+    // Re-seleccionar visualment després del renderitzat
+    selectChapter('original', iOrig);
+    selectChapter('traduccio', iTrad);
+    
+    document.getElementById('btnRevisar').disabled = true;
+    document.getElementById('btnRevisar').textContent = '⏳ Revisant...';
+    
+    google.script.run
+      .withSuccessHandler(function(result) {
+        delete state.processing['o' + iOrig];
+        delete state.processing['t' + iTrad];
+        
+        // Afegir la revisió a la llista
+        state.revisions.push({
+          titol: tradChapter.titol,
+          contingut: result,
+          indexOrig: iOrig,
+          indexTrad: iTrad
+        });
+        
+        renderIndexes();
+        renderTranslations();
+        showStatus('Capítol "' + tradChapter.titol + '" revisat correctament!', 'success');
+        
+        document.getElementById('btnRevisar').disabled = false;
+        document.getElementById('btnRevisar').textContent = '🔄 Revisar Capítol';
+        
+        // Actualitzar comptador a la pestanya
+        document.getElementById('translationCount').textContent = '(' + state.revisions.length + ')';
+      })
+      .withFailureHandler(function(err) {
+        delete state.processing['o' + iOrig];
+        delete state.processing['t' + iTrad];
+        renderIndexes();
+        showStatus('Error en la revisió: ' + err.message, 'error');
+        document.getElementById('btnRevisar').disabled = false;
+        document.getElementById('btnRevisar').textContent = '🔄 Revisar Capítol';
+      })
+      .revisarCapitol(
+        origChapter.contingut,
+        tradChapter.contingut,
+        model,
+        apiKey,
+        proveidor,
+        state.glossari
+      );
+  }
+
+  function renderTranslations() {
+    var container = document.getElementById('translationsList');
+    
+    if (state.revisions.length === 0) {
+      container.innerHTML = '<div class="empty-state"><div class="icon">📭</div>' +
+        '<p>Encara no hi ha cap capítol revisat.<br>Ves a Configuració per començar.</p></div>';
+      document.getElementById('epubSection').style.display = 'none';
+      return;
+    }
+    
+    container.innerHTML = '';
+    var list = document.createElement('div');
+    list.className = 'translation-list';
+    
+    state.revisions.forEach(function(rev, i) {
+      var item = document.createElement('div');
+      item.className = 'translation-item';
+      item.onclick = function() { openModal(rev.titol, rev.contingut); };
+      
+      var num = document.createElement('span');
+      num.className = 'num';
+      num.textContent = i + 1;
+      item.appendChild(num);
+      
+      var title = document.createElement('span');
+      title.className = 'title';
+      title.textContent = rev.titol;
+      item.appendChild(title);
+      
+      list.appendChild(item);
+    });
+    
+    container.appendChild(list);
+    document.getElementById('epubSection').style.display = '';
+  }
   function generarEPUB() { showStatus('Funció pendent d\'implementar (Prompt 4)', 'error'); }
 </script>
 
