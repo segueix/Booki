@@ -374,18 +374,213 @@
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  // Placeholder functions — seran implementades en prompts 2-4
-  function handleFile(input, type) { showStatus('Funció pendent d\'implementar (Prompt 2)', 'error'); }
-  function generarGlossari() { showStatus('Funció pendent d\'implementar (Prompt 3)', 'error'); }
-  function revisarSeleccio() { showStatus('Funció pendent d\'implementar (Prompt 3)', 'error'); }
-  function generarEPUB() { showStatus('Funció pendent d\'implementar (Prompt 4)', 'error'); }
-  function openModal() {}
+  // ============================================================
+  //  DRAG AND DROP
+  // ============================================================
+  ['uploadOriginal', 'uploadTraduccio'].forEach(function(id) {
+    var zone = document.getElementById(id);
+    zone.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      this.classList.add('dragover');
+    });
+    zone.addEventListener('dragleave', function(e) {
+      this.classList.remove('dragover');
+    });
+    zone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      this.classList.remove('dragover');
+      var type = id === 'uploadOriginal' ? 'original' : 'traduccio';
+      var file = e.dataTransfer.files[0];
+      if (file && file.name.endsWith('.docx')) {
+        processFile(file, type);
+      } else {
+        showStatus('Només s\'accepten fitxers .docx', 'error');
+      }
+    });
+  });
+
+  // ============================================================
+  //  FILE HANDLING
+  // ============================================================
+  function handleFile(input, type) {
+    var file = input.files[0];
+    if (file) processFile(file, type);
+  }
+
+  function processFile(file, type) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var arrayBuffer = e.target.result;
+      mammoth.convertToHtml({arrayBuffer: arrayBuffer})
+        .then(function(result) {
+          var chapters = extractChapters(result.value);
+          state[type].chapters = chapters;
+          state[type].html = result.value;
+          
+          var zoneId = type === 'original' ? 'uploadOriginal' : 'uploadTraduccio';
+          var fnId = type === 'original' ? 'fnOriginal' : 'fnTraduccio';
+          document.getElementById(zoneId).classList.add('loaded');
+          document.getElementById(fnId).textContent = '✅ ' + file.name + ' (' + chapters.length + ' capítols)';
+          
+          renderIndexes();
+          showStatus('Document "' + file.name + '" carregat correctament amb ' + chapters.length + ' capítols.', 'success');
+        })
+        .catch(function(err) {
+          showStatus('Error processant el fitxer: ' + err.message, 'error');
+        });
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // ============================================================
+  //  CHAPTER EXTRACTION
+  // ============================================================
+  function extractChapters(html) {
+    var parser = new DOMParser();
+    var doc = parser.parseFromString('<div>' + html + '</div>', 'text/html');
+    var body = doc.querySelector('div');
+    var chapters = [];
+    var currentChapter = null;
+    
+    for (var i = 0; i < body.childNodes.length; i++) {
+      var node = body.childNodes[i];
+      if (node.nodeType === 1) {
+        var tag = node.tagName.toLowerCase();
+        if (tag === 'h1' || tag === 'h2') {
+          if (currentChapter) {
+            chapters.push(currentChapter);
+          }
+          currentChapter = {
+            titol: node.textContent.trim(),
+            contingut: '',
+            htmlContent: ''
+          };
+        } else if (currentChapter) {
+          currentChapter.contingut += node.textContent + '\n';
+          currentChapter.htmlContent += node.outerHTML;
+        }
+      }
+    }
+    if (currentChapter) {
+      chapters.push(currentChapter);
+    }
+    
+    // Si no hi ha headings, tractar tot com un sol capítol
+    if (chapters.length === 0 && html.trim()) {
+      chapters.push({
+        titol: 'Document complet',
+        contingut: body.textContent,
+        htmlContent: html
+      });
+    }
+    
+    return chapters;
+  }
+
+  // ============================================================
+  //  INDEX RENDERING
+  // ============================================================
+  function renderIndexes() {
+    if (state.original.chapters.length === 0 && state.traduccio.chapters.length === 0) return;
+    
+    document.getElementById('indexContainer').style.display = '';
+    document.getElementById('glossariSection').style.display = '';
+    
+    renderIndex('indexOriginal', state.original.chapters, 'original');
+    renderIndex('indexTraduccio', state.traduccio.chapters, 'traduccio');
+    updateRevisarButton();
+  }
+
+  function renderIndex(containerId, chapters, type) {
+    var container = document.getElementById(containerId);
+    container.innerHTML = '';
+    
+    chapters.forEach(function(ch, i) {
+      var div = document.createElement('div');
+      div.className = 'chapter-item';
+      div.dataset.index = i;
+      div.dataset.type = type;
+      
+      var label = document.createElement('span');
+      label.textContent = (i + 1) + '. ' + ch.titol;
+      label.style.flex = '1';
+      div.appendChild(label);
+      
+      // Indicador de revisat (costat traducció)
+      if (type === 'traduccio') {
+        var revised = state.revisions.find(function(r) { return r.indexTrad === i; });
+        if (revised) {
+          var check = document.createElement('span');
+          check.className = 'check';
+          check.textContent = '✓';
+          div.appendChild(check);
+        }
+        if (state.processing['t' + i]) {
+          var spinner = document.createElement('span');
+          spinner.className = 'spinner';
+          div.appendChild(spinner);
+        }
+      }
+      if (type === 'original' && state.processing['o' + i]) {
+        var spinner = document.createElement('span');
+        spinner.className = 'spinner';
+        div.appendChild(spinner);
+      }
+      
+      div.onclick = function() { selectChapter(type, i); };
+      container.appendChild(div);
+    });
+  }
+
+  // ============================================================
+  //  CHAPTER SELECTION
+  // ============================================================
+  function selectChapter(type, index) {
+    if (type === 'original') {
+      state.selectedOriginal = (state.selectedOriginal === index) ? null : index;
+    } else {
+      state.selectedTraduccio = (state.selectedTraduccio === index) ? null : index;
+    }
+    
+    var containerId = type === 'original' ? 'indexOriginal' : 'indexTraduccio';
+    var selected = type === 'original' ? state.selectedOriginal : state.selectedTraduccio;
+    document.querySelectorAll('#' + containerId + ' .chapter-item').forEach(function(el, i) {
+      el.classList.toggle('selected', i === selected);
+    });
+    
+    updateRevisarButton();
+  }
+
+  function updateRevisarButton() {
+    var btn = document.getElementById('btnRevisar');
+    btn.disabled = (state.selectedOriginal === null || state.selectedTraduccio === null);
+  }
+
+  // ============================================================
+  //  MODAL
+  // ============================================================
+  function openModal(title, content) {
+    document.getElementById('modalTitle').textContent = title;
+    var formatted = content.split('\n').filter(function(l) { return l.trim(); })
+      .map(function(l) { return '<p>' + l + '</p>'; }).join('');
+    document.getElementById('modalBody').innerHTML = formatted;
+    document.getElementById('modal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+
   function closeModal(e) {
     if (e && e.target !== document.getElementById('modal')) return;
     document.getElementById('modal').classList.remove('active');
     document.body.style.overflow = '';
   }
+  
   document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeModal(); });
+
+  // Placeholder functions per prompts 3-4
+  function generarGlossari() { showStatus('Funció pendent d\'implementar (Prompt 3)', 'error'); }
+  function revisarSeleccio() { showStatus('Funció pendent d\'implementar (Prompt 3)', 'error'); }
+  function renderTranslations() {}
+  function generarEPUB() { showStatus('Funció pendent d\'implementar (Prompt 4)', 'error'); }
 </script>
 
 </body>
