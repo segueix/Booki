@@ -80,6 +80,26 @@
     }
     .chapter-item:last-child { border-bottom: 0; }
     .chapter-title { font-size: 14px; font-weight: 600; }
+    .chapter-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .field { display: grid; gap: 6px; }
+    .field label { font-size: 13px; color: var(--muted); }
+    dialog {
+      width: min(900px, 92vw);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0;
+    }
+    dialog::backdrop { background: rgba(17, 24, 39, 0.45); }
+    .dialog-content { padding: 14px; display: grid; gap: 10px; }
+    .dialog-content textarea {
+      min-height: 320px;
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px;
+    }
   </style>
 </head>
 <body>
@@ -107,7 +127,31 @@
 
     <div class="card grid cols-2">
       <div class="grid">
-        <h2>3) Títols de capítol</h2>
+        <h2>3) Metadades</h2>
+        <div class="field">
+          <label for="metaTitle">Títol (dc:title)</label>
+          <input id="metaTitle" type="text" placeholder="Títol del llibre" />
+        </div>
+        <div class="field">
+          <label for="metaAuthor">Autor (dc:creator)</label>
+          <input id="metaAuthor" type="text" placeholder="Nom de l'autor" />
+        </div>
+        <div class="field">
+          <label for="metaLanguage">Idioma (dc:language)</label>
+          <input id="metaLanguage" type="text" placeholder="ca" />
+        </div>
+        <div class="small">Els valors es carreguen des de l'OPF i es guarden en descarregar l'EPUB.</div>
+      </div>
+      <div class="grid">
+        <h2>4) Notes</h2>
+        <div class="small">Aquesta secció et permet ajustar metadades bàsiques EPUB: <code>dc:title</code>, <code>dc:creator</code> i <code>dc:language</code>.</div>
+        <div class="small">Els canvis s'apliquen automàticament en desar/descarregar i no trenquen les funcionalitats actuals de portada, capítols i índex.</div>
+      </div>
+    </div>
+
+    <div class="card grid cols-2">
+      <div class="grid">
+        <h2>5) Títols de capítol</h2>
         <div class="row">
           <button class="btn" id="addMissingHeadingsBtn" disabled>Afegir H1 on falti</button>
         </div>
@@ -115,7 +159,7 @@
         <div class="chapter-list" id="chapterList"></div>
       </div>
       <div class="grid">
-        <h2>4) Índex editable</h2>
+        <h2>6) Índex editable</h2>
         <table>
           <thead>
             <tr><th style="width:44%">Títol</th><th style="width:36%">Href</th><th>Accions</th></tr>
@@ -135,6 +179,18 @@
     </div>
   </div>
 
+  <dialog id="chapterEditorDialog">
+    <div class="dialog-content">
+      <h2 id="chapterEditorTitle">Editar capítol</h2>
+      <textarea id="chapterEditorTextarea" spellcheck="false"></textarea>
+      <div class="row">
+        <button class="btn ok" id="saveChapterEditBtn">Guardar canvis</button>
+        <button class="btn" id="closeChapterEditBtn">Tancar</button>
+      </div>
+      <div class="small">Edició ràpida del contingut intern del &lt;body&gt; del capítol seleccionat.</div>
+    </div>
+  </dialog>
+
 <script>
   const state = {
     zip: null,
@@ -145,11 +201,17 @@
     manifestById: {},
     spineIds: [],
     toc: [],
-    chapters: []
+    chapters: [],
+    metadata: { title: '', creator: '', language: '' },
+    cssHref: null,
+    editingChapterIndex: null
   };
 
   const loadStatus = document.getElementById('loadStatus');
   const actionStatus = document.getElementById('actionStatus');
+  const metaTitleInput = document.getElementById('metaTitle');
+  const metaAuthorInput = document.getElementById('metaAuthor');
+  const metaLanguageInput = document.getElementById('metaLanguage');
   const tocBody = document.getElementById('tocBody');
   const chapterList = document.getElementById('chapterList');
 
@@ -160,6 +222,11 @@
   const addTocEntryBtn = document.getElementById('addTocEntryBtn');
   const rebuildNavBtn = document.getElementById('rebuildNavBtn');
   const downloadBtn = document.getElementById('downloadBtn');
+  const chapterEditorDialog = document.getElementById('chapterEditorDialog');
+  const chapterEditorTitle = document.getElementById('chapterEditorTitle');
+  const chapterEditorTextarea = document.getElementById('chapterEditorTextarea');
+  const saveChapterEditBtn = document.getElementById('saveChapterEditBtn');
+  const closeChapterEditBtn = document.getElementById('closeChapterEditBtn');
 
   epubFileInput.addEventListener('change', (e) => loadEpub(e.target.files[0]));
   applyCoverBtn.addEventListener('click', applyCover);
@@ -170,6 +237,8 @@
   });
   rebuildNavBtn.addEventListener('click', rebuildIndexFiles);
   downloadBtn.addEventListener('click', downloadEpub);
+  saveChapterEditBtn.addEventListener('click', saveEditedChapter);
+  closeChapterEditBtn.addEventListener('click', () => chapterEditorDialog.close());
 
   function setEnabled(v) {
     [applyCoverBtn, addMissingHeadingsBtn, addTocEntryBtn, rebuildNavBtn, downloadBtn].forEach(btn => btn.disabled = !v);
@@ -188,6 +257,7 @@
       const opfXml = await state.zip.file(state.opfPath).async('string');
       state.opfDoc = new DOMParser().parseFromString(opfXml, 'application/xml');
       parseManifestAndSpine();
+      loadMetadataFromOpf();
       await loadTocFromBook();
       await loadChapters();
       renderToc();
@@ -215,6 +285,27 @@
       const idref = it.getAttribute('idref');
       if (idref) state.spineIds.push(idref);
     });
+  }
+
+  // Llegeix metadades bàsiques del package OPF i les mostra a la UI.
+  function loadMetadataFromOpf() {
+    const metadata = state.opfDoc.querySelector('metadata');
+    state.metadata.title = getTextByLocalName(metadata, 'title');
+    state.metadata.creator = getTextByLocalName(metadata, 'creator');
+    state.metadata.language = getTextByLocalName(metadata, 'language');
+
+    metaTitleInput.value = state.metadata.title;
+    metaAuthorInput.value = state.metadata.creator;
+    metaLanguageInput.value = state.metadata.language;
+  }
+
+  // Escriu els valors actuals de la UI al fitxer OPF abans de guardar/descarregar.
+  function writeMetadataToOpf() {
+    const metadata = state.opfDoc.querySelector('metadata');
+    if (!metadata) return;
+    upsertDcElement(metadata, 'title', metaTitleInput.value.trim() || 'Sense títol');
+    upsertDcElement(metadata, 'creator', metaAuthorInput.value.trim() || 'Autor desconegut');
+    upsertDcElement(metadata, 'language', metaLanguageInput.value.trim() || 'und');
   }
 
   async function loadTocFromBook() {
@@ -323,13 +414,50 @@
     state.chapters.forEach((ch, idx) => {
       const div = document.createElement('div');
       div.className = 'chapter-item';
-      div.innerHTML = `<div class="chapter-title">${idx + 1}. ${escapeHtml(ch.title)}</div>
+      div.innerHTML = `<div class="chapter-head"><div class="chapter-title">${idx + 1}. ${escapeHtml(ch.title)}</div><button class="btn" data-edit-chapter="${idx}">Editar</button></div>
       <div class="small">${escapeHtml(ch.href)} · H1: ${ch.hasH1 ? 'sí' : 'no'}</div>`;
       chapterList.appendChild(div);
     });
+
+    chapterList.querySelectorAll('button[data-edit-chapter]').forEach(btn => {
+      btn.addEventListener('click', () => openChapterEditor(Number(btn.dataset.editChapter)));
+    });
+  }
+
+  async function openChapterEditor(index) {
+    const chapter = state.chapters[index];
+    if (!chapter) return;
+    const xml = await state.zip.file(chapter.path)?.async('string');
+    if (!xml) return;
+    const doc = new DOMParser().parseFromString(xml, 'application/xhtml+xml');
+    const body = doc.querySelector('body');
+    chapterEditorTitle.textContent = `Editar capítol: ${chapter.title}`;
+    chapterEditorTextarea.value = body ? body.innerHTML.trim() : '';
+    state.editingChapterIndex = index;
+    chapterEditorDialog.showModal();
+  }
+
+  async function saveEditedChapter() {
+    const index = state.editingChapterIndex;
+    const chapter = state.chapters[index];
+    if (!chapter) return;
+    const xml = await state.zip.file(chapter.path)?.async('string');
+    if (!xml) return;
+    const doc = new DOMParser().parseFromString(xml, 'application/xhtml+xml');
+    const body = doc.querySelector('body');
+    if (!body) return;
+
+    body.innerHTML = chapterEditorTextarea.value;
+    chapter.hasH1 = !!body.querySelector('h1');
+    chapter.title = body.querySelector('h1')?.textContent?.trim() || chapter.title;
+    state.zip.file(chapter.path, new XMLSerializer().serializeToString(doc));
+    renderChapters();
+    chapterEditorDialog.close();
+    actionStatus.textContent = `Capítol "${chapter.title}" actualitzat.`;
   }
 
   async function addMissingHeadings() {
+    const cssHref = await ensureChapterCssAsset();
     let changed = 0;
     for (const ch of state.chapters) {
       if (ch.hasH1) continue;
@@ -337,7 +465,10 @@
       const doc = new DOMParser().parseFromString(xml, 'application/xhtml+xml');
       const body = doc.querySelector('body');
       if (!body) continue;
+
+      ensureStylesheetLink(doc, ch.path, cssHref);
       const h1 = doc.createElement('h1');
+      h1.className = 'epubcraft-injected-heading';
       h1.textContent = ch.title || fileName(ch.href);
       body.insertBefore(h1, body.firstChild);
       state.zip.file(ch.path, new XMLSerializer().serializeToString(doc));
@@ -383,8 +514,27 @@
     }
     metaCover.setAttribute('content', 'cover-image');
 
+    ensureCoverReference(coverRel);
+
     await saveOpf();
     actionStatus.textContent = 'Portada aplicada correctament.';
+  }
+
+  // Compatibilitat EPUB2: crea o actualitza guide/reference type="cover".
+  function ensureCoverReference(coverHref) {
+    let guide = state.opfDoc.querySelector('package > guide');
+    if (!guide) {
+      guide = state.opfDoc.createElement('guide');
+      state.opfDoc.documentElement.appendChild(guide);
+    }
+    let ref = state.opfDoc.querySelector('guide > reference[type="cover"]');
+    if (!ref) {
+      ref = state.opfDoc.createElement('reference');
+      ref.setAttribute('type', 'cover');
+      ref.setAttribute('title', 'Cover');
+      guide.appendChild(ref);
+    }
+    ref.setAttribute('href', coverHref);
   }
 
   async function rebuildIndexFiles() {
@@ -447,6 +597,7 @@
   }
 
   async function saveOpf() {
+    writeMetadataToOpf();
     state.zip.file(state.opfPath, new XMLSerializer().serializeToString(state.opfDoc));
   }
 
@@ -478,6 +629,85 @@
   function escapeHtml(str) { return (str || '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
   function escapeAttr(str) { return escapeHtml(str).replace(/'/g, '&apos;'); }
   function escapeXml(str) { return (str || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c])); }
+
+  function getTextByLocalName(root, localName) {
+    if (!root) return '';
+    const node = [...root.children].find(el => (el.localName || el.nodeName.split(':').pop()) === localName);
+    return node?.textContent?.trim() || '';
+  }
+
+  function upsertDcElement(metadataNode, localName, value) {
+    let node = [...metadataNode.children].find(el => (el.localName || el.nodeName.split(':').pop()) === localName);
+    if (!node) {
+      const prefix = metadataNode.lookupPrefix?.('http://purl.org/dc/elements/1.1/') || 'dc';
+      node = state.opfDoc.createElement(`${prefix}:${localName}`);
+      metadataNode.appendChild(node);
+    }
+    node.textContent = value;
+  }
+
+  // Busca un CSS existent al manifest; si no existeix, crea styles.css i l'afegeix al manifest.
+  async function ensureChapterCssAsset() {
+    if (state.cssHref) return state.cssHref;
+    const existingCss = Object.values(state.manifestById).find(item => item.mediaType === 'text/css' || /\.css$/i.test(item.href || ''));
+    if (existingCss) {
+      state.cssHref = existingCss.href;
+      return state.cssHref;
+    }
+
+    const manifest = state.opfDoc.querySelector('manifest');
+    const styleHref = 'styles.css';
+    const stylePath = resolvePath(state.opfPath, styleHref);
+    state.zip.file(stylePath, `h1.epubcraft-injected-heading {\n  text-align: center;\n  margin-top: 2em;\n  font-family: sans-serif;\n}\n`);
+
+    const item = state.opfDoc.createElement('item');
+    item.setAttribute('id', generateUniqueManifestId('styles'));
+    item.setAttribute('href', styleHref);
+    item.setAttribute('media-type', 'text/css');
+    manifest.appendChild(item);
+
+    parseManifestAndSpine();
+    state.cssHref = styleHref;
+    return state.cssHref;
+  }
+
+  function ensureStylesheetLink(doc, chapterPath, cssHref) {
+    if (!cssHref) return;
+    const head = doc.querySelector('head');
+    if (!head) return;
+    const cssPath = resolvePath(state.opfPath, cssHref);
+    const relativeHref = relativePath(chapterPath, cssPath);
+
+    const existing = [...head.querySelectorAll('link[rel="stylesheet"]')]
+      .find(l => stripAnchor(l.getAttribute('href') || '') === stripAnchor(relativeHref));
+    if (existing) return;
+
+    const link = doc.createElement('link');
+    link.setAttribute('rel', 'stylesheet');
+    link.setAttribute('type', 'text/css');
+    link.setAttribute('href', relativeHref);
+    head.appendChild(link);
+  }
+
+  function relativePath(fromFilePath, toFilePath) {
+    const fromParts = baseDir(fromFilePath).split('/').filter(Boolean);
+    const toParts = toFilePath.split('/').filter(Boolean);
+    while (fromParts.length && toParts.length && fromParts[0] === toParts[0]) {
+      fromParts.shift();
+      toParts.shift();
+    }
+    return `${'../'.repeat(fromParts.length)}${toParts.join('/')}` || fileName(toFilePath);
+  }
+
+  function generateUniqueManifestId(base) {
+    let i = 0;
+    let id = base;
+    while (state.manifestById[id]) {
+      i += 1;
+      id = `${base}-${i}`;
+    }
+    return id;
+  }
 </script>
 </body>
 </html>
