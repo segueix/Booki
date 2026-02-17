@@ -70,6 +70,7 @@ let selectedCategory = localStorage.getItem(LAST_CATEGORY_STORAGE_KEY) || 'Novet
 let historySelectedCategory = 'Novetats';
 let historyFilterLiked = false;
 let currentFeedVideos = [];
+let lastRenderedFeedList = [];
 let currentFeedData = null;
 let currentFeedRenderer = null;
 let activePlaylistVideo = null;
@@ -2804,6 +2805,7 @@ function renderFeed() {
         return;
     }
 
+    lastRenderedFeedList = filtered;
     currentFeedRenderer(filtered);
 }
 
@@ -6018,38 +6020,76 @@ function renderCategoryVideosBelow(currentChannelId, currentVideoId) {
     }
     setExtraRelatedTitle(DEFAULT_EXTRA_RELATED_TITLE);
 
-    let allVideos = currentFeedVideos || [];
+    const useListCategories = ['Novetats', 'Tot', 'Seguint'];
+    const shouldUseList = useListCategories.includes(selectedCategory)
+        || isCustomCategory(selectedCategory);
 
-    // Determinar la categoria efectiva
-    let effectiveCategory = null;
-    if (selectedCategory && selectedCategory !== 'Novetats' && selectedCategory !== 'Tot') {
-        effectiveCategory = selectedCategory;
-    } else {
-        // Deduir del canal del vídeo actual
-        effectiveCategory = getEffectiveCategory(currentChannelId);
-    }
-
-    // Filtrar per categoria efectiva
     let videos;
-    if (effectiveCategory) {
-        // Guardar selectedCategory original i usar l'efectiva per filtrar
-        const originalCategory = selectedCategory;
-        selectedCategory = effectiveCategory;
-        videos = filterVideosByCategory(allVideos, currentFeedData);
-        selectedCategory = originalCategory;
+
+    if (shouldUseList && lastRenderedFeedList.length > 0) {
+        // Trobar posició actual a la llista
+        let currentIndex = lastRenderedFeedList.findIndex(v => String(v.id) === String(currentVideoId));
+
+        // Obtenir vídeos restants de la llista (després del vídeo actual)
+        let listVideos;
+        if (currentIndex >= 0) {
+            listVideos = lastRenderedFeedList.slice(currentIndex + 1);
+        } else {
+            listVideos = [...lastRenderedFeedList];
+        }
+
+        // Excloure shorts i el vídeo actual
+        listVideos = listVideos.filter(v =>
+            String(v.id) !== String(currentVideoId) && !v.isShort
+        );
+
+        // Prioritzar per categoria principal del vídeo actual
+        const mainCategory = getEffectiveCategory(currentChannelId);
+        if (mainCategory) {
+            const sameCat = [];
+            const otherCat = [];
+            listVideos.forEach(v => {
+                const vCat = getEffectiveCategory(v.channelId);
+                if (vCat && vCat.toLowerCase() === mainCategory.toLowerCase()) {
+                    sameCat.push(v);
+                } else {
+                    otherCat.push(v);
+                }
+            });
+            listVideos = [...sameCat, ...otherCat];
+        }
+
+        videos = listVideos;
     } else {
-        videos = [...allVideos];
+        // Comportament actual per categories estàndard
+        let allVideos = currentFeedVideos || [];
+
+        let effectiveCategory = null;
+        if (selectedCategory && selectedCategory !== 'Novetats' && selectedCategory !== 'Tot') {
+            effectiveCategory = selectedCategory;
+        } else {
+            effectiveCategory = getEffectiveCategory(currentChannelId);
+        }
+
+        if (effectiveCategory) {
+            const originalCategory = selectedCategory;
+            selectedCategory = effectiveCategory;
+            videos = filterVideosByCategory(allVideos, currentFeedData);
+            selectedCategory = originalCategory;
+        } else {
+            videos = [...allVideos];
+        }
+
+        // Excloure vídeo actual, canal actual, shorts
+        videos = videos.filter(v =>
+            String(v.channelId) !== String(currentChannelId)
+            && String(v.id) !== String(currentVideoId)
+            && !v.isShort
+        );
+
+        // Aplicar scoring personalitzat
+        videos = scoreRelatedVideos(videos, { id: currentVideoId, channelId: currentChannelId });
     }
-
-    // Excloure vídeo actual, canal actual, shorts
-    videos = videos.filter(v =>
-        String(v.channelId) !== String(currentChannelId)
-        && String(v.id) !== String(currentVideoId)
-        && !v.isShort
-    );
-
-    // Aplicar scoring personalitzat
-    videos = scoreRelatedVideos(videos, { id: currentVideoId, channelId: currentChannelId });
 
 
     if (videos.length === 0) {
