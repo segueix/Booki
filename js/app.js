@@ -1349,6 +1349,9 @@ function initEventListeners() {
             const page = item.dataset.page;
             if (page === 'home') {
                 historyFilterLiked = false;
+                selectedCategory = 'Novetats';
+                localStorage.setItem(LAST_CATEGORY_STORAGE_KEY, selectedCategory);
+                renderCategories();
                 showHome();
                 if (useYouTubeAPI) {
                     loadVideosFromAPI();
@@ -1377,6 +1380,9 @@ function initEventListeners() {
             if (page === 'history') {
                 showHistory();
             } else if (page === 'home') {
+                selectedCategory = 'Novetats';
+                localStorage.setItem(LAST_CATEGORY_STORAGE_KEY, selectedCategory);
+                renderCategories();
                 showHome();
                 if (useYouTubeAPI) {
                     loadVideosFromAPI();
@@ -1414,6 +1420,9 @@ function initEventListeners() {
             if (homeNav) {
                 homeNav.classList.add('active');
             }
+            selectedCategory = 'Novetats';
+            localStorage.setItem(LAST_CATEGORY_STORAGE_KEY, selectedCategory);
+            renderCategories();
             const basePath = window.location.pathname.replace(/\/index\.html$/, '/');
             history.pushState({}, '', basePath);
             if (!isMiniPlayerActive()) {
