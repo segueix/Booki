@@ -6048,30 +6048,6 @@ function renderCategoryVideosBelow(currentChannelId, currentVideoId) {
         && !v.isShort
     );
 
-    // Fallback: si queden < 5 vídeos, ampliar amb vídeos generals
-    if (videos.length < 5) {
-        const excludedCats = ['mitjans', 'digitals', 'entitats'];
-        const videoIds = new Set(videos.map(v => String(v.id)));
-        const fallbackVideos = allVideos.filter(v => {
-            if (videoIds.has(String(v.id))) return false;
-            if (String(v.channelId) === String(currentChannelId)) return false;
-            if (String(v.id) === String(currentVideoId)) return false;
-            if (v.isShort) return false;
-            const channelCats = getChannelCustomCategories(v.channelId);
-            let feedCats = [];
-            if (currentFeedData?.channels) {
-                const ch = currentFeedData.channels.find(c => String(c.id) === String(v.channelId));
-                if (ch && Array.isArray(ch.categories)) feedCats = ch.categories;
-            } else if (cachedChannels[v.channelId]?.categories) {
-                feedCats = cachedChannels[v.channelId].categories;
-            }
-            return ![...channelCats, ...feedCats].some(cat =>
-                excludedCats.includes(String(cat).toLowerCase())
-            );
-        });
-        videos = [...videos, ...fallbackVideos];
-    }
-
     // Aplicar scoring personalitzat
     videos = scoreRelatedVideos(videos, { id: currentVideoId, channelId: currentChannelId });
 
@@ -7278,17 +7254,9 @@ function loadRelatedVideos(currentVideoId) {
     // Filtrar per categoria
     let relatedVideos = VIDEOS.filter(v => v.id !== parseInt(currentVideoId) && !v.isShort);
 
-    // Intentar filtrar per categoria del vídeo actual
+    // Filtrar estrictament per categoria del vídeo actual
     if (currentVideo?.categoryId) {
-        const categoryFiltered = relatedVideos.filter(v => v.categoryId === currentVideo.categoryId);
-        if (categoryFiltered.length >= 5) {
-            relatedVideos = categoryFiltered;
-        } else if (categoryFiltered.length > 0) {
-            // Prioritzar els de la mateixa categoria + omplir amb generals
-            const categoryIds = new Set(categoryFiltered.map(v => v.id));
-            const others = relatedVideos.filter(v => !categoryIds.has(v.id));
-            relatedVideos = [...categoryFiltered, ...others];
-        }
+        relatedVideos = relatedVideos.filter(v => v.categoryId === currentVideo.categoryId);
     }
 
     // Excloure canal actual
