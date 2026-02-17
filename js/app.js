@@ -70,6 +70,7 @@ let selectedCategory = localStorage.getItem(LAST_CATEGORY_STORAGE_KEY) || 'Novet
 let historySelectedCategory = 'Novetats';
 let historyFilterLiked = false;
 let currentFeedVideos = [];
+let lastRenderedFeedList = [];
 let currentFeedData = null;
 let currentFeedRenderer = null;
 let activePlaylistVideo = null;
@@ -1348,6 +1349,9 @@ function initEventListeners() {
             const page = item.dataset.page;
             if (page === 'home') {
                 historyFilterLiked = false;
+                selectedCategory = 'Novetats';
+                localStorage.setItem(LAST_CATEGORY_STORAGE_KEY, selectedCategory);
+                renderCategories();
                 showHome();
                 if (useYouTubeAPI) {
                     loadVideosFromAPI();
@@ -1376,6 +1380,9 @@ function initEventListeners() {
             if (page === 'history') {
                 showHistory();
             } else if (page === 'home') {
+                selectedCategory = 'Novetats';
+                localStorage.setItem(LAST_CATEGORY_STORAGE_KEY, selectedCategory);
+                renderCategories();
                 showHome();
                 if (useYouTubeAPI) {
                     loadVideosFromAPI();
@@ -1413,6 +1420,9 @@ function initEventListeners() {
             if (homeNav) {
                 homeNav.classList.add('active');
             }
+            selectedCategory = 'Novetats';
+            localStorage.setItem(LAST_CATEGORY_STORAGE_KEY, selectedCategory);
+            renderCategories();
             const basePath = window.location.pathname.replace(/\/index\.html$/, '/');
             history.pushState({}, '', basePath);
             if (!isMiniPlayerActive()) {
@@ -2804,6 +2814,7 @@ function renderFeed() {
         return;
     }
 
+    lastRenderedFeedList = filtered;
     currentFeedRenderer(filtered);
 }
 
@@ -6018,62 +6029,76 @@ function renderCategoryVideosBelow(currentChannelId, currentVideoId) {
     }
     setExtraRelatedTitle(DEFAULT_EXTRA_RELATED_TITLE);
 
-    let allVideos = currentFeedVideos || [];
+    const useListCategories = ['Novetats', 'Tot', 'Seguint'];
+    const shouldUseList = useListCategories.includes(selectedCategory)
+        || isCustomCategory(selectedCategory);
 
-    // Determinar la categoria efectiva
-    let effectiveCategory = null;
-    if (selectedCategory && selectedCategory !== 'Novetats' && selectedCategory !== 'Tot') {
-        effectiveCategory = selectedCategory;
-    } else {
-        // Deduir del canal del vídeo actual
-        effectiveCategory = getEffectiveCategory(currentChannelId);
-    }
-
-    // Filtrar per categoria efectiva
     let videos;
-    if (effectiveCategory) {
-        // Guardar selectedCategory original i usar l'efectiva per filtrar
-        const originalCategory = selectedCategory;
-        selectedCategory = effectiveCategory;
-        videos = filterVideosByCategory(allVideos, currentFeedData);
-        selectedCategory = originalCategory;
+
+    if (shouldUseList && lastRenderedFeedList.length > 0) {
+        // Trobar posició actual a la llista
+        let currentIndex = lastRenderedFeedList.findIndex(v => String(v.id) === String(currentVideoId));
+
+        // Obtenir vídeos restants de la llista (després del vídeo actual)
+        let listVideos;
+        if (currentIndex >= 0) {
+            listVideos = lastRenderedFeedList.slice(currentIndex + 1);
+        } else {
+            listVideos = [...lastRenderedFeedList];
+        }
+
+        // Excloure shorts i el vídeo actual
+        listVideos = listVideos.filter(v =>
+            String(v.id) !== String(currentVideoId) && !v.isShort
+        );
+
+        // Prioritzar per categoria principal del vídeo actual
+        const mainCategory = getEffectiveCategory(currentChannelId);
+        if (mainCategory) {
+            const sameCat = [];
+            const otherCat = [];
+            listVideos.forEach(v => {
+                const vCat = getEffectiveCategory(v.channelId);
+                if (vCat && vCat.toLowerCase() === mainCategory.toLowerCase()) {
+                    sameCat.push(v);
+                } else {
+                    otherCat.push(v);
+                }
+            });
+            listVideos = [...sameCat, ...otherCat];
+        }
+
+        videos = listVideos;
     } else {
-        videos = [...allVideos];
+        // Comportament actual per categories estàndard
+        let allVideos = currentFeedVideos || [];
+
+        let effectiveCategory = null;
+        if (selectedCategory && selectedCategory !== 'Novetats' && selectedCategory !== 'Tot') {
+            effectiveCategory = selectedCategory;
+        } else {
+            effectiveCategory = getEffectiveCategory(currentChannelId);
+        }
+
+        if (effectiveCategory) {
+            const originalCategory = selectedCategory;
+            selectedCategory = effectiveCategory;
+            videos = filterVideosByCategory(allVideos, currentFeedData);
+            selectedCategory = originalCategory;
+        } else {
+            videos = [...allVideos];
+        }
+
+        // Excloure vídeo actual, canal actual, shorts
+        videos = videos.filter(v =>
+            String(v.channelId) !== String(currentChannelId)
+            && String(v.id) !== String(currentVideoId)
+            && !v.isShort
+        );
+
+        // Aplicar scoring personalitzat
+        videos = scoreRelatedVideos(videos, { id: currentVideoId, channelId: currentChannelId });
     }
-
-    // Excloure vídeo actual, canal actual, shorts
-    videos = videos.filter(v =>
-        String(v.channelId) !== String(currentChannelId)
-        && String(v.id) !== String(currentVideoId)
-        && !v.isShort
-    );
-
-    // Fallback: si queden < 5 vídeos, ampliar amb vídeos generals
-    if (videos.length < 5) {
-        const excludedCats = ['mitjans', 'digitals', 'entitats'];
-        const videoIds = new Set(videos.map(v => String(v.id)));
-        const fallbackVideos = allVideos.filter(v => {
-            if (videoIds.has(String(v.id))) return false;
-            if (String(v.channelId) === String(currentChannelId)) return false;
-            if (String(v.id) === String(currentVideoId)) return false;
-            if (v.isShort) return false;
-            const channelCats = getChannelCustomCategories(v.channelId);
-            let feedCats = [];
-            if (currentFeedData?.channels) {
-                const ch = currentFeedData.channels.find(c => String(c.id) === String(v.channelId));
-                if (ch && Array.isArray(ch.categories)) feedCats = ch.categories;
-            } else if (cachedChannels[v.channelId]?.categories) {
-                feedCats = cachedChannels[v.channelId].categories;
-            }
-            return ![...channelCats, ...feedCats].some(cat =>
-                excludedCats.includes(String(cat).toLowerCase())
-            );
-        });
-        videos = [...videos, ...fallbackVideos];
-    }
-
-    // Aplicar scoring personalitzat
-    videos = scoreRelatedVideos(videos, { id: currentVideoId, channelId: currentChannelId });
 
 
     if (videos.length === 0) {
@@ -7278,17 +7303,9 @@ function loadRelatedVideos(currentVideoId) {
     // Filtrar per categoria
     let relatedVideos = VIDEOS.filter(v => v.id !== parseInt(currentVideoId) && !v.isShort);
 
-    // Intentar filtrar per categoria del vídeo actual
+    // Filtrar estrictament per categoria del vídeo actual
     if (currentVideo?.categoryId) {
-        const categoryFiltered = relatedVideos.filter(v => v.categoryId === currentVideo.categoryId);
-        if (categoryFiltered.length >= 5) {
-            relatedVideos = categoryFiltered;
-        } else if (categoryFiltered.length > 0) {
-            // Prioritzar els de la mateixa categoria + omplir amb generals
-            const categoryIds = new Set(categoryFiltered.map(v => v.id));
-            const others = relatedVideos.filter(v => !categoryIds.has(v.id));
-            relatedVideos = [...categoryFiltered, ...others];
-        }
+        relatedVideos = relatedVideos.filter(v => v.categoryId === currentVideo.categoryId);
     }
 
     // Excloure canal actual
