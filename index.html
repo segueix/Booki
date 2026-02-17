@@ -1,713 +1,906 @@
 <!DOCTYPE html>
 <html lang="ca">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>EpubCraft · Editor EPUB</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-  <style>
-    :root {
-      --bg: #f3f4f6;
-      --surface: #fff;
-      --text: #111827;
-      --muted: #6b7280;
-      --line: #e5e7eb;
-      --primary: #2563eb;
-      --ok: #059669;
-      --danger: #dc2626;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-    }
-    .app {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 20px;
-      display: grid;
-      gap: 16px;
-    }
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 16px;
-    }
-    h1 { margin: 0; font-size: 28px; }
-    h2 { margin: 0 0 12px; font-size: 18px; }
-    .sub { color: var(--muted); margin-top: 8px; font-size: 14px; }
-    .grid { display: grid; gap: 12px; }
-    .grid.cols-2 { grid-template-columns: 1fr 1fr; }
-    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-    .btn {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 9px 14px;
-      background: #fff;
-      cursor: pointer;
-      font-size: 14px;
-    }
-    .btn.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
-    .btn.ok { background: var(--ok); color: #fff; border-color: var(--ok); }
-    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
-    input[type="file"], input[type="text"] {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 8px 10px;
-      font-size: 14px;
-      width: 100%;
-    }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { border-bottom: 1px solid var(--line); padding: 8px; text-align: left; vertical-align: middle; }
-    th { font-size: 13px; color: var(--muted); font-weight: 600; }
-    .small { font-size: 12px; color: var(--muted); }
-    .status { font-size: 14px; color: var(--muted); white-space: pre-wrap; }
-    .chapter-list {
-      max-height: 260px;
-      overflow: auto;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-    }
-    .chapter-item {
-      padding: 8px 10px;
-      border-bottom: 1px solid var(--line);
-      display: grid;
-      gap: 4px;
-    }
-    .chapter-item:last-child { border-bottom: 0; }
-    .chapter-title { font-size: 14px; font-weight: 600; }
-    .chapter-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .field { display: grid; gap: 6px; }
-    .field label { font-size: 13px; color: var(--muted); }
-    dialog {
-      width: min(900px, 92vw);
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 0;
-    }
-    dialog::backdrop { background: rgba(17, 24, 39, 0.45); }
-    .dialog-content { padding: 14px; display: grid; gap: 10px; }
-    .dialog-content textarea {
-      min-height: 320px;
-      width: 100%;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 10px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 13px;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Novel·la IA</title>
+<style>
+  :root {
+    --bg:        #0f0f13;
+    --surface:   #1a1a24;
+    --surface2:  #22222f;
+    --border:    #2e2e42;
+    --accent:    #7c6af7;
+    --accent2:   #a78bfa;
+    --text:      #e8e8f0;
+    --text2:     #9898b0;
+    --success:   #4ade80;
+    --warning:   #fbbf24;
+    --radius:    12px;
+    --font:      'Segoe UI', system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 60px;
+  }
+
+  /* ── Header ── */
+  header {
+    width: 100%;
+    max-width: 860px;
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 6px;
+  }
+  header p { color: var(--text2); font-size: .95rem; }
+
+  /* ── Progress bar ── */
+  #progress-wrap {
+    width: 100%;
+    max-width: 860px;
+    margin-bottom: 28px;
+  }
+  .progress-steps {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .step-pill {
+    flex-shrink: 0;
+    padding: 5px 14px;
+    border-radius: 99px;
+    font-size: .75rem;
+    font-weight: 600;
+    background: var(--surface2);
+    color: var(--text2);
+    border: 1px solid var(--border);
+    transition: all .3s;
+  }
+  .step-pill.done     { background: #2a2a3d; color: var(--accent2); border-color: var(--accent); }
+  .step-pill.active   { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .step-arrow { color: var(--border); font-size: .8rem; flex-shrink: 0; }
+
+  /* ── Card ── */
+  .card {
+    width: 100%;
+    max-width: 860px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    margin-bottom: 20px;
+  }
+  .card h2 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 18px;
+    color: var(--accent2);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .card h2 .icon { font-size: 1.4rem; }
+
+  /* ── Select ── */
+  select {
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 1rem;
+    font-family: var(--font);
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%239898b0' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    padding-right: 40px;
+  }
+  select:focus { outline: none; border-color: var(--accent); }
+
+  /* ── Botons ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 24px;
+    border-radius: 8px;
+    font-size: .95rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all .2s;
+    font-family: var(--font);
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover { background: #6b5be0; transform: translateY(-1px); }
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent2); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; transform: none !important; }
+  .btn-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+
+  /* ── Llista de premisses ── */
+  .premise-list { display: flex; flex-direction: column; gap: 10px; }
+  .premise-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .premise-item:hover  { border-color: var(--accent); }
+  .premise-item.chosen { border-color: var(--accent); background: #1e1b38; }
+  .premise-item input[type=radio] { margin-top: 2px; accent-color: var(--accent); flex-shrink: 0; }
+  .premise-item label { cursor: pointer; line-height: 1.5; font-size: .95rem; }
+
+  /* ── Opcions dobles ── */
+  .options-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 640px) { .options-grid { grid-template-columns: 1fr; } }
+  .option-card {
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    cursor: pointer;
+    transition: all .2s;
+    position: relative;
+  }
+  .option-card:hover  { border-color: var(--accent); }
+  .option-card.chosen { border-color: var(--accent); background: #1e1b38; }
+  .option-card .opt-label {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    font-size: .7rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 99px;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+  .option-card.chosen .opt-label { background: var(--success); }
+  .option-card pre {
+    white-space: pre-wrap;
+    font-family: var(--font);
+    font-size: .88rem;
+    line-height: 1.65;
+    color: var(--text);
+  }
+  .opt-check {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .9rem;
+    transition: all .2s;
+  }
+  .option-card.chosen .opt-check { background: var(--success); border-color: var(--success); color: #fff; }
+
+  /* ── Capítol escrit ── */
+  .chapter-content {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    white-space: pre-wrap;
+    font-size: .95rem;
+    line-height: 1.8;
+    color: var(--text);
+    font-family: 'Georgia', serif;
+    max-height: 500px;
+    overflow-y: auto;
+  }
+  .chapter-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--accent2);
+    margin-bottom: 16px;
+    font-family: 'Georgia', serif;
+  }
+
+  /* ── Taula de capítols ── */
+  .chapter-table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+  .chapter-table th {
+    background: var(--surface2);
+    padding: 10px 14px;
+    text-align: left;
+    font-size: .8rem;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    border-bottom: 1px solid var(--border);
+  }
+  .chapter-table td {
+    padding: 11px 14px;
+    font-size: .9rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+  .chapter-table tr:last-child td { border-bottom: none; }
+  .chapter-table .ch-num {
+    color: var(--accent2);
+    font-weight: 700;
+    white-space: nowrap;
+    width: 80px;
+  }
+  .chapter-table tr.writing td { background: #1e1b38; }
+  .chapter-table tr.done td    { opacity: .5; }
+  .ch-status { font-size: .75rem; }
+  .ch-status.pendent  { color: var(--text2); }
+  .ch-status.escrivint { color: var(--warning); }
+  .ch-status.fet       { color: var(--success); }
+
+  /* ── Loader ── */
+  .loader-wrap {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 28px 0;
+    color: var(--text2);
+    font-size: .9rem;
+  }
+  .loader-wrap.visible { display: flex; }
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 12px 24px;
+    border-radius: 99px;
+    font-size: .9rem;
+    transition: transform .3s;
+    z-index: 9999;
+    pointer-events: none;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── Bíblia resum ── */
+  .biblia-item {
+    display: flex;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: .88rem;
+    line-height: 1.5;
+  }
+  .biblia-item:last-child { border-bottom: none; }
+  .biblia-label {
+    flex-shrink: 0;
+    width: 110px;
+    color: var(--text2);
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    padding-top: 1px;
+  }
+  .biblia-val { color: var(--text); }
+
+  /* ── Export ── */
+  .export-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--accent2);
+    text-decoration: none;
+    font-size: .9rem;
+    font-weight: 600;
+    padding: 8px 16px;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    transition: all .2s;
+  }
+  .export-link:hover { background: #1e1b38; }
+
+  /* ── Secció amagada ── */
+  .hidden { display: none !important; }
+</style>
 </head>
 <body>
-  <div class="app">
-    <div class="card">
-      <h1>EpubCraft <span class="small">Editor EPUB</span></h1>
-      <p class="sub">Carrega un EPUB, posa-li portada, afegeix títols de capítol si falten, crea/edita l'índex i descarrega l'EPUB modificat.</p>
-    </div>
 
-    <div class="card grid cols-2">
-      <div class="grid">
-        <h2>1) Carregar EPUB</h2>
-        <input id="epubFile" type="file" accept=".epub" />
-        <div class="status" id="loadStatus">Encara no s'ha carregat cap fitxer.</div>
-      </div>
-      <div class="grid">
-        <h2>2) Portada</h2>
-        <input id="coverFile" type="file" accept="image/png,image/jpeg,image/webp" />
-        <div class="row">
-          <button class="btn" id="applyCoverBtn" disabled>Aplicar portada</button>
-        </div>
-        <div class="small">S'afegeix dins l'EPUB i s'actualitza la metadata de portada.</div>
-      </div>
-    </div>
+<header>
+  <h1>📖 Novel·la IA</h1>
+  <p>Construeix la teva obra pas a pas amb intel·ligència artificial</p>
+</header>
 
-    <div class="card grid cols-2">
-      <div class="grid">
-        <h2>3) Metadades</h2>
-        <div class="field">
-          <label for="metaTitle">Títol (dc:title)</label>
-          <input id="metaTitle" type="text" placeholder="Títol del llibre" />
-        </div>
-        <div class="field">
-          <label for="metaAuthor">Autor (dc:creator)</label>
-          <input id="metaAuthor" type="text" placeholder="Nom de l'autor" />
-        </div>
-        <div class="field">
-          <label for="metaLanguage">Idioma (dc:language)</label>
-          <input id="metaLanguage" type="text" placeholder="ca" />
-        </div>
-        <div class="small">Els valors es carreguen des de l'OPF i es guarden en descarregar l'EPUB.</div>
-      </div>
-      <div class="grid">
-        <h2>4) Notes</h2>
-        <div class="small">Aquesta secció et permet ajustar metadades bàsiques EPUB: <code>dc:title</code>, <code>dc:creator</code> i <code>dc:language</code>.</div>
-        <div class="small">Els canvis s'apliquen automàticament en desar/descarregar i no trenquen les funcionalitats actuals de portada, capítols i índex.</div>
-      </div>
-    </div>
+<!-- Progress -->
+<div id="progress-wrap">
+  <div class="progress-steps" id="steps-bar">
+    <div class="step-pill active" data-step="0">Temàtica</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="1">Premissa</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="2">Estructura</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="3">Personatges</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="4">Món</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="5">Capítols</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="6">Escriptura</div>
+  </div>
+</div>
 
-    <div class="card grid cols-2">
-      <div class="grid">
-        <h2>5) Títols de capítol</h2>
-        <div class="row">
-          <button class="btn" id="addMissingHeadingsBtn" disabled>Afegir H1 on falti</button>
-        </div>
-        <div class="small">Inserta un títol al principi del capítol si no existeix cap &lt;h1&gt;.</div>
-        <div class="chapter-list" id="chapterList"></div>
-      </div>
-      <div class="grid">
-        <h2>6) Índex editable</h2>
-        <table>
-          <thead>
-            <tr><th style="width:44%">Títol</th><th style="width:36%">Href</th><th>Accions</th></tr>
-          </thead>
-          <tbody id="tocBody"></tbody>
-        </table>
-        <div class="row">
-          <button class="btn" id="addTocEntryBtn" disabled>Afegir entrada</button>
-          <button class="btn ok" id="rebuildNavBtn" disabled>Regenerar índex</button>
-        </div>
-      </div>
-    </div>
+<!-- FASE 0: Selecció de temàtica -->
+<div class="card" id="fase-0">
+  <h2><span class="icon">🎭</span> Tria la temàtica</h2>
+  <select id="sel-tematica">
+    <option value="">— Selecciona un gènere —</option>
+    <option value="novel·la d'aventures">Novel·la d'aventures</option>
+    <option value="ciència ficció">Ciència ficció</option>
+    <option value="fantasia èpica">Fantasia èpica</option>
+    <option value="novel·la històrica">Novel·la històrica</option>
+    <option value="novel·la romàntica">Novel·la romàntica</option>
+    <option value="thriller i misteri">Thriller i misteri</option>
+    <option value="terror psicològic">Terror psicològic</option>
+    <option value="drama contemporani">Drama contemporani</option>
+    <option value="conte literari">Conte literari</option>
+    <option value="novel·la gràfica narrativa">Art i novel·la gràfica narrativa</option>
+  </select>
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="iniciarFase1()">✨ Generar premisses</button>
+  </div>
+</div>
 
-    <div class="card row">
-      <button class="btn primary" id="downloadBtn" disabled>Descarregar EPUB editat</button>
-      <div class="status" id="actionStatus">.</div>
+<!-- FASE 1: Selecció de premissa -->
+<div class="card hidden" id="fase-1">
+  <h2><span class="icon">💡</span> Tria la premissa</h2>
+  <div class="loader-wrap" id="loader-1">
+    <div class="spinner"></div>
+    <span>Generant 10 premisses…</span>
+  </div>
+  <div id="llista-premisses" class="premise-list"></div>
+  <div class="btn-row">
+    <button class="btn btn-primary hidden" id="btn-fase1" onclick="iniciarFase2()">🏗️ Construir estructura</button>
+  </div>
+</div>
+
+<!-- FASE 2: Estructura narrativa -->
+<div class="card hidden" id="fase-2">
+  <h2><span class="icon">🏗️</span> Tria l'estructura narrativa</h2>
+  <div class="loader-wrap" id="loader-2">
+    <div class="spinner"></div>
+    <span>Generant propostes d'estructura…</span>
+  </div>
+  <div class="options-grid hidden" id="opcions-estructura"></div>
+  <div class="btn-row">
+    <button class="btn btn-primary hidden" id="btn-fase2" onclick="iniciarFase3()">👥 Crear personatges</button>
+  </div>
+</div>
+
+<!-- FASE 3: Personatges -->
+<div class="card hidden" id="fase-3">
+  <h2><span class="icon">👥</span> Tria els personatges</h2>
+  <div class="loader-wrap" id="loader-3">
+    <div class="spinner"></div>
+    <span>Generant propostes de personatges…</span>
+  </div>
+  <div class="options-grid hidden" id="opcions-personatges"></div>
+  <div class="btn-row">
+    <button class="btn btn-primary hidden" id="btn-fase3" onclick="iniciarFase4()">🌍 Construir el món</button>
+  </div>
+</div>
+
+<!-- FASE 4: Món -->
+<div class="card hidden" id="fase-4">
+  <h2><span class="icon">🌍</span> Tria el món i l'ambientació</h2>
+  <div class="loader-wrap" id="loader-4">
+    <div class="spinner"></div>
+    <span>Generant propostes de món…</span>
+  </div>
+  <div class="options-grid hidden" id="opcions-mon"></div>
+  <div class="btn-row">
+    <button class="btn btn-primary hidden" id="btn-fase4" onclick="iniciarFase5()">📋 Generar taula de capítols</button>
+  </div>
+</div>
+
+<!-- FASE 5: Taula de capítols -->
+<div class="card hidden" id="fase-5">
+  <h2><span class="icon">📋</span> Taula de capítols</h2>
+  <div class="loader-wrap" id="loader-5">
+    <div class="spinner"></div>
+    <span>Generant l'estructura de capítols…</span>
+  </div>
+  <div id="taula-capitols-wrap" class="hidden">
+    <table class="chapter-table" id="taula-capitols">
+      <thead>
+        <tr>
+          <th>Capítol</th>
+          <th>Títol</th>
+          <th>Objectiu narratiu</th>
+          <th>Estat</th>
+        </tr>
+      </thead>
+      <tbody id="capitols-tbody"></tbody>
+    </table>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-primary hidden" id="btn-fase5" onclick="iniciarEscriptura()">✍️ Escriure la novel·la</button>
+  </div>
+</div>
+
+<!-- FASE 6: Escriptura de capítols -->
+<div class="card hidden" id="fase-6">
+  <h2><span class="icon">✍️</span> Escriptura — <span id="titol-capitol-actual">—</span></h2>
+  <div class="loader-wrap" id="loader-6">
+    <div class="spinner"></div>
+    <span id="loader-6-text">Escrivint capítol…</span>
+  </div>
+  <div id="capitol-escrit" class="hidden">
+    <div class="chapter-title" id="capitol-titol-h"></div>
+    <div class="chapter-content" id="capitol-cos"></div>
+    <div class="btn-row" style="margin-top:16px;">
+      <button class="btn btn-primary" id="btn-seguent-capitol" onclick="seguentCapitol()">▶ Capítol següent</button>
+      <button class="btn btn-secondary" onclick="regenerarCapitol()">🔄 Regenerar</button>
     </div>
   </div>
+</div>
 
-  <dialog id="chapterEditorDialog">
-    <div class="dialog-content">
-      <h2 id="chapterEditorTitle">Editar capítol</h2>
-      <textarea id="chapterEditorTextarea" spellcheck="false"></textarea>
-      <div class="row">
-        <button class="btn ok" id="saveChapterEditBtn">Guardar canvis</button>
-        <button class="btn" id="closeChapterEditBtn">Tancar</button>
-      </div>
-      <div class="small">Edició ràpida del contingut intern del &lt;body&gt; del capítol seleccionat.</div>
-    </div>
-  </dialog>
+<!-- Bíblia resum (lateral inferior) -->
+<div class="card hidden" id="card-biblia">
+  <h2><span class="icon">📚</span> Bíblia narrativa</h2>
+  <div id="biblia-contingut"></div>
+</div>
+
+<!-- Export final -->
+<div id="export-wrap" class="hidden" style="width:100%;max-width:860px;margin-bottom:20px;">
+  <div class="card">
+    <h2><span class="icon">🎉</span> Novel·la completada!</h2>
+    <p style="color:var(--text2);margin-bottom:16px;">Tots els capítols han estat generats. Pots exportar-la a Google Docs.</p>
+    <button class="btn btn-primary" onclick="exportarDoc()">📄 Exportar a Google Docs</button>
+    <div id="export-link-wrap" class="hidden" style="margin-top:14px;"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
 
 <script>
-  const state = {
-    zip: null,
-    opfPath: null,
-    opfDoc: null,
-    navPath: null,
-    ncxPath: null,
-    manifestById: {},
-    spineIds: [],
-    toc: [],
-    chapters: [],
-    metadata: { title: '', creator: '', language: '' },
-    cssHref: null,
-    editingChapterIndex: null
-  };
+// ═══════════════════════════════════════════════════════════
+//  ESTAT GLOBAL
+// ═══════════════════════════════════════════════════════════
+const ESTAT = {
+  fase:           0,
+  tematica:       '',
+  history:        [],
+  premissaTriada: '',
+  estructuraTriada:'',
+  personatgesTriats:'',
+  monTriat:       '',
+  capitols:       [],      // [{num, titol, text}]
+  capitalActual:  0,
+  novellaTextos:  []       // textos dels capítols escrits
+};
 
-  const loadStatus = document.getElementById('loadStatus');
-  const actionStatus = document.getElementById('actionStatus');
-  const metaTitleInput = document.getElementById('metaTitle');
-  const metaAuthorInput = document.getElementById('metaAuthor');
-  const metaLanguageInput = document.getElementById('metaLanguage');
-  const tocBody = document.getElementById('tocBody');
-  const chapterList = document.getElementById('chapterList');
+// ═══════════════════════════════════════════════════════════
+//  UTILITATS UI
+// ═══════════════════════════════════════════════════════════
+function showCard(id)  { document.getElementById(id).classList.remove('hidden'); }
+function hideCard(id)  { document.getElementById(id).classList.add('hidden'); }
+function showLoader(n) { document.getElementById('loader-' + n).classList.add('visible'); }
+function hideLoader(n) { document.getElementById('loader-' + n).classList.remove('visible'); }
+function showBtn(id)   { document.getElementById(id).classList.remove('hidden'); }
+function hideBtn(id)   { document.getElementById(id).classList.add('hidden'); }
 
-  const epubFileInput = document.getElementById('epubFile');
-  const coverFileInput = document.getElementById('coverFile');
-  const applyCoverBtn = document.getElementById('applyCoverBtn');
-  const addMissingHeadingsBtn = document.getElementById('addMissingHeadingsBtn');
-  const addTocEntryBtn = document.getElementById('addTocEntryBtn');
-  const rebuildNavBtn = document.getElementById('rebuildNavBtn');
-  const downloadBtn = document.getElementById('downloadBtn');
-  const chapterEditorDialog = document.getElementById('chapterEditorDialog');
-  const chapterEditorTitle = document.getElementById('chapterEditorTitle');
-  const chapterEditorTextarea = document.getElementById('chapterEditorTextarea');
-  const saveChapterEditBtn = document.getElementById('saveChapterEditBtn');
-  const closeChapterEditBtn = document.getElementById('closeChapterEditBtn');
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
 
-  epubFileInput.addEventListener('change', (e) => loadEpub(e.target.files[0]));
-  applyCoverBtn.addEventListener('click', applyCover);
-  addMissingHeadingsBtn.addEventListener('click', addMissingHeadings);
-  addTocEntryBtn.addEventListener('click', () => {
-    state.toc.push({ title: 'Nou capítol', href: state.chapters[0]?.href || '' });
-    renderToc();
+function updateProgress(fase) {
+  document.querySelectorAll('.step-pill').forEach(el => {
+    const s = parseInt(el.dataset.step);
+    el.classList.remove('active', 'done');
+    if (s < fase)  el.classList.add('done');
+    if (s === fase) el.classList.add('active');
   });
-  rebuildNavBtn.addEventListener('click', rebuildIndexFiles);
-  downloadBtn.addEventListener('click', downloadEpub);
-  saveChapterEditBtn.addEventListener('click', saveEditedChapter);
-  closeChapterEditBtn.addEventListener('click', () => chapterEditorDialog.close());
+}
 
-  function setEnabled(v) {
-    [applyCoverBtn, addMissingHeadingsBtn, addTocEntryBtn, rebuildNavBtn, downloadBtn].forEach(btn => btn.disabled = !v);
+function actualitzarBiblia() {
+  const b = document.getElementById('biblia-contingut');
+  const items = [
+    ['Temàtica',     ESTAT.tematica        || '—'],
+    ['Premissa',     ESTAT.premissaTriada  || '—'],
+    ['Estructura',   ESTAT.estructuraTriada ? ESTAT.estructuraTriada.substring(0,80)+'…' : '—'],
+    ['Personatges',  ESTAT.personatgesTriats ? ESTAT.personatgesTriats.substring(0,80)+'…' : '—'],
+    ['Món',          ESTAT.monTriat        ? ESTAT.monTriat.substring(0,80)+'…' : '—'],
+  ];
+  b.innerHTML = items.map(([l,v]) =>
+    `<div class="biblia-item"><div class="biblia-label">${l}</div><div class="biblia-val">${v}</div></div>`
+  ).join('');
+  showCard('card-biblia');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FASE 1 — Premisses
+// ═══════════════════════════════════════════════════════════
+function iniciarFase1() {
+  const sel = document.getElementById('sel-tematica').value;
+  if (!sel) { toast('Selecciona primer una temàtica.'); return; }
+  ESTAT.tematica = sel;
+  ESTAT.history  = [];
+  ESTAT.fase     = 1;
+  updateProgress(1);
+  showCard('fase-1');
+  showLoader(1);
+
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.history = res.history;
+      hideLoader(1);
+      renderPremisses(res.response);
+    })
+    .withFailureHandler(err => {
+      hideLoader(1);
+      toast('Error: ' + err.message);
+    })
+    .fase1_premisses(sel, []);
+}
+
+function renderPremisses(text) {
+  const wrap = document.getElementById('llista-premisses');
+  // Parseig local
+  const lines = text.split('\n').filter(l => /^\d+\./.test(l.trim()));
+  if (lines.length === 0) {
+    wrap.innerHTML = `<pre style="white-space:pre-wrap;font-size:.9rem;">${text}</pre>`;
+  } else {
+    wrap.innerHTML = lines.map((l, i) => {
+      const txt = l.replace(/^\d+\.\s*/, '').trim();
+      return `<div class="premise-item" id="prem-${i}" onclick="triarPremissa(${i}, this)">
+        <input type="radio" name="prem" id="r-${i}">
+        <label for="r-${i}">${txt}</label>
+      </div>`;
+    }).join('');
   }
+  ESTAT._premissaLista = lines.map(l => l.replace(/^\d+\.\s*/, '').trim());
+  showBtn('btn-fase1');
+}
 
-  async function loadEpub(file) {
-    if (!file) return;
-    try {
-      state.zip = await JSZip.loadAsync(file);
-      const containerXml = await state.zip.file('META-INF/container.xml')?.async('string');
-      if (!containerXml) throw new Error('No s\'ha trobat META-INF/container.xml');
-      const containerDoc = new DOMParser().parseFromString(containerXml, 'application/xml');
-      state.opfPath = containerDoc.querySelector('rootfile')?.getAttribute('full-path');
-      if (!state.opfPath) throw new Error('No s\'ha trobat el fitxer OPF.');
+function triarPremissa(idx, el) {
+  document.querySelectorAll('.premise-item').forEach(e => e.classList.remove('chosen'));
+  el.classList.add('chosen');
+  el.querySelector('input').checked = true;
+  ESTAT._premissaIdx = idx;
+}
 
-      const opfXml = await state.zip.file(state.opfPath).async('string');
-      state.opfDoc = new DOMParser().parseFromString(opfXml, 'application/xml');
-      parseManifestAndSpine();
-      loadMetadataFromOpf();
-      await loadTocFromBook();
-      await loadChapters();
-      renderToc();
-      renderChapters();
-      setEnabled(true);
-      loadStatus.textContent = `EPUB carregat correctament. OPF: ${state.opfPath}. Capítols detectats: ${state.chapters.length}.`;
-      actionStatus.textContent = 'Projecte llest per editar.';
-    } catch (err) {
-      setEnabled(false);
-      loadStatus.textContent = 'Error carregant EPUB: ' + err.message;
+function iniciarFase2() {
+  const idx = ESTAT._premissaIdx;
+  if (idx === undefined || idx === null) { toast("Tria una premissa primer."); return; }
+  ESTAT.premissaTriada = ESTAT._premissaLista[idx];
+  ESTAT.fase = 2;
+  updateProgress(2);
+  actualitzarBiblia();
+  showCard('fase-2');
+  showLoader(2);
+
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.history = res.history;
+      hideLoader(2);
+      renderOpcionsDobles(res.response, 'opcions-estructura', 'btn-fase2', '_opcioEstructura');
+    })
+    .withFailureHandler(err => { hideLoader(2); toast('Error: ' + err.message); })
+    .fase2_estructura(ESTAT.premissaTriada, ESTAT.history);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  HELPERS PER OPCIONS DOBLES
+// ═══════════════════════════════════════════════════════════
+function renderOpcionsDobles(text, wrapId, btnId, estatKey) {
+  const wrap = document.getElementById(wrapId);
+  const parts = text.split(/===\s*OPCIÓ\s*[12]\s*===/i).filter(p => p.trim().length > 0);
+
+  if (parts.length < 2) {
+    // Fallback: mostra text complet en una sola carta
+    wrap.innerHTML = `<div class="option-card" onclick="triarOpcioDoble(0, this, '${estatKey}', \`${text.replace(/`/g,'\\`')}\`)">
+      <div class="opt-label">Opció única</div>
+      <div class="opt-check"></div>
+      <pre>${text}</pre>
+    </div>`;
+    ESTAT['_optionsList_' + estatKey] = [text];
+  } else {
+    ESTAT['_optionsList_' + estatKey] = parts.map(p => p.trim());
+    wrap.innerHTML = parts.map((p, i) => `
+      <div class="option-card" id="opt-${estatKey}-${i}" onclick="triarOpcioDoble(${i}, this, '${estatKey}')">
+        <div class="opt-label">Opció ${i+1}</div>
+        <div class="opt-check">${i===0 ? '' : ''}</div>
+        <pre>${escHtml(p.trim())}</pre>
+      </div>
+    `).join('');
+  }
+  wrap.classList.remove('hidden');
+  showBtn(btnId);
+}
+
+function triarOpcioDoble(idx, el, key) {
+  const prefix = 'opt-' + key + '-';
+  document.querySelectorAll(`[id^="${prefix}"]`).forEach(e => {
+    e.classList.remove('chosen');
+    e.querySelector('.opt-check').textContent = '';
+  });
+  el.classList.add('chosen');
+  el.querySelector('.opt-check').textContent = '✓';
+  ESTAT['_opcioSelIdx_' + key] = idx;
+}
+
+function escHtml(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function getOpcioTriada(key) {
+  const idx  = ESTAT['_opcioSelIdx_' + key];
+  const list = ESTAT['_optionsList_' + key];
+  if (idx === undefined || !list) return null;
+  return list[idx];
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FASE 3 — Personatges
+// ═══════════════════════════════════════════════════════════
+function iniciarFase3() {
+  const tri = getOpcioTriada('_opcioEstructura');
+  if (!tri) { toast('Tria una opció d\'estructura.'); return; }
+  ESTAT.estructuraTriada = tri;
+  ESTAT.fase = 3;
+  updateProgress(3);
+  actualitzarBiblia();
+  showCard('fase-3');
+  showLoader(3);
+
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.history = res.history;
+      hideLoader(3);
+      renderOpcionsDobles(res.response, 'opcions-personatges', 'btn-fase3', '_opcioPersonatges');
+    })
+    .withFailureHandler(err => { hideLoader(3); toast('Error: ' + err.message); })
+    .fase3_personatges(ESTAT.estructuraTriada, ESTAT.history);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FASE 4 — Món
+// ═══════════════════════════════════════════════════════════
+function iniciarFase4() {
+  const tri = getOpcioTriada('_opcioPersonatges');
+  if (!tri) { toast('Tria una opció de personatges.'); return; }
+  ESTAT.personatgesTriats = tri;
+  ESTAT.fase = 4;
+  updateProgress(4);
+  actualitzarBiblia();
+  showCard('fase-4');
+  showLoader(4);
+
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.history = res.history;
+      hideLoader(4);
+      renderOpcionsDobles(res.response, 'opcions-mon', 'btn-fase4', '_opcioMon');
+    })
+    .withFailureHandler(err => { hideLoader(4); toast('Error: ' + err.message); })
+    .fase4_mon(ESTAT.personatgesTriats, ESTAT.history);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FASE 5 — Taula de capítols
+// ═══════════════════════════════════════════════════════════
+function iniciarFase5() {
+  const tri = getOpcioTriada('_opcioMon');
+  if (!tri) { toast('Tria una opció de món.'); return; }
+  ESTAT.monTriat = tri;
+  ESTAT.fase = 5;
+  updateProgress(5);
+  actualitzarBiblia();
+  showCard('fase-5');
+  showLoader(5);
+
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.history = res.history;
+      hideLoader(5);
+      renderTaulaCapitols(res.response);
+    })
+    .withFailureHandler(err => { hideLoader(5); toast('Error: ' + err.message); })
+    .fase5_capitols(ESTAT.monTriat, ESTAT.history);
+}
+
+function renderTaulaCapitols(text) {
+  // Parseig capítols: busca blocs separats per "---"
+  const blocks = text.split('---').map(b => b.trim()).filter(b => b.length > 0);
+  const capitols = [];
+  blocks.forEach(block => {
+    const m = block.match(/\*\*Capítol\s+(\d+):\s*(.+?)\*\*/i);
+    if (m) {
+      capitols.push({ num: parseInt(m[1]), titol: m[2].trim(), text: block });
     }
+  });
+
+  if (capitols.length === 0) {
+    // Fallback: text complet
+    document.getElementById('taula-capitols-wrap').innerHTML =
+      `<pre style="white-space:pre-wrap;font-size:.88rem;">${text}</pre>`;
+  } else {
+    ESTAT.capitols = capitols;
+    const tbody = document.getElementById('capitols-tbody');
+    tbody.innerHTML = capitols.map(c => `
+      <tr id="tr-cap-${c.num}">
+        <td class="ch-num">Cap. ${c.num}</td>
+        <td>${escHtml(c.titol)}</td>
+        <td>${escHtml(extractObjNarratiu(c.text))}</td>
+        <td><span class="ch-status pendent" id="st-cap-${c.num}">Pendent</span></td>
+      </tr>
+    `).join('');
+  }
+  document.getElementById('taula-capitols-wrap').classList.remove('hidden');
+  showBtn('btn-fase5');
+}
+
+function extractObjNarratiu(text) {
+  const m = text.match(/Objectiu narratiu:\s*(.+)/i);
+  return m ? m[1].trim() : '';
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FASE 6 — Escriptura de capítols
+// ═══════════════════════════════════════════════════════════
+function iniciarEscriptura() {
+  ESTAT.fase          = 6;
+  ESTAT.capitalActual = 0;
+  ESTAT.novellaTextos = [];
+  updateProgress(6);
+  showCard('fase-6');
+  escriureCapitolActual();
+}
+
+function escriureCapitolActual() {
+  const cap     = ESTAT.capitols[ESTAT.capitalActual];
+  const total   = ESTAT.capitols.length;
+  const numCap  = cap.num;
+  const titol   = cap.titol;
+
+  document.getElementById('titol-capitol-actual').textContent = `Capítol ${numCap}: ${titol}`;
+  document.getElementById('loader-6-text').textContent = `Escrivint capítol ${numCap} de ${total}…`;
+  hideCard('capitol-escrit');
+  showLoader(6);
+
+  // Marcar a la taula
+  const tr = document.getElementById('tr-cap-' + numCap);
+  if (tr) tr.classList.add('writing');
+  const st = document.getElementById('st-cap-' + numCap);
+  if (st) { st.textContent = '✍️ Escrivint…'; st.className = 'ch-status escrivint'; }
+
+  // Actualitzar botó "Capítol següent" / "Finalitzar"
+  const btnSeg = document.getElementById('btn-seguent-capitol');
+  if (ESTAT.capitalActual < total - 1) {
+    btnSeg.textContent = `▶ Capítol ${numCap + 1}`;
+    btnSeg.style.display = '';
+  } else {
+    btnSeg.textContent = '🏁 Finalitzar';
+    btnSeg.style.display = '';
   }
 
-  function parseManifestAndSpine() {
-    state.manifestById = {};
-    state.spineIds = [];
-    [...state.opfDoc.querySelectorAll('manifest > item')].forEach(item => {
-      state.manifestById[item.getAttribute('id')] = {
-        id: item.getAttribute('id'),
-        href: item.getAttribute('href'),
-        mediaType: item.getAttribute('media-type') || ''
-      };
-    });
-    [...state.opfDoc.querySelectorAll('spine > itemref')].forEach(it => {
-      const idref = it.getAttribute('idref');
-      if (idref) state.spineIds.push(idref);
-    });
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.history = res.history;
+      ESTAT.novellaTextos.push({ num: numCap, titol, text: res.response });
+      hideLoader(6);
+      mostrarCapitolEscrit(numCap, titol, res.response);
+      // Actualitzar taula
+      if (tr) tr.classList.remove('writing');
+      if (st) { st.textContent = '✅ Fet'; st.className = 'ch-status fet'; }
+    })
+    .withFailureHandler(err => { hideLoader(6); toast('Error: ' + err.message); })
+    .fase6_escriureCapitol(numCap, titol, total, ESTAT.history);
+}
+
+function mostrarCapitolEscrit(num, titol, text) {
+  document.getElementById('capitol-titol-h').textContent = `Capítol ${num}: ${titol}`;
+  document.getElementById('capitol-cos').textContent     = text;
+  showCard('capitol-escrit');
+}
+
+function seguentCapitol() {
+  ESTAT.capitalActual++;
+  if (ESTAT.capitalActual >= ESTAT.capitols.length) {
+    // Novel·la completada
+    hideCard('fase-6');
+    showCard('export-wrap');
+    updateProgress(7);
+    toast('🎉 Novel·la completada!');
+    return;
   }
+  // Scroll a dalt del capítol
+  document.getElementById('fase-6').scrollIntoView({ behavior: 'smooth' });
+  escriureCapitolActual();
+}
 
-  // Llegeix metadades bàsiques del package OPF i les mostra a la UI.
-  function loadMetadataFromOpf() {
-    const metadata = state.opfDoc.querySelector('metadata');
-    state.metadata.title = getTextByLocalName(metadata, 'title');
-    state.metadata.creator = getTextByLocalName(metadata, 'creator');
-    state.metadata.language = getTextByLocalName(metadata, 'language');
+function regenerarCapitol() {
+  if (!confirm('Vols regenerar aquest capítol? El text actual es perdrà.')) return;
+  // Eliminar últim text guardat
+  ESTAT.novellaTextos.pop();
+  // Eliminar últims 2 missatges (user + assistant) de l'historial
+  ESTAT.history = ESTAT.history.slice(0, -2);
+  escriureCapitolActual();
+}
 
-    metaTitleInput.value = state.metadata.title;
-    metaAuthorInput.value = state.metadata.creator;
-    metaLanguageInput.value = state.metadata.language;
-  }
+// ═══════════════════════════════════════════════════════════
+//  EXPORT A GOOGLE DOCS
+// ═══════════════════════════════════════════════════════════
+function exportarDoc() {
+  const titol    = ESTAT.premissaTriada.substring(0, 50) + '…';
+  const contingut = ESTAT.novellaTextos.map(c =>
+    `**Capítol ${c.num}: ${c.titol}**\n\n${c.text}`
+  ).join('\n\n---\n\n');
 
-  // Escriu els valors actuals de la UI al fitxer OPF abans de guardar/descarregar.
-  function writeMetadataToOpf() {
-    const metadata = state.opfDoc.querySelector('metadata');
-    if (!metadata) return;
-    upsertDcElement(metadata, 'title', metaTitleInput.value.trim() || 'Sense títol');
-    upsertDcElement(metadata, 'creator', metaAuthorInput.value.trim() || 'Autor desconegut');
-    upsertDcElement(metadata, 'language', metaLanguageInput.value.trim() || 'und');
-  }
+  toast('Creant document a Google Docs…');
 
-  async function loadTocFromBook() {
-    state.toc = [];
-    state.navPath = null;
-    state.ncxPath = null;
-
-    const navItem = Object.values(state.manifestById).find(item => item.mediaType === 'application/xhtml+xml' && /nav/i.test(item.id));
-    const ncxItem = Object.values(state.manifestById).find(item => item.mediaType === 'application/x-dtbncx+xml');
-
-    if (navItem) {
-      state.navPath = resolvePath(state.opfPath, navItem.href);
-      const navXml = await state.zip.file(state.navPath)?.async('string');
-      if (navXml) {
-        const navDoc = new DOMParser().parseFromString(navXml, 'application/xhtml+xml');
-        navDoc.querySelectorAll('nav li > a').forEach(a => {
-          state.toc.push({ title: a.textContent.trim() || 'Sense títol', href: a.getAttribute('href') || '' });
-        });
-      }
-    }
-
-    if (state.toc.length === 0 && ncxItem) {
-      state.ncxPath = resolvePath(state.opfPath, ncxItem.href);
-      const ncxXml = await state.zip.file(state.ncxPath)?.async('string');
-      if (ncxXml) {
-        const ncxDoc = new DOMParser().parseFromString(ncxXml, 'application/xml');
-        ncxDoc.querySelectorAll('navMap navPoint').forEach(np => {
-          state.toc.push({
-            title: np.querySelector('text')?.textContent?.trim() || 'Sense títol',
-            href: np.querySelector('content')?.getAttribute('src') || ''
-          });
-        });
-      }
-    }
-
-    if (state.toc.length === 0) {
-      state.toc = state.spineIds
-        .map((idref, idx) => ({
-          title: `Capítol ${idx + 1}`,
-          href: state.manifestById[idref]?.href || ''
-        }))
-        .filter(x => x.href);
-    }
-  }
-
-  async function loadChapters() {
-    state.chapters = [];
-    for (const idref of state.spineIds) {
-      const item = state.manifestById[idref];
-      if (!item || !item.mediaType.includes('xhtml')) continue;
-      const chapterPath = resolvePath(state.opfPath, item.href);
-      const xml = await state.zip.file(chapterPath)?.async('string');
-      if (!xml) continue;
-      const doc = new DOMParser().parseFromString(xml, 'application/xhtml+xml');
-      const h1 = doc.querySelector('h1');
-      const guessedTitle = h1?.textContent?.trim() || state.toc.find(t => stripAnchor(t.href) === stripAnchor(item.href))?.title || fileName(item.href);
-      state.chapters.push({
-        idref,
-        href: item.href,
-        path: chapterPath,
-        title: guessedTitle,
-        hasH1: !!h1
-      });
-    }
-  }
-
-  function renderToc() {
-    tocBody.innerHTML = '';
-    state.toc.forEach((entry, index) => {
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td><input type="text" value="${escapeHtml(entry.title)}" data-k="title" data-i="${index}"></td>
-        <td><input type="text" value="${escapeHtml(entry.href)}" data-k="href" data-i="${index}"></td>
-        <td>
-          <div class="row">
-            <button class="btn" data-act="up" data-i="${index}">↑</button>
-            <button class="btn" data-act="down" data-i="${index}">↓</button>
-            <button class="btn" data-act="del" data-i="${index}">Eliminar</button>
-          </div>
-        </td>`;
-      tocBody.appendChild(row);
-    });
-
-    tocBody.querySelectorAll('input').forEach(input => {
-      input.addEventListener('input', (e) => {
-        const i = Number(e.target.dataset.i);
-        const k = e.target.dataset.k;
-        state.toc[i][k] = e.target.value;
-      });
-    });
-
-    tocBody.querySelectorAll('button[data-act]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const i = Number(btn.dataset.i);
-        const act = btn.dataset.act;
-        if (act === 'del') state.toc.splice(i, 1);
-        if (act === 'up' && i > 0) [state.toc[i - 1], state.toc[i]] = [state.toc[i], state.toc[i - 1]];
-        if (act === 'down' && i < state.toc.length - 1) [state.toc[i], state.toc[i + 1]] = [state.toc[i + 1], state.toc[i]];
-        renderToc();
-      });
-    });
-  }
-
-  function renderChapters() {
-    chapterList.innerHTML = '';
-    state.chapters.forEach((ch, idx) => {
-      const div = document.createElement('div');
-      div.className = 'chapter-item';
-      div.innerHTML = `<div class="chapter-head"><div class="chapter-title">${idx + 1}. ${escapeHtml(ch.title)}</div><button class="btn" data-edit-chapter="${idx}">Editar</button></div>
-      <div class="small">${escapeHtml(ch.href)} · H1: ${ch.hasH1 ? 'sí' : 'no'}</div>`;
-      chapterList.appendChild(div);
-    });
-
-    chapterList.querySelectorAll('button[data-edit-chapter]').forEach(btn => {
-      btn.addEventListener('click', () => openChapterEditor(Number(btn.dataset.editChapter)));
-    });
-  }
-
-  async function openChapterEditor(index) {
-    const chapter = state.chapters[index];
-    if (!chapter) return;
-    const xml = await state.zip.file(chapter.path)?.async('string');
-    if (!xml) return;
-    const doc = new DOMParser().parseFromString(xml, 'application/xhtml+xml');
-    const body = doc.querySelector('body');
-    chapterEditorTitle.textContent = `Editar capítol: ${chapter.title}`;
-    chapterEditorTextarea.value = body ? body.innerHTML.trim() : '';
-    state.editingChapterIndex = index;
-    chapterEditorDialog.showModal();
-  }
-
-  async function saveEditedChapter() {
-    const index = state.editingChapterIndex;
-    const chapter = state.chapters[index];
-    if (!chapter) return;
-    const xml = await state.zip.file(chapter.path)?.async('string');
-    if (!xml) return;
-    const doc = new DOMParser().parseFromString(xml, 'application/xhtml+xml');
-    const body = doc.querySelector('body');
-    if (!body) return;
-
-    body.innerHTML = chapterEditorTextarea.value;
-    chapter.hasH1 = !!body.querySelector('h1');
-    chapter.title = body.querySelector('h1')?.textContent?.trim() || chapter.title;
-    state.zip.file(chapter.path, new XMLSerializer().serializeToString(doc));
-    renderChapters();
-    chapterEditorDialog.close();
-    actionStatus.textContent = `Capítol "${chapter.title}" actualitzat.`;
-  }
-
-  async function addMissingHeadings() {
-    const cssHref = await ensureChapterCssAsset();
-    let changed = 0;
-    for (const ch of state.chapters) {
-      if (ch.hasH1) continue;
-      const xml = await state.zip.file(ch.path).async('string');
-      const doc = new DOMParser().parseFromString(xml, 'application/xhtml+xml');
-      const body = doc.querySelector('body');
-      if (!body) continue;
-
-      ensureStylesheetLink(doc, ch.path, cssHref);
-      const h1 = doc.createElement('h1');
-      h1.className = 'epubcraft-injected-heading';
-      h1.textContent = ch.title || fileName(ch.href);
-      body.insertBefore(h1, body.firstChild);
-      state.zip.file(ch.path, new XMLSerializer().serializeToString(doc));
-      ch.hasH1 = true;
-      changed++;
-    }
-    renderChapters();
-    actionStatus.textContent = `Títols afegits: ${changed}.`;
-  }
-
-  async function applyCover() {
-    const file = coverFileInput.files?.[0];
-    if (!file) {
-      actionStatus.textContent = 'Selecciona una imatge de portada.';
-      return;
-    }
-    const ext = file.name.split('.').pop().toLowerCase();
-    const mime = file.type || (ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg');
-    const coverFolder = baseDir(state.opfPath) + '/images';
-    const coverRel = 'images/cover.' + (ext === 'jpeg' ? 'jpg' : ext);
-    const coverPath = coverFolder + '/cover.' + (ext === 'jpeg' ? 'jpg' : ext);
-
-    const arrayBuffer = await file.arrayBuffer();
-    state.zip.file(coverPath.replace(/^\/+/, ''), arrayBuffer);
-
-    const manifest = state.opfDoc.querySelector('manifest');
-    let coverItem = state.opfDoc.querySelector('manifest > item[id="cover-image"]');
-    if (!coverItem) {
-      coverItem = state.opfDoc.createElement('item');
-      coverItem.setAttribute('id', 'cover-image');
-      manifest.appendChild(coverItem);
-    }
-    coverItem.setAttribute('href', coverRel);
-    coverItem.setAttribute('media-type', mime);
-    coverItem.setAttribute('properties', 'cover-image');
-
-    const metadata = state.opfDoc.querySelector('metadata');
-    let metaCover = state.opfDoc.querySelector('metadata > meta[name="cover"]');
-    if (!metaCover) {
-      metaCover = state.opfDoc.createElement('meta');
-      metaCover.setAttribute('name', 'cover');
-      metadata.appendChild(metaCover);
-    }
-    metaCover.setAttribute('content', 'cover-image');
-
-    ensureCoverReference(coverRel);
-
-    await saveOpf();
-    actionStatus.textContent = 'Portada aplicada correctament.';
-  }
-
-  // Compatibilitat EPUB2: crea o actualitza guide/reference type="cover".
-  function ensureCoverReference(coverHref) {
-    let guide = state.opfDoc.querySelector('package > guide');
-    if (!guide) {
-      guide = state.opfDoc.createElement('guide');
-      state.opfDoc.documentElement.appendChild(guide);
-    }
-    let ref = state.opfDoc.querySelector('guide > reference[type="cover"]');
-    if (!ref) {
-      ref = state.opfDoc.createElement('reference');
-      ref.setAttribute('type', 'cover');
-      ref.setAttribute('title', 'Cover');
-      guide.appendChild(ref);
-    }
-    ref.setAttribute('href', coverHref);
-  }
-
-  async function rebuildIndexFiles() {
-    const navItem = ensureNavManifestItem();
-    state.navPath = resolvePath(state.opfPath, navItem.getAttribute('href'));
-
-    const navXhtml = `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
-<head><title>Índex</title></head>
-<body>
-  <nav epub:type="toc" id="toc">
-    <h1>Índex</h1>
-    <ol>
-      ${state.toc.map(e => `<li><a href="${escapeAttr(e.href)}">${escapeHtml(e.title)}</a></li>`).join('\n      ')}
-    </ol>
-  </nav>
-</body>
-</html>`;
-    state.zip.file(state.navPath, navXhtml);
-
-    const ncxItem = Object.values(state.manifestById).find(item => item.mediaType === 'application/x-dtbncx+xml');
-    if (ncxItem) {
-      state.ncxPath = resolvePath(state.opfPath, ncxItem.href);
-      const ncx = `<?xml version="1.0" encoding="UTF-8"?>
-<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
-  <head></head>
-  <docTitle><text>Índex</text></docTitle>
-  <navMap>
-    ${state.toc.map((e, i) => `<navPoint id="navPoint-${i + 1}" playOrder="${i + 1}"><navLabel><text>${escapeXml(e.title)}</text></navLabel><content src="${escapeAttr(e.href)}"/></navPoint>`).join('')}
-  </navMap>
-</ncx>`;
-      state.zip.file(state.ncxPath, ncx);
-    }
-
-    await saveOpf();
-    actionStatus.textContent = 'Índex regenerat (nav + ncx si existia).';
-  }
-
-  function ensureNavManifestItem() {
-    let navItem = state.opfDoc.querySelector('manifest > item[properties="nav"]');
-    if (!navItem) {
-      const manifest = state.opfDoc.querySelector('manifest');
-      navItem = state.opfDoc.createElement('item');
-      navItem.setAttribute('id', 'nav');
-      navItem.setAttribute('href', 'nav.xhtml');
-      navItem.setAttribute('media-type', 'application/xhtml+xml');
-      navItem.setAttribute('properties', 'nav');
-      manifest.appendChild(navItem);
-      if (!state.spineIds.includes('nav')) {
-        const spine = state.opfDoc.querySelector('spine');
-        const itemref = state.opfDoc.createElement('itemref');
-        itemref.setAttribute('idref', 'nav');
-        spine.insertBefore(itemref, spine.firstChild);
-        state.spineIds.unshift('nav');
-      }
-    }
-    parseManifestAndSpine();
-    return navItem;
-  }
-
-  async function saveOpf() {
-    writeMetadataToOpf();
-    state.zip.file(state.opfPath, new XMLSerializer().serializeToString(state.opfDoc));
-  }
-
-  async function downloadEpub() {
-    await saveOpf();
-    const blob = await state.zip.generateAsync({ type: 'blob' });
-    saveAs(blob, 'epub-editat.epub');
-    actionStatus.textContent = 'EPUB generat i descarregat.';
-  }
-
-  function resolvePath(fromFile, rel) {
-    const fromDir = baseDir(fromFile);
-    const joined = (fromDir ? fromDir + '/' : '') + rel;
-    const out = [];
-    joined.split('/').forEach(p => {
-      if (!p || p === '.') return;
-      if (p === '..') out.pop();
-      else out.push(p);
-    });
-    return out.join('/');
-  }
-
-  function baseDir(path) {
-    const i = path.lastIndexOf('/');
-    return i >= 0 ? path.slice(0, i) : '';
-  }
-  function stripAnchor(href) { return (href || '').split('#')[0]; }
-  function fileName(path) { return (path || '').split('/').pop() || 'capitol'; }
-  function escapeHtml(str) { return (str || '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-  function escapeAttr(str) { return escapeHtml(str).replace(/'/g, '&apos;'); }
-  function escapeXml(str) { return (str || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c])); }
-
-  function getTextByLocalName(root, localName) {
-    if (!root) return '';
-    const node = [...root.children].find(el => (el.localName || el.nodeName.split(':').pop()) === localName);
-    return node?.textContent?.trim() || '';
-  }
-
-  function upsertDcElement(metadataNode, localName, value) {
-    let node = [...metadataNode.children].find(el => (el.localName || el.nodeName.split(':').pop()) === localName);
-    if (!node) {
-      const prefix = metadataNode.lookupPrefix?.('http://purl.org/dc/elements/1.1/') || 'dc';
-      node = state.opfDoc.createElement(`${prefix}:${localName}`);
-      metadataNode.appendChild(node);
-    }
-    node.textContent = value;
-  }
-
-  // Busca un CSS existent al manifest; si no existeix, crea styles.css i l'afegeix al manifest.
-  async function ensureChapterCssAsset() {
-    if (state.cssHref) return state.cssHref;
-    const existingCss = Object.values(state.manifestById).find(item => item.mediaType === 'text/css' || /\.css$/i.test(item.href || ''));
-    if (existingCss) {
-      state.cssHref = existingCss.href;
-      return state.cssHref;
-    }
-
-    const manifest = state.opfDoc.querySelector('manifest');
-    const styleHref = 'styles.css';
-    const stylePath = resolvePath(state.opfPath, styleHref);
-    state.zip.file(stylePath, `h1.epubcraft-injected-heading {\n  text-align: center;\n  margin-top: 2em;\n  font-family: sans-serif;\n}\n`);
-
-    const item = state.opfDoc.createElement('item');
-    item.setAttribute('id', generateUniqueManifestId('styles'));
-    item.setAttribute('href', styleHref);
-    item.setAttribute('media-type', 'text/css');
-    manifest.appendChild(item);
-
-    parseManifestAndSpine();
-    state.cssHref = styleHref;
-    return state.cssHref;
-  }
-
-  function ensureStylesheetLink(doc, chapterPath, cssHref) {
-    if (!cssHref) return;
-    const head = doc.querySelector('head');
-    if (!head) return;
-    const cssPath = resolvePath(state.opfPath, cssHref);
-    const relativeHref = relativePath(chapterPath, cssPath);
-
-    const existing = [...head.querySelectorAll('link[rel="stylesheet"]')]
-      .find(l => stripAnchor(l.getAttribute('href') || '') === stripAnchor(relativeHref));
-    if (existing) return;
-
-    const link = doc.createElement('link');
-    link.setAttribute('rel', 'stylesheet');
-    link.setAttribute('type', 'text/css');
-    link.setAttribute('href', relativeHref);
-    head.appendChild(link);
-  }
-
-  function relativePath(fromFilePath, toFilePath) {
-    const fromParts = baseDir(fromFilePath).split('/').filter(Boolean);
-    const toParts = toFilePath.split('/').filter(Boolean);
-    while (fromParts.length && toParts.length && fromParts[0] === toParts[0]) {
-      fromParts.shift();
-      toParts.shift();
-    }
-    return `${'../'.repeat(fromParts.length)}${toParts.join('/')}` || fileName(toFilePath);
-  }
-
-  function generateUniqueManifestId(base) {
-    let i = 0;
-    let id = base;
-    while (state.manifestById[id]) {
-      i += 1;
-      id = `${base}-${i}`;
-    }
-    return id;
-  }
+  google.script.run
+    .withSuccessHandler(url => {
+      const wrap = document.getElementById('export-link-wrap');
+      wrap.innerHTML = `<a href="${url}" target="_blank" class="export-link">📄 Obrir a Google Docs →</a>`;
+      wrap.classList.remove('hidden');
+    })
+    .withFailureHandler(err => toast('Error: ' + err.message))
+    .exportarADoc(titol, contingut);
+}
 </script>
 </body>
 </html>
