@@ -997,6 +997,20 @@ body.sidebar-collapsed .main-content {
     transition: opacity 0.2s;
 }
 
+.home-categories .chip {
+    font-weight: 600;
+}
+
+.home-categories .chip:not(.is-active) {
+    color: rgba(255, 255, 255, 0.95);
+    opacity: 0.85;
+}
+
+.home-categories .chip:not(.is-active) i,
+.home-categories .chip:not(.is-active) svg {
+    color: inherit;
+}
+
 .chip.is-active {
     background: var(--color-button-accent);
     color: #ffffff;
