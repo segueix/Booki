@@ -2472,11 +2472,11 @@ button:disabled,
     font-size: 0.875rem;
 }
 
-.channel-profile-share-btn {
+.channel-profile-share-btn.btn-round-icon {
     width: 40px;
     height: 40px;
-    background: transparent;
-    color: var(--color-text);
+    background-color: var(--color-button-accent);
+    color: #ffffff;
 }
 
 .follow-grid {
@@ -2728,8 +2728,8 @@ button:disabled,
     .sidebar-channel-actions .btn-round-icon {
         width: 40px;
         height: 40px;
-        background: transparent;
-        color: var(--color-text);
+        background: var(--color-button-accent);
+        color: #ffffff;
     }
 
     .sidebar-channel-videos-title {
