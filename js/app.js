@@ -5211,6 +5211,23 @@ function initYouTubeMessageListener() {
     youtubeMessageListenerInitialized = true;
 }
 
+function getDefaultVideoQuality() {
+    const isMobile = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+        && window.matchMedia('(max-width: 768px)').matches;
+    return isMobile ? 'large' : 'hd720';
+}
+
+function suggestVideoQuality() {
+    const iframe = videoPlayer?.querySelector('iframe');
+    if (!iframe?.contentWindow) return;
+    const quality = getDefaultVideoQuality();
+    iframe.contentWindow.postMessage(JSON.stringify({
+        event: 'command',
+        func: 'setPlaybackQuality',
+        args: [quality]
+    }), '*');
+}
+
 function handleYouTubeMessage(event) {
     if (!event.origin || !/youtube\.com|youtube-nocookie\.com/.test(event.origin)) {
         return;
@@ -5226,6 +5243,10 @@ function handleYouTubeMessage(event) {
     // Guardem l'estat del reproductor (1 = Playing, 2 = Paused, etc.)
     if (payload?.event === 'onStateChange' && videoPlayer) {
         videoPlayer.dataset.playerState = payload.info;
+    }
+    // Quan comença a reproduir-se (1 = Playing), suggerir qualitat
+    if (payload?.event === 'onStateChange' && payload?.info === 1) {
+        suggestVideoQuality();
     }
     if (payload?.event === 'onStateChange' && payload?.info === 0) {
         handlePlaylistVideoEnded();
@@ -5255,6 +5276,12 @@ function setupYouTubeIframeMessaging(iframe) {
             event: 'command',
             func: 'addEventListener',
             args: ['onStateChange']
+        }), '*');
+        // Suggerir qualitat per defecte: 480p mòbil, 720p escriptori
+        iframe.contentWindow.postMessage(JSON.stringify({
+            event: 'command',
+            func: 'setPlaybackQuality',
+            args: [getDefaultVideoQuality()]
         }), '*');
     };
     if (iframe._ytListener) {
