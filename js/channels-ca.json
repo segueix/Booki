@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-13T21:42:47.827Z",
+  "updatedAt": "2026-02-18T18:54:40.340Z",
   "channels": [
     {
       "id": "UCN1_BdVHGL8l0x2sWRUXJvQ",
@@ -709,12 +709,12 @@
       "id": "UC-Z3S_8M0LEm3LiH7OiOjGQ",
       "name": "Canal Malaia",
       "categories": [
-        "el món"
+        "vida"
       ],
-      "category": "el món"
+      "category": "vida"
     },
     {
-      "id": "@MissTaglessSilviaPSese",
+      "id": "UCuo3iIQ9q2o2zZmXXvYLAIA",
       "name": "MissTagless",
       "categories": [
         "vida"
@@ -722,8 +722,200 @@
       "category": "vida"
     },
     {
-      "id": "@Kilometre0cat",
+      "id": "UCTkaDEDEHGSit4VGegXXyXw",
       "name": "Kilometre0.cat",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UCHzgcTNEeLBt5RmFURGR-zw",
+      "name": "Paraula de Rahola",
+      "categories": [
+        "el món"
+      ],
+      "category": "el món"
+    },
+    {
+      "id": "UCT6oahHRrtmkRFRymhmeD_g",
+      "name": "Marc Lesan",
+      "categories": [
+        "diversió"
+      ],
+      "category": "diversió"
+    },
+    {
+      "id": "UCH80jJlGreWRsDADMdFzHow",
+      "name": "Gerard Sesé",
+      "categories": [
+        "el món"
+      ],
+      "category": "el món"
+    },
+    {
+      "id": "UCTeW2DTQjf2CrStYylchAUg",
+      "name": "Marc Baskes",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UCB8I9dUJ2dI5aKKTn0WCSRQ",
+      "name": "Míriam Haze",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UCqRk7FOpGRxsMWKXwdYctUg",
+      "name": "Aventuraxjapo",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UCj7uJq2rt5OKWCTh93J2Pog",
+      "name": "ONtravelling",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UCNtezF37nO6X2-1GcGb2oTw",
+      "name": "anna around",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UCqLXSrV4VtacRY0ARFKEuPQ",
+      "name": "MagnoliaMagnolia",
+      "categories": [
+        "cultura"
+      ],
+      "category": "cultura"
+    },
+    {
+      "id": "UCCyst_DBtHMrPl2sxlUKbhg",
+      "name": "ESTEVEROVIRATEAM",
+      "categories": [
+        "diversió"
+      ],
+      "category": "diversió"
+    },
+    {
+      "id": "UCb0bcXU4nQsbRhahTervk2Q",
+      "name": "Albert Campos",
+      "categories": [
+        "cultura"
+      ],
+      "category": "cultura"
+    },
+    {
+      "id": "UC5RaBBf6V5G-AHIH1ggRxKQ",
+      "name": "dreamtraveldream",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UCMs5RmZu4Wo1Lfa9jDzkoCg",
+      "name": "Farners Pei Hong",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UCedPgkOLyD-WQEOxK-gHfFw",
+      "name": "EA3HSL RADIOAFICIONAT",
+      "categories": [
+        "diversió"
+      ],
+      "category": "diversió"
+    },
+    {
+      "id": "UCmHWnvmYhBaBftDdt7xiX1A",
+      "name": "SocTastaolletes",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UCbzVpjfa-zhxR-4tGF6a7Gw",
+      "name": "AVENTURA DE VIURE",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UCeZ1cOrjCrcsEc61uXYkRog",
+      "name": "horturba",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UC_3DCnrM0jKIWGjpVanOVqA",
+      "name": "Irina García",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UCDXS2WP3t8quZF9ztBBpkHw",
+      "name": "Família Caricú",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UCknxM9mNyL_rpfpk1B1V_kA",
+      "name": "Devir Cat",
+      "categories": [
+        "gaming"
+      ],
+      "category": "gaming"
+    },
+    {
+      "id": "UCxQHLgFEKI_Z2CLI-9MUN4w",
+      "name": "Anthony Sànchez",
+      "categories": [
+        "entitats"
+      ],
+      "category": "entitats"
+    },
+    {
+      "id": "UCJ0nTmQimARctjT6YfCVevA",
+      "name": "L'Arrabassada",
+      "categories": [
+        "el món"
+      ],
+      "category": "el món"
+    },
+    {
+      "id": "UCSkt3NKa-7ZQjxYX-bD_FJQ",
+      "name": "Berta Aroca i Chica",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UC53AwVEoOElXMqnWIL4IHxQ",
+      "name": "juliana canet",
       "categories": [
         "vida"
       ],
