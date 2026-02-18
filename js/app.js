@@ -97,6 +97,7 @@ let installPromptEvent = null;
 let currentFontSize = null;
 let userGridPreference = '4';
 let userWatchGridPreference = '3';
+let isAutoPlayNavigating = false;
 let miniPlayerTimer = null;
 const featuredVideoBySection = new Map();
 const customCategorySearchCache = new Map();
@@ -3842,7 +3843,7 @@ function renderVideos(videos) {
     videoCards.forEach(card => {
         card.addEventListener('click', () => {
             const videoId = card.dataset.videoId;
-            showVideoFromAPI(videoId);
+            playThenNavigate(videoId, 'api');
         });
     });
     bindChannelLinks(videosGrid);
@@ -5969,7 +5970,7 @@ function renderDesktopSidebar(channel, channelVideos, currentVideoId) {
     bindChannelLinks(channelInfoContainer);
     channelVideosContainer.querySelectorAll('.sidebar-video-item').forEach(item => {
         item.addEventListener('click', () => {
-            showVideoFromAPI(item.dataset.videoId);
+            playThenNavigate(item.dataset.videoId, 'api');
         });
     });
 }
@@ -6112,7 +6113,7 @@ function renderCategoryVideosBelow(currentChannelId, currentVideoId) {
 
     extraContainer.querySelectorAll('.video-card').forEach(card => {
         card.addEventListener('click', () => {
-            showVideoFromAPI(card.dataset.videoId);
+            playThenNavigate(card.dataset.videoId, 'api');
         });
     });
     bindChannelLinks(extraContainer);
@@ -6198,7 +6199,15 @@ async function showVideoFromAPI(videoId) {
 
     // 1. Renderitzat immediat des del catxé si està disponible
     const cachedVideo = cachedAPIVideos.find(video => video.id === videoId);
-    if (isMini) {
+    if (isAutoPlayNavigating) {
+        // El vídeo ja s'està reproduint al mini-player, expandir-lo
+        isAutoPlayNavigating = false;
+        setMiniPlayerState(false);
+        preparePlayerForPlayback({
+            thumbnail: cachedVideo?.thumbnail || '',
+            title: cachedVideo?.title || ''
+        });
+    } else if (isMini) {
         queuePlayback({
             videoId,
             source: 'api',
@@ -6472,7 +6481,7 @@ function renderStaticVideos(videos) {
     videoCards.forEach(card => {
         card.addEventListener('click', () => {
             const videoId = card.dataset.videoId;
-            showVideo(videoId);
+            playThenNavigate(videoId, 'static');
         });
     });
     bindChannelLinks(videosGrid);
@@ -6501,7 +6510,7 @@ function loadVideosByCategoryStatic(categoryId) {
     videoCards.forEach(card => {
         card.addEventListener('click', () => {
             const videoId = card.dataset.videoId;
-            showVideo(videoId);
+            playThenNavigate(videoId, 'static');
         });
     });
     bindChannelLinks(videosGrid);
@@ -6599,6 +6608,39 @@ function showHome() {
     window.scrollTo(0, 0);
 }
 
+// Reproduir i navegar: inicia la reproducció al mini-player i després obre la pàgina del vídeo
+function playThenNavigate(videoId, source) {
+    if (!videoPlayer) {
+        if (source === 'api') {
+            showVideoFromAPI(videoId);
+        } else {
+            showVideo(videoId);
+        }
+        return;
+    }
+
+    isAutoPlayNavigating = true;
+
+    // Obtenir dades del vídeo per al iframe
+    if (source === 'static') {
+        const video = getVideoById(videoId);
+        updatePlayerIframe({ source: 'static', videoId, videoUrl: video?.videoUrl });
+    } else {
+        updatePlayerIframe({ source: 'api', videoId });
+    }
+
+    // Activar mini-player per mostrar el vídeo reproduint-se
+    videoPlayer.style.display = 'block';
+    setMiniPlayerState(true);
+
+    // Navegar a la pàgina del vídeo
+    if (source === 'api') {
+        showVideoFromAPI(videoId);
+    } else {
+        showVideo(videoId);
+    }
+}
+
 // Mostrar vídeo (estàtic)
 function showVideo(videoId) {
     const isMini = videoPlayer?.classList.contains('mini-player-active');
@@ -6634,7 +6676,15 @@ function showVideo(videoId) {
     homePage.classList.add('hidden');
     watchPage.classList.remove('hidden');
 
-    if (isMini) {
+    if (isAutoPlayNavigating) {
+        // El vídeo ja s'està reproduint al mini-player, expandir-lo
+        isAutoPlayNavigating = false;
+        setMiniPlayerState(false);
+        preparePlayerForPlayback({
+            thumbnail: video.thumbnail,
+            title: video.title
+        });
+    } else if (isMini) {
         queuePlayback({
             videoId,
             source: 'static',
@@ -7264,7 +7314,7 @@ function openChannelProfile(channelId) {
     channelVideosGrid.innerHTML = channelVideos.map(video => createVideoCardAPI(video)).join('');
     channelVideosGrid.querySelectorAll('.video-card').forEach(card => {
         card.addEventListener('click', () => {
-            showVideoFromAPI(card.dataset.videoId);
+            playThenNavigate(card.dataset.videoId, 'api');
         });
     });
     bindChannelLinks(channelVideosGrid);
@@ -7363,14 +7413,14 @@ function loadRelatedVideos(currentVideoId) {
     relatedVideoElements.forEach(element => {
         element.addEventListener('click', () => {
             const videoId = element.dataset.videoId;
-            showVideo(videoId);
+            playThenNavigate(videoId, 'static');
         });
     });
 
     if (extraContainer) {
         extraContainer.querySelectorAll('.video-card').forEach(card => {
             card.addEventListener('click', () => {
-                showVideo(card.dataset.videoId);
+                playThenNavigate(card.dataset.videoId, 'static');
             });
         });
         bindChannelLinks(extraContainer);
