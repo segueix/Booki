@@ -6,42 +6,9 @@ const API_KEY = process.env.YOUTUBE_API_KEY; // O posa la teva clau aquí tempor
 // Posa aquí la llista dels teus canals (o la URL del CSV si prefereixes descarregar-lo)
 // Format: "Nom del canal (@Handle)"
 const HANDLES_TO_CONVERT = [ 
-  "@JulianaCanet",
-  "@ParaulaDeRahola",
-  "@PagesGai",
-  "@MarcLesan",
-  "@GerardSese",
-  "@MarcBaskes",
-  "@MiriamHaze",
-  "@Aventuraxjapo",
-  "@DolcaTerra",
-  "@ONtravelling",
-  "@Roger",
-  "@AnnaAround",
-  "@EmFaFelic",
-  "@Magnoliamagnòlia",
-  "@SaraGuerrero",
-  "@CatalaAlNatural",
-  "@elsgustosreunits",
-  "@Esteverovirateam",
-  "@AlbertCampos",
-  "@LluisFernandez",
-  "@dreamtraveldream",
-  "@FarnersPeiHong",
-  "@ElTrasterDavid",
-  "@EA3HSL",
-  "@PelsCaminsMon",
-  "@SocTastaolletes",
-  "@ToniDaventura",
-  "@CanalMuntaner",
-  "@AventuraDeViure",
-  "@HortUrba",
-  "@IrinaGarcia",
-  "@FamiliaCaricu",
-  "@devircat6893",
-  "@COREYCAT",
-  "@larrabassada",
-  "@bertaaroca"
+  "@MissTaglessSilviaPSese",
+  "@Kilometre0cat",
+  "@julianacanetpe"
 ];
 const fetchYouTubeData = async (url) => {
     const response = await fetch(url);
