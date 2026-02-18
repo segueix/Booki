@@ -2472,10 +2472,10 @@ button:disabled,
     font-size: 0.875rem;
 }
 
-.channel-profile-share-btn {
+.channel-profile-share-btn.btn-round-icon {
     width: 40px;
     height: 40px;
-    background: var(--color-button-accent);
+    background-color: var(--color-button-accent);
     color: #ffffff;
 }
 
