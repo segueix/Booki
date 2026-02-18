@@ -381,8 +381,29 @@
   <p>Construeix la teva obra pas a pas amb intel·ligència artificial</p>
 </header>
 
+
+<!-- CONFIGURACIÓ INICIAL -->
+<div class="card" id="card-config">
+  <h2><span class="icon">⚙️</span> Configuració</h2>
+  <p style="color:var(--text2);margin-bottom:8px;">Configura el model abans de començar l'assistent.</p>
+
+  <label class="field-label" for="config-provider">Proveïdor</label>
+  <select id="config-provider">
+    <option value="openai">OpenAI (GPT-4)</option>
+    <option value="anthropic">Anthropic (Claude 3.5)</option>
+    <option value="gemini">Google (Gemini 1.5)</option>
+  </select>
+
+  <label class="field-label" for="config-apikey">API Key</label>
+  <input type="password" id="config-apikey" placeholder="Enganxa aquí la teva API key">
+
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="guardarIComencar()">Guardar i Començar</button>
+  </div>
+</div>
+
 <!-- Progress -->
-<div id="progress-wrap">
+<div id="progress-wrap" class="hidden">
   <div class="progress-steps" id="steps-bar">
     <div class="step-pill active" data-step="0">Temàtica</div>
     <div class="step-arrow">›</div>
@@ -401,22 +422,8 @@
 </div>
 
 <!-- FASE 0: Selecció de temàtica -->
-<div class="card" id="fase-0">
+<div class="card hidden" id="fase-0">
   <h2><span class="icon">🎭</span> Tria la temàtica</h2>
-
-  <label class="field-label" for="sel-provider">Proveïdor LLM</label>
-  <select id="sel-provider">
-    <option value="anthropic">Anthropic (Claude)</option>
-    <option value="openai">OpenAI (ChatGPT)</option>
-    <option value="gemini">Google Gemini</option>
-  </select>
-
-  <label class="field-label" for="inp-model">Model</label>
-  <input type="text" id="inp-model" value="claude-opus-4-1" placeholder="Ex: claude-opus-4-1 / gpt-4o / gemini-1.5-pro">
-
-  <label class="field-label" for="inp-apikey">API Key</label>
-  <input type="password" id="inp-apikey" placeholder="Introdueix la teva clau API (no es desa)">
-
   <label class="field-label" for="sel-tematica">Gènere literari</label>
   <select id="sel-tematica">
     <option value="">— Selecciona un gènere —</option>
@@ -562,18 +569,9 @@ const ESTAT = {
   monTriat:       '',
   capitols:       [],      // [{num, titol, text}]
   capitalActual:  0,
-  novellaTextos:  [],      // textos dels capítols escrits
-  userConfig:     null
+  novellaTextos:  []       // textos dels capítols escrits
 };
 
-
-document.getElementById('sel-provider').addEventListener('change', e => {
-  const v = e.target.value;
-  const inpModel = document.getElementById('inp-model');
-  if (v === 'anthropic') inpModel.value = 'claude-opus-4-1';
-  if (v === 'openai') inpModel.value = 'gpt-4o';
-  if (v === 'gemini') inpModel.value = 'gemini-1.5-pro';
-});
 
 // ═══════════════════════════════════════════════════════════
 //  UTILITATS UI
@@ -619,31 +617,44 @@ function actualitzarBiblia() {
 // ═══════════════════════════════════════════════════════════
 //  FASE 1 — Premisses
 // ═══════════════════════════════════════════════════════════
-function obtenirUserConfig() {
-  const provider = document.getElementById('sel-provider').value;
-  const apiKey = document.getElementById('inp-apikey').value.trim();
-  const model = document.getElementById('inp-model').value.trim();
+let USER_CONFIG = null;
+
+function guardarIComencar() {
+  const provider = document.getElementById('config-provider').value;
+  const apiKey = document.getElementById('config-apikey').value.trim();
 
   if (!provider) {
-    throw new Error('Selecciona un proveïdor LLM.');
+    toast('Selecciona un proveïdor.');
+    return;
   }
   if (!apiKey) {
-    throw new Error('Introdueix una API key.');
+    toast('Introdueix una API key.');
+    return;
   }
 
-  return { provider, apiKey, model };
+  const modelByProvider = {
+    openai: 'gpt-4o',
+    anthropic: 'claude-3-5-sonnet-20241022',
+    gemini: 'gemini-1.5-pro'
+  };
+
+  USER_CONFIG = {
+    provider,
+    apiKey,
+    model: modelByProvider[provider] || ''
+  };
+
+  hideCard('card-config');
+  document.getElementById('progress-wrap').classList.remove('hidden');
+  showCard('fase-0');
+  toast('Configuració guardada. Ja pots començar.');
 }
 
 function iniciarFase1() {
   const sel = document.getElementById('sel-tematica').value;
   if (!sel) { toast('Selecciona primer una temàtica.'); return; }
 
-  try {
-    ESTAT.userConfig = obtenirUserConfig();
-  } catch (e) {
-    toast(e.message);
-    return;
-  }
+  if (!USER_CONFIG) { toast('Primer has de guardar la configuració inicial.'); return; }
 
   ESTAT.tematica = sel;
   ESTAT.history  = [];
@@ -662,7 +673,7 @@ function iniciarFase1() {
       hideLoader(1);
       toast('Error: ' + err.message);
     })
-    .fase1_premisses(sel, [], ESTAT.userConfig);
+    .fase1_premisses(sel, [], USER_CONFIG);
 }
 
 function renderPremisses(text) {
@@ -708,7 +719,7 @@ function iniciarFase2() {
       renderOpcionsDobles(res.response, 'opcions-estructura', 'btn-fase2', '_opcioEstructura');
     })
     .withFailureHandler(err => { hideLoader(2); toast('Error: ' + err.message); })
-    .fase2_estructura(ESTAT.premissaTriada, ESTAT.history, ESTAT.userConfig);
+    .fase2_estructura(ESTAT.premissaTriada, ESTAT.history, USER_CONFIG);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -782,7 +793,7 @@ function iniciarFase3() {
       renderOpcionsDobles(res.response, 'opcions-personatges', 'btn-fase3', '_opcioPersonatges');
     })
     .withFailureHandler(err => { hideLoader(3); toast('Error: ' + err.message); })
-    .fase3_personatges(ESTAT.estructuraTriada, ESTAT.history, ESTAT.userConfig);
+    .fase3_personatges(ESTAT.estructuraTriada, ESTAT.history, USER_CONFIG);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -805,7 +816,7 @@ function iniciarFase4() {
       renderOpcionsDobles(res.response, 'opcions-mon', 'btn-fase4', '_opcioMon');
     })
     .withFailureHandler(err => { hideLoader(4); toast('Error: ' + err.message); })
-    .fase4_mon(ESTAT.personatgesTriats, ESTAT.history, ESTAT.userConfig);
+    .fase4_mon(ESTAT.personatgesTriats, ESTAT.history, USER_CONFIG);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -828,7 +839,7 @@ function iniciarFase5() {
       renderTaulaCapitols(res.response);
     })
     .withFailureHandler(err => { hideLoader(5); toast('Error: ' + err.message); })
-    .fase5_capitols(ESTAT.monTriat, ESTAT.history, ESTAT.userConfig);
+    .fase5_capitols(ESTAT.monTriat, ESTAT.history, USER_CONFIG);
 }
 
 function renderTaulaCapitols(text) {
@@ -917,7 +928,7 @@ function escriureCapitolActual() {
       if (st) { st.textContent = '✅ Fet'; st.className = 'ch-status fet'; }
     })
     .withFailureHandler(err => { hideLoader(6); toast('Error: ' + err.message); })
-    .fase6_escriureCapitol(numCap, titol, total, ESTAT.history, ESTAT.userConfig);
+    .fase6_escriureCapitol(numCap, titol, total, ESTAT.history, USER_CONFIG);
 }
 
 function mostrarCapitolEscrit(num, titol, text) {
