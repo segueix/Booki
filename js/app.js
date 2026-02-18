@@ -6200,9 +6200,10 @@ async function showVideoFromAPI(videoId) {
     // 1. Renderitzat immediat des del catxé si està disponible
     const cachedVideo = cachedAPIVideos.find(video => video.id === videoId);
     if (isAutoPlayNavigating) {
-        // El vídeo ja s'està reproduint al mini-player, expandir-lo
+        // L'iframe ja s'està carregant, només posicionar el reproductor
         isAutoPlayNavigating = false;
-        setMiniPlayerState(false);
+        videoPlayer.style.opacity = '';
+        videoPlayer.style.pointerEvents = '';
         preparePlayerForPlayback({
             thumbnail: cachedVideo?.thumbnail || '',
             title: cachedVideo?.title || ''
@@ -6608,7 +6609,7 @@ function showHome() {
     window.scrollTo(0, 0);
 }
 
-// Reproduir i navegar: inicia la reproducció al mini-player i després obre la pàgina del vídeo
+// Reproduir i navegar: inicia la reproducció de l'iframe i després obre la pàgina del vídeo
 function playThenNavigate(videoId, source) {
     if (!videoPlayer) {
         if (source === 'api') {
@@ -6621,7 +6622,10 @@ function playThenNavigate(videoId, source) {
 
     isAutoPlayNavigating = true;
 
-    // Obtenir dades del vídeo per al iframe
+    // Crear l'iframe (autoplay) sense mostrar-lo — evita salts visuals
+    videoPlayer.style.opacity = '0';
+    videoPlayer.style.pointerEvents = 'none';
+
     if (source === 'static') {
         const video = getVideoById(videoId);
         updatePlayerIframe({ source: 'static', videoId, videoUrl: video?.videoUrl });
@@ -6629,11 +6633,7 @@ function playThenNavigate(videoId, source) {
         updatePlayerIframe({ source: 'api', videoId });
     }
 
-    // Activar mini-player per mostrar el vídeo reproduint-se
-    videoPlayer.style.display = 'block';
-    setMiniPlayerState(true);
-
-    // Navegar a la pàgina del vídeo
+    // Navegar a la pàgina del vídeo (showVideo/showVideoFromAPI posicionarà el reproductor)
     if (source === 'api') {
         showVideoFromAPI(videoId);
     } else {
@@ -6677,9 +6677,10 @@ function showVideo(videoId) {
     watchPage.classList.remove('hidden');
 
     if (isAutoPlayNavigating) {
-        // El vídeo ja s'està reproduint al mini-player, expandir-lo
+        // L'iframe ja s'està carregant, només posicionar el reproductor
         isAutoPlayNavigating = false;
-        setMiniPlayerState(false);
+        videoPlayer.style.opacity = '';
+        videoPlayer.style.pointerEvents = '';
         preparePlayerForPlayback({
             thumbnail: video.thumbnail,
             title: video.title
