@@ -997,6 +997,10 @@ body.sidebar-collapsed .main-content {
     transition: opacity 0.2s;
 }
 
+.home-categories .chip {
+    font-weight: 600;
+}
+
 .chip.is-active {
     background: var(--color-button-accent);
     color: #ffffff;
