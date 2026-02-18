@@ -3963,7 +3963,7 @@ function loadShort(index) {
     const origin = encodeURIComponent(window.location.origin || '');
     const language = encodeURIComponent(YouTubeAPI?.language || 'ca');
     const regionCode = encodeURIComponent(YouTubeAPI?.regionCode || 'AD');
-    const src = `https://www.youtube.com/embed/${encodeURIComponent(short.id)}?playsinline=1&rel=0&modestbranding=1&autoplay=1&enablejsapi=1&origin=${origin}&hl=${language}&cc_lang_pref=${language}&cc_load_policy=1&gl=${regionCode}`;
+    const src = `https://www.youtube.com/embed/${encodeURIComponent(short.id)}?playsinline=1&rel=0&modestbranding=1&autoplay=1&enablejsapi=1&origin=${origin}&hl=${language}&cc_lang_pref=${language}&cc_load_policy=0&gl=${regionCode}`;
 
     iframe.src = src;
     iframe.dataset.shortPaused = 'false';
@@ -5321,7 +5321,7 @@ function updatePlayerIframe({ source, videoId, videoUrl }) {
     const language = encodeURIComponent(YouTubeAPI?.language || 'ca');
     const regionCode = encodeURIComponent(YouTubeAPI?.regionCode || 'AD');
     const iframeSrc = source === 'api'
-        ? `https://www.youtube.com/embed/${videoId}?playsinline=1&rel=0&modestbranding=1&autoplay=1&enablejsapi=1&origin=${origin}&hl=${language}&cc_lang_pref=${language}&cc_load_policy=1&gl=${regionCode}`
+        ? `https://www.youtube.com/embed/${videoId}?playsinline=1&rel=0&modestbranding=1&autoplay=1&enablejsapi=1&origin=${origin}&hl=${language}&cc_lang_pref=${language}&cc_load_policy=0&gl=${regionCode}`
         : addAutoplayParam(videoUrl);
     const existingIframe = videoPlayer.querySelector('iframe');
     if (!isMobile && existingIframe) {
