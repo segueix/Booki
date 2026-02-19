@@ -550,6 +550,8 @@ main,
     color: #ffffff;
     cursor: pointer;
     transition: background 0.2s, border-color 0.2s, filter 0.2s;
+    -webkit-appearance: none;
+    appearance: none;
 }
 
 .icon-btn:hover {
