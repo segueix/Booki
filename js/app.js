@@ -47,7 +47,8 @@ function getVideoDisplayDuration(video) {
 let sidebar, menuBtn, videosGrid, homePage, watchPage, loading, mainContent;
 let historyPage, historyGrid, historyFilters, chipsBar;
 let customCategoryModal, customCategoryInput, customCategoryAddBtn, customCategoryModalClose;
-let playlistsPage, playlistsList, playlistNameInput, createPlaylistBtn;
+let playlistsPage, playlistsList, playlistNameInput, createPlaylistBtn, smartCategoriesList, libraryTabs;
+let activeLibraryTab = 'playlists';
 let followPage, followGrid, followTabs;
 let addYoutuberModal;
 let heroSection, heroTitle, heroDescription, heroImage, heroDuration, heroButton, heroEyebrow, heroChannel;
@@ -1270,6 +1271,17 @@ function initElements() {
     playlistsList = document.getElementById('playlistsList');
     playlistNameInput = document.getElementById('playlistNameInput');
     createPlaylistBtn = document.getElementById('createPlaylistBtn');
+    smartCategoriesList = document.getElementById('smartCategoriesList');
+    libraryTabs = document.getElementById('libraryTabs');
+    if (smartCategoriesList) {
+        smartCategoriesList.addEventListener('click', (e) => {
+            const btn = e.target.closest('.smart-cat-share-btn');
+            if (!btn) return;
+            const categoryName = btn.dataset.category;
+            const channelIds = btn.dataset.channels.split(',').map(decodeURIComponent).filter(Boolean);
+            shareCategoryWithYoutubers(categoryName, channelIds);
+        });
+    }
     followPage = document.getElementById('followPage');
     followGrid = document.getElementById('followGrid');
     followTabs = document.getElementById('followTabs');
@@ -1399,6 +1411,16 @@ function initEventListeners() {
             }
         });
     });
+
+    if (libraryTabs) {
+        libraryTabs.querySelectorAll('.library-tab').forEach(tab => {
+            tab.addEventListener('click', (event) => {
+                event.preventDefault();
+                const tabId = tab.dataset.libraryTab;
+                if (tabId) setActiveLibraryTab(tabId);
+            });
+        });
+    }
 
     if (followTabs) {
         followTabs.querySelectorAll('.follow-tab').forEach(tab => {
@@ -7225,6 +7247,76 @@ function showHistory() {
     window.scrollTo(0, 0);
 }
 
+function setActiveLibraryTab(tabId) {
+    activeLibraryTab = tabId;
+    if (libraryTabs) {
+        libraryTabs.querySelectorAll('.library-tab').forEach(tab => {
+            tab.classList.toggle('is-active', tab.dataset.libraryTab === tabId);
+        });
+    }
+    const panelPlaylists = document.getElementById('libraryTabPlaylists');
+    const panelSmartCats = document.getElementById('libraryTabSmartCategories');
+    if (panelPlaylists) panelPlaylists.classList.toggle('hidden', tabId !== 'playlists');
+    if (panelSmartCats) panelSmartCats.classList.toggle('hidden', tabId !== 'smart-categories');
+
+    if (tabId === 'smart-categories') {
+        renderSmartCategoriesTab();
+    } else {
+        renderPlaylistsPage();
+    }
+}
+
+function renderSmartCategoriesTab() {
+    if (!smartCategoriesList) return;
+
+    const allTags = getCustomTags();
+    const channelCatsRaw = JSON.parse(localStorage.getItem(CHANNEL_CUSTOM_CATEGORIES_KEY) || '{}');
+
+    const categoriesWithChannels = allTags.map(tag => {
+        const channelIds = Object.entries(channelCatsRaw)
+            .filter(([, cats]) => cats.some(c => String(c).toLowerCase() === tag.toLowerCase()))
+            .map(([id]) => id);
+        return { tag, channelIds };
+    }).filter(({ channelIds }) => channelIds.length > 0);
+
+    if (categoriesWithChannels.length === 0) {
+        smartCategoriesList.innerHTML = '<div class="playlist-empty">No tens cap categoria intel·ligent amb canals assignats.</div>';
+        return;
+    }
+
+    smartCategoriesList.innerHTML = categoriesWithChannels.map(({ tag, channelIds }) => {
+        const channelsMarkup = channelIds.map(channelId => {
+            const channelObj = cachedChannels[channelId] || {};
+            const avatar = resolveChannelAvatar(channelId, channelObj) || 'img/icon-192.png';
+            const name = channelObj.name || channelId;
+            return `
+                <div class="smart-cat-channel-row">
+                    <img class="smart-cat-channel-avatar" src="${escapeHtml(avatar)}" alt="${escapeHtml(name)}" loading="lazy">
+                    <span class="smart-cat-channel-name">${escapeHtml(name)}</span>
+                </div>`;
+        }).join('');
+
+        const count = channelIds.length;
+        return `
+            <div class="smart-category-card">
+                <div class="smart-category-header">
+                    <span class="smart-category-name">${escapeHtml(tag)}</span>
+                    <button class="btn-round-icon smart-cat-share-btn"
+                            data-category="${escapeHtml(tag)}"
+                            data-channels="${channelIds.map(encodeURIComponent).join(',')}"
+                            title="Compartir categoria"
+                            style="width:32px; height:32px; min-width:32px; min-height:32px; background:rgba(255,255,255,0.1);">
+                        <i data-lucide="share-2" style="width:16px; height:16px;"></i>
+                    </button>
+                </div>
+                <div class="smart-category-meta">${count} canal${count !== 1 ? 's' : ''}</div>
+                <div class="smart-cat-channels-list">${channelsMarkup}</div>
+            </div>`;
+    }).join('');
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
 function showPlaylists() {
     handlePlayerVisibilityOnNavigation();
     exitPlaylistMode();
@@ -7246,7 +7338,7 @@ function showPlaylists() {
     if (chipsBar) {
         chipsBar.classList.add('hidden');
     }
-    renderPlaylistsPage();
+    setActiveLibraryTab(activeLibraryTab);
     window.scrollTo(0, 0);
 }
 

@@ -3084,6 +3084,112 @@ button:disabled,
     margin: 6px 0 16px;
 }
 
+/* ==================== LIBRARY TABS ==================== */
+
+.library-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 12px;
+    margin-bottom: 20px;
+}
+
+.library-tab {
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--color-text);
+    cursor: pointer;
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.library-tab.is-active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #ffffff;
+}
+
+.library-tab-panel.hidden {
+    display: none;
+}
+
+/* ==================== SMART CATEGORIES ==================== */
+
+.smart-categories-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
+}
+
+.smart-category-card {
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    padding: 14px 16px 18px;
+}
+
+.smart-category-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.25);
+}
+
+.smart-category-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.smart-category-name {
+    font-weight: 600;
+    font-size: 0.9375rem;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.smart-category-meta {
+    color: var(--color-text-secondary);
+    font-size: 0.75rem;
+    margin-top: 4px;
+    margin-bottom: 10px;
+}
+
+.smart-cat-channels-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.smart-cat-channel-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.smart-cat-channel-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.smart-cat-channel-name {
+    font-size: 0.8125rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .playlist-create {
     display: flex;
     flex-wrap: wrap;
