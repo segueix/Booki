@@ -3190,12 +3190,6 @@ button:disabled,
     gap: 4px;
 }
 
-.smart-category-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-}
 
 .smart-category-name {
     font-weight: 600;
@@ -3398,6 +3392,17 @@ button:disabled,
 .playlist-card-title {
     font-weight: 600;
     font-size: 0.9375rem;
+}
+
+.library-share-btn {
+    width: 44px;
+    height: 44px;
+}
+
+.library-share-btn svg,
+.library-share-btn i {
+    width: 20px;
+    height: 20px;
 }
 
 .playlist-card-meta {

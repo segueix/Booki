@@ -4622,15 +4622,12 @@ function renderPlaylistsPage() {
                     <button class="playlist-delete" type="button" data-playlist-id="${list.id}" aria-label="Esborrar llista" onclick="event.stopPropagation(); removePlaylist('${list.id}'); renderPlaylistsPage();">×</button>
                 </div>
                 <div class="playlist-card-body">
-                    <div class="playlist-card-title">
-                        ${escapeHtml(list.name)}
-                        <button class="btn-round-icon" 
-                                onclick="event.stopPropagation(); shareSegueixPlaylist('${escapeHtml(list.name)}')" 
-                                title="Compartir llista" 
-                                style="width:32px; height:32px; min-width:32px; min-height:32px; background:rgba(255,255,255,0.1);">
-                            <i data-lucide="share-2" style="width:16px; height:16px;"></i>
-                        </button>
-                    </div>
+                    <div class="playlist-card-title">${escapeHtml(list.name)}</div>
+                    <button class="btn-round-icon library-share-btn"
+                            onclick="event.stopPropagation(); shareSegueixPlaylist('${escapeHtml(list.name)}')"
+                            title="Compartir llista">
+                        <i data-lucide="share-2"></i>
+                    </button>
                     <div class="playlist-card-meta">${videoCount} vídeos</div>
                     ${videosMarkup}
                 </div>
@@ -7349,16 +7346,13 @@ function renderSmartCategoriesTab() {
                     <img src="${thumbUrl}" alt="" loading="lazy">
                 </div>
                 <div class="smart-cat-body">
-                    <div class="smart-category-header">
-                        <span class="smart-category-name">${escapeHtml(tag)}</span>
-                        <button class="btn-round-icon smart-cat-share-btn"
-                                data-category="${escapeHtml(tag)}"
-                                data-channels="${channelIds.map(encodeURIComponent).join(',')}"
-                                title="Compartir categoria"
-                                style="width:28px; height:28px; min-width:28px; min-height:28px; background:rgba(255,255,255,0.1);">
-                            <i data-lucide="share-2" style="width:14px; height:14px;"></i>
-                        </button>
-                    </div>
+                    <div class="smart-category-name">${escapeHtml(tag)}</div>
+                    <button class="btn-round-icon library-share-btn smart-cat-share-btn"
+                            data-category="${escapeHtml(tag)}"
+                            data-channels="${channelIds.map(encodeURIComponent).join(',')}"
+                            title="Compartir categoria">
+                        <i data-lucide="share-2"></i>
+                    </button>
                     <div class="smart-category-meta">${count} canal${count !== 1 ? 's' : ''}</div>
                     <div class="smart-cat-channels-list">${channelsMarkup}</div>
                 </div>
