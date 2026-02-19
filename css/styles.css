@@ -3399,6 +3399,12 @@ button:disabled,
 .library-share-btn {
     width: 44px;
     height: 44px;
+    background-color: var(--color-button-accent);
+}
+
+.library-share-btn:hover {
+    background-color: var(--color-button-accent);
+    filter: brightness(1.2);
 }
 
 .library-share-btn svg,
