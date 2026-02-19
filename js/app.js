@@ -88,7 +88,7 @@ let currentShortIndex = 0;
 let currentShortsQueue = [];
 let isNavigatingShort = false;
 let shortModalScrollY = 0;
-let shortNavHintShown = false;
+let shortScrollHintTimer = null;
 let youtubeMessageListenerInitialized = false;
 let searchDropdownItems = [];
 let searchDropdownActiveIndex = -1;
@@ -3873,28 +3873,49 @@ function openShortModal(videoId) {
     if (!modal) return;
 
     shortModalScrollY = window.scrollY || 0;
-    shortNavHintShown = false;
 
     if (isPlaylistMode && activePlaylistQueue.length > 0) {
         currentShortsQueue = activePlaylistQueue;
         currentShortIndex = currentPlaylistIndex;
     } else {
         let sourceVideos = currentFeedVideos;
-        if (!sourceVideos || sourceVideos.length === 0 || !sourceVideos.some(v => v.isShort)) {
+        if (!sourceVideos || sourceVideos.length === 0) {
             sourceVideos = cachedAPIVideos;
         }
-        currentShortsQueue = sourceVideos.filter(v => v.isShort);
+
+        // Aplica el mateix filtre de categoria que renderFeed()
+        let categoryFiltered = filterVideosByCategory(sourceVideos, currentFeedData);
+        if (selectedCategory === 'Novetats' || selectedCategory === 'Tot') {
+            categoryFiltered = categoryFiltered.filter(video => {
+                const channelCats = getChannelCustomCategories(video.channelId);
+                let feedCats = [];
+                if (currentFeedData?.channels) {
+                    const ch = currentFeedData.channels.find(c => String(c.id) === String(video.channelId));
+                    if (ch?.categories) feedCats = ch.categories;
+                } else if (cachedChannels[video.channelId]?.categories) {
+                    feedCats = cachedChannels[video.channelId].categories;
+                }
+                return ![...channelCats, ...feedCats].some(c =>
+                    ['mitjans', 'digitals', 'entitats'].includes(String(c).toLowerCase())
+                );
+            });
+        }
+
+        // Cua: shorts no vistos d'aquesta categoria
+        currentShortsQueue = filterOutWatchedVideos(categoryFiltered.filter(v => v.isShort));
+
+        // Sempre inclou el short clicat explícitament (pot ser ja vist)
+        const currentVideoIdStr = String(videoId);
+        if (!currentShortsQueue.find(v => String(v.id) === currentVideoIdStr)) {
+            const video = categoryFiltered.find(v => String(v.id) === currentVideoIdStr)
+                || cachedAPIVideos.find(v => String(v.id) === currentVideoIdStr)
+                || { id: videoId, isShort: true, title: '', channelTitle: '' };
+            currentShortsQueue.unshift(video);
+        }
 
         if (currentShortsQueue.length === 0) {
             console.warn('No hi ha shorts disponibles');
             return;
-        }
-
-        const currentVideoIdStr = String(videoId);
-        if (!currentShortsQueue.find(v => String(v.id) === currentVideoIdStr)) {
-            const video = cachedAPIVideos.find(v => String(v.id) === currentVideoIdStr)
-                || { id: videoId, isShort: true, title: '', channelTitle: '' };
-            currentShortsQueue.unshift(video);
         }
 
         currentShortIndex = currentShortsQueue.findIndex(v => String(v.id) === currentVideoIdStr);
@@ -3912,6 +3933,8 @@ function openShortModal(videoId) {
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('no-scroll');
+
+    triggerShortScrollHint();
 
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
@@ -3968,6 +3991,8 @@ function loadShort(index) {
     iframe.src = src;
     iframe.dataset.shortPaused = 'false';
 
+    addToHistory({ ...short, isShort: true });
+
     const titleEl = document.getElementById('shortTitle');
     const channelEl = document.getElementById('shortChannel');
     if (titleEl) titleEl.textContent = short.title || '';
@@ -4009,11 +4034,6 @@ function loadShort(index) {
         lucide.createIcons();
     }
 
-    updateShortNavButtons();
-
-    if (index === 0 && !shortNavHintShown) {
-        triggerShortNavHint();
-    }
 }
 
 function navigateShort(direction) {
@@ -4050,28 +4070,28 @@ function handleScrollIntent(direction) {
     }
 }
 
-function updateShortNavButtons() {
-    const prevBtn = document.querySelector('.short-nav-prev');
-    const nextBtn = document.querySelector('.short-nav-next');
+function triggerShortScrollHint() {
+    const hint = document.getElementById('shortScrollHint');
+    if (!hint) return;
 
-    if (prevBtn) prevBtn.disabled = currentShortIndex === 0;
-    if (nextBtn) nextBtn.disabled = currentShortIndex === currentShortsQueue.length - 1;
-}
+    if (shortScrollHintTimer) {
+        clearTimeout(shortScrollHintTimer);
+        shortScrollHintTimer = null;
+    }
 
-function triggerShortNavHint() {
-    const prevBtn = document.querySelector('.short-nav-prev');
-    const nextBtn = document.querySelector('.short-nav-next');
+    hint.classList.remove('blinking', 'fadeout');
+    void hint.offsetWidth; // forçar reflow
 
-    if (!prevBtn || !nextBtn) return;
+    hint.classList.add('blinking');
 
-    prevBtn.classList.add('short-nav-hint');
-    nextBtn.classList.add('short-nav-hint');
-    shortNavHintShown = true;
-
-    setTimeout(() => {
-        prevBtn.classList.remove('short-nav-hint');
-        nextBtn.classList.remove('short-nav-hint');
-    }, 2000);
+    shortScrollHintTimer = setTimeout(() => {
+        hint.classList.remove('blinking');
+        hint.classList.add('fadeout');
+        shortScrollHintTimer = setTimeout(() => {
+            hint.classList.remove('fadeout');
+            shortScrollHintTimer = null;
+        }, 1000);
+    }, 4000);
 }
 
 function setupShortScroll() {
@@ -4144,6 +4164,13 @@ function toggleShortPlayback() {
 function closeShortModal() {
     const modal = document.getElementById('short-modal');
     const iframe = document.getElementById('short-iframe');
+
+    if (shortScrollHintTimer) {
+        clearTimeout(shortScrollHintTimer);
+        shortScrollHintTimer = null;
+    }
+    const hint = document.getElementById('shortScrollHint');
+    if (hint) hint.classList.remove('blinking', 'fadeout');
 
     iframe.src = '';
     modal.classList.add('hidden');
@@ -6928,11 +6955,16 @@ function getFilteredHistoryItems() {
         filtered = filtered.filter(video => likedIds.includes(String(video.id)));
     }
 
-    if (historySelectedCategory !== 'Tot') {
-        const wanted = historySelectedCategory.toLowerCase();
-        filtered = filtered.filter(video =>
-            getHistoryVideoCategories(video).some(cat => String(cat).toLowerCase() === wanted)
-        );
+    if (historySelectedCategory === 'Shorts') {
+        filtered = filtered.filter(video => video.isShort === true);
+    } else {
+        filtered = filtered.filter(video => !video.isShort);
+        if (historySelectedCategory !== 'Tot') {
+            const wanted = historySelectedCategory.toLowerCase();
+            filtered = filtered.filter(video =>
+                getHistoryVideoCategories(video).some(cat => String(cat).toLowerCase() === wanted)
+            );
+        }
     }
 
     return filtered;
@@ -7013,6 +7045,51 @@ function createHistoryCard(video) {
     `;
 }
 
+function renderShortsHistoryCarousel(items) {
+    const groups = new Map();
+    items.forEach(video => {
+        const viewedAt = video.viewedAt || video.publishedAt || video.uploadDate || '';
+        const label = viewedAt ? formatDate(viewedAt) : 'Sense data';
+        if (!groups.has(label)) groups.set(label, []);
+        groups.get(label).push(video);
+    });
+
+    let html = '';
+    groups.forEach((videos, label) => {
+        const carouselItems = videos.map(video => {
+            const thumbnail = video.thumbnail
+                || video.snippet?.thumbnails?.maxres?.url
+                || video.snippet?.thumbnails?.high?.url
+                || video.snippet?.thumbnails?.medium?.url
+                || '';
+            const title = video.title || video.snippet?.title || '';
+            return `
+                <div class="short-history-item" data-video-id="${video.id}" role="button" tabindex="0" aria-label="${escapeHtml(title)}">
+                    <button class="short-history-delete" type="button" aria-label="Eliminar de l'historial" data-history-id="${video.id}">×</button>
+                    <img src="${thumbnail}" alt="${escapeHtml(title)}" loading="lazy">
+                    <div class="short-history-item-title">${escapeHtml(title)}</div>
+                </div>`;
+        }).join('');
+        html += `<h2 class="history-group-title">${escapeHtml(label)}</h2>
+            <div class="shorts-history-carousel">${carouselItems}</div>`;
+    });
+
+    historyGrid.innerHTML = html;
+
+    historyGrid.querySelectorAll('.short-history-item').forEach(item => {
+        item.addEventListener('click', () => openShortModal(item.dataset.videoId));
+    });
+
+    historyGrid.querySelectorAll('.short-history-delete').forEach(btn => {
+        btn.addEventListener('click', event => {
+            event.stopPropagation();
+            const targetId = btn.dataset.historyId;
+            saveHistoryItems(getHistoryItems().filter(item => String(item.id) !== String(targetId)));
+            renderHistory();
+        });
+    });
+}
+
 function renderHistory() {
     if (!historyGrid) return;
 
@@ -7026,6 +7103,7 @@ function renderHistory() {
     });
 
     if (historyItems.length === 0) {
+        historyGrid.classList.remove('is-shorts');
         const message = totalHistoryItems.length === 0
             ? 'Encara no hi ha vídeos a l\'historial.'
             : 'No hi ha vídeos que coincideixin amb aquests filtres.';
@@ -7033,6 +7111,14 @@ function renderHistory() {
         return;
     }
 
+    if (historySelectedCategory === 'Shorts') {
+        historyGrid.classList.add('is-shorts');
+        renderShortsHistoryCarousel(historyItems);
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        return;
+    }
+
+    historyGrid.classList.remove('is-shorts');
     let currentLabel = null;
     const groupedMarkup = historyItems.map(video => {
         const viewedAt = video.viewedAt || video.publishedAt || video.uploadDate || video.snippet?.publishedAt || '';
