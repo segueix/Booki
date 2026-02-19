@@ -1548,71 +1548,41 @@ body.sidebar-collapsed .main-content {
     to { opacity: 0; visibility: hidden; }
 }
 
-.short-nav-btn {
+.short-scroll-hint {
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    border: none;
-    background: rgba(0, 0, 0, 0.1);
-    color: rgba(255, 255, 255, 0.6);
-    cursor: pointer;
+    bottom: 22%;
+    z-index: 20;
+    pointer-events: none;
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 10;
-    transition: background 0.2s;
+    opacity: 0;
 }
 
-.short-nav-btn svg {
-    width: 28px;
-    height: 48px;
-    stroke-width: 2.5;
+.short-scroll-hint svg {
+    width: 46px;
+    height: 46px;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.7));
 }
 
-.short-nav-btn.short-nav-hint {
-    width: 64px;
-    height: 64px;
-    background: transparent;
-    box-shadow: none;
-    color: rgba(255, 255, 255, 0.9);
+.short-scroll-hint.blinking {
+    animation: shortScrollBlink 0.65s ease-in-out infinite;
 }
 
-.short-nav-btn.short-nav-hint svg {
-    width: 32px;
-    height: 56px;
-    animation: shortHintBlink 0.6s ease-in-out infinite;
+.short-scroll-hint.fadeout {
+    animation: shortScrollFadeOut 1s ease-out forwards;
 }
 
-.short-nav-btn:hover {
-    background: rgba(0, 0, 0, 0.8);
+@keyframes shortScrollBlink {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 1; }
 }
 
-.short-nav-prev {
-    top: 60px;
-}
-
-.short-nav-next {
-    bottom: 60px;
-}
-
-@keyframes shortHintBlink {
-    0%,
-    100% {
-        opacity: 0;
-        transform: translateY(6px);
-    }
-    50% {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.short-nav-btn:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
+@keyframes shortScrollFadeOut {
+    from { opacity: 0.85; }
+    to { opacity: 0; }
 }
 
 .short-info {

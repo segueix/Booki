@@ -88,7 +88,7 @@ let currentShortIndex = 0;
 let currentShortsQueue = [];
 let isNavigatingShort = false;
 let shortModalScrollY = 0;
-let shortNavHintShown = false;
+let shortScrollHintTimer = null;
 let youtubeMessageListenerInitialized = false;
 let searchDropdownItems = [];
 let searchDropdownActiveIndex = -1;
@@ -3873,7 +3873,6 @@ function openShortModal(videoId) {
     if (!modal) return;
 
     shortModalScrollY = window.scrollY || 0;
-    shortNavHintShown = false;
 
     if (isPlaylistMode && activePlaylistQueue.length > 0) {
         currentShortsQueue = activePlaylistQueue;
@@ -3912,6 +3911,8 @@ function openShortModal(videoId) {
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('no-scroll');
+
+    triggerShortScrollHint();
 
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
@@ -4009,11 +4010,6 @@ function loadShort(index) {
         lucide.createIcons();
     }
 
-    updateShortNavButtons();
-
-    if (index === 0 && !shortNavHintShown) {
-        triggerShortNavHint();
-    }
 }
 
 function navigateShort(direction) {
@@ -4050,28 +4046,28 @@ function handleScrollIntent(direction) {
     }
 }
 
-function updateShortNavButtons() {
-    const prevBtn = document.querySelector('.short-nav-prev');
-    const nextBtn = document.querySelector('.short-nav-next');
+function triggerShortScrollHint() {
+    const hint = document.getElementById('shortScrollHint');
+    if (!hint) return;
 
-    if (prevBtn) prevBtn.disabled = currentShortIndex === 0;
-    if (nextBtn) nextBtn.disabled = currentShortIndex === currentShortsQueue.length - 1;
-}
+    if (shortScrollHintTimer) {
+        clearTimeout(shortScrollHintTimer);
+        shortScrollHintTimer = null;
+    }
 
-function triggerShortNavHint() {
-    const prevBtn = document.querySelector('.short-nav-prev');
-    const nextBtn = document.querySelector('.short-nav-next');
+    hint.classList.remove('blinking', 'fadeout');
+    void hint.offsetWidth; // forçar reflow
 
-    if (!prevBtn || !nextBtn) return;
+    hint.classList.add('blinking');
 
-    prevBtn.classList.add('short-nav-hint');
-    nextBtn.classList.add('short-nav-hint');
-    shortNavHintShown = true;
-
-    setTimeout(() => {
-        prevBtn.classList.remove('short-nav-hint');
-        nextBtn.classList.remove('short-nav-hint');
-    }, 2000);
+    shortScrollHintTimer = setTimeout(() => {
+        hint.classList.remove('blinking');
+        hint.classList.add('fadeout');
+        shortScrollHintTimer = setTimeout(() => {
+            hint.classList.remove('fadeout');
+            shortScrollHintTimer = null;
+        }, 1000);
+    }, 4000);
 }
 
 function setupShortScroll() {
@@ -4144,6 +4140,13 @@ function toggleShortPlayback() {
 function closeShortModal() {
     const modal = document.getElementById('short-modal');
     const iframe = document.getElementById('short-iframe');
+
+    if (shortScrollHintTimer) {
+        clearTimeout(shortScrollHintTimer);
+        shortScrollHintTimer = null;
+    }
+    const hint = document.getElementById('shortScrollHint');
+    if (hint) hint.classList.remove('blinking', 'fadeout');
 
     iframe.src = '';
     modal.classList.add('hidden');

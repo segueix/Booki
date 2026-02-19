@@ -260,13 +260,13 @@
                 <i data-lucide="x"></i>
             </button>
 
-            <!-- Navegació entre shorts -->
-            <button class="short-nav-btn short-nav-prev" type="button" onclick="navigateShort(-1)" aria-label="Short anterior">
-                <i data-lucide="arrow-up"></i>
-            </button>
-            <button class="short-nav-btn short-nav-next" type="button" onclick="navigateShort(1)" aria-label="Següent short">
-                <i data-lucide="arrow-down"></i>
-            </button>
+            <!-- Indicador de scroll -->
+            <div id="shortScrollHint" class="short-scroll-hint" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <line x1="12" y1="4" x2="12" y2="20" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
+                    <polyline points="5 13 12 20 19 13" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
 
             <!-- Reproductor -->
             <div class="short-player-wrap" id="shortPlayerWrap">
