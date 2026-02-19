@@ -3879,21 +3879,43 @@ function openShortModal(videoId) {
         currentShortIndex = currentPlaylistIndex;
     } else {
         let sourceVideos = currentFeedVideos;
-        if (!sourceVideos || sourceVideos.length === 0 || !sourceVideos.some(v => v.isShort)) {
+        if (!sourceVideos || sourceVideos.length === 0) {
             sourceVideos = cachedAPIVideos;
         }
-        currentShortsQueue = sourceVideos.filter(v => v.isShort);
+
+        // Aplica el mateix filtre de categoria que renderFeed()
+        let categoryFiltered = filterVideosByCategory(sourceVideos, currentFeedData);
+        if (selectedCategory === 'Novetats' || selectedCategory === 'Tot') {
+            categoryFiltered = categoryFiltered.filter(video => {
+                const channelCats = getChannelCustomCategories(video.channelId);
+                let feedCats = [];
+                if (currentFeedData?.channels) {
+                    const ch = currentFeedData.channels.find(c => String(c.id) === String(video.channelId));
+                    if (ch?.categories) feedCats = ch.categories;
+                } else if (cachedChannels[video.channelId]?.categories) {
+                    feedCats = cachedChannels[video.channelId].categories;
+                }
+                return ![...channelCats, ...feedCats].some(c =>
+                    ['mitjans', 'digitals', 'entitats'].includes(String(c).toLowerCase())
+                );
+            });
+        }
+
+        // Cua: shorts no vistos d'aquesta categoria
+        currentShortsQueue = filterOutWatchedVideos(categoryFiltered.filter(v => v.isShort));
+
+        // Sempre inclou el short clicat explícitament (pot ser ja vist)
+        const currentVideoIdStr = String(videoId);
+        if (!currentShortsQueue.find(v => String(v.id) === currentVideoIdStr)) {
+            const video = categoryFiltered.find(v => String(v.id) === currentVideoIdStr)
+                || cachedAPIVideos.find(v => String(v.id) === currentVideoIdStr)
+                || { id: videoId, isShort: true, title: '', channelTitle: '' };
+            currentShortsQueue.unshift(video);
+        }
 
         if (currentShortsQueue.length === 0) {
             console.warn('No hi ha shorts disponibles');
             return;
-        }
-
-        const currentVideoIdStr = String(videoId);
-        if (!currentShortsQueue.find(v => String(v.id) === currentVideoIdStr)) {
-            const video = cachedAPIVideos.find(v => String(v.id) === currentVideoIdStr)
-                || { id: videoId, isShort: true, title: '', channelTitle: '' };
-            currentShortsQueue.unshift(video);
         }
 
         currentShortIndex = currentShortsQueue.findIndex(v => String(v.id) === currentVideoIdStr);
@@ -3968,6 +3990,8 @@ function loadShort(index) {
 
     iframe.src = src;
     iframe.dataset.shortPaused = 'false';
+
+    addToHistory({ ...short, isShort: true });
 
     const titleEl = document.getElementById('shortTitle');
     const channelEl = document.getElementById('shortChannel');
@@ -6932,10 +6956,14 @@ function getFilteredHistoryItems() {
     }
 
     if (historySelectedCategory !== 'Tot') {
-        const wanted = historySelectedCategory.toLowerCase();
-        filtered = filtered.filter(video =>
-            getHistoryVideoCategories(video).some(cat => String(cat).toLowerCase() === wanted)
-        );
+        if (historySelectedCategory === 'Shorts') {
+            filtered = filtered.filter(video => video.isShort === true);
+        } else {
+            const wanted = historySelectedCategory.toLowerCase();
+            filtered = filtered.filter(video =>
+                getHistoryVideoCategories(video).some(cat => String(cat).toLowerCase() === wanted)
+            );
+        }
     }
 
     return filtered;
