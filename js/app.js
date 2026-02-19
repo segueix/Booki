@@ -7358,7 +7358,7 @@ function renderSmartCategoriesTab() {
 
     const categoriesWithChannels = allTags.map(tag => {
         const channelIds = Object.entries(channelCatsRaw)
-            .filter(([, cats]) => cats.some(c => String(c).toLowerCase() === tag.toLowerCase()))
+            .filter(([, cats]) => cats.some(c => normalizeCustomTag(String(c)).toLowerCase() === tag.toLowerCase()))
             .map(([id]) => id);
         return { tag, channelIds };
     }).filter(({ channelIds }) => channelIds.length > 0);
