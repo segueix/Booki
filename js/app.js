@@ -6955,10 +6955,11 @@ function getFilteredHistoryItems() {
         filtered = filtered.filter(video => likedIds.includes(String(video.id)));
     }
 
-    if (historySelectedCategory !== 'Tot') {
-        if (historySelectedCategory === 'Shorts') {
-            filtered = filtered.filter(video => video.isShort === true);
-        } else {
+    if (historySelectedCategory === 'Shorts') {
+        filtered = filtered.filter(video => video.isShort === true);
+    } else {
+        filtered = filtered.filter(video => !video.isShort);
+        if (historySelectedCategory !== 'Tot') {
             const wanted = historySelectedCategory.toLowerCase();
             filtered = filtered.filter(video =>
                 getHistoryVideoCategories(video).some(cat => String(cat).toLowerCase() === wanted)
@@ -7044,6 +7045,51 @@ function createHistoryCard(video) {
     `;
 }
 
+function renderShortsHistoryCarousel(items) {
+    const groups = new Map();
+    items.forEach(video => {
+        const viewedAt = video.viewedAt || video.publishedAt || video.uploadDate || '';
+        const label = viewedAt ? formatDate(viewedAt) : 'Sense data';
+        if (!groups.has(label)) groups.set(label, []);
+        groups.get(label).push(video);
+    });
+
+    let html = '';
+    groups.forEach((videos, label) => {
+        const carouselItems = videos.map(video => {
+            const thumbnail = video.thumbnail
+                || video.snippet?.thumbnails?.maxres?.url
+                || video.snippet?.thumbnails?.high?.url
+                || video.snippet?.thumbnails?.medium?.url
+                || '';
+            const title = video.title || video.snippet?.title || '';
+            return `
+                <div class="short-history-item" data-video-id="${video.id}" role="button" tabindex="0" aria-label="${escapeHtml(title)}">
+                    <button class="short-history-delete" type="button" aria-label="Eliminar de l'historial" data-history-id="${video.id}">×</button>
+                    <img src="${thumbnail}" alt="${escapeHtml(title)}" loading="lazy">
+                    <div class="short-history-item-title">${escapeHtml(title)}</div>
+                </div>`;
+        }).join('');
+        html += `<h2 class="history-group-title">${escapeHtml(label)}</h2>
+            <div class="shorts-history-carousel">${carouselItems}</div>`;
+    });
+
+    historyGrid.innerHTML = html;
+
+    historyGrid.querySelectorAll('.short-history-item').forEach(item => {
+        item.addEventListener('click', () => openShortModal(item.dataset.videoId));
+    });
+
+    historyGrid.querySelectorAll('.short-history-delete').forEach(btn => {
+        btn.addEventListener('click', event => {
+            event.stopPropagation();
+            const targetId = btn.dataset.historyId;
+            saveHistoryItems(getHistoryItems().filter(item => String(item.id) !== String(targetId)));
+            renderHistory();
+        });
+    });
+}
+
 function renderHistory() {
     if (!historyGrid) return;
 
@@ -7057,6 +7103,7 @@ function renderHistory() {
     });
 
     if (historyItems.length === 0) {
+        historyGrid.classList.remove('is-shorts');
         const message = totalHistoryItems.length === 0
             ? 'Encara no hi ha vídeos a l\'historial.'
             : 'No hi ha vídeos que coincideixin amb aquests filtres.';
@@ -7064,6 +7111,14 @@ function renderHistory() {
         return;
     }
 
+    if (historySelectedCategory === 'Shorts') {
+        historyGrid.classList.add('is-shorts');
+        renderShortsHistoryCarousel(historyItems);
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        return;
+    }
+
+    historyGrid.classList.remove('is-shorts');
     let currentLabel = null;
     const groupedMarkup = historyItems.map(video => {
         const viewedAt = video.viewedAt || video.publishedAt || video.uploadDate || video.snippet?.publishedAt || '';
