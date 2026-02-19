@@ -1,0 +1,19 @@
+name: Diagnosticar Canals
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnosticar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar codi
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Executar diagnòstic
+        run: node scripts/diagnosticar_canals.js
