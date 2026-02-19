@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-19T11:02:03.797Z",
+  "updatedAt": "2026-02-19T14:25:38.259Z",
   "channels": [
     {
       "id": "UCN1_BdVHGL8l0x2sWRUXJvQ",
@@ -18,12 +18,28 @@
       "category": "mitjans"
     },
     {
+      "id": "UCcOh4_iym9H-q5HSHjPg4Xw",
+      "name": "3CatCultura",
+      "categories": [
+        "mitjans"
+      ],
+      "category": "mitjans"
+    },
+    {
       "id": "UC06jp6UgU3rzTNpuBk0OebQ",
       "name": "À Punt Mèdia",
       "categories": [
         "mitjans"
       ],
       "category": "mitjans"
+    },
+    {
+      "id": "UCb0bcXU4nQsbRhahTervk2Q",
+      "name": "Albert Campos",
+      "categories": [
+        "cultura"
+      ],
+      "category": "cultura"
     },
     {
       "id": "UCkQz3Xt7Q-G-5amu1VaxsKA",
@@ -36,6 +52,22 @@
     {
       "id": "UCuYwOL9sNlMcro0-TE388gg",
       "name": "Alhora",
+      "categories": [
+        "entitats"
+      ],
+      "category": "entitats"
+    },
+    {
+      "id": "UCNtezF37nO6X2-1GcGb2oTw",
+      "name": "anna around",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UCxQHLgFEKI_Z2CLI-9MUN4w",
+      "name": "Anthony Sànchez",
       "categories": [
         "entitats"
       ],
@@ -74,12 +106,36 @@
       "category": "gaming"
     },
     {
+      "id": "UCbzVpjfa-zhxR-4tGF6a7Gw",
+      "name": "AVENTURA DE VIURE",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UCqRk7FOpGRxsMWKXwdYctUg",
+      "name": "Aventuraxjapo",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
       "id": "UChOzqUp9V9AQPB4WzOhu-Xw",
       "name": "Aya_ZholvaX: Jocs de taula",
       "categories": [
         "gaming"
       ],
       "category": "gaming"
+    },
+    {
+      "id": "UCSkt3NKa-7ZQjxYX-bD_FJQ",
+      "name": "Berta Aroca i Chica",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
     },
     {
       "id": "UCPn1nFLeba3BIU5Q11tEpdQ",
@@ -98,6 +154,14 @@
       "category": "mitjans"
     },
     {
+      "id": "UC-Z3S_8M0LEm3LiH7OiOjGQ",
+      "name": "Canal Malaia",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
       "id": "UCfwf5LTzLq88guMvu3VkaUQ",
       "name": "Catalunya Ràdio",
       "categories": [
@@ -114,6 +178,14 @@
       "category": "gaming"
     },
     {
+      "id": "UC39QbSGf29J8fWJfEQqYhyA",
+      "name": "CFEM",
+      "categories": [
+        "entitats"
+      ],
+      "category": "entitats"
+    },
+    {
       "id": "UC1IsIqLMItHMn-SgnKJBRWw",
       "name": "Crisàlide",
       "categories": [
@@ -122,8 +194,24 @@
       "category": "digitals"
     },
     {
+      "id": "UCTOJJTxi7__LJ7z36cQ3PhA",
+      "name": "CUP Comarques Gironines",
+      "categories": [
+        "entitats"
+      ],
+      "category": "entitats"
+    },
+    {
       "id": "UCJ1tSoCKvIJEJlfwupF3mOA",
       "name": "Devid",
+      "categories": [
+        "gaming"
+      ],
+      "category": "gaming"
+    },
+    {
+      "id": "UCknxM9mNyL_rpfpk1B1V_kA",
+      "name": "Devir Cat",
       "categories": [
         "gaming"
       ],
@@ -146,6 +234,38 @@
       "category": "digitals"
     },
     {
+      "id": "UC5RaBBf6V5G-AHIH1ggRxKQ",
+      "name": "dreamtraveldream",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UCedPgkOLyD-WQEOxK-gHfFw",
+      "name": "EA3HSL RADIOAFICIONAT",
+      "categories": [
+        "diversió"
+      ],
+      "category": "diversió"
+    },
+    {
+      "id": "UC-N1tXokYk1mSVkmm6e5x_g",
+      "name": "EL BUIRAC DE MEMÒRIES",
+      "categories": [
+        "cultura"
+      ],
+      "category": "cultura"
+    },
+    {
+      "id": "UCfJJW4YzguKAKBKPdKNXmLg",
+      "name": "El Foment",
+      "categories": [
+        "entitats"
+      ],
+      "category": "entitats"
+    },
+    {
       "id": "UC6BDPfKO7EVktkK1EGarfjw",
       "name": "El Moviment Ondulatori",
       "categories": [
@@ -160,6 +280,14 @@
         "digitals"
       ],
       "category": "digitals"
+    },
+    {
+      "id": "UCxWzPQqjZpHhM_BF5eCHvMQ",
+      "name": "Els Ulls de Clio",
+      "categories": [
+        "cultura"
+      ],
+      "category": "cultura"
     },
     {
       "id": "UCHnWdAPT4U0CRf0MO5XmJgA",
@@ -218,12 +346,44 @@
       "category": "diversió"
     },
     {
+      "id": "UCCyst_DBtHMrPl2sxlUKbhg",
+      "name": "ESTEVEROVIRATEAM",
+      "categories": [
+        "diversió"
+      ],
+      "category": "diversió"
+    },
+    {
       "id": "UCOzd_BhDxbQZ8Y2H1j9wOOg",
       "name": "EVA",
       "categories": [
         "diversió"
       ],
       "category": "diversió"
+    },
+    {
+      "id": "UCDXS2WP3t8quZF9ztBBpkHw",
+      "name": "Família Caricú",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UCMs5RmZu4Wo1Lfa9jDzkoCg",
+      "name": "Farners Pei Hong",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UCpIWhEzmE8OJfTf54S-2knA",
+      "name": "Fòrum de Debats",
+      "categories": [
+        "entitats"
+      ],
+      "category": "entitats"
     },
     {
       "id": "UCAYhM78shc-n6vhgoFTt1HQ",
@@ -244,6 +404,22 @@
     {
       "id": "UCQvIQnJGSDFX_IAiV9JuBew",
       "name": "Gent De Merda",
+      "categories": [
+        "diversió"
+      ],
+      "category": "diversió"
+    },
+    {
+      "id": "UCH80jJlGreWRsDADMdFzHow",
+      "name": "Gerard Sesé",
+      "categories": [
+        "el món"
+      ],
+      "category": "el món"
+    },
+    {
+      "id": "UClwJkRkjtBnMirSma1AoNGw",
+      "name": "Godai Garcia",
       "categories": [
         "diversió"
       ],
@@ -274,6 +450,14 @@
       "category": "cultura"
     },
     {
+      "id": "UCeZ1cOrjCrcsEc61uXYkRog",
+      "name": "horturba",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
       "id": "UCff_CBVJDTHP4wOHPjP5BMg",
       "name": "IB3",
       "categories": [
@@ -298,12 +482,36 @@
       "category": "entitats"
     },
     {
+      "id": "UCH53ue1LvguXxuUzHs8KjKQ",
+      "name": "Institut Nova Història",
+      "categories": [
+        "entitats"
+      ],
+      "category": "entitats"
+    },
+    {
       "id": "UCduKvutWvgrYXgtOMRS_HQA",
       "name": "Institut Nova Història - Conferències",
       "categories": [
         "entitats"
       ],
       "category": "entitats"
+    },
+    {
+      "id": "UC_3DCnrM0jKIWGjpVanOVqA",
+      "name": "Irina García",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UCVG5bGyAHBJGkFsQHhfGIRA",
+      "name": "Isabel y Pedro",
+      "categories": [
+        "cultura"
+      ],
+      "category": "cultura"
     },
     {
       "id": "UCjPL0bozxQmzcMqPsnvLLTA",
@@ -314,12 +522,36 @@
       "category": "diversió"
     },
     {
+      "id": "UC53AwVEoOElXMqnWIL4IHxQ",
+      "name": "Juliana Canet",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UCTkaDEDEHGSit4VGegXXyXw",
+      "name": "Kilometre0.cat",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
       "id": "UCBrH5lu4efHa0u6Bg1uTk7g",
       "name": "Kouttocat",
       "categories": [
         "gaming"
       ],
       "category": "gaming"
+    },
+    {
+      "id": "UCJ0nTmQimARctjT6YfCVevA",
+      "name": "L'Arrabassada",
+      "categories": [
+        "el món"
+      ],
+      "category": "el món"
     },
     {
       "id": "UC995eaX8sye3WGZB3XUl9lg",
@@ -336,6 +568,14 @@
         "digitals"
       ],
       "category": "digitals"
+    },
+    {
+      "id": "UCgwuoJvIn3nrsGDelo2TRKQ",
+      "name": "La CLAU de la nostra història",
+      "categories": [
+        "cultura"
+      ],
+      "category": "cultura"
     },
     {
       "id": "UCbj8yTKaC_J0sG7LMUHLA7g",
@@ -386,6 +626,14 @@
       "category": "cultura"
     },
     {
+      "id": "UCqLXSrV4VtacRY0ARFKEuPQ",
+      "name": "MagnoliaMagnolia",
+      "categories": [
+        "cultura"
+      ],
+      "category": "cultura"
+    },
+    {
       "id": "UCbOj46zFDV0_EquDRQzr5HQ",
       "name": "Mai Tant Podcast",
       "categories": [
@@ -402,6 +650,46 @@
       "category": "cultura"
     },
     {
+      "id": "UCTeW2DTQjf2CrStYylchAUg",
+      "name": "Marc Baskes",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UCT6oahHRrtmkRFRymhmeD_g",
+      "name": "Marc Lesan",
+      "categories": [
+        "diversió"
+      ],
+      "category": "diversió"
+    },
+    {
+      "id": "UCB8I9dUJ2dI5aKKTn0WCSRQ",
+      "name": "Míriam Haze",
+      "categories": [
+        "gaming"
+      ],
+      "category": "gaming"
+    },
+    {
+      "id": "UCuo3iIQ9q2o2zZmXXvYLAIA",
+      "name": "MissTagless",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
+      "id": "UCeKFhW7Ni8_CJU6EVXfX46Q",
+      "name": "Museu Terra",
+      "categories": [
+        "entitats"
+      ],
+      "category": "entitats"
+    },
+    {
       "id": "UCPo0g32vdypYi8X_oOQlPBQ",
       "name": "NacióTV",
       "categories": [
@@ -416,6 +704,14 @@
         "el món"
       ],
       "category": "el món"
+    },
+    {
+      "id": "UCJacrtImXjm0NxH5UGWddYw",
+      "name": "Nexe Nacional",
+      "categories": [
+        "entitats"
+      ],
+      "category": "entitats"
     },
     {
       "id": "UCW1ZdYsRaVbp4X_ppZ9_wZg",
@@ -442,12 +738,28 @@
       "category": "el món"
     },
     {
+      "id": "UCj7uJq2rt5OKWCTh93J2Pog",
+      "name": "ONtravelling",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
       "id": "UCHwg1QG8c6WrDZm_J6oAweg",
       "name": "País Invisible Podcast",
       "categories": [
         "cultura"
       ],
       "category": "cultura"
+    },
+    {
+      "id": "UCHzgcTNEeLBt5RmFURGR-zw",
+      "name": "Paraula de Rahola",
+      "categories": [
+        "el món"
+      ],
+      "category": "el món"
     },
     {
       "id": "UCjbCdLq72no0F4_WKWffnmw",
@@ -522,12 +834,44 @@
       "category": "gaming"
     },
     {
+      "id": "UCyVLnWkfIkgTjJWyy0UyrOA",
+      "name": "Smile and Learn - Català",
+      "categories": [
+        "cultura"
+      ],
+      "category": "cultura"
+    },
+    {
+      "id": "UCmHWnvmYhBaBftDdt7xiX1A",
+      "name": "SocTastaolletes",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
+    },
+    {
       "id": "UCR02uhLihApwzJ2-dhFBQbg",
       "name": "Tirant lo dau",
       "categories": [
         "gaming"
       ],
       "category": "gaming"
+    },
+    {
+      "id": "UC3lLPAOb4cKzj6UN71cqeyQ",
+      "name": "Uep! Com anam? IB3",
+      "categories": [
+        "mitjans"
+      ],
+      "category": "mitjans"
+    },
+    {
+      "id": "UCjTyN0vgWG-8I_ltE3b5BzA",
+      "name": "Ulls d'Otus",
+      "categories": [
+        "vida"
+      ],
+      "category": "vida"
     },
     {
       "id": "UCxUct190LRnBcmqEPFd4HgQ",
@@ -576,350 +920,6 @@
         "gaming"
       ],
       "category": "gaming"
-    },
-    {
-      "id": "UCH53ue1LvguXxuUzHs8KjKQ",
-      "name": "Institut Nova Història",
-      "categories": [
-        "entitats"
-      ],
-      "category": "entitats"
-    },
-    {
-      "id": "UC39QbSGf29J8fWJfEQqYhyA",
-      "name": "CFEM",
-      "categories": [
-        "entitats"
-      ],
-      "category": "entitats"
-    },
-    {
-      "id": "UC-N1tXokYk1mSVkmm6e5x_g",
-      "name": "EL BUIRAC DE MEMÒRIES",
-      "categories": [
-        "cultura"
-      ],
-      "category": "cultura"
-    },
-    {
-      "id": "UCcOh4_iym9H-q5HSHjPg4Xw",
-      "name": "3CatCultura",
-      "categories": [
-        "mitjans"
-      ],
-      "category": "mitjans"
-    },
-    {
-      "id": "UCTOJJTxi7__LJ7z36cQ3PhA",
-      "name": "CUP Comarques Gironines",
-      "categories": [
-        "entitats"
-      ],
-      "category": "entitats"
-    },
-    {
-      "id": "UCpIWhEzmE8OJfTf54S-2knA",
-      "name": "Fòrum de Debats",
-      "categories": [
-        "entitats"
-      ],
-      "category": "entitats"
-    },
-    {
-      "id": "UCgwuoJvIn3nrsGDelo2TRKQ",
-      "name": "La CLAU de la nostra història",
-      "categories": [
-        "cultura"
-      ],
-      "category": "cultura"
-    },
-    {
-      "id": "UCeKFhW7Ni8_CJU6EVXfX46Q",
-      "name": "Museu Terra",
-      "categories": [
-        "entitats"
-      ],
-      "category": "entitats"
-    },
-    {
-      "id": "UClwJkRkjtBnMirSma1AoNGw",
-      "name": "Godai Garcia",
-      "categories": [
-        "diversió"
-      ],
-      "category": "diversió"
-    },
-    {
-      "id": "UCJacrtImXjm0NxH5UGWddYw",
-      "name": "Nexe Nacional",
-      "categories": [
-        "entitats"
-      ],
-      "category": "entitats"
-    },
-    {
-      "id": "UCVG5bGyAHBJGkFsQHhfGIRA",
-      "name": "Isabel y Pedro",
-      "categories": [
-        "cultura"
-      ],
-      "category": "cultura"
-    },
-    {
-      "id": "UCyVLnWkfIkgTjJWyy0UyrOA",
-      "name": "Smile and Learn - Català",
-      "categories": [
-        "cultura"
-      ],
-      "category": "cultura"
-    },
-    {
-      "id": "UC3lLPAOb4cKzj6UN71cqeyQ",
-      "name": "Uep! Com anam? IB3",
-      "categories": [
-        "mitjans"
-      ],
-      "category": "mitjans"
-    },
-    {
-      "id": "UCxWzPQqjZpHhM_BF5eCHvMQ",
-      "name": "Els Ulls de Clio",
-      "categories": [
-        "cultura"
-      ],
-      "category": "cultura"
-    },
-    {
-      "id": "UCjTyN0vgWG-8I_ltE3b5BzA",
-      "name": "Ulls d'Otus",
-      "categories": [
-        "vida"
-      ],
-      "category": "vida"
-    },
-    {
-      "id": "UCfJJW4YzguKAKBKPdKNXmLg",
-      "name": "El Foment",
-      "categories": [
-        "entitats"
-      ],
-      "category": "entitats"
-    },
-    {
-      "id": "UC-Z3S_8M0LEm3LiH7OiOjGQ",
-      "name": "Canal Malaia",
-      "categories": [
-        "vida"
-      ],
-      "category": "vida"
-    },
-    {
-      "id": "UCuo3iIQ9q2o2zZmXXvYLAIA",
-      "name": "MissTagless",
-      "categories": [
-        "vida"
-      ],
-      "category": "vida"
-    },
-    {
-      "id": "UCTkaDEDEHGSit4VGegXXyXw",
-      "name": "Kilometre0.cat",
-      "categories": [
-        "vida"
-      ],
-      "category": "vida"
-    },
-    {
-      "id": "UCHzgcTNEeLBt5RmFURGR-zw",
-      "name": "Paraula de Rahola",
-      "categories": [
-        "el món"
-      ],
-      "category": "el món"
-    },
-    {
-      "id": "UCT6oahHRrtmkRFRymhmeD_g",
-      "name": "Marc Lesan",
-      "categories": [
-        "diversió"
-      ],
-      "category": "diversió"
-    },
-    {
-      "id": "UCH80jJlGreWRsDADMdFzHow",
-      "name": "Gerard Sesé",
-      "categories": [
-        "el món"
-      ],
-      "category": "el món"
-    },
-    {
-      "id": "UCTeW2DTQjf2CrStYylchAUg",
-      "name": "Marc Baskes",
-      "categories": [
-        "vida"
-      ],
-      "category": "vida"
-    },
-    {
-      "id": "UCB8I9dUJ2dI5aKKTn0WCSRQ",
-      "name": "Míriam Haze",
-      "categories": [
-        "gaming"
-      ],
-      "category": "gaming"
-    },
-    {
-      "id": "UCqRk7FOpGRxsMWKXwdYctUg",
-      "name": "Aventuraxjapo",
-      "categories": [
-        "vida"
-      ],
-      "category": "vida"
-    },
-    {
-      "id": "UCj7uJq2rt5OKWCTh93J2Pog",
-      "name": "ONtravelling",
-      "categories": [
-        "vida"
-      ],
-      "category": "vida"
-    },
-    {
-      "id": "UCNtezF37nO6X2-1GcGb2oTw",
-      "name": "anna around",
-      "categories": [
-        "vida"
-      ],
-      "category": "vida"
-    },
-    {
-      "id": "UCqLXSrV4VtacRY0ARFKEuPQ",
-      "name": "MagnoliaMagnolia",
-      "categories": [
-        "cultura"
-      ],
-      "category": "cultura"
-    },
-    {
-      "id": "UCCyst_DBtHMrPl2sxlUKbhg",
-      "name": "ESTEVEROVIRATEAM",
-      "categories": [
-        "diversió"
-      ],
-      "category": "diversió"
-    },
-    {
-      "id": "UCb0bcXU4nQsbRhahTervk2Q",
-      "name": "Albert Campos",
-      "categories": [
-        "cultura"
-      ],
-      "category": "cultura"
-    },
-    {
-      "id": "UC5RaBBf6V5G-AHIH1ggRxKQ",
-      "name": "dreamtraveldream",
-      "categories": [
-        "vida"
-      ],
-      "category": "vida"
-    },
-    {
-      "id": "UCMs5RmZu4Wo1Lfa9jDzkoCg",
-      "name": "Farners Pei Hong",
-      "categories": [
-        "vida"
-      ],
-      "category": "vida"
-    },
-    {
-      "id": "UCedPgkOLyD-WQEOxK-gHfFw",
-      "name": "EA3HSL RADIOAFICIONAT",
-      "categories": [
-        "diversió"
-      ],
-      "category": "diversió"
-    },
-    {
-      "id": "UCmHWnvmYhBaBftDdt7xiX1A",
-      "name": "SocTastaolletes",
-      "categories": [
-        "vida"
-      ],
-      "category": "vida"
-    },
-    {
-      "id": "UCbzVpjfa-zhxR-4tGF6a7Gw",
-      "name": "AVENTURA DE VIURE",
-      "categories": [
-        "vida"
-      ],
-      "category": "vida"
-    },
-    {
-      "id": "UCeZ1cOrjCrcsEc61uXYkRog",
-      "name": "horturba",
-      "categories": [
-        "vida"
-      ],
-      "category": "vida"
-    },
-    {
-      "id": "UC_3DCnrM0jKIWGjpVanOVqA",
-      "name": "Irina García",
-      "categories": [
-        "vida"
-      ],
-      "category": "vida"
-    },
-    {
-      "id": "UCDXS2WP3t8quZF9ztBBpkHw",
-      "name": "Família Caricú",
-      "categories": [
-        "vida"
-      ],
-      "category": "vida"
-    },
-    {
-      "id": "UCknxM9mNyL_rpfpk1B1V_kA",
-      "name": "Devir Cat",
-      "categories": [
-        "gaming"
-      ],
-      "category": "gaming"
-    },
-    {
-      "id": "UCxQHLgFEKI_Z2CLI-9MUN4w",
-      "name": "Anthony Sànchez",
-      "categories": [
-        "entitats"
-      ],
-      "category": "entitats"
-    },
-    {
-      "id": "UCJ0nTmQimARctjT6YfCVevA",
-      "name": "L'Arrabassada",
-      "categories": [
-        "el món"
-      ],
-      "category": "el món"
-    },
-    {
-      "id": "UCSkt3NKa-7ZQjxYX-bD_FJQ",
-      "name": "Berta Aroca i Chica",
-      "categories": [
-        "vida"
-      ],
-      "category": "vida"
-    },
-    {
-      "id": "UC53AwVEoOElXMqnWIL4IHxQ",
-      "name": "juliana canet",
-      "categories": [
-        "vida"
-      ],
-      "category": "vida"
     }
   ]
 }
