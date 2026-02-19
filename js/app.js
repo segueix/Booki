@@ -3868,6 +3868,41 @@ function createShortCard(video) {
 
 // ==================== SHORTS MANAGEMENT ====================
 
+// Entrellaça shorts per minimitzar dos shorts consecutius del mateix canal.
+// Algorisme greedy: a cada pas tria el canal amb més shorts pendents
+// que no sigui el mateix que l'anterior.
+function interleaveShortsByChannel(shorts) {
+    if (shorts.length <= 1) return shorts;
+
+    const channelMap = new Map();
+    for (const short of shorts) {
+        const key = short.channelId || short.channelTitle || '_';
+        if (!channelMap.has(key)) channelMap.set(key, []);
+        channelMap.get(key).push(short);
+    }
+
+    let buckets = [...channelMap.values()];
+    const result = [];
+    let lastKey = null;
+
+    while (buckets.length > 0) {
+        buckets.sort((a, b) => b.length - a.length);
+        let idx = 0;
+        if (
+            buckets.length > 1 &&
+            (buckets[0][0].channelId || buckets[0][0].channelTitle || '_') === lastKey
+        ) {
+            idx = 1;
+        }
+        const short = buckets[idx].shift();
+        result.push(short);
+        lastKey = short.channelId || short.channelTitle || '_';
+        if (buckets[idx].length === 0) buckets.splice(idx, 1);
+    }
+
+    return result;
+}
+
 function openShortModal(videoId) {
     const modal = document.getElementById('short-modal');
     if (!modal) return;
@@ -3901,8 +3936,10 @@ function openShortModal(videoId) {
             });
         }
 
-        // Cua: shorts no vistos d'aquesta categoria
-        currentShortsQueue = filterOutWatchedVideos(categoryFiltered.filter(v => v.isShort));
+        // Cua: shorts no vistos d'aquesta categoria, entrellaçats per canal
+        currentShortsQueue = interleaveShortsByChannel(
+            filterOutWatchedVideos(categoryFiltered.filter(v => v.isShort))
+        );
 
         // Sempre inclou el short clicat explícitament (pot ser ja vist)
         const currentVideoIdStr = String(videoId);
