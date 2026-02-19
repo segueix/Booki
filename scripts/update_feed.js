@@ -494,6 +494,36 @@ async function main() {
             }
         }
 
+        // Afegir canals configurats però sense vídeos (perquè apareguin a la Biblioteca)
+        const allConfiguredIds = channels.map(ch => ch.id).filter(Boolean);
+        const missingChannelIds = allConfiguredIds.filter(id => !channelMetadata[id]);
+        if (missingChannelIds.length > 0) {
+            console.log(`🔎 Carregant metadades per ${missingChannelIds.length} canals sense vídeos...`);
+            const missingChunks = chunkArray(missingChannelIds, 50);
+            for (const chunk of missingChunks) {
+                const cUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${chunk.join(',')}&key=${API_KEY}`;
+                const cData = await fetchYouTubeData(cUrl);
+                if (Array.isArray(cData.items)) {
+                    cData.items.forEach(item => {
+                        const thumbnail = item.snippet?.thumbnails?.high?.url
+                            || item.snippet?.thumbnails?.medium?.url
+                            || '';
+                        const customUrl = item.snippet?.customUrl || '';
+                        const handle = customUrl
+                            ? (customUrl.startsWith('@') ? customUrl : `@${customUrl}`)
+                            : '';
+                        channelMetadata[item.id] = {
+                            name: item.snippet?.title || '',
+                            avatar: thumbnail,
+                            description: truncateText(item.snippet?.description || ''),
+                            handle,
+                            subscriberCount: Number(item.statistics?.subscriberCount || 0)
+                        };
+                    });
+                }
+            }
+        }
+
         const categoriesBySourceId = new Map(
             channels.map(channel => [channel.id, channel.categories || []])
         );
@@ -512,6 +542,15 @@ async function main() {
             const categories = Array.from(categoriesByChannelId.get(channelId) || []);
             if (categories.length > 0) {
                 channelMetadata[channelId].categories = categories;
+            }
+        });
+
+        // Canals sense vídeos: assignar categories directament del full de càlcul
+        missingChannelIds.forEach(channelId => {
+            if (!channelMetadata[channelId]) return;
+            const cats = categoriesBySourceId.get(channelId) || [];
+            if (cats.length > 0) {
+                channelMetadata[channelId].categories = cats;
             }
         });
 

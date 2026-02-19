@@ -550,6 +550,8 @@ main,
     color: #ffffff;
     cursor: pointer;
     transition: background 0.2s, border-color 0.2s, filter 0.2s;
+    -webkit-appearance: none;
+    appearance: none;
 }
 
 .icon-btn:hover {
@@ -3397,6 +3399,15 @@ button:disabled,
 .library-share-btn {
     width: 44px;
     height: 44px;
+}
+
+.library-share-btn.btn-round-icon {
+    background-color: var(--color-button-accent);
+}
+
+.library-share-btn.btn-round-icon:hover {
+    background-color: var(--color-button-accent);
+    filter: brightness(1.2);
 }
 
 .library-share-btn svg,

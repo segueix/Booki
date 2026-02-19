@@ -904,6 +904,68 @@ function isCustomCategory(category) {
     return getCustomTags().some(tag => tag.toLowerCase() === normalized);
 }
 
+function initDefaultSmartCategories() {
+    if (localStorage.getItem('catube_defaults_v1')) return;
+
+    const DEFAULT_TAG = '"Canal Jove"'; // stored with quotes, displayed without
+    const DEFAULT_CHANNELS = [
+        'UCSkt3NKa-7ZQjxYX-bD_FJQ',
+        'UCMs5RmZu4Wo1Lfa9jDzkoCg',
+        'UC5Ha9G3Tp_17qcC38GPPvQg',
+        'UCOzd_BhDxbQZ8Y2H1j9wOOg',
+        'UC5ytRP5VNigPHovAY7kyicQ',
+        'UCuo3iIQ9q2o2zZmXXvYLAIA',
+        'UCPikYBuH-XamjDe1OuEiLfA',
+        'UC5j3iZVh9Bzhxn-K7_yK2Tg',
+        'UCyVLnWkfIkgTjJWyy0UyrOA',
+        'UCHnWdAPT4U0CRf0MO5XmJgA',
+        'UC1IsIqLMItHMn-SgnKJBRWw',
+        'UCPn1nFLeba3BIU5Q11tEpdQ',
+        'UC-Z3S_8M0LEm3LiH7OiOjGQ',
+        'UC53AwVEoOElXMqnWIL4IHxQ'
+    ];
+
+    const normalizedDefault = normalizeCustomTag(DEFAULT_TAG).toLowerCase();
+
+    // Add tag to custom tags list
+    try {
+        const stored = localStorage.getItem(CUSTOM_TAGS_STORAGE_KEY);
+        const existing = stored ? JSON.parse(stored) : [];
+        const list = Array.isArray(existing) ? existing : [];
+        const alreadyExists = list.some(t => normalizeCustomTag(t).toLowerCase() === normalizedDefault);
+        if (!alreadyExists) {
+            list.push(DEFAULT_TAG);
+            localStorage.setItem(CUSTOM_TAGS_STORAGE_KEY, JSON.stringify(list));
+        }
+    } catch (e) {
+        localStorage.setItem(CUSTOM_TAGS_STORAGE_KEY, JSON.stringify([DEFAULT_TAG]));
+    }
+
+    // Assign tag to each default channel
+    try {
+        const stored = localStorage.getItem(CHANNEL_CUSTOM_CATEGORIES_KEY);
+        const existing = stored ? JSON.parse(stored) : {};
+        const obj = (existing && typeof existing === 'object') ? existing : {};
+        for (const channelId of DEFAULT_CHANNELS) {
+            const cats = Array.isArray(obj[channelId]) ? obj[channelId] : [];
+            const alreadyHas = cats.some(c => normalizeCustomTag(c).toLowerCase() === normalizedDefault);
+            if (!alreadyHas) {
+                cats.push(DEFAULT_TAG);
+                obj[channelId] = cats;
+            }
+        }
+        localStorage.setItem(CHANNEL_CUSTOM_CATEGORIES_KEY, JSON.stringify(obj));
+    } catch (e) {
+        const obj = {};
+        for (const channelId of DEFAULT_CHANNELS) {
+            obj[channelId] = [DEFAULT_TAG];
+        }
+        localStorage.setItem(CHANNEL_CUSTOM_CATEGORIES_KEY, JSON.stringify(obj));
+    }
+
+    localStorage.setItem('catube_defaults_v1', '1');
+}
+
 const SHARE_INTRO_TEXT = 'Descobreix els nostres Youtubers:';
 const SHARE_IMAGE_NAME = 'icon-512.png';
 
@@ -1117,6 +1179,7 @@ function initIntroSplash() {
 
 // Inicialitzar l'aplicació
 document.addEventListener('DOMContentLoaded', async () => {
+    initDefaultSmartCategories();
     initIntroSplash();
     initElements();
     loadGridLayoutPreference();
@@ -7295,7 +7358,7 @@ function renderSmartCategoriesTab() {
 
     const categoriesWithChannels = allTags.map(tag => {
         const channelIds = Object.entries(channelCatsRaw)
-            .filter(([, cats]) => cats.some(c => String(c).toLowerCase() === tag.toLowerCase()))
+            .filter(([, cats]) => cats.some(c => normalizeCustomTag(String(c)).toLowerCase() === tag.toLowerCase()))
             .map(([id]) => id);
         return { tag, channelIds };
     }).filter(({ channelIds }) => channelIds.length > 0);
