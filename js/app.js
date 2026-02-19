@@ -666,6 +666,14 @@ function saveChannelCustomCategories(channelId, categories) {
     localStorage.setItem(CHANNEL_CUSTOM_CATEGORIES_KEY, JSON.stringify(parsed));
 }
 
+function removeCategoryFromChannel(channelId, category) {
+    const normalized = normalizeCustomTag(category);
+    if (!normalized) return;
+    const current = getChannelCustomCategories(channelId);
+    const next = current.filter(c => c.toLowerCase() !== normalized.toLowerCase());
+    saveChannelCustomCategories(channelId, next);
+}
+
 function addChannelCustomCategory(channelId, category) {
     if (!channelId) {
         return [];
@@ -1275,11 +1283,27 @@ function initElements() {
     libraryTabs = document.getElementById('libraryTabs');
     if (smartCategoriesList) {
         smartCategoriesList.addEventListener('click', (e) => {
-            const btn = e.target.closest('.smart-cat-share-btn');
-            if (!btn) return;
-            const categoryName = btn.dataset.category;
-            const channelIds = btn.dataset.channels.split(',').map(decodeURIComponent).filter(Boolean);
-            shareCategoryWithYoutubers(categoryName, channelIds);
+            // Compartir categoria
+            const shareBtn = e.target.closest('.smart-cat-share-btn');
+            if (shareBtn) {
+                const categoryName = shareBtn.dataset.category;
+                const channelIds = shareBtn.dataset.channels.split(',').map(decodeURIComponent).filter(Boolean);
+                shareCategoryWithYoutubers(categoryName, channelIds);
+                return;
+            }
+            // Eliminar categoria sencera
+            const deleteBtn = e.target.closest('.smart-cat-delete-btn');
+            if (deleteBtn) {
+                const categoryName = deleteBtn.dataset.category;
+                if (removeCustomTag(categoryName)) renderSmartCategoriesTab();
+                return;
+            }
+            // Eliminar youtuber d'una categoria
+            const removeBtn = e.target.closest('.smart-cat-channel-remove');
+            if (removeBtn) {
+                removeCategoryFromChannel(removeBtn.dataset.channelId, removeBtn.dataset.category);
+                renderSmartCategoriesTab();
+            }
         });
     }
     followPage = document.getElementById('followPage');
@@ -7285,6 +7309,11 @@ function renderSmartCategoriesTab() {
     }
 
     smartCategoriesList.innerHTML = categoriesWithChannels.map(({ tag, channelIds }) => {
+        // Portada: darrer vídeo del primer canal de la llista
+        const firstChVideos = (cachedAPIVideos || []).filter(v => String(v.channelId) === String(channelIds[0]));
+        const newestResult = getNewestVideoFromList(firstChVideos);
+        const thumbUrl = escapeHtml(newestResult?.video?.thumbnail || 'img/icon-512.png');
+
         const channelsMarkup = channelIds.map(channelId => {
             const channelObj = cachedChannels[channelId] || {};
             const avatar = resolveChannelAvatar(channelId, channelObj) || 'img/icon-192.png';
@@ -7293,24 +7322,38 @@ function renderSmartCategoriesTab() {
                 <div class="smart-cat-channel-row">
                     <img class="smart-cat-channel-avatar" src="${escapeHtml(avatar)}" alt="${escapeHtml(name)}" loading="lazy">
                     <span class="smart-cat-channel-name">${escapeHtml(name)}</span>
+                    <button class="smart-cat-channel-remove"
+                            data-category="${escapeHtml(tag)}"
+                            data-channel-id="${escapeHtml(channelId)}"
+                            title="Eliminar ${escapeHtml(name)} d'aquesta categoria"
+                            aria-label="Eliminar ${escapeHtml(name)}">×</button>
                 </div>`;
         }).join('');
 
         const count = channelIds.length;
         return `
             <div class="smart-category-card">
-                <div class="smart-category-header">
-                    <span class="smart-category-name">${escapeHtml(tag)}</span>
-                    <button class="btn-round-icon smart-cat-share-btn"
-                            data-category="${escapeHtml(tag)}"
-                            data-channels="${channelIds.map(encodeURIComponent).join(',')}"
-                            title="Compartir categoria"
-                            style="width:32px; height:32px; min-width:32px; min-height:32px; background:rgba(255,255,255,0.1);">
-                        <i data-lucide="share-2" style="width:16px; height:16px;"></i>
-                    </button>
+                <button class="smart-cat-delete-btn"
+                        data-category="${escapeHtml(tag)}"
+                        title="Eliminar categoria"
+                        aria-label="Eliminar categoria ${escapeHtml(tag)}">×</button>
+                <div class="smart-cat-thumb">
+                    <img src="${thumbUrl}" alt="" loading="lazy">
                 </div>
-                <div class="smart-category-meta">${count} canal${count !== 1 ? 's' : ''}</div>
-                <div class="smart-cat-channels-list">${channelsMarkup}</div>
+                <div class="smart-cat-body">
+                    <div class="smart-category-header">
+                        <span class="smart-category-name">${escapeHtml(tag)}</span>
+                        <button class="btn-round-icon smart-cat-share-btn"
+                                data-category="${escapeHtml(tag)}"
+                                data-channels="${channelIds.map(encodeURIComponent).join(',')}"
+                                title="Compartir categoria"
+                                style="width:28px; height:28px; min-width:28px; min-height:28px; background:rgba(255,255,255,0.1);">
+                            <i data-lucide="share-2" style="width:14px; height:14px;"></i>
+                        </button>
+                    </div>
+                    <div class="smart-category-meta">${count} canal${count !== 1 ? 's' : ''}</div>
+                    <div class="smart-cat-channels-list">${channelsMarkup}</div>
+                </div>
             </div>`;
     }).join('');
 
