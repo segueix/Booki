@@ -7308,6 +7308,12 @@ function renderSmartCategoriesTab() {
         return;
     }
 
+    // Mapa id→canal des de feedChannels (font amb avatar real)
+    const feedChannelMap = new Map(
+        (Array.isArray(YouTubeAPI?.getAllChannels?.()) ? YouTubeAPI.getAllChannels() : [])
+            .map(ch => [String(ch.id), ch])
+    );
+
     smartCategoriesList.innerHTML = categoriesWithChannels.map(({ tag, channelIds }) => {
         // Portada: darrer vídeo del primer canal de la llista
         const firstChVideos = (cachedAPIVideos || []).filter(v => String(v.channelId) === String(channelIds[0]));
@@ -7315,9 +7321,11 @@ function renderSmartCategoriesTab() {
         const thumbUrl = escapeHtml(newestResult?.video?.thumbnail || 'img/icon-512.png');
 
         const channelsMarkup = channelIds.map(channelId => {
-            const channelObj = cachedChannels[channelId] || {};
-            const avatar = resolveChannelAvatar(channelId, channelObj) || 'img/icon-192.png';
-            const name = channelObj.name || channelId;
+            const feedCh = feedChannelMap.get(String(channelId));
+            const avatar = feedCh?.avatar || feedCh?.thumbnail
+                || resolveChannelAvatar(channelId, cachedChannels[channelId] || {})
+                || 'img/icon-192.png';
+            const name = feedCh?.name || cachedChannels[channelId]?.name || channelId;
             return `
                 <div class="smart-cat-channel-row">
                     <img class="smart-cat-channel-avatar" src="${escapeHtml(avatar)}" alt="${escapeHtml(name)}" loading="lazy">
