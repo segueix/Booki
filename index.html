@@ -229,13 +229,22 @@
     </div>
 
     <div id="playlistsPage" class="main-content hidden">
-        <h1 class="page-title">Llistes de Reproducció</h1>
-        <p class="page-subtitle">Crea i gestiona les teves llistes personalitzades.</p>
-        <div class="playlist-create">
-            <input id="playlistNameInput" class="playlist-input" type="text" placeholder="Nom de la llista" aria-label="Nom de la llista">
-            <button id="createPlaylistBtn" class="playlist-create-btn" type="button">Crear nova llista</button>
+        <h1 class="page-title">Biblioteca</h1>
+        <p class="page-subtitle">Crea i gestiona les teves llistes i categories personalitzades.</p>
+        <div class="library-tabs" id="libraryTabs" role="tablist">
+            <button class="library-tab is-active" type="button" role="tab" data-library-tab="playlists">Llistes de Reproducció</button>
+            <button class="library-tab" type="button" role="tab" data-library-tab="smart-categories">Categories Intel·ligents</button>
         </div>
-        <div id="playlistsList" class="playlists-list"></div>
+        <div id="libraryTabPlaylists" class="library-tab-panel">
+            <div class="playlist-create">
+                <input id="playlistNameInput" class="playlist-input" type="text" placeholder="Nom de la llista" aria-label="Nom de la llista">
+                <button id="createPlaylistBtn" class="playlist-create-btn" type="button">Crear nova llista</button>
+            </div>
+            <div id="playlistsList" class="playlists-list"></div>
+        </div>
+        <div id="libraryTabSmartCategories" class="library-tab-panel hidden">
+            <div id="smartCategoriesList" class="smart-categories-list"></div>
+        </div>
     </div>
 
     <div id="followPage" class="main-content hidden" aria-labelledby="followPageTitle">
@@ -265,7 +274,7 @@
             <div id="shortScrollHint" class="short-scroll-hint" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <line x1="12" y1="4" x2="12" y2="20" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
-                    <polyline points="5 13 12 20 19 13" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <polyline points="5 11 12 4 19 11" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
             </div>
 

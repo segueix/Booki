@@ -47,7 +47,8 @@ function getVideoDisplayDuration(video) {
 let sidebar, menuBtn, videosGrid, homePage, watchPage, loading, mainContent;
 let historyPage, historyGrid, historyFilters, chipsBar;
 let customCategoryModal, customCategoryInput, customCategoryAddBtn, customCategoryModalClose;
-let playlistsPage, playlistsList, playlistNameInput, createPlaylistBtn;
+let playlistsPage, playlistsList, playlistNameInput, createPlaylistBtn, smartCategoriesList, libraryTabs;
+let activeLibraryTab = 'playlists';
 let followPage, followGrid, followTabs;
 let addYoutuberModal;
 let heroSection, heroTitle, heroDescription, heroImage, heroDuration, heroButton, heroEyebrow, heroChannel;
@@ -665,6 +666,14 @@ function saveChannelCustomCategories(channelId, categories) {
     localStorage.setItem(CHANNEL_CUSTOM_CATEGORIES_KEY, JSON.stringify(parsed));
 }
 
+function removeCategoryFromChannel(channelId, category) {
+    const normalized = normalizeCustomTag(category);
+    if (!normalized) return;
+    const current = getChannelCustomCategories(channelId);
+    const next = current.filter(c => c.toLowerCase() !== normalized.toLowerCase());
+    saveChannelCustomCategories(channelId, next);
+}
+
 function addChannelCustomCategory(channelId, category) {
     if (!channelId) {
         return [];
@@ -1270,6 +1279,33 @@ function initElements() {
     playlistsList = document.getElementById('playlistsList');
     playlistNameInput = document.getElementById('playlistNameInput');
     createPlaylistBtn = document.getElementById('createPlaylistBtn');
+    smartCategoriesList = document.getElementById('smartCategoriesList');
+    libraryTabs = document.getElementById('libraryTabs');
+    if (smartCategoriesList) {
+        smartCategoriesList.addEventListener('click', (e) => {
+            // Compartir categoria
+            const shareBtn = e.target.closest('.smart-cat-share-btn');
+            if (shareBtn) {
+                const categoryName = shareBtn.dataset.category;
+                const channelIds = shareBtn.dataset.channels.split(',').map(decodeURIComponent).filter(Boolean);
+                shareCategoryWithYoutubers(categoryName, channelIds);
+                return;
+            }
+            // Eliminar categoria sencera
+            const deleteBtn = e.target.closest('.smart-cat-delete-btn');
+            if (deleteBtn) {
+                const categoryName = deleteBtn.dataset.category;
+                if (removeCustomTag(categoryName)) renderSmartCategoriesTab();
+                return;
+            }
+            // Eliminar youtuber d'una categoria
+            const removeBtn = e.target.closest('.smart-cat-channel-remove');
+            if (removeBtn) {
+                removeCategoryFromChannel(removeBtn.dataset.channelId, removeBtn.dataset.category);
+                renderSmartCategoriesTab();
+            }
+        });
+    }
     followPage = document.getElementById('followPage');
     followGrid = document.getElementById('followGrid');
     followTabs = document.getElementById('followTabs');
@@ -1399,6 +1435,16 @@ function initEventListeners() {
             }
         });
     });
+
+    if (libraryTabs) {
+        libraryTabs.querySelectorAll('.library-tab').forEach(tab => {
+            tab.addEventListener('click', (event) => {
+                event.preventDefault();
+                const tabId = tab.dataset.libraryTab;
+                if (tabId) setActiveLibraryTab(tabId);
+            });
+        });
+    }
 
     if (followTabs) {
         followTabs.querySelectorAll('.follow-tab').forEach(tab => {
@@ -3868,6 +3914,41 @@ function createShortCard(video) {
 
 // ==================== SHORTS MANAGEMENT ====================
 
+// Entrellaça shorts per minimitzar dos shorts consecutius del mateix canal.
+// Algorisme greedy: a cada pas tria el canal amb més shorts pendents
+// que no sigui el mateix que l'anterior.
+function interleaveShortsByChannel(shorts) {
+    if (shorts.length <= 1) return shorts;
+
+    const channelMap = new Map();
+    for (const short of shorts) {
+        const key = short.channelId || short.channelTitle || '_';
+        if (!channelMap.has(key)) channelMap.set(key, []);
+        channelMap.get(key).push(short);
+    }
+
+    let buckets = [...channelMap.values()];
+    const result = [];
+    let lastKey = null;
+
+    while (buckets.length > 0) {
+        buckets.sort((a, b) => b.length - a.length);
+        let idx = 0;
+        if (
+            buckets.length > 1 &&
+            (buckets[0][0].channelId || buckets[0][0].channelTitle || '_') === lastKey
+        ) {
+            idx = 1;
+        }
+        const short = buckets[idx].shift();
+        result.push(short);
+        lastKey = short.channelId || short.channelTitle || '_';
+        if (buckets[idx].length === 0) buckets.splice(idx, 1);
+    }
+
+    return result;
+}
+
 function openShortModal(videoId) {
     const modal = document.getElementById('short-modal');
     if (!modal) return;
@@ -3901,8 +3982,10 @@ function openShortModal(videoId) {
             });
         }
 
-        // Cua: shorts no vistos d'aquesta categoria
-        currentShortsQueue = filterOutWatchedVideos(categoryFiltered.filter(v => v.isShort));
+        // Cua: shorts no vistos d'aquesta categoria, entrellaçats per canal
+        currentShortsQueue = interleaveShortsByChannel(
+            filterOutWatchedVideos(categoryFiltered.filter(v => v.isShort))
+        );
 
         // Sempre inclou el short clicat explícitament (pot ser ja vist)
         const currentVideoIdStr = String(videoId);
@@ -4539,15 +4622,12 @@ function renderPlaylistsPage() {
                     <button class="playlist-delete" type="button" data-playlist-id="${list.id}" aria-label="Esborrar llista" onclick="event.stopPropagation(); removePlaylist('${list.id}'); renderPlaylistsPage();">×</button>
                 </div>
                 <div class="playlist-card-body">
-                    <div class="playlist-card-title">
-                        ${escapeHtml(list.name)}
-                        <button class="btn-round-icon" 
-                                onclick="event.stopPropagation(); shareSegueixPlaylist('${escapeHtml(list.name)}')" 
-                                title="Compartir llista" 
-                                style="width:32px; height:32px; min-width:32px; min-height:32px; background:rgba(255,255,255,0.1);">
-                            <i data-lucide="share-2" style="width:16px; height:16px;"></i>
-                        </button>
-                    </div>
+                    <div class="playlist-card-title">${escapeHtml(list.name)}</div>
+                    <button class="btn-round-icon library-share-btn"
+                            onclick="event.stopPropagation(); shareSegueixPlaylist('${escapeHtml(list.name)}')"
+                            title="Compartir llista">
+                        <i data-lucide="share-2"></i>
+                    </button>
                     <div class="playlist-card-meta">${videoCount} vídeos</div>
                     ${videosMarkup}
                 </div>
@@ -7188,6 +7268,100 @@ function showHistory() {
     window.scrollTo(0, 0);
 }
 
+function setActiveLibraryTab(tabId) {
+    activeLibraryTab = tabId;
+    if (libraryTabs) {
+        libraryTabs.querySelectorAll('.library-tab').forEach(tab => {
+            tab.classList.toggle('is-active', tab.dataset.libraryTab === tabId);
+        });
+    }
+    const panelPlaylists = document.getElementById('libraryTabPlaylists');
+    const panelSmartCats = document.getElementById('libraryTabSmartCategories');
+    if (panelPlaylists) panelPlaylists.classList.toggle('hidden', tabId !== 'playlists');
+    if (panelSmartCats) panelSmartCats.classList.toggle('hidden', tabId !== 'smart-categories');
+
+    if (tabId === 'smart-categories') {
+        renderSmartCategoriesTab();
+    } else {
+        renderPlaylistsPage();
+    }
+}
+
+function renderSmartCategoriesTab() {
+    if (!smartCategoriesList) return;
+
+    const allTags = getCustomTags();
+    const channelCatsRaw = JSON.parse(localStorage.getItem(CHANNEL_CUSTOM_CATEGORIES_KEY) || '{}');
+
+    const categoriesWithChannels = allTags.map(tag => {
+        const channelIds = Object.entries(channelCatsRaw)
+            .filter(([, cats]) => cats.some(c => String(c).toLowerCase() === tag.toLowerCase()))
+            .map(([id]) => id);
+        return { tag, channelIds };
+    }).filter(({ channelIds }) => channelIds.length > 0);
+
+    if (categoriesWithChannels.length === 0) {
+        smartCategoriesList.innerHTML = '<div class="playlist-empty">No tens cap categoria intel·ligent amb canals assignats.</div>';
+        return;
+    }
+
+    // Mapa id→canal des de feedChannels (font amb avatar real)
+    const feedChannelMap = new Map(
+        (Array.isArray(YouTubeAPI?.getAllChannels?.()) ? YouTubeAPI.getAllChannels() : [])
+            .map(ch => [String(ch.id), ch])
+    );
+
+    smartCategoriesList.innerHTML = categoriesWithChannels.map(({ tag, channelIds }) => {
+        // Portada: darrer vídeo del primer canal de la llista
+        const firstChVideos = (cachedAPIVideos || []).filter(v => String(v.channelId) === String(channelIds[0]));
+        const newestResult = getNewestVideoFromList(firstChVideos);
+        const thumbUrl = escapeHtml(newestResult?.video?.thumbnail || 'img/icon-512.png');
+
+        const channelsMarkup = channelIds.map(channelId => {
+            const feedCh = feedChannelMap.get(String(channelId));
+            const avatar = feedCh?.avatar || feedCh?.thumbnail
+                || resolveChannelAvatar(channelId, cachedChannels[channelId] || {})
+                || 'img/icon-192.png';
+            const name = feedCh?.name || cachedChannels[channelId]?.name || channelId;
+            return `
+                <div class="smart-cat-channel-row">
+                    <img class="smart-cat-channel-avatar" src="${escapeHtml(avatar)}" alt="${escapeHtml(name)}" loading="lazy">
+                    <span class="smart-cat-channel-name">${escapeHtml(name)}</span>
+                    <button class="smart-cat-channel-remove"
+                            data-category="${escapeHtml(tag)}"
+                            data-channel-id="${escapeHtml(channelId)}"
+                            title="Eliminar ${escapeHtml(name)} d'aquesta categoria"
+                            aria-label="Eliminar ${escapeHtml(name)}">×</button>
+                </div>`;
+        }).join('');
+
+        const count = channelIds.length;
+        return `
+            <div class="smart-category-card">
+                <button class="smart-cat-delete-btn"
+                        data-category="${escapeHtml(tag)}"
+                        title="Eliminar categoria"
+                        aria-label="Eliminar categoria ${escapeHtml(tag)}">×</button>
+                <div class="smart-cat-thumb">
+                    <img src="${thumbUrl}" alt="" loading="lazy">
+                </div>
+                <div class="smart-cat-body">
+                    <div class="smart-category-name">${escapeHtml(tag)}</div>
+                    <button class="btn-round-icon library-share-btn smart-cat-share-btn"
+                            data-category="${escapeHtml(tag)}"
+                            data-channels="${channelIds.map(encodeURIComponent).join(',')}"
+                            title="Compartir categoria">
+                        <i data-lucide="share-2"></i>
+                    </button>
+                    <div class="smart-category-meta">${count} canal${count !== 1 ? 's' : ''}</div>
+                    <div class="smart-cat-channels-list">${channelsMarkup}</div>
+                </div>
+            </div>`;
+    }).join('');
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
 function showPlaylists() {
     handlePlayerVisibilityOnNavigation();
     exitPlaylistMode();
@@ -7209,7 +7383,7 @@ function showPlaylists() {
     if (chipsBar) {
         chipsBar.classList.add('hidden');
     }
-    renderPlaylistsPage();
+    setActiveLibraryTab(activeLibraryTab);
     window.scrollTo(0, 0);
 }
 
