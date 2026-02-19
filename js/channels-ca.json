@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-18T18:54:59.747Z",
+  "updatedAt": "2026-02-19T11:02:03.797Z",
   "channels": [
     {
       "id": "UCN1_BdVHGL8l0x2sWRUXJvQ",
@@ -205,9 +205,9 @@
       "id": "UCOmWJETLyAlFrHkmccOQ-3w",
       "name": "Esports IB3",
       "categories": [
-        "digitals"
+        "mitjans"
       ],
-      "category": "digitals"
+      "category": "mitjans"
     },
     {
       "id": "UC5ytRP5VNigPHovAY7kyicQ",
@@ -285,9 +285,9 @@
       "id": "UCgBd6ey27YnfwSUy2qpHmZw",
       "name": "IB3 Notícies",
       "categories": [
-        "digitals"
+        "mitjans"
       ],
-      "category": "digitals"
+      "category": "mitjans"
     },
     {
       "id": "UCiyqbY6juCPvXFKv6IkDTlw",
@@ -765,9 +765,9 @@
       "id": "UCB8I9dUJ2dI5aKKTn0WCSRQ",
       "name": "Míriam Haze",
       "categories": [
-        "vida"
+        "gaming"
       ],
-      "category": "vida"
+      "category": "gaming"
     },
     {
       "id": "UCqRk7FOpGRxsMWKXwdYctUg",
