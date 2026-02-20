@@ -600,6 +600,25 @@ function fase10_outline(contextComprimit, estructuraTriada, history, userConfig,
   return { response, history: newHistory };
 }
 
+// ─── FASE 10B: Auditoria automàtica de l'outline ───────────
+function fase10_auditarOutline(outlineGenerat, userConfig, tematica) {
+  var systemAuditoria = getSystemPrompt(tematica) +
+    '\n\nActues com un Editor implacable. Detectes forats de guió, capítols redundants i problemes de ritme.';
+  var msgs = [{
+    role: 'user',
+    content:
+      'Auditza aquest outline de capítols:\n\n' + (outlineGenerat || '') + '\n\n' +
+      'Tasques:\n' +
+      '1) Troba forats de guió i problemes de ritme.\n' +
+      '2) Si n\'hi ha, reescriu TOT l\'outline corregint-los.\n' +
+      '3) Si no n\'hi ha, retorna l\'outline igual (admet microajustos de claredat).\n\n' +
+      'Format ESTRICTE (res més):\n' +
+      'Cap. N — [Títol breu] | POV: [Nom] | [Objectiu narratiu en 10 paraules màxim] | Descobriment: [text breu]'
+  }];
+  var response = callLLM(msgs, systemAuditoria, Object.assign({}, userConfig, { maxTokens: 4096 }));
+  return { response: response };
+}
+
 // ─── FASE 13: Compilar bíblia de consistència (sense LLM) ───
 // dades: objecte amb tots els camps acumulats de l'ESTAT frontend.
 // Objectiu: document de ~800-1200 paraules que serà el context
@@ -762,7 +781,7 @@ function analitzarAmbEditor(userPrompt, userConfig) {
 // capitolsData: array de {num, outlineText, text} per als capítols generats.
 // biblia:       string (bíblia de consistència compilada).
 // userConfig:   configuració del LLM de l'usuari.
-function fase15_revisioCoherencia(capitolsData, biblia, userConfig) {
+function fase15_revisioCoherencia(capitolsData, biblia, userConfig, fetsCanonicsText, outlineFuturText) {
   var d = capitolsData || [];
 
   // Comprimir cada capítol: primeres i últimes 200 paraules + outline
@@ -779,8 +798,12 @@ function fase15_revisioCoherencia(capitolsData, biblia, userConfig) {
     ? '=== BÍBLIA DE REFERÈNCIA ===\n' + biblia.substring(0, 1200) + '\n\n'
     : '';
 
+  var fetsCanonicsRef = fetsCanonicsText && String(fetsCanonicsText).trim()
+    ? '=== FETS CANÒNICS RECENTS ===\n' + String(fetsCanonicsText).substring(0, 2000) + '\n\n'
+    : '';
+
   var userPrompt =
-    bibliaRef + resumCapitols + '\n\n---\n' +
+    bibliaRef + fetsCanonicsRef + resumCapitols + '\n\n---\n' +
     'Analitza la coherència dels ' + d.length + ' capítols anteriors. Identifica:\n' +
     '1. Contradiccions factuals (noms, dates, llocs, fets que canvien)\n' +
     '2. Canvis de to o veu narrativa injustificats\n' +
@@ -793,22 +816,85 @@ function fase15_revisioCoherencia(capitolsData, biblia, userConfig) {
     'Si no trobes cap problema real, escriu únicament: "Cap inconsistència detectada."\n' +
     'Cap comentari addicional fora d\'aquest format.';
 
-  var response = analitzarAmbEditor(userPrompt, userConfig);
-  return { response: response };
+  var propostaCritic = analitzarAmbEditor(userPrompt, userConfig);
+
+  if (!propostaCritic || !propostaCritic.trim() || /cap inconsistència detectada\./i.test(propostaCritic)) {
+    return { response: 'Cap inconsistència detectada.' };
+  }
+
+  var blocs = [];
+  var current = null;
+  propostaCritic.split('\n').forEach(function(line) {
+    var l = (line || '').trim();
+    if (/^PROBLEMA:/i.test(l)) {
+      if (current) blocs.push(current);
+      current = { problema: l.replace(/^PROBLEMA:\s*/i, '').trim(), correccio: '', capNum: null };
+    } else if (/^CORREC/i.test(l) && current) {
+      current.correccio = l.replace(/^CORREC[CÇ]I[ÓO]:\s*/i, '').trim();
+      var m = current.correccio.match(/^\[?Cap\.?\s*(\d+)\]?/i);
+      if (m) current.capNum = parseInt(m[1], 10);
+    } else if (current && l && !current.correccio) {
+      current.problema += ' ' + l;
+    }
+  });
+  if (current) blocs.push(current);
+
+  if (!blocs.length) return { response: 'Cap inconsistència detectada.' };
+
+  var aprovades = [];
+  blocs.forEach(function(bloc) {
+    if (!bloc || !bloc.correccio || !bloc.capNum) return;
+
+    var capNum = bloc.capNum;
+    var capsAfectats = d.filter(function(cap) { return cap && cap.num === capNum; });
+    var resumCapsAfectats = capsAfectats.map(function(cap) {
+      var txt = (cap.text || '').trim().split(/\s+/).slice(0, 260).join(' ');
+      return '=== CAPÍTOL ' + cap.num + ' ===\nOUTLINE: ' + (cap.outlineText || '') + '\nTEXT:\n' + txt;
+    }).join('\n\n');
+
+    var supervisorPrompt =
+      'Aquesta és una correcció proposada per al capítol ' + capNum + ':\n\n' +
+      'PROBLEMA: ' + (bloc.problema || '—') + '\n' +
+      'CORRECCIÓ: ' + bloc.correccio + '\n\n' +
+      '=== CAPÍTOLS AFECTATS ===\n' + (resumCapsAfectats || '—') + '\n\n' +
+      '=== OUTLINE FUTUR ===\n' + (outlineFuturText || '—') + '\n\n' +
+      'Aquesta és una correcció proposada per al capítol X. Si apliquem això, ¿es trenca algun esdeveniment que ha de passar als capítols futurs segons l\'outline? Respon \'APROVAT\' si és segur, o \'REBUTJAT\' seguit del motiu si trenca la història.';
+
+    var respostaSupervisor = analitzarAmbEditor(supervisorPrompt, userConfig);
+    if (/^\s*APROVAT\b/i.test(respostaSupervisor || '')) {
+      aprovades.push('PROBLEMA: ' + (bloc.problema || '—'));
+      aprovades.push('CORRECCIÓ: ' + bloc.correccio);
+    }
+  });
+
+  return { response: aprovades.length ? aprovades.join('\n') : 'Cap inconsistència detectada.' };
 }
 
 // ─── FASE 14: Escriure un capítol (patró anti-timeout, 2 parts) ──
 // partNum:      1 (primera meitat) o 2 (segona meitat)
 // historialPart: null per Part 1; historial retornat per Part 1 per a Part 2
-function escriureCapitol(partNum, numCapitol, totalCapitols, biblia, outlineCapitol, textCapAnterior, estilDesc, userConfig, tematica, historialPart) {
+function escriureCapitol(partNum, numCapitol, totalCapitols, biblia, outlineCapitol, textCapAnterior, estilDesc, userConfig, tematica, historialPart, fetsCanonicsText, estatJson) {
+  var capitolsRestants = Math.max(0, (totalCapitols || 0) - (numCapitol || 0));
   var systemForCap = getSystemPrompt(tematica) +
     '\n\n=== BÍBLIA DE LA NOVEL·LA ===\n' + (biblia || '');
+
+  if (capitolsRestants > 3) {
+    systemForCap += '\n\n[ALERTA DE RITME: Estàs a la fase de desenvolupament. ESTÀ PROHIBIT resoldre el conflicte principal, revelar els grans secrets o matar l\'antagonista en aquest capítol. Mantingues la tensió.]';
+  }
+
+  if (fetsCanonicsText && String(fetsCanonicsText).trim()) {
+    systemForCap += '\n\n=== FETS CANÒNICS RECENTS (NO CONTRADIR) ===\n' + String(fetsCanonicsText).substring(0, 2000);
+  }
 
   var contextAnterior = '';
   if (textCapAnterior && textCapAnterior.trim()) {
     var words    = textCapAnterior.trim().split(/\s+/);
     var darreres = words.slice(-500).join(' ');
     contextAnterior = '\n\n=== FINAL DEL CAPÍTOL ANTERIOR (per continuïtat de to) ===\n' + darreres;
+  }
+
+  if (estatJson && String(estatJson).trim()) {
+    contextAnterior += '\n\n=== ESTAT JSON VIGENT (context pur) ===\n' + String(estatJson).trim();
   }
 
   var isNoir    = tematica && /noir|negr[ae]|nòrdi/i.test(tematica);
@@ -842,6 +928,7 @@ function escriureCapitol(partNum, numCapitol, totalCapitols, biblia, outlineCapi
       '→ Assegura que s\'ha complert l\'objectiu narratiu al final.\n' +
       '→ Mantén exactament la mateixa veu, to i registre de la primera meitat.\n' +
       '→ L\'última frase ha de deixar el lector amb ganes de continuar.' + noirExtra + '\n' +
+      'IMPORTANT: Just al final del capítol, afegeix un únic bloc ```json amb un objecte JSON vàlid que resumeixi l\'estat exacte d\'aquest moment narratiu (p. ex. inventari_protagonista, estat_fisic, ubicacio_actual).\n' +
       'Continua directament en català des d\'on s\'ha aturat. Cap paraula en anglès. Cap comentari fora de la narració literària.';
 
     var msgs2 = histBase.concat([{ role: 'user', content: part2Content }]);
@@ -870,14 +957,16 @@ function fase12_cronologia(contextComprimit, outline, subtrames, history, userCo
 // ─── FASE 11: Subtrames i fils temàtics ─────────────────────
 // outline: string compacte "Cap. N — Títol" per línia (sense POV ni detalls)
 function fase11_subtrames(contextComprimit, outline, history, userConfig, tematica) {
+  const systemForSubtrames = getSystemPrompt(tematica) +
+    '\n\nINSTRUCCIÓ NARRATIVA OBLIGATÒRIA: TOTES les subtrames han de col·lisionar obligatòriament amb la trama principal cap a l\'Acte III o el clímax. Sempre has d\'incloure el camp "Punt de Convergència" per a cada subtrama.';
   const msgs = [
     ...history,
     {
       role: 'user',
-      content: `Tenim definit el món, els personatges i l'outline de la novel·la:\n\n${contextComprimit}\n\nOUTLINE (capítols):\n${outline}\n\n---\nGenera entre 5 i 7 subtrames per a la novel·la. Cada subtrama ha de:\n- Tenir vida pròpia independent de la trama principal\n- Estar ancorada a capítols concrets de l'outline (inici, complicació i resolució)\n- Associar-se a un fil temàtic de la novel·la (amor, traïció, identitat, poder, etc.)\n- Involucrar personatges de l'elenc que no siguin sempre el protagonista\n\nMarca amb (Recomanat) les 3 o 4 subtrames més necessàries per enriquir la novel·la.\n\nFormat ESTRICTE (una subtrama per línia, res més, sense introducció):\n1. **[Nom de la subtrama]** | Inici: Cap. N | Complicació: Cap. N | Resolució: Cap. N | Tema: [fil temàtic associat]\n2. **[Nom de la subtrama]** | Inici: Cap. N | Complicació: Cap. N | Resolució: Cap. N | Tema: [fil temàtic associat]\n3. ...\n4. ...\n5. ...\n6. ... (Recomanat)\n7. ...`
+      content: `Tenim definit el món, els personatges i l'outline de la novel·la:\n\n${contextComprimit}\n\nOUTLINE (capítols):\n${outline}\n\n---\nGenera entre 5 i 7 subtrames per a la novel·la. Cada subtrama ha de:\n- Tenir vida pròpia independent de la trama principal\n- Estar ancorada a capítols concrets de l'outline (inici, complicació i resolució)\n- Associar-se a un fil temàtic de la novel·la (amor, traïció, identitat, poder, etc.)\n- Involucrar personatges de l'elenc que no siguin sempre el protagonista\n- Col·lisionar obligatòriament amb la trama principal cap a l'Acte III o el clímax\n\nMarca amb (Recomanat) les 3 o 4 subtrames més necessàries per enriquir la novel·la.\n\nFormat ESTRICTE (una subtrama per línia, res més, sense introducció):\n1. **[Nom de la subtrama]** | Inici: Cap. N | Complicació: Cap. N | Resolució: Cap. N | Punt de Convergència: Cap. N (Acte III/Clímax) | Tema: [fil temàtic associat]\n2. **[Nom de la subtrama]** | Inici: Cap. N | Complicació: Cap. N | Resolució: Cap. N | Punt de Convergència: Cap. N (Acte III/Clímax) | Tema: [fil temàtic associat]\n3. ...\n4. ...\n5. ...\n6. ... (Recomanat)\n7. ...`
     }
   ];
-  const response   = callLLM(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 2048 }));
+  const response   = callLLM(msgs, systemForSubtrames, Object.assign({}, userConfig, { maxTokens: 2048 }));
   const newHistory = [...msgs, { role: 'assistant', content: response }];
   return { response, history: newHistory };
 }
