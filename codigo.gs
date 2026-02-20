@@ -672,6 +672,56 @@ function fase13_bibliaPerCapitol(biblia, outlineDetallat, numCapitol, textCapAnt
   return context;
 }
 
+// ─── System prompt d'Editor IA (reutilitzable) ──────────────
+const EDITOR_SYSTEM = `Ets un editor literari expert i minuciós. La teva tasca és analitzar textos narratius i identificar problemes de coherència interna: contradiccions factuals, canvis de to injustificats, fils narratius abandonats i inconsistències de personatges.
+Respons exclusivament en català. No alibies el text. Identifica problemes reals i proposa correccions concretes i accionables. Si no trobes cap problema, digues-ho clarament.`;
+
+// ─── Funció genèrica d'anàlisi amb l'Editor IA ──────────────
+// Infraestructura reutilitzable: missatges mínims, sense historial de conversa.
+function analitzarAmbEditor(userPrompt, userConfig) {
+  var msgs = [{ role: 'user', content: userPrompt }];
+  return callLLM(msgs, EDITOR_SYSTEM, Object.assign({}, userConfig, { maxTokens: 3000 }));
+}
+
+// ─── FASE 15: Revisió de coherència inter-capítols ───────────
+// capitolsData: array de {num, outlineText, text} per als capítols generats.
+// biblia:       string (bíblia de consistència compilada).
+// userConfig:   configuració del LLM de l'usuari.
+function fase15_revisioCoherencia(capitolsData, biblia, userConfig) {
+  var d = capitolsData || [];
+
+  // Comprimir cada capítol: primeres i últimes 200 paraules + outline
+  var resumCapitols = d.map(function(cap) {
+    var words     = (cap.text || '').trim().split(/\s+/).filter(function(w) { return w; });
+    var primer200 = words.slice(0, 200).join(' ');
+    var ultim200  = words.length > 200 ? '\n[…]\n' + words.slice(-200).join(' ') : '';
+    return '=== CAPÍTOL ' + cap.num + ' ===\n' +
+      'OUTLINE: ' + (cap.outlineText || '').substring(0, 160) + '\n' +
+      'INICI:\n' + primer200 + ultim200;
+  }).join('\n\n');
+
+  var bibliaRef = biblia
+    ? '=== BÍBLIA DE REFERÈNCIA ===\n' + biblia.substring(0, 1200) + '\n\n'
+    : '';
+
+  var userPrompt =
+    bibliaRef + resumCapitols + '\n\n---\n' +
+    'Analitza la coherència dels ' + d.length + ' capítols anteriors. Identifica:\n' +
+    '1. Contradiccions factuals (noms, dates, llocs, fets que canvien)\n' +
+    '2. Canvis de to o veu narrativa injustificats\n' +
+    '3. Fils narratius o detalls plantats que han quedat abandonats\n' +
+    '4. Inconsistències de personatges (comportament, coneixements, relacions)\n\n' +
+    'Per cada problema, proposa una correcció específica al capítol corresponent.\n\n' +
+    'Format ESTRICTE per a cada problema (sense cap variació):\n' +
+    'PROBLEMA: [descripció clara i breu]\n' +
+    'CORRECCIÓ: [Cap. N] [instrucció concreta i directa per a la millora]\n\n' +
+    'Si no trobes cap problema real, escriu únicament: "Cap inconsistència detectada."\n' +
+    'Cap comentari addicional fora d\'aquest format.';
+
+  var response = analitzarAmbEditor(userPrompt, userConfig);
+  return { response: response };
+}
+
 // ─── FASE 14: Escriure un capítol (patró anti-timeout, 2 parts) ──
 // partNum:      1 (primera meitat) o 2 (segona meitat)
 // historialPart: null per Part 1; historial retornat per Part 1 per a Part 2

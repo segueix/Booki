@@ -564,6 +564,102 @@
   /* ── Secció amagada ── */
   .hidden { display: none !important; }
 
+  /* ── Fase 15: Revisió de coherència ── */
+  .revisio-banner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 18px;
+    background: rgba(251,191,36,.07);
+    border: 1px solid rgba(251,191,36,.28);
+    border-radius: 8px;
+    margin-bottom: 18px;
+  }
+  .revisio-banner-text {
+    flex: 1;
+    font-size: .88rem;
+    color: var(--warning);
+    font-weight: 500;
+  }
+  .revisio-panel {
+    margin-top: 24px;
+    border-top: 1px solid var(--border);
+    padding-top: 20px;
+  }
+  .revisio-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .revisio-panel-titol {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--accent2);
+    flex: 1;
+  }
+  .editor-result {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px 26px;
+  }
+  .revisio-problema {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .revisio-problema:last-child { border-bottom: none; }
+  .revisio-problema-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .revisio-label {
+    font-size: .7rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--accent2);
+    font-weight: 700;
+  }
+  .revisio-cap-badge {
+    font-size: .72rem;
+    background: rgba(124,106,247,.18);
+    color: var(--accent2);
+    padding: 2px 9px;
+    border-radius: 99px;
+    font-weight: 700;
+  }
+  .revisio-desc {
+    font-size: .9rem;
+    line-height: 1.65;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+  .revisio-correccio {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 14px;
+    background: rgba(124,106,247,.07);
+    border: 1px solid rgba(124,106,247,.18);
+    border-radius: 7px;
+  }
+  .revisio-correccio-text {
+    flex: 1;
+    font-size: .85rem;
+    line-height: 1.55;
+    color: var(--text2);
+  }
+  .revisio-ok {
+    padding: 18px 0;
+    color: var(--success);
+    font-size: .95rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
   /* ── Fase 14: Escriptura capítol a capítol ── */
   .fase14-layout {
     display: flex;
@@ -1058,6 +1154,14 @@
   <h2><span class="icon">📝</span> Escriptura de la novel·la</h2>
   <p style="color:var(--text2);font-size:.9rem;margin-bottom:20px;">Genera cada capítol individualment. Pots regenerar o millorar cada un abans de continuar.</p>
 
+  <!-- Banner de revisió de coherència (apareix automàticament cada 3 caps) -->
+  <div class="revisio-banner hidden" id="revisio-banner">
+    <span style="font-size:1.1rem;">🔍</span>
+    <span class="revisio-banner-text" id="revisio-banner-text">Revisió de coherència disponible</span>
+    <button class="btn btn-secondary" style="padding:7px 16px;font-size:.82rem;" onclick="iniciarRevisio()">Revisar ara</button>
+    <button class="btn btn-ghost" style="padding:7px 10px;font-size:.82rem;" onclick="this.closest('.revisio-banner').classList.add('hidden')" title="Descartar">✕</button>
+  </div>
+
   <div class="fase14-layout">
     <!-- Sidebar: llista de capítols -->
     <div class="cap-sidebar" id="cap-sidebar"></div>
@@ -1110,6 +1214,19 @@
         </button>
       </div>
     </div>
+  </div>
+
+  <!-- Panel de revisió de coherència (Fase 15) -->
+  <div class="revisio-panel hidden" id="revisio-panel">
+    <div class="revisio-panel-header">
+      <span class="revisio-panel-titol">🔍 Informe de coherència</span>
+      <button class="btn btn-ghost" style="padding:6px 12px;font-size:.82rem;" onclick="document.getElementById('revisio-panel').classList.add('hidden')">✕ Tancar</button>
+    </div>
+    <div class="cap-loader" id="revisio-loader">
+      <div class="spinner"></div>
+      <span>Analitzant la coherència dels capítols…</span>
+    </div>
+    <div class="editor-result hidden" id="revisio-result"></div>
   </div>
 </div>
 
@@ -1206,7 +1323,8 @@ const ESTAT = {
   // Fase 14: capítols generats
   capitols:                 [],  // null o text per a cada capítol
   _capActual:               0,   // índex 0-based del capítol actiu
-  _capGenerant:             null // índex del capítol en generació (o null)
+  _capGenerant:             null, // índex del capítol en generació (o null)
+  _revisioCapTrigger:       0    // nº de capítols quan es va mostrar l'últim banner
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -2419,6 +2537,7 @@ function generarCapitolActual() {
           document.getElementById('cap-loader').classList.remove('visible');
           renderSidebarCapitols();
           mostrarCapitol(idx);
+          verificarRevisioDisponible();
           toast('Capítol ' + (idx + 1) + ' generat!');
         })
         .withFailureHandler(function(err) {
@@ -2485,6 +2604,146 @@ function navegarCapitol(dir) {
   const nextIdx = ESTAT._capActual + dir;
   if (nextIdx < 0 || nextIdx >= ESTAT.outline.length) return;
   seleccionarCapitol(nextIdx);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FASE 15: Revisió de coherència inter-capítols
+// ═══════════════════════════════════════════════════════════
+
+// Emmagatzemar les correccions parseades per accedir-hi per índex
+// (evita problemes d'escapament de cadenes en onclick inline)
+let _revisioCorreccions = [];
+
+// ─── Trigger automàtic cada 3 capítols completats ───────────
+function verificarRevisioDisponible() {
+  const nGenerats = ESTAT.capitols.filter(c => c !== null).length;
+  if (nGenerats > 0 && nGenerats % 3 === 0 && nGenerats > ESTAT._revisioCapTrigger) {
+    ESTAT._revisioCapTrigger = nGenerats;
+    const banner   = document.getElementById('revisio-banner');
+    const bannerTx = document.getElementById('revisio-banner-text');
+    bannerTx.textContent = `Revisió de coherència disponible (caps. 1–${nGenerats})`;
+    banner.classList.remove('hidden');
+  }
+}
+
+// ─── Iniciar la revisió (crida al backend amb l'Editor IA) ──
+function iniciarRevisio() {
+  const capGenerats = ESTAT.capitols.reduce((acc, text, i) => {
+    if (text) acc.push({ num: i + 1, outlineText: (ESTAT.outline[i] || {}).text || '', text });
+    return acc;
+  }, []);
+
+  if (capGenerats.length === 0) { toast('No hi ha capítols generats.'); return; }
+
+  document.getElementById('revisio-banner').classList.add('hidden');
+
+  const panel = document.getElementById('revisio-panel');
+  panel.classList.remove('hidden');
+  document.getElementById('revisio-loader').classList.add('visible');
+  document.getElementById('revisio-result').classList.add('hidden');
+  setTimeout(() => panel.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      document.getElementById('revisio-loader').classList.remove('visible');
+      renderRevisio(res.response);
+      document.getElementById('revisio-result').classList.remove('hidden');
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById('revisio-loader').classList.remove('visible');
+      toast('Error a la revisió: ' + err.message);
+    })
+    .fase15_revisioCoherencia(capGenerats, ESTAT.biblia, USER_CONFIG);
+}
+
+// ─── Renderitzar l'informe de revisió ───────────────────────
+function renderRevisio(text) {
+  const container = document.getElementById('revisio-result');
+  _revisioCorreccions = [];
+
+  if (!text || !text.trim() || /cap inconsistència/i.test(text)) {
+    container.innerHTML = `<div class="revisio-ok">✅ Cap inconsistència detectada als capítols revisats.</div>`;
+    return;
+  }
+
+  // Parsejar blocs PROBLEMA / CORRECCIÓ
+  const blocs  = [];
+  let current  = null;
+
+  text.split('\n').forEach(line => {
+    const l = line.trim();
+    if (/^PROBLEMA:/i.test(l)) {
+      if (current) blocs.push(current);
+      current = { problema: l.replace(/^PROBLEMA:\s*/i, '').trim(), capNum: null, instruccio: '' };
+    } else if (/^CORREC/i.test(l) && current) {
+      // "CORRECCIÓ: [Cap. N] instrucció" o "CORRECCIO: [Cap. N] instrucció"
+      const raw      = l.replace(/^CORREC[CÇ]I[ÓO]:\s*/i, '').trim();
+      const capMatch = raw.match(/^\[?Cap\.?\s*(\d+)\]?\s*/i);
+      if (capMatch) {
+        current.capNum    = parseInt(capMatch[1]);
+        current.instruccio = raw.replace(/^\[?Cap\.?\s*\d+\]?\s*/i, '').trim();
+      } else {
+        current.instruccio = raw;
+      }
+    } else if (current && l && !current.instruccio) {
+      current.problema += ' ' + l;
+    }
+  });
+  if (current) blocs.push(current);
+
+  if (blocs.length === 0) {
+    container.innerHTML = `<pre style="white-space:pre-wrap;font-size:.88rem;color:var(--text2);">${escHtml(text)}</pre>`;
+    return;
+  }
+
+  // Guardar correccions per accés per índex des d'onclick
+  _revisioCorreccions = blocs.map(b => ({ capIdx: b.capNum ? b.capNum - 1 : null, instruccio: b.instruccio }));
+
+  const totalLabel = `${blocs.length} problema${blocs.length !== 1 ? 'es' : ''} detectat${blocs.length !== 1 ? 's' : ''}`;
+  container.innerHTML = `
+    <p style="font-size:.8rem;color:var(--text2);margin-bottom:14px;">${escHtml(totalLabel)}</p>
+    ${blocs.map((b, i) => {
+      const capBadge = b.capNum
+        ? `<span class="revisio-cap-badge">Cap. ${b.capNum}</span>`
+        : '';
+      const btnAplicar = (b.capNum !== null && b.instruccio)
+        ? `<button class="btn btn-secondary" style="font-size:.78rem;padding:5px 12px;flex-shrink:0;" onclick="aplicarCorreccio(${i})">Aplicar →</button>`
+        : '';
+      return `<div class="revisio-problema">
+        <div class="revisio-problema-header">
+          <span class="revisio-label">Problema ${i + 1}</span>
+          ${capBadge}
+        </div>
+        <div class="revisio-desc">${escHtml(b.problema)}</div>
+        ${b.instruccio ? `<div class="revisio-correccio">
+          <span class="revisio-correccio-text">${escHtml(b.instruccio)}</span>
+          ${btnAplicar}
+        </div>` : ''}
+      </div>`;
+    }).join('')}`;
+}
+
+// ─── Aplicar una correcció al capítol afectat ───────────────
+function aplicarCorreccio(idx) {
+  const corr = _revisioCorreccions[idx];
+  if (!corr || corr.capIdx === null) { toast('No s\'ha pogut determinar el capítol afectat.'); return; }
+  if (corr.capIdx < 0 || corr.capIdx >= ESTAT.outline.length) {
+    toast('El capítol ' + (corr.capIdx + 1) + ' no existeix a l\'outline.'); return;
+  }
+
+  // Navegar al capítol afectat
+  seleccionarCapitol(corr.capIdx);
+
+  // Pre-omplir el camp de millora
+  const input = document.getElementById('cap-millora-input');
+  if (input) {
+    input.value = corr.instruccio;
+    setTimeout(() => {
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      input.focus();
+    }, 200);
+  }
+  toast('Instrucció carregada al capítol ' + (corr.capIdx + 1) + '. Clica "Millorar" per aplicar-la.');
 }
 </script>
 </body>
