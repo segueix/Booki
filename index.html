@@ -376,9 +376,11 @@
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="3">Protagonista</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="4">Final</div>
+    <div class="step-pill" data-step="4">Localització</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="5">Escriptura</div>
+    <div class="step-pill" data-step="5">Final</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="6">Escriptura</div>
   </div>
 </div>
 
@@ -483,29 +485,42 @@
   </div>
   <div id="llista-personatges" class="premise-list"></div>
   <div class="btn-row">
-    <button class="btn btn-primary hidden" id="btn-fase3" onclick="iniciarFase4()">🏁 Triar el final</button>
+    <button class="btn btn-primary hidden" id="btn-fase3" onclick="iniciarFase4()">📍 Triar la localització</button>
   </div>
 </div>
 
-<!-- FASE 4: Finals -->
+<!-- FASE 4: Localitzacions -->
 <div class="card hidden" id="fase-4">
-  <h2><span class="icon">🏁</span> Tria el final</h2>
+  <h2><span class="icon">📍</span> Tria la localització</h2>
   <div class="loader-wrap" id="loader-4">
+    <div class="spinner"></div>
+    <span>Generant 5 localitzacions…</span>
+  </div>
+  <div id="llista-localitzacions" class="premise-list"></div>
+  <div class="btn-row">
+    <button class="btn btn-primary hidden" id="btn-fase4" onclick="iniciarFase5()">🏁 Triar el final</button>
+  </div>
+</div>
+
+<!-- FASE 5: Finals -->
+<div class="card hidden" id="fase-5">
+  <h2><span class="icon">🏁</span> Tria el final</h2>
+  <div class="loader-wrap" id="loader-5">
     <div class="spinner"></div>
     <span>Generant 5 finals possibles…</span>
   </div>
   <div id="llista-finals" class="premise-list"></div>
   <div class="btn-row">
-    <button class="btn btn-primary hidden" id="btn-fase4" onclick="iniciarEscriptura()">✍️ Escriure el conte</button>
+    <button class="btn btn-primary hidden" id="btn-fase5" onclick="iniciarEscriptura()">✍️ Escriure el conte</button>
   </div>
 </div>
 
-<!-- FASE 5: Escriptura -->
-<div class="card hidden" id="fase-5">
+<!-- FASE 6: Escriptura -->
+<div class="card hidden" id="fase-6">
   <h2><span class="icon">✍️</span> El teu conte</h2>
-  <div class="loader-wrap" id="loader-5">
+  <div class="loader-wrap" id="loader-6">
     <div class="spinner"></div>
-    <span id="loader-5-text">Escrivint el conte…</span>
+    <span id="loader-6-text">Escrivint el conte…</span>
   </div>
   <div id="conte-wrap" class="hidden">
     <div class="conte-reader" id="conte-cos"></div>
@@ -585,13 +600,21 @@ const ESTAT = {
     paraules:    1500,
     desc:        ''
   },
-  _llistaProtagonistes: [],
-  _idxProtagonista:     null,
-  protagonistaTriat:    '',
-  _llistaFinals:        [],
-  _idxFinal:            null,
-  finalTriat:           '',
-  conteText:            ''
+  _llistaProtagonistes:  [],
+  _idxProtagonista:      null,
+  protagonistaTriat:     '',
+  _llistaLocalitzacions: [],
+  _idxLocalitzacio:      null,
+  localitzacioTriada:    '',
+  _llistaFinals:         [],
+  _idxFinal:             null,
+  finalTriat:            '',
+  // Escriptura per parts
+  _historyBeforeEscriptura: [],
+  _totalParts:              1,
+  _partActual:              1,
+  _partsTexts:              [],
+  conteText:                ''
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -762,7 +785,7 @@ function renderProtagonistes(text) {
 function triarProtagonista(idx, el) { triarItem('llista-personatges', '_idxProtagonista', idx, el); }
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 3 → FASE 4: Finals
+//  FASE 3 → FASE 4: Localitzacions
 // ═══════════════════════════════════════════════════════════
 function iniciarFase4() {
   const idx = ESTAT._idxProtagonista;
@@ -780,14 +803,39 @@ function iniciarFase4() {
     .withSuccessHandler(res => {
       ESTAT.history = res.history;
       hideLoader(4);
-      renderLlistaAmbRecomanat(res.response, 'llista-finals', '_llistaFinals', '_idxFinal', 'btn-fase4');
+      renderLlistaAmbRecomanat(res.response, 'llista-localitzacions', '_llistaLocalitzacions', '_idxLocalitzacio', 'btn-fase4');
     })
     .withFailureHandler(err => { hideLoader(4); toast('Error: ' + err.message); })
-    .fase4_finals(ESTAT.protagonistaTriat, ESTAT.estil.desc, ESTAT.history, USER_CONFIG);
+    .fase_localitzacions(ESTAT.protagonistaTriat, ESTAT.estil.desc, ESTAT.history, USER_CONFIG);
 }
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 4 → FASE 5: Escriptura
+//  FASE 4 → FASE 5: Finals
+// ═══════════════════════════════════════════════════════════
+function iniciarFase5() {
+  const idx = ESTAT._idxLocalitzacio;
+  if (idx === null || idx === undefined || !ESTAT._llistaLocalitzacions[idx]) {
+    toast('Tria una localització primer.');
+    return;
+  }
+  ESTAT.localitzacioTriada = ESTAT._llistaLocalitzacions[idx];
+  ESTAT.fase = 5;
+  updateProgress(5);
+  showCard('fase-5');
+  showLoader(5);
+
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.history = res.history;
+      hideLoader(5);
+      renderLlistaAmbRecomanat(res.response, 'llista-finals', '_llistaFinals', '_idxFinal', 'btn-fase5');
+    })
+    .withFailureHandler(err => { hideLoader(5); toast('Error: ' + err.message); })
+    .fase4_finals(ESTAT.localitzacioTriada, ESTAT.estil.desc, ESTAT.history, USER_CONFIG);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FASE 5 → FASE 6: Escriptura per parts (anti-timeout GAS)
 // ═══════════════════════════════════════════════════════════
 function iniciarEscriptura() {
   const idx = ESTAT._idxFinal;
@@ -796,30 +844,57 @@ function iniciarEscriptura() {
     return;
   }
   ESTAT.finalTriat = ESTAT._llistaFinals[idx];
-  ESTAT.fase = 5;
-  updateProgress(5);
-  showCard('fase-5');
+
+  // Decidir nombre de parts segons la longitud triada
+  // 500 paraules → 1 part | 1500 → 2 parts | 3000 → 3 parts
+  const p = ESTAT.estil.paraules;
+  ESTAT._totalParts  = p <= 600 ? 1 : p <= 1800 ? 2 : 3;
+  ESTAT._partActual  = 1;
+  ESTAT._partsTexts  = [];
+  // Snapshot de l'historial ABANS d'escriure → permet regenerar sense reconstruir
+  ESTAT._historyBeforeEscriptura = [...ESTAT.history];
+
+  ESTAT.fase = 6;
+  updateProgress(6);
+  showCard('fase-6');
   hideCard('conte-wrap');
-  showLoader(5);
-  document.getElementById('loader-5-text').textContent = 'Escrivint el conte…';
   document.getElementById('export-link-wrap').classList.add('hidden');
+
+  escriureSeguentPart();
+}
+
+function escriureSeguentPart() {
+  const part      = ESTAT._partActual;
+  const total     = ESTAT._totalParts;
+  const perPart   = Math.round(ESTAT.estil.paraules / total);
+  const loaderTxt = total === 1
+    ? 'Escrivint el conte…'
+    : `Escrivint part ${part} de ${total}…`;
+
+  showLoader(6);
+  document.getElementById('loader-6-text').textContent = loaderTxt;
 
   google.script.run
     .withSuccessHandler(res => {
-      ESTAT.history   = res.history;
-      ESTAT.conteText = res.response;
-      hideLoader(5);
-      mostrarConte(res.response);
+      ESTAT.history = res.history;
+      ESTAT._partsTexts.push(res.response);
+      hideLoader(6);
+
+      if (ESTAT._partActual < ESTAT._totalParts) {
+        ESTAT._partActual++;
+        escriureSeguentPart(); // Encadena la part següent
+      } else {
+        // Totes les parts generades → assembla i mostra
+        const conteComplet = ESTAT._partsTexts.join('\n\n');
+        ESTAT.conteText    = conteComplet;
+        mostrarConte(conteComplet);
+      }
     })
-    .withFailureHandler(err => { hideLoader(5); toast('Error: ' + err.message); })
-    .escriureConte(
-      ESTAT.protagonistaTriat,
-      ESTAT.finalTriat,
-      ESTAT.estil.desc,
-      ESTAT.estil.paraules,
-      ESTAT.history,
-      USER_CONFIG
-    );
+    .withFailureHandler(err => {
+      hideLoader(6);
+      toast('Error a la part ' + part + ': ' + err.message);
+    })
+    .escriureContePart(part, total, perPart, ESTAT.finalTriat, ESTAT.estil.desc, ESTAT.history, USER_CONFIG);
 }
 
 function mostrarConte(text) {
@@ -832,7 +907,7 @@ function mostrarConte(text) {
 
   showCard('conte-wrap');
   setTimeout(() => {
-    document.getElementById('fase-5').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('fase-6').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, 100);
 }
 
@@ -841,27 +916,12 @@ function mostrarConte(text) {
 // ═══════════════════════════════════════════════════════════
 function regenerarConte() {
   if (!confirm('Vols regenerar el conte? El text actual es perdrà.')) return;
-  ESTAT.history = ESTAT.history.slice(0, -2);
+  // Restaurar l'historial al punt just abans d'escriure (snapshot)
+  ESTAT.history     = [...ESTAT._historyBeforeEscriptura];
+  ESTAT._partActual = 1;
+  ESTAT._partsTexts = [];
   hideCard('conte-wrap');
-  showLoader(5);
-  document.getElementById('loader-5-text').textContent = 'Regenerant el conte…';
-
-  google.script.run
-    .withSuccessHandler(res => {
-      ESTAT.history   = res.history;
-      ESTAT.conteText = res.response;
-      hideLoader(5);
-      mostrarConte(res.response);
-    })
-    .withFailureHandler(err => { hideLoader(5); toast('Error: ' + err.message); })
-    .escriureConte(
-      ESTAT.protagonistaTriat,
-      ESTAT.finalTriat,
-      ESTAT.estil.desc,
-      ESTAT.estil.paraules,
-      ESTAT.history,
-      USER_CONFIG
-    );
+  escriureSeguentPart();
 }
 
 function millorarConte() {
@@ -870,19 +930,19 @@ function millorarConte() {
   if (!ESTAT.conteText) { toast('Primer genera el conte.'); return; }
 
   hideCard('conte-wrap');
-  showLoader(5);
-  document.getElementById('loader-5-text').textContent = 'Aplicant la millora…';
+  showLoader(6);
+  document.getElementById('loader-6-text').textContent = 'Aplicant la millora…';
 
   google.script.run
     .withSuccessHandler(res => {
       ESTAT.history   = res.history;
       ESTAT.conteText = res.response;
-      hideLoader(5);
+      hideLoader(6);
       document.getElementById('millora-input').value = '';
       mostrarConte(res.response);
       toast('Millora aplicada.');
     })
-    .withFailureHandler(err => { hideLoader(5); toast('Error: ' + err.message); })
+    .withFailureHandler(err => { hideLoader(6); toast('Error: ' + err.message); })
     .millorarConte(instruccio, ESTAT.conteText, ESTAT.estil.desc, ESTAT.history, USER_CONFIG);
 }
 

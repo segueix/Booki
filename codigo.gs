@@ -245,11 +245,41 @@ Format ESTRICTE (5 opcions, res més):
   return { response, history: newHistory };
 }
 
-// ─── FASE 4: 5 finals possibles ─────────────────────────────
-function fase4_finals(protagonistaTriat, estilDesc, history, userConfig) {
+// ─── FASE 4: 5 localitzacions ───────────────────────────────
+function fase_localitzacions(protagonistaTriat, estilDesc, history, userConfig) {
   const msgs = [
     ...history,
     { role: 'user',      content: `He triat el protagonista: "${protagonistaTriat}".` },
+    { role: 'assistant', content: "Perfecte. Proposo localitzacions que maximitzin el potencial narratiu de la premissa i el protagonista." },
+    {
+      role: 'user',
+      content: `Genera 5 localitzacions possibles per a aquest conte, coherents amb el gènere, l'estil i el protagonista triat.
+
+Cada localització ha de:
+- Tenir una atmosfera concreta que reforci el to del conte
+- Incloure un detall físic específic que pugui tenir rol narratiu
+- Suggerir tensions o possibilitats implícites (no explicar-les)
+
+Afegeix (Recomanat) al final de la localització que millor serveixi la premissa i l'estil.
+
+Format ESTRICTE (5 opcions, res més):
+1. **[Nom/tipus de lloc]** | Atmosfera: [adjectius sensorials] | Detall clau: [element físic concret] | Potencial: [possibilitat narrativa breu]
+2. **[Nom/tipus de lloc]** | Atmosfera: [...] | Detall clau: [...] | Potencial: [...]
+3. **[Nom/tipus de lloc]** | Atmosfera: [...] | Detall clau: [...] | Potencial: [...]
+4. **[Nom/tipus de lloc]** | Atmosfera: [...] | Detall clau: [...] | Potencial: [...]
+5. **[Nom/tipus de lloc]** | Atmosfera: [...] | Detall clau: [...] | Potencial: [...]`
+    }
+  ];
+  const response   = callLLM(msgs, SYSTEM_DEFAULT, Object.assign({}, userConfig, { maxTokens: 1800 }));
+  const newHistory = [...msgs, { role: 'assistant', content: response }];
+  return { response, history: newHistory };
+}
+
+// ─── FASE 5: 5 finals possibles ─────────────────────────────
+function fase4_finals(localitzacioTriada, estilDesc, history, userConfig) {
+  const msgs = [
+    ...history,
+    { role: 'user',      content: `He triat la localització: "${localitzacioTriada}".` },
     { role: 'assistant', content: 'Perfecte. Amb totes les decisions preses, proposo possibles finals per al conte.' },
     {
       role: 'user',
@@ -276,46 +306,76 @@ Format ESTRICTE (5 opcions, res més):
   return { response, history: newHistory };
 }
 
-// ─── ESCRIPTURA: Conte complet en un sol bloc ───────────────
-function escriureConte(protagonistaTriat, finalTriat, estilDesc, paraules, history, userConfig) {
-  const paraulesNum = parseInt(paraules) || 1500;
-  const msgs = [
-    ...history,
-    { role: 'user',      content: `He triat el final: "${finalTriat}".` },
-    { role: 'assistant', content: 'Perfecte. Ara escric el conte complet respectant el final triat i amb màxima qualitat literària.' },
-    {
-      role: 'user',
-      content: `Escriu el CONTE COMPLET. Extensió aproximada: ${paraulesNum} paraules. Estil: ${estilDesc}.
+// ─── ESCRIPTURA: Generació per parts (anti-timeout GAS) ─────
+// Cada crida genera UNA part del conte (~750-1200 paraules màx).
+// El frontend encadena les crides i assembla el text final.
+// Així cap crida individual supera els 2-3 min d'execució de GAS.
+//
+// partNum:       1, 2 o 3
+// totalParts:    1 (microconte), 2 (curt), 3 (llarg)
+// paraulesPerPart: objectiu de paraules per a aquesta part
+// finalTriat:    el final escollit (s'inclou a l'última part)
+// estilDesc:     descripció de l'estil narratiu
+function escriureContePart(partNum, totalParts, paraulesPerPart, finalTriat, estilDesc, history, userConfig) {
+  const pp = parseInt(paraulesPerPart) || 750;
+  let userContent;
 
-El conte ha de culminar amb el final triat: "${finalTriat}"
+  if (totalParts === 1) {
+    // ── Conte sencer en una sola crida (microconte ≤500 paraules) ──
+    userContent =
+`He triat el final: "${finalTriat}".
 
-═══ REQUISITS DE QUALITAT MÀXIMA ═══
+Escriu el CONTE COMPLET (~${pp} paraules). Estil: ${estilDesc}.
+Final obligatori: "${finalTriat}"
 
-OBERTURA:
-→ La primera frase ha de ser impossible de no llegir. Ha de plantar una pregunta o tensió immediata en la ment del lector.
-→ Els primers 3 paràgrafs estableixen el to, el món i el personatge sense cap exposició directa.
+OBERTURA: primera frase magnètica, tensió immediata. Primers 3 paràgrafs sense exposició directa.
+ESTRUCTURA: unitat d'efecte, tensió creixent, punt d'inflexió a les 2/3 parts.
+ESTIL: mostra no expliquis, detalls sensorials concrets, ritme variat, veu única, diàlegs que revelen caràcter.
+FINAL: l'última frase ressona i tanca un cercle del principi.
+Escriu directament el conte, sense títol ni nota de l'autor.`;
 
-ESTRUCTURA:
-→ Unitat d'efecte: cada escena, diàleg i detall serveix l'impacte emocional final únic.
-→ Tensió creixent sense caigudes de ritme. El lector no ha de trobar cap excusa per parar.
-→ Un punt d'inflexió clar i sorprenent a les 2/3 parts del conte.
+  } else if (partNum === 1) {
+    // ── Primera part: obertura i plantejament ──
+    userContent =
+`He triat el final: "${finalTriat}".
 
-ESTIL:
-→ Mostra, no expliquis. Mai "estava trist" → mostra com es comporta, com li tremola la veu, com mira el terra.
-→ Detalls sensorials concrets i inesperats (olfacte, tacte, so), mai genèrics ni decoratius.
-→ Ritme variat: frases curtes per a tensió i impacte; frases llargues per a immersió i atmosfera.
-→ Veu narrativa única i consistent de principi a fi.
-→ Diàlegs que revelen caràcter i avancen el conflicte, mai que expliquen ni informen.
+Escriu la PRIMERA PART del conte (~${pp} paraules). Estil: ${estilDesc}.
 
-FINAL:
-→ El desenllaç ha de concloure tal com s'ha triat, però executat amb precisió literària.
+Objectiu d'aquesta part:
+→ Primera frase impossible de no llegir (pregunta o tensió immediata).
+→ Establir la veu, l'atmosfera i el personatge sense exposició directa.
+→ Plantar la tensió central i el conflicte que s'ha de resoldre.
+→ Acabar en un punt de suspens que demani la continuació (NO resolguis res).
+Mostra, no expliquis. Detalls sensorials concrets. Veu única.
+Escriu directament, sense títol ni indicació de "Part 1".`;
+
+  } else if (partNum < totalParts) {
+    // ── Part central: desenvolupament i escalada ──
+    userContent =
+`Continua el conte amb la PART ${partNum} (~${pp} paraules).
+
+Objectiu d'aquesta part:
+→ Augmenta el conflicte i la pressió sobre el protagonista.
+→ Introdueix el punt d'inflexió o la complicació principal.
+→ Acaba quan la tensió arriba al màxim, just abans de la resolució.
+Continua directament des d'on ha quedat el text. Sense cap indicació de part.`;
+
+  } else {
+    // ── Última part: clímax i resolució ──
+    userContent =
+`Finalitza el conte amb la PART FINAL (~${pp} paraules).
+
+El desenllaç OBLIGATORI és: "${finalTriat}"
+
+→ Executa el clímax i la resolució amb precisió literària.
+→ El desenllaç ha de ser inevitable en retrospectiva però imprevist durant la lectura.
 → L'última frase ha de ressonar i tancar un cercle obert al principi.
+Continua directament des d'on ha quedat el text. Sense cap indicació de part.`;
+  }
 
-Escriu directament el conte, sense títol, sense cap introducció ni nota de l'autor.`
-    }
-  ];
-  // ~1.8 tokens per paraula catalana + marge de seguretat
-  const maxTokens  = Math.min(Math.round(paraulesNum * 1.9) + 600, 8000);
+  const msgs      = [...history, { role: 'user', content: userContent }];
+  // Màxim ~2800 tokens per crida → ben per sota del timeout de GAS
+  const maxTokens = Math.min(Math.round(pp * 1.9) + 400, 2800);
   const response   = callLLM(msgs, SYSTEM_DEFAULT, Object.assign({}, userConfig, { maxTokens }));
   const newHistory = [...msgs, { role: 'assistant', content: response }];
   return { response, history: newHistory };
