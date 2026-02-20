@@ -227,7 +227,7 @@ Format ESTRICTE (res més, sense cap introducció):
 10. [premissa]`
   };
   const msgs       = [...history, userMsg];
-  const response   = callLLM(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 1800 }));
+  const response   = callLLM(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 4096 }));
   const newHistory = [...msgs, { role: 'assistant', content: response }];
   return { response, history: newHistory };
 }
@@ -268,7 +268,7 @@ Format ESTRICTE (5 opcions, res més):
 5. **[Nom, edat]** | Desig: [...] | Temor: [...] | Contradicció: [...] | Veu: [...]`
     }
   ];
-  const response   = callLLM(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 2200 }));
+  const response   = callLLM(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 4096 }));
   const newHistory = [...msgs, { role: 'assistant', content: response }];
   return { response, history: newHistory };
 }
@@ -298,7 +298,7 @@ Format ESTRICTE (5 opcions, res més):
 5. **[Nom/tipus de lloc]** | Atmosfera: [...] | Detall clau: [...] | Potencial: [...]`
     }
   ];
-  const response   = callLLM(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 1800 }));
+  const response   = callLLM(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 4096 }));
   const newHistory = [...msgs, { role: 'assistant', content: response }];
   return { response, history: newHistory };
 }
@@ -329,7 +329,7 @@ Format ESTRICTE (5 opcions, res més):
 5. [descripció del final en 2-3 frases]`
     }
   ];
-  const response   = callLLM(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 1800 }));
+  const response   = callLLM(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 4096 }));
   const newHistory = [...msgs, { role: 'assistant', content: response }];
   return { response, history: newHistory };
 }
@@ -410,7 +410,7 @@ Continua directament des d'on ha quedat el text. Sense cap indicació de part.`;
   }
 
   const msgs      = [...history, { role: 'user', content: userContent }];
-  const maxTokens = Math.min(Math.round(pp * 1.9) + 400, 2800);
+  const maxTokens = Math.min(Math.round(pp * 2.5) + 1500, 6000);
   const response   = callLLM(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens }));
   const newHistory = [...msgs, { role: 'assistant', content: response }];
   return { response, history: newHistory };
