@@ -376,6 +376,71 @@
     border-left: 2px solid var(--border);
   }
 
+  /* ── Outline editor ── */
+  .outline-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .outline-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: border-color .2s;
+  }
+  .outline-item:focus-within { border-color: var(--accent); }
+  .outline-num {
+    color: var(--accent2);
+    font-weight: 700;
+    font-size: .78rem;
+    min-width: 48px;
+    padding-top: 4px;
+    flex-shrink: 0;
+    user-select: none;
+  }
+  .outline-text {
+    flex: 1;
+    font-size: .88rem;
+    line-height: 1.65;
+    color: var(--text);
+    background: transparent;
+    border: none;
+    outline: none;
+    resize: none;
+    font-family: var(--font);
+    width: 100%;
+    overflow: hidden;
+  }
+  .outline-text::placeholder { color: var(--text2); }
+  .outline-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex-shrink: 0;
+  }
+  .outline-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text2);
+    border-radius: 5px;
+    width: 26px;
+    height: 26px;
+    cursor: pointer;
+    font-size: .78rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .15s;
+    padding: 0;
+    line-height: 1;
+  }
+  .outline-btn:hover { border-color: var(--accent); color: var(--accent2); }
+  .outline-btn.danger:hover { border-color: #f87171; color: #f87171; }
+
   /* ── Comptador de seleccionats ── */
   .seleccio-comptador {
     font-size: .82rem;
@@ -446,6 +511,8 @@
     <div class="step-pill" data-step="8">Personatges</div>
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="9">Estructura</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="10">Capítols</div>
   </div>
 </div>
 
@@ -606,6 +673,25 @@
   </div>
 </div>
 
+<!-- FASE 10: Outline de capítols -->
+<div class="card hidden" id="fase-10">
+  <h2><span class="icon">📋</span> Mapa de capítols</h2>
+  <div class="loader-wrap" id="loader-10">
+    <div class="spinner"></div>
+    <span>Generant l'outline de capítols…</span>
+  </div>
+  <div id="outline-wrap" class="hidden">
+    <p style="color:var(--text2);font-size:.9rem;margin-bottom:16px;">Fes clic en un capítol per editar-lo. Utilitza els botons per reordenar, eliminar o afegir capítols.</p>
+    <div id="outline-list" class="outline-list"></div>
+    <div class="btn-row" style="margin-top:14px;">
+      <button class="btn btn-ghost" style="font-size:.85rem;padding:8px 16px;" onclick="outlineAfegir(ESTAT.outline.length)">＋ Afegir capítol al final</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="iniciarFase11()">🧵 Subtrames</button>
+    </div>
+  </div>
+</div>
+
 <!-- FASE 9: Estructura narrativa -->
 <div class="card hidden" id="fase-9">
   <h2><span class="icon">🏗️</span> Estructura narrativa</h2>
@@ -746,7 +832,9 @@ const ESTAT = {
   // Estructura narrativa
   _llistaEstructures:       [],
   _idxEstructura:           null,
-  estructuraTriada:         ''
+  estructuraTriada:         '',
+  // Outline de capítols
+  outline:                  []
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -1404,8 +1492,155 @@ function confirmarEstructura() {
     return;
   }
   ESTAT.estructuraTriada = ESTAT._llistaEstructures[idx];
-  toast('Estructura confirmada. Mapa de capítols en construcció…');
-  // Placeholder per a la fase 10
+  iniciarFase10();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FASE 9 → FASE 10: Outline de capítols
+// ═══════════════════════════════════════════════════════════
+
+// Versió client de comprimirContext (mirall de la funció backend).
+// Permet calcular el context compacte sense una crida GAS extra.
+function comprimirContextClient() {
+  const parts = [];
+  parts.push('GÈNERE: ' + (ESTAT.tematica || '—'));
+  parts.push('ESTIL: ' + (ESTAT.estil.desc || '—'));
+
+  if (ESTAT.elencPersonatges && ESTAT.elencPersonatges.length > 0) {
+    parts.push('\nPERSONATGES:');
+    ESTAT.elencPersonatges.forEach(p => {
+      const nomM = p.match(/\*\*(.+?)\*\*/);
+      const rolM = p.match(/Rol:\s*([^|]+)/);
+      const arcM = p.match(/Arc:\s*([^|]+)/);
+      const nom  = nomM ? nomM[1].trim() : p.substring(0, 25).trim();
+      const rol  = rolM ? rolM[1].trim().substring(0, 70) : '—';
+      const arc  = arcM ? arcM[1].trim().substring(0, 80) : '—';
+      parts.push('• ' + nom + ' — ' + rol + ' | Arc: ' + arc);
+    });
+  }
+
+  if (ESTAT.worldbuilding && ESTAT.worldbuilding.trim()) {
+    parts.push('\nMÓN:');
+    ESTAT.worldbuilding.split(/\n\n+/).filter(b => b.trim()).forEach(bloc => {
+      const linies = bloc.trim().split('\n');
+      const titol  = linies[0].replace(/\*\*/g, '').trim();
+      const desc   = (linies[1] || '').trim().substring(0, 100);
+      if (titol) parts.push('• ' + titol + (desc ? ': ' + desc : ''));
+    });
+  }
+
+  return parts.join('\n');
+}
+
+function iniciarFase10() {
+  ESTAT.fase = 10;
+  updateProgress(10);
+  showCard('fase-10');
+  document.getElementById('outline-wrap').classList.add('hidden');
+  showLoader(10);
+
+  const ctx = comprimirContextClient();
+
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.history = res.history;
+      hideLoader(10);
+      ESTAT.outline = parseOutline(res.response);
+      renderOutline();
+      document.getElementById('outline-wrap').classList.remove('hidden');
+      setTimeout(() => {
+        document.getElementById('fase-10').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    })
+    .withFailureHandler(err => { hideLoader(10); toast('Error: ' + err.message); })
+    .fase10_outline(ctx, ESTAT.estructuraTriada, ESTAT.history, USER_CONFIG, ESTAT.tematica);
+}
+
+// ─── Parser de l'outline ─────────────────────────────────────
+function parseOutline(text) {
+  const lines = text.split('\n').filter(l => /^Cap\.?\s*\d+/i.test(l.trim()));
+  return lines.map((line, i) => {
+    // Extreure el text net (sense "Cap. N — ")
+    const textNet = line.replace(/^Cap\.?\s*\d+\s*[—\-–]\s*/i, '').trim();
+    // Parsejar els camps separats per " | "
+    const segments  = textNet.split(/\s*\|\s*/);
+    const titol     = segments[0] || '';
+    const povSeg    = segments.find(s => /^POV:/i.test(s)) || '';
+    const pov       = povSeg.replace(/^POV:\s*/i, '').trim();
+    const descSeg   = segments.find(s => /^Descobriment:/i.test(s)) || '';
+    const descobriment = descSeg.replace(/^Descobriment:\s*/i, '').trim();
+    const objectiu  = segments
+      .filter(s => s !== segments[0] && !/^POV:/i.test(s) && !/^Descobriment:/i.test(s))
+      .join(' | ').trim();
+    return { num: i + 1, titol, pov, objectiu, descobriment, text: textNet };
+  });
+}
+
+// ─── Render i edició de l'outline ────────────────────────────
+function renderOutline() {
+  const list = document.getElementById('outline-list');
+  list.innerHTML = ESTAT.outline.map((cap, i) => {
+    const n     = i + 1;
+    const isFirst = i === 0;
+    const isLast  = i === ESTAT.outline.length - 1;
+    return `<div class="outline-item" id="outline-item-${i}">
+      <span class="outline-num">Cap.&nbsp;${n}</span>
+      <textarea class="outline-text" rows="1"
+        oninput="outlineSyncText(${i}, this); autoResizeTA(this);"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();}"
+      >${escHtml(cap.text)}</textarea>
+      <div class="outline-actions">
+        <button class="outline-btn" title="Pujar" ${isFirst ? 'disabled style="opacity:.3"' : ''} onclick="outlineMoure(${i},-1)">↑</button>
+        <button class="outline-btn" title="Baixar" ${isLast ? 'disabled style="opacity:.3"' : ''} onclick="outlineMoure(${i},1)">↓</button>
+        <button class="outline-btn" title="Afegir després" onclick="outlineAfegir(${i + 1})">＋</button>
+        <button class="outline-btn danger" title="Eliminar" onclick="outlineEliminar(${i})">×</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Ajustar alçada de tots els textareas al contingut inicial
+  list.querySelectorAll('.outline-text').forEach(ta => autoResizeTA(ta));
+}
+
+function autoResizeTA(ta) {
+  ta.style.height = 'auto';
+  ta.style.height = ta.scrollHeight + 'px';
+}
+
+function outlineSyncText(idx, ta) {
+  if (ESTAT.outline[idx]) ESTAT.outline[idx].text = ta.value;
+}
+
+function outlineMoure(idx, dir) {
+  const target = idx + dir;
+  if (target < 0 || target >= ESTAT.outline.length) return;
+  [ESTAT.outline[idx], ESTAT.outline[target]] = [ESTAT.outline[target], ESTAT.outline[idx]];
+  // Renumerar
+  ESTAT.outline.forEach((c, i) => { c.num = i + 1; });
+  renderOutline();
+}
+
+function outlineEliminar(idx) {
+  if (ESTAT.outline.length <= 1) { toast('Cal tenir almenys un capítol.'); return; }
+  ESTAT.outline.splice(idx, 1);
+  ESTAT.outline.forEach((c, i) => { c.num = i + 1; });
+  renderOutline();
+}
+
+function outlineAfegir(afterIdx) {
+  const nouCap = { num: afterIdx + 1, titol: '', pov: '', objectiu: '', descobriment: '', text: '' };
+  ESTAT.outline.splice(afterIdx, 0, nouCap);
+  ESTAT.outline.forEach((c, i) => { c.num = i + 1; });
+  renderOutline();
+  // Focus al nou capítol
+  setTimeout(() => {
+    const ta = document.querySelector(`#outline-item-${afterIdx} .outline-text`);
+    if (ta) { ta.focus(); autoResizeTA(ta); }
+  }, 50);
+}
+
+function iniciarFase11() {
+  toast('La fase de subtrames arribarà aviat!');
 }
 </script>
 </body>

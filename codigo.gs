@@ -549,6 +549,21 @@ function fase9_estructura(conteActual, worldbuilding, elencPersonatges, tematica
   return { response, history: newHistory };
 }
 
+// ─── FASE 10: Outline de capítols ───────────────────────────
+// contextComprimit: string ja comprimida pel frontend (sense cost extra)
+function fase10_outline(contextComprimit, estructuraTriada, history, userConfig, tematica) {
+  const msgs = [
+    ...history,
+    {
+      role: 'user',
+      content: `Tenim definits el món, els personatges i l'estructura de la novel·la:\n\n${contextComprimit}\n\nESTRUCTURA TRIADA:\n${estructuraTriada}\n\n---\nGenera l'outline complet de capítols de la novel·la. El nombre de capítols ha d'estar entre 12 i 25, ajustat a la complexitat de l'estructura triada.\n\nCada capítol en una sola línia, format ESTRICTE:\nCap. N — [Títol breu] | POV: [Nom] | [Objectiu narratiu en 10 paraules màxim] | Descobriment: [Què sap el lector de nou al final del capítol]\n\nEl conjunt ha de:\n- Cobrir tots els actes de l'estructura triada de manera proporcional\n- Distribuir els POVs estratègicament entre els personatges de l'elenc\n- Mantenir tensió creixent amb punts de gir als capítols clau\n- Cada capítol ha de tenir un objectiu narratiu clar i diferent dels altres\n\nFormat ESTRICTE (res més, sense introducció ni resum final):\nCap. 1 — [Títol] | POV: [Nom] | [Objectiu 10 paraules] | Descobriment: [text breu]\nCap. 2 — [Títol] | POV: [Nom] | [Objectiu 10 paraules] | Descobriment: [text breu]\n...`
+    }
+  ];
+  const response   = callLLM(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 4096 }));
+  const newHistory = [...msgs, { role: 'assistant', content: response }];
+  return { response, history: newHistory };
+}
+
 // ─── Export a Google Doc (format literari) ──────────────────
 function exportarADoc(titol, contingut) {
   const doc  = DocumentApp.create(titol || 'Conte');
