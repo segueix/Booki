@@ -3,21 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Novel·la IA</title>
+<title>Conte IA</title>
 <style>
   :root {
-    --bg:        #0f0f13;
-    --surface:   #1a1a24;
-    --surface2:  #22222f;
-    --border:    #2e2e42;
-    --accent:    #7c6af7;
-    --accent2:   #a78bfa;
-    --text:      #e8e8f0;
-    --text2:     #9898b0;
-    --success:   #4ade80;
-    --warning:   #fbbf24;
-    --radius:    12px;
-    --font:      'Segoe UI', system-ui, sans-serif;
+    --bg:       #0f0f13;
+    --surface:  #1a1a24;
+    --surface2: #22222f;
+    --border:   #2e2e42;
+    --accent:   #7c6af7;
+    --accent2:  #a78bfa;
+    --text:     #e8e8f0;
+    --text2:    #9898b0;
+    --success:  #4ade80;
+    --warning:  #fbbf24;
+    --radius:   12px;
+    --font:     'Segoe UI', system-ui, sans-serif;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -74,8 +74,8 @@
     border: 1px solid var(--border);
     transition: all .3s;
   }
-  .step-pill.done     { background: #2a2a3d; color: var(--accent2); border-color: var(--accent); }
-  .step-pill.active   { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .step-pill.done   { background: #2a2a3d; color: var(--accent2); border-color: var(--accent); }
+  .step-pill.active { background: var(--accent); color: #fff; border-color: var(--accent); }
   .step-arrow { color: var(--border); font-size: .8rem; flex-shrink: 0; }
 
   /* ── Card ── */
@@ -153,19 +153,47 @@
     transition: all .2s;
     font-family: var(--font);
   }
-  .btn-primary {
-    background: var(--accent);
-    color: #fff;
-  }
+  .btn-primary   { background: var(--accent); color: #fff; }
   .btn-primary:hover { background: #6b5be0; transform: translateY(-1px); }
-  .btn-secondary {
-    background: var(--surface2);
-    color: var(--text);
-    border: 1px solid var(--border);
-  }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
   .btn-secondary:hover { border-color: var(--accent); color: var(--accent2); }
+  .btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--text2); }
   .btn:disabled { opacity: .4; cursor: not-allowed; transform: none !important; }
   .btn-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+
+  /* ── Pills de selecció (estil narratiu) ── */
+  .opts-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+  }
+  .opt-pill {
+    flex: 1;
+    min-width: 130px;
+    padding: 14px 16px;
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    text-align: center;
+    font-size: .88rem;
+    font-weight: 600;
+    transition: all .2s;
+    line-height: 1.4;
+    user-select: none;
+  }
+  .opt-pill small {
+    display: block;
+    font-weight: 400;
+    color: var(--text2);
+    font-size: .75rem;
+    margin-top: 4px;
+  }
+  .opt-pill:hover   { border-color: var(--accent); }
+  .opt-pill.chosen  { border-color: var(--accent); background: #1e1b38; color: var(--accent2); }
+  .opt-pill.chosen small { color: var(--accent2); }
 
   /* ── Llista de premisses ── */
   .premise-list { display: flex; flex-direction: column; gap: 10px; }
@@ -185,114 +213,21 @@
   .premise-item input[type=radio] { margin-top: 2px; accent-color: var(--accent); flex-shrink: 0; }
   .premise-item label { cursor: pointer; line-height: 1.5; font-size: .95rem; }
 
-  /* ── Opcions dobles ── */
-  .options-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-  }
-  @media (max-width: 640px) { .options-grid { grid-template-columns: 1fr; } }
-  .option-card {
-    background: var(--surface2);
-    border: 2px solid var(--border);
-    border-radius: 10px;
-    padding: 18px;
-    cursor: pointer;
-    transition: all .2s;
-    position: relative;
-  }
-  .option-card:hover  { border-color: var(--accent); }
-  .option-card.chosen { border-color: var(--accent); background: #1e1b38; }
-  .option-card .opt-label {
+  /* ── Badge Recomanat ── */
+  .badge-recomanat {
     display: inline-block;
-    background: var(--accent);
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
     color: #fff;
-    font-size: .7rem;
+    font-size: .68rem;
     font-weight: 700;
-    padding: 3px 10px;
+    padding: 2px 9px;
     border-radius: 99px;
-    margin-bottom: 12px;
     text-transform: uppercase;
-    letter-spacing: .06em;
+    letter-spacing: .07em;
+    margin-right: 8px;
+    vertical-align: middle;
+    flex-shrink: 0;
   }
-  .option-card.chosen .opt-label { background: var(--success); }
-  .option-card pre {
-    white-space: pre-wrap;
-    font-family: var(--font);
-    font-size: .88rem;
-    line-height: 1.65;
-    color: var(--text);
-  }
-  .opt-check {
-    position: absolute;
-    top: 14px;
-    right: 14px;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    border: 2px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: .9rem;
-    transition: all .2s;
-  }
-  .option-card.chosen .opt-check { background: var(--success); border-color: var(--success); color: #fff; }
-
-  /* ── Capítol escrit ── */
-  .chapter-content {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 24px;
-    white-space: pre-wrap;
-    font-size: .95rem;
-    line-height: 1.8;
-    color: var(--text);
-    font-family: 'Georgia', serif;
-    max-height: 500px;
-    overflow-y: auto;
-  }
-  .chapter-title {
-    font-size: 1.3rem;
-    font-weight: 700;
-    color: var(--accent2);
-    margin-bottom: 16px;
-    font-family: 'Georgia', serif;
-  }
-
-  /* ── Taula de capítols ── */
-  .chapter-table { width: 100%; border-collapse: collapse; margin-top: 4px; }
-  .chapter-table th {
-    background: var(--surface2);
-    padding: 10px 14px;
-    text-align: left;
-    font-size: .8rem;
-    color: var(--text2);
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    border-bottom: 1px solid var(--border);
-  }
-  .chapter-table td {
-    padding: 11px 14px;
-    font-size: .9rem;
-    border-bottom: 1px solid var(--border);
-    vertical-align: top;
-    line-height: 1.5;
-  }
-  .chapter-table tr:last-child td { border-bottom: none; }
-  .chapter-table .ch-num {
-    color: var(--accent2);
-    font-weight: 700;
-    white-space: nowrap;
-    width: 80px;
-  }
-  .chapter-table tr.writing td { background: #1e1b38; }
-  .chapter-table tr.done td    { opacity: .5; }
-  .ch-status { font-size: .75rem; }
-  .ch-status.pendent  { color: var(--text2); }
-  .ch-status.escrivint { color: var(--warning); }
-  .ch-status.fet       { color: var(--success); }
 
   /* ── Loader ── */
   .loader-wrap {
@@ -300,7 +235,7 @@
     flex-direction: column;
     align-items: center;
     gap: 12px;
-    padding: 28px 0;
+    padding: 32px 0;
     color: var(--text2);
     font-size: .9rem;
   }
@@ -333,26 +268,52 @@
   }
   #toast.show { transform: translateX(-50%) translateY(0); }
 
-  /* ── Bíblia resum ── */
-  .biblia-item {
+  /* ── Reader del conte ── */
+  .conte-reader {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 40px 48px;
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-size: 1.05rem;
+    line-height: 1.9;
+    color: var(--text);
+    max-height: 72vh;
+    overflow-y: auto;
+  }
+  .conte-reader p {
+    margin-bottom: 1.1em;
+    text-indent: 1.8em;
+  }
+  .conte-reader p:first-child { text-indent: 0; }
+  @media (max-width: 600px) {
+    .conte-reader { padding: 24px 20px; font-size: .97rem; }
+  }
+  .conte-wordcount {
+    font-size: .78rem;
+    color: var(--text2);
+    margin-top: 10px;
+    text-align: right;
+  }
+
+  /* ── Millora ── */
+  .millora-row {
     display: flex;
     gap: 10px;
-    padding: 8px 0;
-    border-bottom: 1px solid var(--border);
-    font-size: .88rem;
-    line-height: 1.5;
+    margin-top: 14px;
   }
-  .biblia-item:last-child { border-bottom: none; }
-  .biblia-label {
-    flex-shrink: 0;
-    width: 110px;
-    color: var(--text2);
-    font-size: .8rem;
-    text-transform: uppercase;
-    letter-spacing: .05em;
-    padding-top: 1px;
+  .millora-row input {
+    flex: 1;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: .9rem;
+    font-family: var(--font);
   }
-  .biblia-val { color: var(--text); }
+  .millora-row input:focus { outline: none; border-color: var(--accent); }
+  .millora-row input::placeholder { color: var(--text2); }
 
   /* ── Export ── */
   .export-link {
@@ -370,29 +331,616 @@
   }
   .export-link:hover { background: #1e1b38; }
 
+  /* ── Worldbuilding multi-select ── */
+  .world-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .world-item:hover  { border-color: var(--accent); }
+  .world-item.chosen { border-color: var(--accent); background: #1e1b38; }
+  .world-item input[type=checkbox] { margin-top: 3px; accent-color: var(--accent); flex-shrink: 0; width: 16px; height: 16px; cursor: pointer; }
+  .world-item label { cursor: pointer; line-height: 1.5; font-size: .95rem; }
+
+  /* ── Resultat worldbuilding ── */
+  .worldbuilding-result {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px 32px;
+    font-size: .95rem;
+    line-height: 1.85;
+    color: var(--text);
+  }
+  .worldbuilding-result .world-bloc {
+    margin-bottom: 22px;
+  }
+  .worldbuilding-result .world-bloc:last-child {
+    margin-bottom: 0;
+  }
+  .worldbuilding-result .world-bloc-titol {
+    color: var(--accent2);
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 6px;
+  }
+  .worldbuilding-result .world-bloc-desc {
+    color: var(--text);
+    padding-left: 12px;
+    border-left: 2px solid var(--border);
+  }
+
+  /* ── Bíblia de consistència ── */
+  .biblia-container {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px 28px;
+    max-height: 65vh;
+    overflow-y: auto;
+  }
+  .biblia-seccio {
+    margin-bottom: 18px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .biblia-seccio:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+  .biblia-titol {
+    color: var(--accent2);
+    font-weight: 700;
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    margin-bottom: 6px;
+  }
+  .biblia-cos {
+    font-family: var(--font);
+    font-size: .88rem;
+    line-height: 1.7;
+    color: var(--text);
+    white-space: pre-wrap;
+    margin: 0;
+  }
+  .biblia-textarea {
+    width: 100%;
+    min-height: 420px;
+    max-height: 65vh;
+    padding: 20px 24px;
+    background: var(--surface2);
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: .88rem;
+    font-family: var(--font);
+    line-height: 1.7;
+    resize: vertical;
+    display: none;
+  }
+  .biblia-textarea:focus { outline: none; }
+
+  /* ── Taula cronologia ── */
+  .crono-wrap {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    overflow-x: auto;
+    max-height: 62vh;
+    overflow-y: auto;
+  }
+  .crono-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .88rem;
+  }
+  .crono-table th {
+    background: #1a1a2e;
+    color: var(--accent2);
+    font-size: .73rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 2px solid var(--accent);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  .crono-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    line-height: 1.6;
+    color: var(--text);
+  }
+  .crono-table tr:last-child td { border-bottom: none; }
+  .crono-table tr:hover td { background: #1e1e2e; }
+  .crono-table .crono-temps {
+    color: var(--accent2);
+    font-weight: 700;
+    white-space: nowrap;
+    min-width: 100px;
+    font-size: .82rem;
+  }
+  .crono-table .crono-caps {
+    color: var(--accent2);
+    font-weight: 600;
+    white-space: nowrap;
+    font-size: .82rem;
+    min-width: 70px;
+  }
+  .crono-table .crono-personatges {
+    font-size: .82rem;
+    color: var(--text2);
+    margin-top: 4px;
+  }
+
+  /* ── Outline editor ── */
+  .outline-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .outline-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: border-color .2s;
+  }
+  .outline-item:focus-within { border-color: var(--accent); }
+  .outline-num {
+    color: var(--accent2);
+    font-weight: 700;
+    font-size: .78rem;
+    min-width: 48px;
+    padding-top: 4px;
+    flex-shrink: 0;
+    user-select: none;
+  }
+  .outline-text {
+    flex: 1;
+    font-size: .88rem;
+    line-height: 1.65;
+    color: var(--text);
+    background: transparent;
+    border: none;
+    outline: none;
+    resize: none;
+    font-family: var(--font);
+    width: 100%;
+    overflow: hidden;
+  }
+  .outline-text::placeholder { color: var(--text2); }
+  .outline-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex-shrink: 0;
+  }
+  .outline-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text2);
+    border-radius: 5px;
+    width: 26px;
+    height: 26px;
+    cursor: pointer;
+    font-size: .78rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .15s;
+    padding: 0;
+    line-height: 1;
+  }
+  .outline-btn:hover { border-color: var(--accent); color: var(--accent2); }
+  .outline-btn.danger:hover { border-color: #f87171; color: #f87171; }
+
+  /* ── Comptador de seleccionats ── */
+  .seleccio-comptador {
+    font-size: .82rem;
+    color: var(--text2);
+    margin-bottom: 14px;
+  }
+  .seleccio-comptador .num {
+    color: var(--accent2);
+    font-weight: 700;
+  }
+  .seleccio-comptador .rang {
+    color: var(--text2);
+  }
+
   /* ── Secció amagada ── */
   .hidden { display: none !important; }
+
+  /* ── Fase 17: Paratextos ── */
+  .para-seccio {
+    margin-bottom: 26px;
+    padding-bottom: 26px;
+    border-bottom: 1px solid var(--border);
+  }
+  .para-seccio:last-of-type { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .para-titol-seccio {
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    font-weight: 700;
+    color: var(--accent2);
+    margin-bottom: 12px;
+  }
+  .para-textarea {
+    width: 100%;
+    padding: 14px 18px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: .92rem;
+    font-family: var(--font);
+    line-height: 1.78;
+    resize: vertical;
+    transition: border-color .2s;
+  }
+  .para-textarea:focus { outline: none; border-color: var(--accent); }
+  .para-wordcount {
+    font-size: .78rem;
+    color: var(--text2);
+    text-align: right;
+    margin-bottom: 6px;
+  }
+
+  /* ── Fase 16: Panel de poliment ── */
+  .cap-millora-panel {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .cap-millora-label {
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--text2);
+    font-weight: 700;
+    margin-bottom: 10px;
+    display: block;
+  }
+  .cap-millora-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+  .cap-millora-row select {
+    flex: 1;
+    min-width: 180px;
+  }
+
+  /* ── Fase 15: Revisió de coherència ── */
+  .revisio-banner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 18px;
+    background: rgba(251,191,36,.07);
+    border: 1px solid rgba(251,191,36,.28);
+    border-radius: 8px;
+    margin-bottom: 18px;
+  }
+  .revisio-banner-text {
+    flex: 1;
+    font-size: .88rem;
+    color: var(--warning);
+    font-weight: 500;
+  }
+  .revisio-panel {
+    margin-top: 24px;
+    border-top: 1px solid var(--border);
+    padding-top: 20px;
+  }
+  .revisio-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .revisio-panel-titol {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--accent2);
+    flex: 1;
+  }
+  .editor-result {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px 26px;
+  }
+  .revisio-problema {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .revisio-problema:last-child { border-bottom: none; }
+  .revisio-problema-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .revisio-label {
+    font-size: .7rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--accent2);
+    font-weight: 700;
+  }
+  .revisio-cap-badge {
+    font-size: .72rem;
+    background: rgba(124,106,247,.18);
+    color: var(--accent2);
+    padding: 2px 9px;
+    border-radius: 99px;
+    font-weight: 700;
+  }
+  .revisio-desc {
+    font-size: .9rem;
+    line-height: 1.65;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+  .revisio-correccio {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 14px;
+    background: rgba(124,106,247,.07);
+    border: 1px solid rgba(124,106,247,.18);
+    border-radius: 7px;
+  }
+  .revisio-correccio-text {
+    flex: 1;
+    font-size: .85rem;
+    line-height: 1.55;
+    color: var(--text2);
+  }
+  .revisio-ok {
+    padding: 18px 0;
+    color: var(--success);
+    font-size: .95rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  /* ── Fase 14: Escriptura capítol a capítol ── */
+  .fase14-layout {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+  }
+  .cap-sidebar {
+    width: 200px;
+    flex-shrink: 0;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow-y: auto;
+    max-height: 62vh;
+  }
+  .cap-sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: background .15s;
+    border-bottom: 1px solid var(--border);
+    border-left: 3px solid transparent;
+  }
+  .cap-sidebar-item:last-child { border-bottom: none; }
+  .cap-sidebar-item:hover { background: rgba(124,106,247,.1); }
+  .cap-sidebar-item.actiu {
+    background: rgba(124,106,247,.15);
+    border-left-color: var(--accent);
+  }
+  .cap-sidebar-num {
+    font-weight: 700;
+    font-size: .75rem;
+    color: var(--accent2);
+    flex-shrink: 0;
+    min-width: 26px;
+  }
+  .cap-sidebar-status { flex-shrink: 0; font-size: .85rem; }
+  .cap-sidebar-titol {
+    flex: 1;
+    font-size: .78rem;
+    color: var(--text2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .cap-sidebar-item.actiu .cap-sidebar-titol { color: var(--accent2); }
+  .cap-sidebar-item.generat .cap-sidebar-titol { color: var(--text); }
+  .cap-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+  }
+  .cap-main-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .cap-main-num {
+    font-size: .78rem;
+    font-weight: 700;
+    color: var(--accent2);
+    background: rgba(124,106,247,.15);
+    padding: 3px 12px;
+    border-radius: 99px;
+    flex-shrink: 0;
+  }
+  .cap-main-titol {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+    flex: 1;
+  }
+  .cap-outline-text {
+    font-size: .82rem;
+    color: var(--text2);
+    line-height: 1.6;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .cap-loader {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 40px 0;
+    color: var(--text2);
+    font-size: .9rem;
+  }
+  .cap-loader.visible { display: flex; }
+  @media (max-width: 680px) {
+    .fase14-layout { flex-direction: column; gap: 14px; }
+    .cap-sidebar {
+      width: 100%;
+      max-height: none;
+      display: flex;
+      flex-direction: row;
+      overflow-x: auto;
+      overflow-y: visible;
+    }
+    .cap-sidebar-item {
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 8px 10px;
+      min-width: 54px;
+      flex-shrink: 0;
+      border-bottom: none;
+      border-left: none;
+      border-bottom: 3px solid transparent;
+    }
+    .cap-sidebar-item.actiu {
+      border-left-color: transparent;
+      border-bottom-color: var(--accent);
+    }
+    .cap-sidebar-titol { display: none; }
+    .cap-sidebar-num { min-width: auto; font-size: .8rem; }
+  }
+
+  /* ── Fase 18: Assemblatge final ── */
+  .fase18-celebracio {
+    text-align: center;
+    font-size: 1.6rem;
+    padding: 10px 0 4px;
+    letter-spacing: .02em;
+  }
+  .fase18-subtitol {
+    text-align: center;
+    color: var(--success);
+    font-size: .95rem;
+    font-weight: 600;
+    margin-bottom: 28px;
+  }
+  .fase18-stats {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin: 22px 0 28px;
+  }
+  .fase18-stat {
+    flex: 1;
+    min-width: 110px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 14px;
+    text-align: center;
+  }
+  .fase18-stat-num {
+    display: block;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent2);
+    line-height: 1.1;
+  }
+  .fase18-stat-label {
+    font-size: .78rem;
+    color: var(--text2);
+    margin-top: 5px;
+  }
+  .fase18-export-links {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 18px;
+  }
+  .fase18-export-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: .95rem;
+    transition: all .2s;
+  }
+  .fase18-export-link:hover {
+    border-color: var(--accent);
+    color: var(--accent2);
+    background: rgba(124,106,247,.07);
+  }
+  #confetti-canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 9999;
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>📖 Novel·la IA</h1>
-  <p>Construeix la teva obra pas a pas amb intel·ligència artificial</p>
+  <h1>📖 Conte IA</h1>
+  <p>Crea el teu conte pas a pas amb intel·ligència artificial</p>
 </header>
-
 
 <!-- CONFIGURACIÓ INICIAL -->
 <div class="card" id="card-config">
   <h2><span class="icon">⚙️</span> Configuració</h2>
-  <p style="color:var(--text2);margin-bottom:8px;">Configura el model abans de començar l'assistent.</p>
+  <p style="color:var(--text2);margin-bottom:8px;">Configura el model d'IA abans de començar.</p>
 
   <label class="field-label" for="config-provider">Proveïdor</label>
-  <select id="config-provider">
-    <option value="openai">OpenAI (GPT-4)</option>
-    <option value="anthropic">Anthropic (Claude 3.5)</option>
+  <select id="config-provider" onchange="actualitzarModelDefault()">
+    <option value="anthropic">Anthropic (Claude)</option>
+    <option value="openai">OpenAI (GPT-4o)</option>
     <option value="gemini">Google (Gemini 1.5)</option>
   </select>
+
+  <label class="field-label" for="config-model">Model</label>
+  <input type="text" id="config-model" placeholder="claude-opus-4-1" value="claude-opus-4-1">
 
   <label class="field-label" for="config-apikey">API Key</label>
   <input type="password" id="config-apikey" placeholder="Enganxa aquí la teva API key">
@@ -405,38 +953,58 @@
 <!-- Progress -->
 <div id="progress-wrap" class="hidden">
   <div class="progress-steps" id="steps-bar">
-    <div class="step-pill active" data-step="0">Temàtica</div>
+    <div class="step-pill active" data-step="0">Gènere</div>
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="1">Premissa</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="2">Estructura</div>
+    <div class="step-pill" data-step="2">Estil</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="3">Personatges</div>
+    <div class="step-pill" data-step="3">Protagonista</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="4">Desenllaç</div>
+    <div class="step-pill" data-step="4">Localització</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="5">Bíblia</div>
+    <div class="step-pill" data-step="5">Final</div>
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="6">Escriptura</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="7">Món</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="8">Personatges</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="9">Estructura</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="10">Capítols</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="11">Subtrames</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="12">Cronologia</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="13">Bíblia</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="14">Novel·la</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="17">Paratextos</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="18">Final</div>
   </div>
 </div>
 
-<!-- FASE 0: Selecció de temàtica -->
+<!-- FASE 0: Selecció de gènere -->
 <div class="card hidden" id="fase-0">
-  <h2><span class="icon">🎭</span> Tria la temàtica</h2>
-  <label class="field-label" for="sel-tematica">Gènere literari</label>
+  <h2><span class="icon">🎭</span> Tria el gènere</h2>
+  <label class="field-label" for="sel-tematica">Tipus de conte</label>
   <select id="sel-tematica">
     <option value="">— Selecciona un gènere —</option>
-    <option value="novel·la d'aventures">Novel·la d'aventures</option>
-    <option value="ciència ficció">Ciència ficció</option>
-    <option value="fantasia èpica">Fantasia èpica</option>
-    <option value="novel·la històrica">Novel·la històrica</option>
-    <option value="novel·la romàntica">Novel·la romàntica</option>
-    <option value="thriller i misteri">Thriller i misteri</option>
-    <option value="terror psicològic">Terror psicològic</option>
-    <option value="drama contemporani">Drama contemporani</option>
-    <option value="conte literari">Conte literari</option>
-    <option value="novel·la gràfica narrativa">Art i novel·la gràfica narrativa</option>
+    <option value="conte de terror psicològic">Terror psicològic</option>
+    <option value="conte de realisme màgic">Realisme màgic</option>
+    <option value="conte negre nòrdic (Nordic Noir)">Conte negre (Nordic Noir)</option>
+    <option value="conte de ciència-ficció breu">Ciència ficció</option>
+    <option value="conte fantàstic">Conte fantàstic</option>
+    <option value="faula contemporània">Faula contemporània</option>
+    <option value="conte sentimental">Conte sentimental</option>
+    <option value="conte d'humor negre">Humor negre</option>
+    <option value="microconte / flash fiction">Microconte / flash fiction</option>
+    <option value="conte de misteri">Misteri</option>
   </select>
   <div class="btn-row">
     <button class="btn btn-primary" onclick="iniciarFase1()">✨ Generar premisses</button>
@@ -452,104 +1020,458 @@
   </div>
   <div id="llista-premisses" class="premise-list"></div>
   <div class="btn-row">
-    <button class="btn btn-primary hidden" id="btn-fase1" onclick="iniciarFase2()">🏗️ Construir estructura</button>
+    <button class="btn btn-primary hidden" id="btn-fase1" onclick="iniciarFase2()">🎨 Triar estil narratiu</button>
   </div>
 </div>
 
-<!-- FASE 2: Estructura narrativa -->
+<!-- FASE 2: Estil narratiu (sense crida a LLM) -->
 <div class="card hidden" id="fase-2">
-  <h2><span class="icon">🏗️</span> Tria la trama</h2>
-  <div class="loader-wrap" id="loader-2">
-    <div class="spinner"></div>
-    <span>Generant 10 trames possibles…</span>
+  <h2><span class="icon">🎨</span> Estil narratiu</h2>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:4px;">Defineix el to, la perspectiva i la longitud del conte.</p>
+
+  <label class="field-label">To i atmosfera</label>
+  <select id="sel-to">
+    <option value="">— Tria el to —</option>
+    <option value="misteri i suspens creixent">Misteri i suspens</option>
+    <option value="terror psicològic i claustrofòbic">Terror psicològic</option>
+    <option value="realisme màgic poètic">Realisme màgic</option>
+    <option value="humor negre i irònic">Humor negre</option>
+    <option value="melancolia i bittersweet">Melancolia / bittersweet</option>
+    <option value="thriller emocional d'alta tensió">Thriller emocional</option>
+    <option value="tendresa i vulnerabilitat">Tendresa i vulnerabilitat</option>
+    <option value="absurd i kafkià">Absurd / kafkià</option>
+    <option value="meravella i màgia continguda">Màgia i meravella</option>
+    <option value="ràbia i tensió social">Ràbia i tensió social</option>
+  </select>
+
+  <label class="field-label">Perspectiva narrativa</label>
+  <div class="opts-row" id="opts-perspectiva">
+    <div class="opt-pill" data-group="perspectiva" data-val="primera persona (narrador protagonista)" onclick="triarPill(this)">
+      1a persona
+      <small>Jo narrador</small>
+    </div>
+    <div class="opt-pill" data-group="perspectiva" data-val="tercera persona limitada (focalització única en el protagonista)" onclick="triarPill(this)">
+      3a persona
+      <small>Focalització única</small>
+    </div>
+    <div class="opt-pill" data-group="perspectiva" data-val="segona persona (el lector és el protagonista)" onclick="triarPill(this)">
+      2a persona
+      <small>Tu ets el protagonista</small>
+    </div>
   </div>
-  <div id="llista-estructures" class="premise-list"></div>
+
+  <label class="field-label">Longitud del conte</label>
+  <div class="opts-row" id="opts-paraules">
+    <div class="opt-pill" data-group="paraules" data-val="500" onclick="triarPill(this)">
+      Microconte
+      <small>~500 paraules</small>
+    </div>
+    <div class="opt-pill" data-group="paraules" data-val="1500" onclick="triarPill(this)">
+      Conte curt
+      <small>~1.500 paraules</small>
+    </div>
+    <div class="opt-pill" data-group="paraules" data-val="3000" onclick="triarPill(this)">
+      Conte llarg
+      <small>~3.000 paraules</small>
+    </div>
+  </div>
+
   <div class="btn-row">
-    <button class="btn btn-primary hidden" id="btn-fase2" onclick="iniciarFase3()">👤 Triar protagonista</button>
+    <button class="btn btn-primary" onclick="iniciarFase3()">👤 Triar protagonista</button>
   </div>
 </div>
 
-<!-- FASE 3: Personatges -->
+<!-- FASE 3: Protagonista -->
 <div class="card hidden" id="fase-3">
-  <h2><span class="icon">👥</span> Tria el protagonista</h2>
+  <h2><span class="icon">👤</span> Tria el protagonista</h2>
   <div class="loader-wrap" id="loader-3">
     <div class="spinner"></div>
-    <span>Generant 10 protagonistes possibles…</span>
+    <span>Generant protagonistes…</span>
   </div>
   <div id="llista-personatges" class="premise-list"></div>
   <div class="btn-row">
-    <button class="btn btn-primary hidden" id="btn-fase3" onclick="iniciarFase4()">🏁 Definir desenllaç</button>
+    <button class="btn btn-primary hidden" id="btn-fase3" onclick="iniciarFase4()">📍 Triar la localització</button>
   </div>
 </div>
 
-<!-- FASE 4: Desenllaç -->
+<!-- FASE 4: Localitzacions -->
 <div class="card hidden" id="fase-4">
-  <h2><span class="icon">🏁</span> Tria el desenllaç</h2>
+  <h2><span class="icon">📍</span> Tria la localització</h2>
   <div class="loader-wrap" id="loader-4">
     <div class="spinner"></div>
-    <span>Generant 10 desenllaços possibles…</span>
+    <span>Generant 5 localitzacions…</span>
   </div>
-  <div id="llista-desenllac" class="premise-list"></div>
+  <div id="llista-localitzacions" class="premise-list"></div>
   <div class="btn-row">
-    <button class="btn btn-primary hidden" id="btn-fase4" onclick="iniciarFase5()">📋 Generar taula de capítols</button>
+    <button class="btn btn-primary hidden" id="btn-fase4" onclick="iniciarFase5()">🏁 Triar el final</button>
   </div>
 </div>
 
-<!-- FASE 5: Taula de capítols -->
+<!-- FASE 5: Finals -->
 <div class="card hidden" id="fase-5">
-  <h2><span class="icon">📋</span> Taula de capítols</h2>
+  <h2><span class="icon">🏁</span> Tria el final</h2>
   <div class="loader-wrap" id="loader-5">
     <div class="spinner"></div>
-    <span>Generant l'estructura de capítols…</span>
+    <span>Generant 5 finals possibles…</span>
   </div>
-  <div id="taula-capitols-wrap" class="hidden">
-    <table class="chapter-table" id="taula-capitols">
-      <thead>
-        <tr>
-          <th>Capítol</th>
-          <th>Títol</th>
-          <th>Objectiu narratiu</th>
-          <th>Estat</th>
-        </tr>
-      </thead>
-      <tbody id="capitols-tbody"></tbody>
-    </table>
-  </div>
+  <div id="llista-finals" class="premise-list"></div>
   <div class="btn-row">
-    <button class="btn btn-primary hidden" id="btn-fase5" onclick="iniciarEscriptura()">✍️ Escriure la novel·la</button>
+    <button class="btn btn-primary hidden" id="btn-fase5" onclick="iniciarEscriptura()">✍️ Escriure el conte</button>
   </div>
 </div>
 
-<!-- FASE 6: Escriptura de capítols -->
+<!-- FASE 6: Escriptura -->
 <div class="card hidden" id="fase-6">
-  <h2><span class="icon">✍️</span> Escriptura — <span id="titol-capitol-actual">—</span></h2>
+  <h2><span class="icon">✍️</span> El teu conte</h2>
   <div class="loader-wrap" id="loader-6">
     <div class="spinner"></div>
-    <span id="loader-6-text">Escrivint capítol…</span>
+    <span id="loader-6-text">Escrivint el conte…</span>
   </div>
-  <div id="capitol-escrit" class="hidden">
-    <div class="chapter-title" id="capitol-titol-h"></div>
-    <div class="chapter-content" id="capitol-cos"></div>
-    <div class="btn-row" style="margin-top:16px;">
-      <button class="btn btn-primary" id="btn-seguent-capitol" onclick="seguentCapitol()">▶ Capítol següent</button>
-      <button class="btn btn-secondary" onclick="regenerarCapitol()">🔄 Regenerar</button>
+  <div id="conte-wrap" class="hidden">
+    <div class="conte-reader" id="conte-cos"></div>
+    <div class="conte-wordcount" id="conte-wordcount"></div>
+
+    <!-- Millora -->
+    <div class="millora-row">
+      <input type="text" id="millora-input" placeholder="Vols millorar alguna cosa? (ex: «fes l'ending més abrupte»)">
+      <button class="btn btn-secondary" onclick="millorarConte()">✨ Millorar</button>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="regenerarConte()">🔄 Regenerar</button>
+      <button class="btn btn-secondary" onclick="exportarDoc()">📄 Exportar a Google Docs</button>
+      <button class="btn btn-primary"   onclick="iniciarFase7()">🌍 Expandir a novel·la</button>
+    </div>
+    <div id="export-link-wrap" class="hidden" style="margin-top:14px;"></div>
+  </div>
+</div>
+
+<!-- FASE 13: Bíblia de consistència -->
+<div class="card hidden" id="fase-13">
+  <h2><span class="icon">📖</span> Bíblia de consistència</h2>
+  <div class="loader-wrap" id="loader-13">
+    <div class="spinner"></div>
+    <span>Compilant la bíblia de la novel·la…</span>
+  </div>
+  <div id="biblia-content" class="hidden">
+    <p style="color:var(--text2);font-size:.9rem;margin-bottom:14px;">Reviseu i editeu la bíblia. Un cop aprovada, podreu escriure els capítols un a un.</p>
+    <div class="biblia-container" id="biblia-view"></div>
+    <textarea class="biblia-textarea" id="biblia-textarea"></textarea>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="btn-editar-biblia" onclick="toggleEditarBiblia()">✏️ Editar</button>
+      <button class="btn btn-ghost hidden" id="btn-desar-biblia" onclick="desarCanvisBiblia()">✔ Desar canvis</button>
+      <button class="btn btn-primary" onclick="iniciarEscripturaCapitol(1)">✍️ Escriure capítol 1</button>
     </div>
   </div>
 </div>
 
-<!-- Bíblia resum (lateral inferior) -->
-<div class="card hidden" id="card-biblia">
-  <h2><span class="icon">📚</span> Bíblia narrativa</h2>
-  <div id="biblia-contingut"></div>
+<!-- FASE 12: Cronologia -->
+<div class="card hidden" id="fase-12">
+  <h2><span class="icon">📅</span> Cronologia</h2>
+  <div class="loader-wrap" id="loader-12">
+    <div class="spinner"></div>
+    <span id="loader-12-text">Generant la línia temporal…</span>
+  </div>
+  <div id="crono-content" class="hidden">
+    <div class="crono-wrap">
+      <table class="crono-table">
+        <thead>
+          <tr>
+            <th>Temps</th>
+            <th>Esdeveniment · Personatges</th>
+            <th>Capítols</th>
+          </tr>
+        </thead>
+        <tbody id="crono-tbody"></tbody>
+      </table>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="regenerarCronologia()">🔄 Regenerar</button>
+      <button class="btn btn-primary"   onclick="confirmarCronologia()">📖 Compilar bíblia</button>
+    </div>
+  </div>
 </div>
 
-<!-- Export final -->
-<div id="export-wrap" class="hidden" style="width:100%;max-width:860px;margin-bottom:20px;">
-  <div class="card">
-    <h2><span class="icon">🎉</span> Novel·la completada!</h2>
-    <p style="color:var(--text2);margin-bottom:16px;">Tots els capítols han estat generats. Pots exportar-la a Google Docs.</p>
-    <button class="btn btn-primary" onclick="exportarDoc()">📄 Exportar a Google Docs</button>
-    <div id="export-link-wrap" class="hidden" style="margin-top:14px;"></div>
+<!-- FASE 11: Subtrames i fils temàtics -->
+<div class="card hidden" id="fase-11">
+  <h2><span class="icon">🧵</span> Subtrames i fils temàtics</h2>
+  <div class="loader-wrap" id="loader-11">
+    <div class="spinner"></div>
+    <span>Generant subtrames…</span>
+  </div>
+  <div id="subtrames-selector" class="hidden">
+    <p style="color:var(--text2);font-size:.9rem;margin-bottom:12px;">Selecciona les subtrames que vols desenvolupar (mínim 2). Les <span style="color:var(--accent2);font-weight:600;">Recomanades</span> ja estan marcades:</p>
+    <div class="seleccio-comptador">
+      <span class="num" id="subtrames-num">0</span> <span class="rang">seleccionades (mínim 2)</span>
+    </div>
+    <div id="llista-subtrames" class="premise-list"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="confirmarSubtrames()">📅 Cronologia</button>
+    </div>
+  </div>
+</div>
+
+<!-- FASE 10: Outline de capítols -->
+<div class="card hidden" id="fase-10">
+  <h2><span class="icon">📋</span> Mapa de capítols</h2>
+  <div class="loader-wrap" id="loader-10">
+    <div class="spinner"></div>
+    <span>Generant l'outline de capítols…</span>
+  </div>
+  <div id="outline-wrap" class="hidden">
+    <p style="color:var(--text2);font-size:.9rem;margin-bottom:16px;">Fes clic en un capítol per editar-lo. Utilitza els botons per reordenar, eliminar o afegir capítols.</p>
+    <div id="outline-list" class="outline-list"></div>
+    <div class="btn-row" style="margin-top:14px;">
+      <button class="btn btn-ghost" style="font-size:.85rem;padding:8px 16px;" onclick="outlineAfegir(ESTAT.outline.length)">＋ Afegir capítol al final</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="iniciarFase11()">🧵 Subtrames</button>
+    </div>
+  </div>
+</div>
+
+<!-- FASE 9: Estructura narrativa -->
+<div class="card hidden" id="fase-9">
+  <h2><span class="icon">🏗️</span> Estructura narrativa</h2>
+  <div class="loader-wrap" id="loader-9">
+    <div class="spinner"></div>
+    <span>Generant opcions d'estructura…</span>
+  </div>
+  <div id="llista-estructura" class="premise-list"></div>
+  <div class="btn-row">
+    <button class="btn btn-primary hidden" id="btn-fase9" onclick="confirmarEstructura()">📋 Mapa de capítols</button>
+  </div>
+</div>
+
+<!-- FASE 8: Elenc de personatges -->
+<div class="card hidden" id="fase-8">
+  <h2><span class="icon">👥</span> Elenc de personatges</h2>
+  <div class="loader-wrap" id="loader-8">
+    <div class="spinner"></div>
+    <span>Generant l'elenc de personatges…</span>
+  </div>
+
+  <div id="elenc-selector" class="hidden">
+    <p style="color:var(--text2);font-size:.9rem;margin-bottom:12px;">Selecciona entre 4 i 7 personatges per a la novel·la. Els <span style="color:var(--accent2);font-weight:600;">Recomanats</span> ja estan marcats:</p>
+    <div class="seleccio-comptador" id="elenc-comptador">
+      <span class="num" id="elenc-num">5</span> <span class="rang">seleccionats (mínim 4, màxim 7)</span>
+    </div>
+    <div id="llista-elenc" class="premise-list"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="confirmarElenc()">🏗️ Definir estructura</button>
+    </div>
+  </div>
+</div>
+
+<!-- FASE 7: Worldbuilding -->
+<div class="card hidden" id="fase-7">
+  <h2><span class="icon">🌍</span> Expansió del món</h2>
+  <div class="loader-wrap" id="loader-7">
+    <div class="spinner"></div>
+    <span id="loader-7-text">Analitzant el conte per proposar elements de món…</span>
+  </div>
+
+  <div id="world-selector" class="hidden">
+    <p style="color:var(--text2);font-size:.9rem;margin-bottom:16px;">Selecciona els elements que vols expandir a la bíblia de món. Els <span style="color:var(--accent2);font-weight:600;">Recomanats</span> ja estan marcats:</p>
+    <div id="llista-world" class="premise-list"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="expandirElementsSeleccionats()">🌍 Expandir seleccionats</button>
+    </div>
+  </div>
+
+  <div id="world-result-wrap" class="hidden">
+    <div class="worldbuilding-result" id="world-result-cos"></div>
+    <div class="btn-row" style="margin-top:20px;">
+      <button class="btn btn-secondary" onclick="tornarASeleccioWorld()">← Tornar a la selecció</button>
+      <button class="btn btn-primary"   onclick="iniciarFase8()">👥 Crear elenc de personatges</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- FASE 14: Escriptura capítol a capítol -->
+<div class="card hidden" id="fase-14">
+  <h2><span class="icon">📝</span> Escriptura de la novel·la</h2>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:20px;">Genera cada capítol individualment. Pots regenerar o millorar cada un abans de continuar.</p>
+
+  <!-- Banner de revisió de coherència (apareix automàticament cada 3 caps) -->
+  <div class="revisio-banner hidden" id="revisio-banner">
+    <span style="font-size:1.1rem;">🔍</span>
+    <span class="revisio-banner-text" id="revisio-banner-text">Revisió de coherència disponible</span>
+    <button class="btn btn-secondary" style="padding:7px 16px;font-size:.82rem;" onclick="iniciarRevisio()">Revisar ara</button>
+    <button class="btn btn-ghost" style="padding:7px 10px;font-size:.82rem;" onclick="this.closest('.revisio-banner').classList.add('hidden')" title="Descartar">✕</button>
+  </div>
+
+  <div class="fase14-layout">
+    <!-- Sidebar: llista de capítols -->
+    <div class="cap-sidebar" id="cap-sidebar"></div>
+
+    <!-- Àrea principal -->
+    <div class="cap-main">
+      <!-- Capçalera del capítol actiu -->
+      <div class="cap-main-header">
+        <span class="cap-main-num" id="cap-main-num">Cap. 1</span>
+        <span class="cap-main-titol" id="cap-main-titol"></span>
+      </div>
+
+      <!-- Outline breu del capítol -->
+      <div class="cap-outline-text" id="cap-outline-text"></div>
+
+      <!-- Loader de generació -->
+      <div class="cap-loader" id="cap-loader">
+        <div class="spinner"></div>
+        <span id="cap-loader-text">Generant capítol…</span>
+      </div>
+
+      <!-- Capítol generat: reader + millora -->
+      <div id="cap-reader-wrap" class="hidden">
+        <div class="conte-reader" id="cap-reader-cos"></div>
+        <div class="conte-wordcount" id="cap-reader-wordcount"></div>
+        <!-- Panel de poliment (Fase 16) -->
+        <div class="cap-millora-panel">
+          <span class="cap-millora-label">Poliment del capítol</span>
+          <div class="cap-millora-row">
+            <select id="cap-millora-select" onchange="actualitzarMilloraUI()">
+              <option value="Enforteix la veu narrativa del personatge protagonista i fes-la més distintiva i personal">Enforteix la veu del personatge</option>
+              <option value="Augmenta la tensió i el ritme narratiu: elimina paraules innecessàries, intensifica els moments clau">Augmenta la tensió</option>
+              <option value="Redueix l'exposició directa: converteix les explicacions en escenes mostrades, usa detalls sensorials concrets">Redueix l'exposició</option>
+              <option value="Millora les transicions entre escenes i moments per garantir una lectura fluida i coherent">Millora transicions</option>
+              <option value="lliure">✏️ Instrucció lliure…</option>
+            </select>
+            <button class="btn btn-secondary" style="flex-shrink:0;" onclick="millorarCapitolActual()">✨ Millorar capítol</button>
+          </div>
+          <div id="cap-millora-lliure-wrap" class="hidden" style="margin-top:10px;">
+            <input type="text" id="cap-millora-input" placeholder="Descriu la millora que vols aplicar al capítol…">
+          </div>
+        </div>
+      </div>
+
+      <!-- Capítol pendent (no generat) -->
+      <div id="cap-pendent-wrap" class="hidden" style="text-align:center;padding:28px 0 8px;">
+        <p style="color:var(--text2);font-size:.9rem;">Aquest capítol encara no s'ha generat.</p>
+      </div>
+
+      <!-- Botons d'acció -->
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-generar-cap" onclick="generarCapitolActual()">
+          ✍️ Generar capítol <span id="btn-generar-num">1</span>
+        </button>
+        <button class="btn btn-secondary hidden" id="btn-regenerar-cap" onclick="regenerarCapitolActual()">
+          🔄 Regenerar
+        </button>
+        <button class="btn btn-ghost hidden" id="btn-cap-anterior" onclick="navegarCapitol(-1)">
+          ‹ Anterior
+        </button>
+        <button class="btn btn-primary hidden" id="btn-cap-seguent" onclick="navegarCapitol(1)">
+          Següent ›
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Accés a Fase 17 (sempre visible dins fase-14) -->
+  <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;">
+    <button class="btn btn-primary" onclick="iniciarFase17()">📚 Elements paratextuals →</button>
+  </div>
+
+  <!-- Panel de revisió de coherència (Fase 15) -->
+  <div class="revisio-panel hidden" id="revisio-panel">
+    <div class="revisio-panel-header">
+      <span class="revisio-panel-titol">🔍 Informe de coherència</span>
+      <button class="btn btn-ghost" style="padding:6px 12px;font-size:.82rem;" onclick="document.getElementById('revisio-panel').classList.add('hidden')">✕ Tancar</button>
+    </div>
+    <div class="cap-loader" id="revisio-loader">
+      <div class="spinner"></div>
+      <span>Analitzant la coherència dels capítols…</span>
+    </div>
+    <div class="editor-result hidden" id="revisio-result"></div>
+  </div>
+</div>
+
+<!-- FASE 17: Elements paratextuals -->
+<div class="card hidden" id="fase-17">
+  <h2><span class="icon">📚</span> Elements paratextuals</h2>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:24px;">Tria el títol definitiu i ajusta l'epígraf i la sinopsi. Podràs editar-los lliurement.</p>
+
+  <div class="loader-wrap" id="loader-17">
+    <div class="spinner"></div>
+    <span>Generant títols, epígraf i sinopsi…</span>
+  </div>
+
+  <div id="para-content" class="hidden">
+
+    <!-- Títol de la novel·la -->
+    <div class="para-seccio">
+      <p class="para-titol-seccio">Títol de la novel·la</p>
+      <div id="para-titols-list" class="premise-list"></div>
+    </div>
+
+    <!-- Divisió en parts (només si >15 capítols) -->
+    <div class="para-seccio hidden" id="para-divisio-seccio">
+      <p class="para-titol-seccio">Divisió en parts / llibres</p>
+      <textarea id="para-divisio-ta" class="para-textarea" rows="4"
+        oninput="ESTAT.divisioEnParts = this.value"></textarea>
+    </div>
+
+    <!-- Epígraf -->
+    <div class="para-seccio">
+      <p class="para-titol-seccio">Epígraf</p>
+      <textarea id="para-epigraf-ta" class="para-textarea" rows="4"
+        placeholder="Epígraf de la novel·la…"
+        oninput="ESTAT.epigraf = this.value"></textarea>
+    </div>
+
+    <!-- Sinopsi de contraportada -->
+    <div class="para-seccio">
+      <p class="para-titol-seccio">Sinopsi de contraportada</p>
+      <div class="para-wordcount" id="para-sinopsi-wc"></div>
+      <textarea id="para-sinopsi-ta" class="para-textarea" rows="6"
+        placeholder="Sinopsi de la novel·la…"
+        oninput="ESTAT.sinopsi = this.value; actualitzarWCSinopsi()"></textarea>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="iniciarFase17()">🔄 Regenerar</button>
+      <button class="btn btn-primary"   onclick="assemblarNovela()">📦 Assemblar novel·la</button>
+    </div>
+    <div id="assemblar-link-wrap" class="hidden" style="margin-top:14px;"></div>
+  </div>
+</div>
+
+<!-- FASE 18: Assemblatge i exportació final -->
+<div class="card hidden" id="fase-18">
+  <canvas id="confetti-canvas"></canvas>
+  <div class="fase18-celebracio">🎉</div>
+  <div class="fase18-subtitol">Novel·la completada!</div>
+  <h2><span class="icon">🏆</span> Assemblatge final</h2>
+
+  <div class="fase18-stats" id="fase18-stats">
+    <div class="fase18-stat">
+      <span class="fase18-stat-num" id="stat-caps">—</span>
+      <div class="fase18-stat-label">Capítols generats</div>
+    </div>
+    <div class="fase18-stat">
+      <span class="fase18-stat-num" id="stat-paraules">—</span>
+      <div class="fase18-stat-label">Paraules totals</div>
+    </div>
+    <div class="fase18-stat" id="stat-titol-wrap">
+      <span class="fase18-stat-num" style="font-size:1rem;word-break:break-word;" id="stat-titol">—</span>
+      <div class="fase18-stat-label">Títol</div>
+    </div>
+  </div>
+
+  <div class="loader-wrap" id="loader-18">
+    <div class="spinner"></div>
+    <span>Generant el document…</span>
+  </div>
+
+  <div id="fase18-links" class="fase18-export-links hidden"></div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" id="btn-exportar-novela" onclick="exportarNovelaDocs()">
+      📄 Generar Google Doc + DOCX
+    </button>
+    <button class="btn btn-secondary" onclick="iniciarFase17()">‹ Tornar a Paratextos</button>
   </div>
 </div>
 
@@ -557,37 +1479,28 @@
 
 <script>
 // ═══════════════════════════════════════════════════════════
-//  ESTAT GLOBAL
+//  UTILITATS
 // ═══════════════════════════════════════════════════════════
-const ESTAT = {
-  fase:           0,
-  tematica:       '',
-  history:        [],
-  premissaTriada: '',
-  estructuraTriada:'',
-  personatgeTriat:'',
-  desenllacTriat: '',
-  capitols:       [],      // [{num, titol, text}]
-  capitalActual:  0,
-  novellaTextos:  []       // textos dels capítols escrits
-};
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
-
-// ═══════════════════════════════════════════════════════════
-//  UTILITATS UI
-// ═══════════════════════════════════════════════════════════
 function showCard(id)  { document.getElementById(id).classList.remove('hidden'); }
 function hideCard(id)  { document.getElementById(id).classList.add('hidden'); }
 function showLoader(n) { document.getElementById('loader-' + n).classList.add('visible'); }
 function hideLoader(n) { document.getElementById('loader-' + n).classList.remove('visible'); }
 function showBtn(id)   { document.getElementById(id).classList.remove('hidden'); }
-function hideBtn(id)   { document.getElementById(id).classList.add('hidden'); }
 
 function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3000);
+  setTimeout(() => t.classList.remove('show'), 3200);
 }
 
 function updateProgress(fase) {
@@ -599,62 +1512,113 @@ function updateProgress(fase) {
   });
 }
 
-function actualitzarBiblia() {
-  const b = document.getElementById('biblia-contingut');
-  const items = [
-    ['Temàtica',     ESTAT.tematica        || '—'],
-    ['Premissa',     ESTAT.premissaTriada  || '—'],
-    ['Trama',        ESTAT.estructuraTriada ? ESTAT.estructuraTriada.substring(0,80)+'…' : '—'],
-    ['Protagonista', ESTAT.personatgeTriat ? ESTAT.personatgeTriat.substring(0,80)+'…' : '—'],
-    ['Desenllaç',    ESTAT.desenllacTriat  ? ESTAT.desenllacTriat.substring(0,80)+'…' : '—'],
-  ];
-  b.innerHTML = items.map(([l,v]) =>
-    `<div class="biblia-item"><div class="biblia-label">${l}</div><div class="biblia-val">${v}</div></div>`
-  ).join('');
-  showCard('card-biblia');
+function compteParaules(text) {
+  return text.trim().split(/\s+/).filter(w => w.length > 0).length;
 }
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 1 — Premisses
+//  ESTAT GLOBAL
 // ═══════════════════════════════════════════════════════════
 let USER_CONFIG = null;
 
+const ESTAT = {
+  fase:             0,
+  tematica:         '',
+  history:          [],
+  premissaTriada:   '',
+  _premissaLista:   [],
+  _premissaIdx:     undefined,
+  estil: {
+    to:          '',
+    perspectiva: '',
+    paraules:    1500,
+    desc:        ''
+  },
+  _llistaProtagonistes:  [],
+  _idxProtagonista:      null,
+  protagonistaTriat:     '',
+  _llistaLocalitzacions: [],
+  _idxLocalitzacio:      null,
+  localitzacioTriada:    '',
+  _llistaFinals:         [],
+  _idxFinal:             null,
+  finalTriat:            '',
+  // Escriptura per parts
+  _historyBeforeEscriptura: [],
+  _totalParts:              1,
+  _partActual:              1,
+  _partsTexts:              [],
+  conteText:                '',
+  // Worldbuilding
+  worldbuilding:            null,
+  // Elenc de personatges
+  elencPersonatges:         [],
+  // Estructura narrativa
+  _llistaEstructures:       [],
+  _idxEstructura:           null,
+  estructuraTriada:         '',
+  // Outline de capítols
+  outline:                  [],
+  // Subtrames
+  subtrames:                [],
+  // Cronologia
+  cronologia:               '',
+  // Bíblia de consistència
+  biblia:                   '',
+  // Fase 14: capítols generats
+  capitols:                 [],  // null o text per a cada capítol
+  _capActual:               0,   // índex 0-based del capítol actiu
+  _capGenerant:             null, // índex del capítol en generació (o null)
+  _revisioCapTrigger:       0,   // nº de capítols quan es va mostrar l'últim banner
+  // Fase 17: paratextos
+  titolNovel:               '',
+  sinopsi:                  '',
+  epigraf:                  '',
+  divisioEnParts:           '',
+  _titolsProposta:          [],
+  _titolIdx:                null
+};
+
+// ═══════════════════════════════════════════════════════════
+//  CONFIGURACIÓ
+// ═══════════════════════════════════════════════════════════
+const MODEL_DEFAULTS = {
+  anthropic: 'claude-opus-4-1',
+  openai:    'gpt-4o',
+  gemini:    'gemini-1.5-pro'
+};
+
+function actualitzarModelDefault() {
+  const provider = document.getElementById('config-provider').value;
+  const input    = document.getElementById('config-model');
+  const def      = MODEL_DEFAULTS[provider] || '';
+  input.placeholder = def;
+  input.value       = def;
+}
+
 function guardarIComencar() {
   const provider = document.getElementById('config-provider').value;
-  const apiKey = document.getElementById('config-apikey').value.trim();
+  const model    = document.getElementById('config-model').value.trim();
+  const apiKey   = document.getElementById('config-apikey').value.trim();
+  if (!provider) { toast('Selecciona un proveïdor.'); return; }
+  if (!model)    { toast('Introdueix el nom del model.'); return; }
+  if (!apiKey)   { toast("Introdueix una API key."); return; }
 
-  if (!provider) {
-    toast('Selecciona un proveïdor.');
-    return;
-  }
-  if (!apiKey) {
-    toast('Introdueix una API key.');
-    return;
-  }
-
-  const modelByProvider = {
-    openai: 'gpt-4o',
-    anthropic: 'claude-3-5-sonnet-20241022',
-    gemini: 'gemini-1.5-pro'
-  };
-
-  USER_CONFIG = {
-    provider,
-    apiKey,
-    model: modelByProvider[provider] || ''
-  };
+  USER_CONFIG = { provider, apiKey, model };
 
   hideCard('card-config');
   document.getElementById('progress-wrap').classList.remove('hidden');
   showCard('fase-0');
-  toast('Configuració guardada. Ja pots començar.');
+  toast('Configuració guardada.');
 }
 
+// ═══════════════════════════════════════════════════════════
+//  FASE 0 → FASE 1: Premisses
+// ═══════════════════════════════════════════════════════════
 function iniciarFase1() {
   const sel = document.getElementById('sel-tematica').value;
-  if (!sel) { toast('Selecciona primer una temàtica.'); return; }
-
-  if (!USER_CONFIG) { toast('Primer has de guardar la configuració inicial.'); return; }
+  if (!sel) { toast('Selecciona primer un gènere.'); return; }
+  if (!USER_CONFIG) { toast('Primer configura el model.'); return; }
 
   ESTAT.tematica = sel;
   ESTAT.history  = [];
@@ -669,111 +1633,100 @@ function iniciarFase1() {
       hideLoader(1);
       renderPremisses(res.response);
     })
-    .withFailureHandler(err => {
-      hideLoader(1);
-      toast('Error: ' + err.message);
-    })
+    .withFailureHandler(err => { hideLoader(1); toast('Error: ' + err.message); })
     .fase1_premisses(sel, [], USER_CONFIG);
 }
 
-function renderPremisses(text) {
-  const wrap = document.getElementById('llista-premisses');
-  // Parseig local
+// ─── Render genèric amb badge "Recomanat" (radio / single-select) ───
+function renderLlistaAmbRecomanat(text, wrapId, listaKey, idxKey, btnId) {
+  const wrap  = document.getElementById(wrapId);
   const lines = text.split('\n').filter(l => /^\d+\./.test(l.trim()));
-  if (lines.length === 0) {
-    wrap.innerHTML = `<pre style="white-space:pre-wrap;font-size:.9rem;">${text}</pre>`;
-  } else {
-    wrap.innerHTML = lines.map((l, i) => {
-      const txt = l.replace(/^\d+\.\s*/, '').trim();
-      return `<div class="premise-item" id="prem-${i}" onclick="triarPremissa(${i}, this)">
-        <input type="radio" name="prem" id="r-${i}">
-        <label for="r-${i}">${txt}</label>
-      </div>`;
-    }).join('');
-  }
-  ESTAT._premissaLista = lines.map(l => l.replace(/^\d+\.\s*/, '').trim());
-  showBtn('btn-fase1');
-}
-
-function triarPremissa(idx, el) {
-  document.querySelectorAll('.premise-item').forEach(e => e.classList.remove('chosen'));
-  el.classList.add('chosen');
-  el.querySelector('input').checked = true;
-  ESTAT._premissaIdx = idx;
-}
-
-function iniciarFase2() {
-  const idx = ESTAT._premissaIdx;
-  if (idx === undefined || idx === null) { toast("Tria una premissa primer."); return; }
-  ESTAT.premissaTriada = ESTAT._premissaLista[idx];
-  ESTAT.fase = 2;
-  updateProgress(2);
-  actualitzarBiblia();
-  showCard('fase-2');
-  showLoader(2);
-
-  google.script.run
-    .withSuccessHandler(res => {
-      ESTAT.history = res.history;
-      hideLoader(2);
-      renderLlistaSeleccionable(res.response, 'llista-estructures', '_llistaTrames', '_idxTrama', 'btn-fase2');
-    })
-    .withFailureHandler(err => { hideLoader(2); toast('Error: ' + err.message); })
-    .fase2_estructura(ESTAT.premissaTriada, ESTAT.history, USER_CONFIG);
-}
-
-// ═══════════════════════════════════════════════════════════
-//  HELPERS DE LLISTA NUMERADA (10 OPCIONS)
-// ═══════════════════════════════════════════════════════════
-function renderLlistaSeleccionable(text, wrapId, stateListKey, selectedIdxKey, btnId) {
-  const wrap = document.getElementById(wrapId);
-  const lines = text.split('\n').filter(l => /^\d+\./.test(l.trim()));
-
   if (lines.length === 0) {
     wrap.innerHTML = `<pre style="white-space:pre-wrap;font-size:.9rem;">${escHtml(text)}</pre>`;
-    window[stateListKey] = [];
+    ESTAT[listaKey] = [];
     return;
   }
-
   const list = lines.map(l => l.replace(/^\d+\.\s*/, '').trim());
-  window[stateListKey] = list;
-  ESTAT[selectedIdxKey] = null;
+  // Guardar sense "(Recomanat)" per usar als prompts
+  ESTAT[listaKey] = list.map(item => item.replace(/\s*\(Recomanat\)\s*/i, '').trim());
+  ESTAT[idxKey]   = null;
 
-  wrap.innerHTML = list.map((item, i) => `
-    <div class="premise-item" id="${wrapId}-item-${i}" onclick="triarDeLlista('${wrapId}', '${selectedIdxKey}', ${i}, this)">
+  let autoIdx = null;
+  wrap.innerHTML = list.map((item, i) => {
+    const esRecomanat = /\(Recomanat\)/i.test(item);
+    const textNet     = item.replace(/\s*\(Recomanat\)\s*/i, '').trim();
+    if (esRecomanat) autoIdx = i;
+    const badge = esRecomanat ? `<span class="badge-recomanat">Recomanat</span>` : '';
+    return `<div class="premise-item" id="${wrapId}-item-${i}" onclick="triarItem('${wrapId}','${idxKey}',${i},this)">
       <input type="radio" name="${wrapId}-radio" id="${wrapId}-r-${i}">
-      <label for="${wrapId}-r-${i}">${escHtml(item)}</label>
-    </div>
-  `).join('');
+      <label for="${wrapId}-r-${i}">${badge}${escHtml(textNet)}</label>
+    </div>`;
+  }).join('');
 
+  // Auto-seleccionar el recomanat
+  if (autoIdx !== null) {
+    const el = document.getElementById(`${wrapId}-item-${autoIdx}`);
+    if (el) {
+      el.classList.add('chosen');
+      el.querySelector('input').checked = true;
+      ESTAT[idxKey] = autoIdx;
+    }
+  }
   showBtn(btnId);
 }
 
-function triarDeLlista(wrapId, selectedIdxKey, idx, el) {
+function triarItem(wrapId, idxKey, idx, el) {
   document.querySelectorAll(`#${wrapId} .premise-item`).forEach(e => e.classList.remove('chosen'));
   el.classList.add('chosen');
-  const radio = el.querySelector('input[type=radio]');
-  if (radio) radio.checked = true;
-  ESTAT[selectedIdxKey] = idx;
+  el.querySelector('input').checked = true;
+  ESTAT[idxKey] = idx;
 }
 
-function getSeleccioLlista(stateListKey, selectedIdxKey) {
-  const list = window[stateListKey] || [];
-  const idx = ESTAT[selectedIdxKey];
-  if (idx === null || idx === undefined || !list[idx]) return null;
-  return list[idx];
+function renderPremisses(text) {
+  renderLlistaAmbRecomanat(text, 'llista-premisses', '_premissaLista', '_premissaIdx', 'btn-fase1');
+}
+
+function triarPremissa(idx, el) { triarItem('llista-premisses', '_premissaIdx', idx, el); }
+
+// ═══════════════════════════════════════════════════════════
+//  FASE 1 → FASE 2: Estil (sense API)
+// ═══════════════════════════════════════════════════════════
+function iniciarFase2() {
+  const idx = ESTAT._premissaIdx;
+  if (idx === undefined || idx === null) { toast('Tria una premissa primer.'); return; }
+  ESTAT.premissaTriada = ESTAT._premissaLista[idx];
+  ESTAT.fase = 2;
+  updateProgress(2);
+  showCard('fase-2');
+}
+
+// Pills de selecció (estil)
+function triarPill(el) {
+  const group = el.dataset.group;
+  document.querySelectorAll(`.opt-pill[data-group="${group}"]`).forEach(p => p.classList.remove('chosen'));
+  el.classList.add('chosen');
+  const val = el.dataset.val;
+  if (group === 'perspectiva') ESTAT.estil.perspectiva = val;
+  if (group === 'paraules')    ESTAT.estil.paraules    = parseInt(val);
 }
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 3 — Personatges
+//  FASE 2 → FASE 3: Protagonista
 // ═══════════════════════════════════════════════════════════
 function iniciarFase3() {
-  const tri = getSeleccioLlista('_llistaTrames', '_idxTrama');
-  if (!tri) { toast('Tria una trama.'); return; }
-  ESTAT.estructuraTriada = tri;
+  const to          = document.getElementById('sel-to').value;
+  const perspectiva = ESTAT.estil.perspectiva;
+  const paraules    = ESTAT.estil.paraules;
+
+  if (!to)          { toast('Tria el to del conte.'); return; }
+  if (!perspectiva) { toast('Tria la perspectiva narrativa.'); return; }
+  if (!paraules)    { toast('Tria la longitud del conte.'); return; }
+
+  ESTAT.estil.to  = to;
+  ESTAT.estil.desc = `to "${to}", ${perspectiva}, ${paraules} paraules aproximades`;
+
   ESTAT.fase = 3;
   updateProgress(3);
-  actualitzarBiblia();
   showCard('fase-3');
   showLoader(3);
 
@@ -781,22 +1734,30 @@ function iniciarFase3() {
     .withSuccessHandler(res => {
       ESTAT.history = res.history;
       hideLoader(3);
-      renderLlistaSeleccionable(res.response, 'llista-personatges', '_llistaProtagonistes', '_idxProtagonista', 'btn-fase3');
+      renderProtagonistes(res.response);
     })
     .withFailureHandler(err => { hideLoader(3); toast('Error: ' + err.message); })
-    .fase3_personatges(ESTAT.estructuraTriada, ESTAT.history, USER_CONFIG);
+    .fase3_personatges(ESTAT.premissaTriada, ESTAT.estil.desc, ESTAT.history, USER_CONFIG, ESTAT.tematica);
 }
 
+function renderProtagonistes(text) {
+  renderLlistaAmbRecomanat(text, 'llista-personatges', '_llistaProtagonistes', '_idxProtagonista', 'btn-fase3');
+}
+
+function triarProtagonista(idx, el) { triarItem('llista-personatges', '_idxProtagonista', idx, el); }
+
 // ═══════════════════════════════════════════════════════════
-//  FASE 4 — Desenllaç
+//  FASE 3 → FASE 4: Localitzacions
 // ═══════════════════════════════════════════════════════════
 function iniciarFase4() {
-  const tri = getSeleccioLlista('_llistaProtagonistes', '_idxProtagonista');
-  if (!tri) { toast('Tria un protagonista.'); return; }
-  ESTAT.personatgeTriat = tri;
+  const idx = ESTAT._idxProtagonista;
+  if (idx === null || idx === undefined || !ESTAT._llistaProtagonistes[idx]) {
+    toast('Tria un protagonista primer.');
+    return;
+  }
+  ESTAT.protagonistaTriat = ESTAT._llistaProtagonistes[idx];
   ESTAT.fase = 4;
   updateProgress(4);
-  actualitzarBiblia();
   showCard('fase-4');
   showLoader(4);
 
@@ -804,22 +1765,24 @@ function iniciarFase4() {
     .withSuccessHandler(res => {
       ESTAT.history = res.history;
       hideLoader(4);
-      renderLlistaSeleccionable(res.response, 'llista-desenllac', '_llistaDesenllacos', '_idxDesenllac', 'btn-fase4');
+      renderLlistaAmbRecomanat(res.response, 'llista-localitzacions', '_llistaLocalitzacions', '_idxLocalitzacio', 'btn-fase4');
     })
     .withFailureHandler(err => { hideLoader(4); toast('Error: ' + err.message); })
-    .fase4_desenllac(ESTAT.personatgeTriat, ESTAT.history, USER_CONFIG);
+    .fase_localitzacions(ESTAT.protagonistaTriat, ESTAT.estil.desc, ESTAT.history, USER_CONFIG, ESTAT.tematica);
 }
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 5 — Bíblia i taula de capítols
+//  FASE 4 → FASE 5: Finals
 // ═══════════════════════════════════════════════════════════
 function iniciarFase5() {
-  const tri = getSeleccioLlista('_llistaDesenllacos', '_idxDesenllac');
-  if (!tri) { toast('Tria un desenllaç.'); return; }
-  ESTAT.desenllacTriat = tri;
+  const idx = ESTAT._idxLocalitzacio;
+  if (idx === null || idx === undefined || !ESTAT._llistaLocalitzacions[idx]) {
+    toast('Tria una localització primer.');
+    return;
+  }
+  ESTAT.localitzacioTriada = ESTAT._llistaLocalitzacions[idx];
   ESTAT.fase = 5;
   updateProgress(5);
-  actualitzarBiblia();
   showCard('fase-5');
   showLoader(5);
 
@@ -827,140 +1790,132 @@ function iniciarFase5() {
     .withSuccessHandler(res => {
       ESTAT.history = res.history;
       hideLoader(5);
-      renderTaulaCapitols(res.response);
+      renderLlistaAmbRecomanat(res.response, 'llista-finals', '_llistaFinals', '_idxFinal', 'btn-fase5');
     })
     .withFailureHandler(err => { hideLoader(5); toast('Error: ' + err.message); })
-    .fase5_compilarBiblia(ESTAT.desenllacTriat, ESTAT.history, USER_CONFIG);
-}
-
-function renderTaulaCapitols(text) {
-  // Parseig capítols: busca blocs separats per "---"
-  const blocks = text.split('---').map(b => b.trim()).filter(b => b.length > 0);
-  const capitols = [];
-  blocks.forEach(block => {
-    const m = block.match(/\*\*Capítol\s+(\d+):\s*(.+?)\*\*/i);
-    if (m) {
-      capitols.push({ num: parseInt(m[1]), titol: m[2].trim(), text: block });
-    }
-  });
-
-  if (capitols.length === 0) {
-    // Fallback: text complet
-    document.getElementById('taula-capitols-wrap').innerHTML =
-      `<pre style="white-space:pre-wrap;font-size:.88rem;">${text}</pre>`;
-  } else {
-    ESTAT.capitols = capitols;
-    const tbody = document.getElementById('capitols-tbody');
-    tbody.innerHTML = capitols.map(c => `
-      <tr id="tr-cap-${c.num}">
-        <td class="ch-num">Cap. ${c.num}</td>
-        <td>${escHtml(c.titol)}</td>
-        <td>${escHtml(extractObjNarratiu(c.text))}</td>
-        <td><span class="ch-status pendent" id="st-cap-${c.num}">Pendent</span></td>
-      </tr>
-    `).join('');
-  }
-  document.getElementById('taula-capitols-wrap').classList.remove('hidden');
-  showBtn('btn-fase5');
-}
-
-function extractObjNarratiu(text) {
-  const m = text.match(/Objectiu narratiu:\s*(.+)/i);
-  return m ? m[1].trim() : '';
+    .fase4_finals(ESTAT.localitzacioTriada, ESTAT.estil.desc, ESTAT.history, USER_CONFIG, ESTAT.tematica);
 }
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 6 — Escriptura de capítols
+//  FASE 5 → FASE 6: Escriptura per parts (anti-timeout GAS)
 // ═══════════════════════════════════════════════════════════
 function iniciarEscriptura() {
-  ESTAT.fase          = 6;
-  ESTAT.capitalActual = 0;
-  ESTAT.novellaTextos = [];
+  const idx = ESTAT._idxFinal;
+  if (idx === null || idx === undefined || !ESTAT._llistaFinals[idx]) {
+    toast('Tria un final primer.');
+    return;
+  }
+  ESTAT.finalTriat = ESTAT._llistaFinals[idx];
+
+  // Decidir nombre de parts segons la longitud triada
+  // 500 paraules → 1 part | 1500 → 2 parts | 3000 → 4 parts
+  const p = ESTAT.estil.paraules;
+  ESTAT._totalParts  = p <= 600 ? 1 : p <= 1800 ? 2 : 4;
+  ESTAT._partActual  = 1;
+  ESTAT._partsTexts  = [];
+  // Snapshot de l'historial ABANS d'escriure → permet regenerar sense reconstruir
+  ESTAT._historyBeforeEscriptura = [...ESTAT.history];
+
+  ESTAT.fase = 6;
   updateProgress(6);
   showCard('fase-6');
-  escriureCapitolActual();
+  hideCard('conte-wrap');
+  document.getElementById('export-link-wrap').classList.add('hidden');
+
+  escriureSeguentPart();
 }
 
-function escriureCapitolActual() {
-  const cap     = ESTAT.capitols[ESTAT.capitalActual];
-  const total   = ESTAT.capitols.length;
-  const numCap  = cap.num;
-  const titol   = cap.titol;
+function escriureSeguentPart() {
+  const part      = ESTAT._partActual;
+  const total     = ESTAT._totalParts;
+  const perPart   = Math.round(ESTAT.estil.paraules / total);
+  const loaderTxt = total === 1
+    ? 'Escrivint el conte…'
+    : `Escrivint part ${part} de ${total}…`;
 
-  document.getElementById('titol-capitol-actual').textContent = `Capítol ${numCap}: ${titol}`;
-  document.getElementById('loader-6-text').textContent = `Escrivint capítol ${numCap} de ${total}…`;
-  hideCard('capitol-escrit');
   showLoader(6);
-
-  // Marcar a la taula
-  const tr = document.getElementById('tr-cap-' + numCap);
-  if (tr) tr.classList.add('writing');
-  const st = document.getElementById('st-cap-' + numCap);
-  if (st) { st.textContent = '✍️ Escrivint…'; st.className = 'ch-status escrivint'; }
-
-  // Actualitzar botó "Capítol següent" / "Finalitzar"
-  const btnSeg = document.getElementById('btn-seguent-capitol');
-  if (ESTAT.capitalActual < total - 1) {
-    btnSeg.textContent = `▶ Capítol ${numCap + 1}`;
-    btnSeg.style.display = '';
-  } else {
-    btnSeg.textContent = '🏁 Finalitzar';
-    btnSeg.style.display = '';
-  }
+  document.getElementById('loader-6-text').textContent = loaderTxt;
 
   google.script.run
     .withSuccessHandler(res => {
       ESTAT.history = res.history;
-      ESTAT.novellaTextos.push({ num: numCap, titol, text: res.response });
+      ESTAT._partsTexts.push(res.response);
       hideLoader(6);
-      mostrarCapitolEscrit(numCap, titol, res.response);
-      // Actualitzar taula
-      if (tr) tr.classList.remove('writing');
-      if (st) { st.textContent = '✅ Fet'; st.className = 'ch-status fet'; }
+
+      if (ESTAT._partActual < ESTAT._totalParts) {
+        ESTAT._partActual++;
+        escriureSeguentPart(); // Encadena la part següent
+      } else {
+        // Totes les parts generades → assembla i mostra
+        const conteComplet = ESTAT._partsTexts.join('\n\n');
+        ESTAT.conteText    = conteComplet;
+        mostrarConte(conteComplet);
+      }
+    })
+    .withFailureHandler(err => {
+      hideLoader(6);
+      toast('Error a la part ' + part + ': ' + err.message);
+    })
+    .escriureContePart(part, total, perPart, ESTAT.finalTriat, ESTAT.estil.desc, ESTAT.history, USER_CONFIG, ESTAT.tematica);
+}
+
+function mostrarConte(text) {
+  const cos  = document.getElementById('conte-cos');
+  const pars = text.split(/\n\n+/).filter(p => p.trim().length > 0);
+  cos.innerHTML = pars.map(p => `<p>${escHtml(p.trim())}</p>`).join('');
+
+  const wc = compteParaules(text);
+  document.getElementById('conte-wordcount').textContent = `${wc.toLocaleString('ca')} paraules`;
+
+  showCard('conte-wrap');
+  setTimeout(() => {
+    document.getElementById('fase-6').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  ACCIONS SOBRE EL CONTE
+// ═══════════════════════════════════════════════════════════
+function regenerarConte() {
+  if (!confirm('Vols regenerar el conte? El text actual es perdrà.')) return;
+  // Restaurar l'historial al punt just abans d'escriure (snapshot)
+  ESTAT.history     = [...ESTAT._historyBeforeEscriptura];
+  ESTAT._partActual = 1;
+  ESTAT._partsTexts = [];
+  hideCard('conte-wrap');
+  escriureSeguentPart();
+}
+
+function millorarConte() {
+  const instruccio = document.getElementById('millora-input').value.trim();
+  if (!instruccio) { toast('Escriu una instrucció de millora.'); return; }
+  if (!ESTAT.conteText) { toast('Primer genera el conte.'); return; }
+
+  hideCard('conte-wrap');
+  showLoader(6);
+  document.getElementById('loader-6-text').textContent = 'Aplicant la millora…';
+
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.history   = res.history;
+      ESTAT.conteText = res.response;
+      hideLoader(6);
+      document.getElementById('millora-input').value = '';
+      mostrarConte(res.response);
+      toast('Millora aplicada.');
     })
     .withFailureHandler(err => { hideLoader(6); toast('Error: ' + err.message); })
-    .fase6_escriureCapitol(numCap, titol, total, ESTAT.history, USER_CONFIG);
-}
-
-function mostrarCapitolEscrit(num, titol, text) {
-  document.getElementById('capitol-titol-h').textContent = `Capítol ${num}: ${titol}`;
-  document.getElementById('capitol-cos').textContent     = text;
-  showCard('capitol-escrit');
-}
-
-function seguentCapitol() {
-  ESTAT.capitalActual++;
-  if (ESTAT.capitalActual >= ESTAT.capitols.length) {
-    // Novel·la completada
-    hideCard('fase-6');
-    showCard('export-wrap');
-    updateProgress(7);
-    toast('🎉 Novel·la completada!');
-    return;
-  }
-  // Scroll a dalt del capítol
-  document.getElementById('fase-6').scrollIntoView({ behavior: 'smooth' });
-  escriureCapitolActual();
-}
-
-function regenerarCapitol() {
-  if (!confirm('Vols regenerar aquest capítol? El text actual es perdrà.')) return;
-  // Eliminar últim text guardat
-  ESTAT.novellaTextos.pop();
-  // Eliminar últims 2 missatges (user + assistant) de l'historial
-  ESTAT.history = ESTAT.history.slice(0, -2);
-  escriureCapitolActual();
+    .millorarConte(instruccio, ESTAT.conteText, ESTAT.estil.desc, ESTAT.history, USER_CONFIG, ESTAT.tematica);
 }
 
 // ═══════════════════════════════════════════════════════════
-//  EXPORT A GOOGLE DOCS
+//  EXPORT
 // ═══════════════════════════════════════════════════════════
 function exportarDoc() {
-  const titol    = ESTAT.premissaTriada.substring(0, 50) + '…';
-  const contingut = ESTAT.novellaTextos.map(c =>
-    `**Capítol ${c.num}: ${c.titol}**\n\n${c.text}`
-  ).join('\n\n---\n\n');
-
+  if (!ESTAT.conteText) { toast('No hi ha cap conte per exportar.'); return; }
+  const titol = ESTAT.premissaTriada
+    ? ESTAT.premissaTriada.substring(0, 55) + (ESTAT.premissaTriada.length > 55 ? '…' : '')
+    : 'Conte IA';
   toast('Creant document a Google Docs…');
 
   google.script.run
@@ -970,7 +1925,1379 @@ function exportarDoc() {
       wrap.classList.remove('hidden');
     })
     .withFailureHandler(err => toast('Error: ' + err.message))
-    .exportarADoc(titol, contingut);
+    .exportarADoc(titol, ESTAT.conteText);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FASE 6 → FASE 7: Worldbuilding
+// ═══════════════════════════════════════════════════════════
+function iniciarFase7() {
+  if (!ESTAT.conteText) { toast('Primer genera el conte.'); return; }
+
+  ESTAT.fase = 7;
+  updateProgress(7);
+  showCard('fase-7');
+  document.getElementById('world-selector').classList.add('hidden');
+  document.getElementById('world-result-wrap').classList.add('hidden');
+  showLoader(7);
+  document.getElementById('loader-7-text').textContent = 'Analitzant el conte per proposar elements de món…';
+
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.history = res.history;
+      hideLoader(7);
+      renderLlistaWorldbuilding(res.response);
+    })
+    .withFailureHandler(err => { hideLoader(7); toast('Error: ' + err.message); })
+    .fase7_worldbuilding(ESTAT.conteText, ESTAT.tematica, ESTAT.estil.desc, ESTAT.history, USER_CONFIG);
+}
+
+function renderLlistaWorldbuilding(text) {
+  const wrap  = document.getElementById('llista-world');
+  const lines = text.split('\n').filter(l => /^\d+\./.test(l.trim()));
+
+  if (lines.length === 0) {
+    wrap.innerHTML = `<pre style="white-space:pre-wrap;font-size:.9rem;">${escHtml(text)}</pre>`;
+    document.getElementById('world-selector').classList.remove('hidden');
+    return;
+  }
+
+  const list = lines.map(l => l.replace(/^\d+\.\s*/, '').trim());
+
+  wrap.innerHTML = list.map((item, i) => {
+    const esRecomanat = /\(Recomanat\)/i.test(item);
+    const textNet     = item.replace(/\s*\(Recomanat\)\s*/i, '').trim();
+    // Renderitza **negreta** en el text de l'element
+    const displayHtml = escHtml(textNet).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    const badge       = esRecomanat ? `<span class="badge-recomanat">Recomanat</span>` : '';
+    const checkedAttr = esRecomanat ? 'checked' : '';
+    const chosenClass = esRecomanat ? 'chosen' : '';
+    return `<div class="world-item ${chosenClass}" id="world-item-${i}" data-text="${escHtml(textNet)}" onclick="toggleWorldItem(${i}, this)">
+      <input type="checkbox" id="world-cb-${i}" ${checkedAttr} onclick="event.stopPropagation();" onchange="syncWorldItem(${i})">
+      <label for="world-cb-${i}">${badge}${displayHtml}</label>
+    </div>`;
+  }).join('');
+
+  document.getElementById('world-selector').classList.remove('hidden');
+  setTimeout(() => {
+    document.getElementById('fase-7').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+function toggleWorldItem(idx, el) {
+  const cb = document.getElementById('world-cb-' + idx);
+  cb.checked = !cb.checked;
+  el.classList.toggle('chosen', cb.checked);
+}
+
+function syncWorldItem(idx) {
+  const cb = document.getElementById('world-cb-' + idx);
+  const el = document.getElementById('world-item-' + idx);
+  el.classList.toggle('chosen', cb.checked);
+}
+
+function expandirElementsSeleccionats() {
+  const checkboxes = document.querySelectorAll('#llista-world input[type=checkbox]:checked');
+  if (checkboxes.length === 0) { toast('Selecciona almenys un element per expandir.'); return; }
+
+  const labels = Array.from(checkboxes).map(cb => {
+    const item = document.getElementById(cb.id.replace('world-cb-', 'world-item-'));
+    return item ? item.dataset.text : '';
+  }).filter(t => t.length > 0);
+
+  document.getElementById('world-selector').classList.add('hidden');
+  document.getElementById('world-result-wrap').classList.add('hidden');
+  showLoader(7);
+  document.getElementById('loader-7-text').textContent = 'Generant la bíblia de món…';
+
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.history      = res.history;
+      ESTAT.worldbuilding = res.response;
+      hideLoader(7);
+      mostrarResultatWorldbuilding(res.response);
+    })
+    .withFailureHandler(err => { hideLoader(7); toast('Error: ' + err.message); })
+    .fase7_expandirElements(labels, ESTAT.conteText, ESTAT.tematica, ESTAT.history, USER_CONFIG);
+}
+
+function mostrarResultatWorldbuilding(text) {
+  const cos = document.getElementById('world-result-cos');
+
+  // Parsejar blocs separats per línia en blanc, cada un amb títol **...**
+  const blocs = text.split(/\n\n+/).filter(b => b.trim().length > 0);
+  cos.innerHTML = blocs.map(bloc => {
+    const linies = bloc.trim().split('\n');
+    const primerLinia = linies[0] || '';
+    const esTitol = /^\*\*.+\*\*/.test(primerLinia.trim());
+    if (esTitol) {
+      const titol = escHtml(primerLinia.trim()).replace(/\*\*(.+?)\*\*/g, '$1');
+      const desc  = linies.slice(1).join('\n').trim();
+      return `<div class="world-bloc">
+        <div class="world-bloc-titol">${titol}</div>
+        <div class="world-bloc-desc">${escHtml(desc)}</div>
+      </div>`;
+    }
+    return `<div class="world-bloc"><div class="world-bloc-desc">${escHtml(bloc.trim())}</div></div>`;
+  }).join('');
+
+  document.getElementById('world-result-wrap').classList.remove('hidden');
+  setTimeout(() => {
+    document.getElementById('fase-7').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+function tornarASeleccioWorld() {
+  document.getElementById('world-result-wrap').classList.add('hidden');
+  document.getElementById('world-selector').classList.remove('hidden');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FASE 7 → FASE 8: Elenc de personatges
+// ═══════════════════════════════════════════════════════════
+function iniciarFase8() {
+  ESTAT.fase = 8;
+  updateProgress(8);
+  showCard('fase-8');
+  document.getElementById('elenc-selector').classList.add('hidden');
+  showLoader(8);
+
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.history = res.history;
+      hideLoader(8);
+      renderLlistaElenc(res.response);
+    })
+    .withFailureHandler(err => { hideLoader(8); toast('Error: ' + err.message); })
+    .fase8_elenc(ESTAT.conteText, ESTAT.worldbuilding, ESTAT.tematica, ESTAT.estil.desc, ESTAT.history, USER_CONFIG);
+}
+
+function renderLlistaElenc(text) {
+  const wrap  = document.getElementById('llista-elenc');
+  const lines = text.split('\n').filter(l => /^\d+\./.test(l.trim()));
+
+  if (lines.length === 0) {
+    wrap.innerHTML = `<pre style="white-space:pre-wrap;font-size:.9rem;">${escHtml(text)}</pre>`;
+    document.getElementById('elenc-selector').classList.remove('hidden');
+    return;
+  }
+
+  const list = lines.map(l => l.replace(/^\d+\.\s*/, '').trim());
+
+  wrap.innerHTML = list.map((item, i) => {
+    const esRecomanat = /\(Recomanat\)/i.test(item);
+    const textNet     = item.replace(/\s*\(Recomanat\)\s*/i, '').trim();
+    const displayHtml = escHtml(textNet).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    const badge       = esRecomanat ? `<span class="badge-recomanat">Recomanat</span>` : '';
+    const checkedAttr = esRecomanat ? 'checked' : '';
+    const chosenClass = esRecomanat ? 'chosen' : '';
+    return `<div class="world-item ${chosenClass}" id="elenc-item-${i}" data-text="${escHtml(textNet)}" onclick="toggleElencItem(${i}, this)">
+      <input type="checkbox" id="elenc-cb-${i}" ${checkedAttr} onclick="event.stopPropagation();" onchange="syncElencItem(${i})">
+      <label for="elenc-cb-${i}">${badge}${displayHtml}</label>
+    </div>`;
+  }).join('');
+
+  actualitzarComptadorElenc();
+  document.getElementById('elenc-selector').classList.remove('hidden');
+  setTimeout(() => {
+    document.getElementById('fase-8').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+function toggleElencItem(idx, el) {
+  const cb = document.getElementById('elenc-cb-' + idx);
+  cb.checked = !cb.checked;
+  el.classList.toggle('chosen', cb.checked);
+  actualitzarComptadorElenc();
+}
+
+function syncElencItem(idx) {
+  const cb = document.getElementById('elenc-cb-' + idx);
+  const el = document.getElementById('elenc-item-' + idx);
+  el.classList.toggle('chosen', cb.checked);
+  actualitzarComptadorElenc();
+}
+
+function actualitzarComptadorElenc() {
+  const n   = document.querySelectorAll('#llista-elenc input[type=checkbox]:checked').length;
+  const num = document.getElementById('elenc-num');
+  if (num) {
+    num.textContent = n;
+    num.style.color = (n >= 4 && n <= 7) ? 'var(--success)' : 'var(--warning)';
+  }
+}
+
+function confirmarElenc() {
+  const checkboxes = document.querySelectorAll('#llista-elenc input[type=checkbox]:checked');
+  const n = checkboxes.length;
+  if (n < 4) { toast('Selecciona almenys 4 personatges.'); return; }
+  if (n > 7) { toast('Selecciona un màxim de 7 personatges.'); return; }
+
+  ESTAT.elencPersonatges = Array.from(checkboxes).map(cb => {
+    const item = document.getElementById(cb.id.replace('elenc-cb-', 'elenc-item-'));
+    return item ? item.dataset.text : '';
+  }).filter(t => t.length > 0);
+
+  iniciarFase9();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FASE 8 → FASE 9: Estructura narrativa
+// ═══════════════════════════════════════════════════════════
+function iniciarFase9() {
+  ESTAT.fase = 9;
+  updateProgress(9);
+  showCard('fase-9');
+  document.getElementById('llista-estructura').innerHTML = '';
+  document.getElementById('btn-fase9').classList.add('hidden');
+  showLoader(9);
+
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.history = res.history;
+      hideLoader(9);
+      renderLlistaEstructura(res.response);
+    })
+    .withFailureHandler(err => { hideLoader(9); toast('Error: ' + err.message); })
+    .fase9_estructura(ESTAT.conteText, ESTAT.worldbuilding, ESTAT.elencPersonatges, ESTAT.tematica, ESTAT.estil.desc, ESTAT.history, USER_CONFIG);
+}
+
+function renderLlistaEstructura(text) {
+  const wrap = document.getElementById('llista-estructura');
+
+  // Agrupar línies en blocs per cada opció numerada
+  const blocs = [];
+  let current = [];
+  text.split('\n').forEach(line => {
+    if (/^\d+\./.test(line.trim()) && current.length > 0) {
+      blocs.push(current.join('\n'));
+      current = [line];
+    } else {
+      current.push(line);
+    }
+  });
+  if (current.length > 0) blocs.push(current.join('\n'));
+
+  const validBlocs = blocs.filter(b => /^\d+\./.test(b.trim()));
+
+  if (validBlocs.length === 0) {
+    wrap.innerHTML = `<pre style="white-space:pre-wrap;font-size:.9rem;">${escHtml(text)}</pre>`;
+    showBtn('btn-fase9');
+    return;
+  }
+
+  ESTAT._llistaEstructures = validBlocs.map(b =>
+    b.replace(/^\d+\.\s*/, '').replace(/\s*\(Recomanat\)\s*/i, '').trim()
+  );
+  ESTAT._idxEstructura = null;
+
+  let autoIdx = null;
+  wrap.innerHTML = validBlocs.map((bloc, i) => {
+    const esRecomanat = /\(Recomanat\)/i.test(bloc);
+    const textNet     = bloc.replace(/^\d+\.\s*/, '').replace(/\s*\(Recomanat\)\s*/i, '').trim();
+    if (esRecomanat) autoIdx = i;
+
+    const lines     = textNet.split('\n').filter(l => l.trim());
+    const titolLnia = lines[0] || '';
+    const detalls   = lines.slice(1);
+
+    const badge     = esRecomanat ? `<span class="badge-recomanat">Recomanat</span>` : '';
+    const titolHtml = escHtml(titolLnia).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    const detallsHtml = detalls.map(l =>
+      `<span style="display:block;color:var(--text2);font-size:.85rem;margin-top:5px;line-height:1.5;">${escHtml(l.trim())}</span>`
+    ).join('');
+
+    return `<div class="premise-item" id="llista-estructura-item-${i}" onclick="triarItem('llista-estructura','_idxEstructura',${i},this)">
+      <input type="radio" name="llista-estructura-radio" id="llista-estructura-r-${i}">
+      <label for="llista-estructura-r-${i}" style="width:100%;">${badge}${titolHtml}${detallsHtml}</label>
+    </div>`;
+  }).join('');
+
+  if (autoIdx !== null) {
+    const el = document.getElementById(`llista-estructura-item-${autoIdx}`);
+    if (el) {
+      el.classList.add('chosen');
+      el.querySelector('input').checked = true;
+      ESTAT._idxEstructura = autoIdx;
+    }
+  }
+  showBtn('btn-fase9');
+  setTimeout(() => {
+    document.getElementById('fase-9').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+function confirmarEstructura() {
+  const idx = ESTAT._idxEstructura;
+  if (idx === null || idx === undefined || !ESTAT._llistaEstructures[idx]) {
+    toast("Tria una estructura primer.");
+    return;
+  }
+  ESTAT.estructuraTriada = ESTAT._llistaEstructures[idx];
+  iniciarFase10();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FASE 9 → FASE 10: Outline de capítols
+// ═══════════════════════════════════════════════════════════
+
+// Versió client de comprimirContext (mirall de la funció backend).
+// Permet calcular el context compacte sense una crida GAS extra.
+function comprimirContextClient() {
+  const parts = [];
+  parts.push('GÈNERE: ' + (ESTAT.tematica || '—'));
+  parts.push('ESTIL: ' + (ESTAT.estil.desc || '—'));
+
+  if (ESTAT.elencPersonatges && ESTAT.elencPersonatges.length > 0) {
+    parts.push('\nPERSONATGES:');
+    ESTAT.elencPersonatges.forEach(p => {
+      const nomM = p.match(/\*\*(.+?)\*\*/);
+      const rolM = p.match(/Rol:\s*([^|]+)/);
+      const arcM = p.match(/Arc:\s*([^|]+)/);
+      const nom  = nomM ? nomM[1].trim() : p.substring(0, 25).trim();
+      const rol  = rolM ? rolM[1].trim().substring(0, 70) : '—';
+      const arc  = arcM ? arcM[1].trim().substring(0, 80) : '—';
+      parts.push('• ' + nom + ' — ' + rol + ' | Arc: ' + arc);
+    });
+  }
+
+  if (ESTAT.worldbuilding && ESTAT.worldbuilding.trim()) {
+    parts.push('\nMÓN:');
+    ESTAT.worldbuilding.split(/\n\n+/).filter(b => b.trim()).forEach(bloc => {
+      const linies = bloc.trim().split('\n');
+      const titol  = linies[0].replace(/\*\*/g, '').trim();
+      const desc   = (linies[1] || '').trim().substring(0, 100);
+      if (titol) parts.push('• ' + titol + (desc ? ': ' + desc : ''));
+    });
+  }
+
+  return parts.join('\n');
+}
+
+function iniciarFase10() {
+  ESTAT.fase = 10;
+  updateProgress(10);
+  showCard('fase-10');
+  document.getElementById('outline-wrap').classList.add('hidden');
+  showLoader(10);
+
+  const ctx = comprimirContextClient();
+
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.history = res.history;
+      hideLoader(10);
+      ESTAT.outline = parseOutline(res.response);
+      renderOutline();
+      document.getElementById('outline-wrap').classList.remove('hidden');
+      setTimeout(() => {
+        document.getElementById('fase-10').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    })
+    .withFailureHandler(err => { hideLoader(10); toast('Error: ' + err.message); })
+    .fase10_outline(ctx, ESTAT.estructuraTriada, ESTAT.history, USER_CONFIG, ESTAT.tematica);
+}
+
+// ─── Parser de l'outline ─────────────────────────────────────
+function parseOutline(text) {
+  const lines = text.split('\n').filter(l => /^Cap\.?\s*\d+/i.test(l.trim()));
+  return lines.map((line, i) => {
+    // Extreure el text net (sense "Cap. N — ")
+    const textNet = line.replace(/^Cap\.?\s*\d+\s*[—\-–]\s*/i, '').trim();
+    // Parsejar els camps separats per " | "
+    const segments  = textNet.split(/\s*\|\s*/);
+    const titol     = segments[0] || '';
+    const povSeg    = segments.find(s => /^POV:/i.test(s)) || '';
+    const pov       = povSeg.replace(/^POV:\s*/i, '').trim();
+    const descSeg   = segments.find(s => /^Descobriment:/i.test(s)) || '';
+    const descobriment = descSeg.replace(/^Descobriment:\s*/i, '').trim();
+    const objectiu  = segments
+      .filter(s => s !== segments[0] && !/^POV:/i.test(s) && !/^Descobriment:/i.test(s))
+      .join(' | ').trim();
+    return { num: i + 1, titol, pov, objectiu, descobriment, text: textNet };
+  });
+}
+
+// ─── Render i edició de l'outline ────────────────────────────
+function renderOutline() {
+  const list = document.getElementById('outline-list');
+  list.innerHTML = ESTAT.outline.map((cap, i) => {
+    const n     = i + 1;
+    const isFirst = i === 0;
+    const isLast  = i === ESTAT.outline.length - 1;
+    return `<div class="outline-item" id="outline-item-${i}">
+      <span class="outline-num">Cap.&nbsp;${n}</span>
+      <textarea class="outline-text" rows="1"
+        oninput="outlineSyncText(${i}, this); autoResizeTA(this);"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();}"
+      >${escHtml(cap.text)}</textarea>
+      <div class="outline-actions">
+        <button class="outline-btn" title="Pujar" ${isFirst ? 'disabled style="opacity:.3"' : ''} onclick="outlineMoure(${i},-1)">↑</button>
+        <button class="outline-btn" title="Baixar" ${isLast ? 'disabled style="opacity:.3"' : ''} onclick="outlineMoure(${i},1)">↓</button>
+        <button class="outline-btn" title="Afegir després" onclick="outlineAfegir(${i + 1})">＋</button>
+        <button class="outline-btn danger" title="Eliminar" onclick="outlineEliminar(${i})">×</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Ajustar alçada de tots els textareas al contingut inicial
+  list.querySelectorAll('.outline-text').forEach(ta => autoResizeTA(ta));
+}
+
+function autoResizeTA(ta) {
+  ta.style.height = 'auto';
+  ta.style.height = ta.scrollHeight + 'px';
+}
+
+function outlineSyncText(idx, ta) {
+  if (ESTAT.outline[idx]) ESTAT.outline[idx].text = ta.value;
+}
+
+function outlineMoure(idx, dir) {
+  const target = idx + dir;
+  if (target < 0 || target >= ESTAT.outline.length) return;
+  [ESTAT.outline[idx], ESTAT.outline[target]] = [ESTAT.outline[target], ESTAT.outline[idx]];
+  // Renumerar
+  ESTAT.outline.forEach((c, i) => { c.num = i + 1; });
+  renderOutline();
+}
+
+function outlineEliminar(idx) {
+  if (ESTAT.outline.length <= 1) { toast('Cal tenir almenys un capítol.'); return; }
+  ESTAT.outline.splice(idx, 1);
+  ESTAT.outline.forEach((c, i) => { c.num = i + 1; });
+  renderOutline();
+}
+
+function outlineAfegir(afterIdx) {
+  const nouCap = { num: afterIdx + 1, titol: '', pov: '', objectiu: '', descobriment: '', text: '' };
+  ESTAT.outline.splice(afterIdx, 0, nouCap);
+  ESTAT.outline.forEach((c, i) => { c.num = i + 1; });
+  renderOutline();
+  // Focus al nou capítol
+  setTimeout(() => {
+    const ta = document.querySelector(`#outline-item-${afterIdx} .outline-text`);
+    if (ta) { ta.focus(); autoResizeTA(ta); }
+  }, 50);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FASE 10 → FASE 11: Subtrames i fils temàtics
+// ═══════════════════════════════════════════════════════════
+function iniciarFase11() {
+  ESTAT.fase = 11;
+  updateProgress(11);
+  showCard('fase-11');
+  document.getElementById('subtrames-selector').classList.add('hidden');
+  showLoader(11);
+
+  // Outline compacte: "Cap. N — Títol" per línia
+  const outlineCompacte = ESTAT.outline
+    .map(c => 'Cap. ' + c.num + ' — ' + (c.titol || c.text || '').split('|')[0].trim())
+    .join('\n');
+
+  const ctx = comprimirContextClient();
+
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.history = res.history;
+      hideLoader(11);
+      renderLlistaSubtrames(res.response);
+    })
+    .withFailureHandler(err => { hideLoader(11); toast('Error: ' + err.message); })
+    .fase11_subtrames(ctx, outlineCompacte, ESTAT.history, USER_CONFIG, ESTAT.tematica);
+}
+
+function renderLlistaSubtrames(text) {
+  const wrap  = document.getElementById('llista-subtrames');
+  const lines = text.split('\n').filter(l => /^\d+\./.test(l.trim()));
+
+  if (lines.length === 0) {
+    wrap.innerHTML = `<pre style="white-space:pre-wrap;font-size:.9rem;">${escHtml(text)}</pre>`;
+    document.getElementById('subtrames-selector').classList.remove('hidden');
+    return;
+  }
+
+  const list = lines.map(l => l.replace(/^\d+\.\s*/, '').trim());
+
+  wrap.innerHTML = list.map((item, i) => {
+    const esRecomanat = /\(Recomanat\)/i.test(item);
+    const textNet     = item.replace(/\s*\(Recomanat\)\s*/i, '').trim();
+    const displayHtml = escHtml(textNet).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    const badge       = esRecomanat ? `<span class="badge-recomanat">Recomanat</span>` : '';
+    const checkedAttr = esRecomanat ? 'checked' : '';
+    const chosenClass = esRecomanat ? 'chosen' : '';
+    return `<div class="world-item ${chosenClass}" id="subtrama-item-${i}" data-text="${escHtml(textNet)}" onclick="toggleSubtrama(${i}, this)">
+      <input type="checkbox" id="subtrama-cb-${i}" ${checkedAttr} onclick="event.stopPropagation();" onchange="syncSubtrama(${i})">
+      <label for="subtrama-cb-${i}">${badge}${displayHtml}</label>
+    </div>`;
+  }).join('');
+
+  actualitzarComptadorSubtrames();
+  document.getElementById('subtrames-selector').classList.remove('hidden');
+  setTimeout(() => {
+    document.getElementById('fase-11').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+function toggleSubtrama(idx, el) {
+  const cb = document.getElementById('subtrama-cb-' + idx);
+  cb.checked = !cb.checked;
+  el.classList.toggle('chosen', cb.checked);
+  actualitzarComptadorSubtrames();
+}
+
+function syncSubtrama(idx) {
+  const cb = document.getElementById('subtrama-cb-' + idx);
+  const el = document.getElementById('subtrama-item-' + idx);
+  el.classList.toggle('chosen', cb.checked);
+  actualitzarComptadorSubtrames();
+}
+
+function actualitzarComptadorSubtrames() {
+  const n   = document.querySelectorAll('#llista-subtrames input[type=checkbox]:checked').length;
+  const num = document.getElementById('subtrames-num');
+  if (num) {
+    num.textContent = n;
+    num.style.color = n >= 2 ? 'var(--success)' : 'var(--warning)';
+  }
+}
+
+function confirmarSubtrames() {
+  const checkboxes = document.querySelectorAll('#llista-subtrames input[type=checkbox]:checked');
+  if (checkboxes.length < 2) { toast('Selecciona almenys 2 subtrames.'); return; }
+
+  ESTAT.subtrames = Array.from(checkboxes).map(cb => {
+    const item = document.getElementById(cb.id.replace('subtrama-cb-', 'subtrama-item-'));
+    return item ? item.dataset.text : '';
+  }).filter(t => t.length > 0);
+
+  iniciarFase12();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FASE 11 → FASE 12: Cronologia
+// ═══════════════════════════════════════════════════════════
+function iniciarFase12() {
+  ESTAT.fase = 12;
+  updateProgress(12);
+  showCard('fase-12');
+  document.getElementById('crono-content').classList.add('hidden');
+  showLoader(12);
+  document.getElementById('loader-12-text').textContent = 'Generant la línia temporal…';
+
+  const ctx            = comprimirContextClient();
+  const outlineCompacte = ESTAT.outline
+    .map(c => 'Cap. ' + c.num + ' — ' + (c.titol || c.text || '').split('|')[0].trim())
+    .join('\n');
+
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.history    = res.history;
+      ESTAT.cronologia = res.response;
+      hideLoader(12);
+      mostrarCronologia(res.response);
+    })
+    .withFailureHandler(err => { hideLoader(12); toast('Error: ' + err.message); })
+    .fase12_cronologia(ctx, outlineCompacte, ESTAT.subtrames, ESTAT.history, USER_CONFIG, ESTAT.tematica);
+}
+
+function mostrarCronologia(text) {
+  const tbody = document.getElementById('crono-tbody');
+  // Línies que comencen amb "Dia/moment N" o num. seguit de " — "
+  const lines = text.split('\n').filter(l =>
+    /^(Dia\/moment\s+\d+|\d+)\s*[—\-]/i.test(l.trim())
+  );
+
+  if (lines.length === 0) {
+    // Fallback: mostrar com a text pla si el format no encaixa
+    tbody.innerHTML = `<tr><td colspan="3"><pre style="white-space:pre-wrap;font-size:.85rem;">${escHtml(text)}</pre></td></tr>`;
+  } else {
+    tbody.innerHTML = lines.map(line => {
+      // Separar per " — " (guió llarg amb espais)
+      const parts = line.split(/\s+[—\-]\s+/);
+      const temps       = (parts[0] || '').trim();
+      const esdeveniment = (parts[1] || '').trim();
+      const personatges  = (parts[2] || '').trim();
+      const caps         = (parts[3] || '').trim();
+      return `<tr>
+        <td class="crono-temps">${escHtml(temps)}</td>
+        <td>
+          <span>${escHtml(esdeveniment)}</span>
+          ${personatges ? `<div class="crono-personatges">${escHtml(personatges)}</div>` : ''}
+        </td>
+        <td class="crono-caps">${escHtml(caps)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('crono-content').classList.remove('hidden');
+  setTimeout(() => {
+    document.getElementById('fase-12').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+function regenerarCronologia() {
+  document.getElementById('crono-content').classList.add('hidden');
+  showLoader(12);
+  document.getElementById('loader-12-text').textContent = 'Regenerant la línia temporal…';
+
+  const ctx             = comprimirContextClient();
+  const outlineCompacte = ESTAT.outline
+    .map(c => 'Cap. ' + c.num + ' — ' + (c.titol || c.text || '').split('|')[0].trim())
+    .join('\n');
+
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.history    = res.history;
+      ESTAT.cronologia = res.response;
+      hideLoader(12);
+      mostrarCronologia(res.response);
+      toast('Cronologia regenerada.');
+    })
+    .withFailureHandler(err => { hideLoader(12); toast('Error: ' + err.message); })
+    .fase12_cronologia(ctx, outlineCompacte, ESTAT.subtrames, ESTAT.history, USER_CONFIG, ESTAT.tematica);
+}
+
+function confirmarCronologia() {
+  if (!ESTAT.cronologia) { toast('Primer genera la cronologia.'); return; }
+  toast('Cronologia validada. Compilant la bíblia…');
+  iniciarFase13();
+}
+
+// ─── FASE 13: Bíblia de consistència ────────────────────────
+function iniciarFase13() {
+  ESTAT.fase = 13;
+  updateProgress(13);
+  showCard('fase-13');
+  document.getElementById('biblia-content').classList.add('hidden');
+  showLoader(13);
+  setTimeout(() => {
+    document.getElementById('fase-13').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+
+  const dades = {
+    tematica:         ESTAT.tematica,
+    estilDesc:        ESTAT.estil.desc || '',
+    premissa:         ESTAT.premissaTriada || '',
+    worldbuilding:    ESTAT.worldbuilding || '',
+    elencPersonatges: ESTAT.elencPersonatges || [],
+    estructuraTriada: ESTAT.estructuraTriada || '',
+    outline:          ESTAT.outline || [],
+    subtrames:        ESTAT.subtrames || [],
+    cronologia:       ESTAT.cronologia || '',
+    conteText:        ESTAT.conteText || ''
+  };
+
+  google.script.run
+    .withSuccessHandler(biblia => {
+      ESTAT.biblia = biblia;
+      hideLoader(13);
+      renderBibliaView(biblia);
+      document.getElementById('biblia-content').classList.remove('hidden');
+    })
+    .withFailureHandler(err => { hideLoader(13); toast('Error: ' + err.message); })
+    .fase13_compilarBiblia(dades);
+}
+
+function renderBibliaView(text) {
+  const container = document.getElementById('biblia-view');
+  if (!text || !text.trim()) {
+    container.innerHTML = '<p style="color:var(--text2)">La bíblia és buida.</p>';
+    return;
+  }
+  const blocks = text.split(/^## /m).filter(b => b.trim());
+  container.innerHTML = blocks.map(block => {
+    const nl    = block.indexOf('\n');
+    const titol = nl >= 0 ? block.substring(0, nl).trim() : block.trim();
+    const cos   = nl >= 0 ? block.substring(nl + 1).trim() : '';
+    return `<div class="biblia-seccio">
+      <div class="biblia-titol">${escHtml(titol)}</div>
+      <pre class="biblia-cos">${escHtml(cos)}</pre>
+    </div>`;
+  }).join('');
+}
+
+function toggleEditarBiblia() {
+  const view     = document.getElementById('biblia-view');
+  const ta       = document.getElementById('biblia-textarea');
+  const btnEdit  = document.getElementById('btn-editar-biblia');
+  const btnDesar = document.getElementById('btn-desar-biblia');
+
+  const editMode = (ta.style.display === 'block');
+  if (!editMode) {
+    ta.value        = ESTAT.biblia;
+    ta.style.display = 'block';
+    view.style.display = 'none';
+    btnEdit.classList.add('hidden');
+    btnDesar.classList.remove('hidden');
+    ta.focus();
+  } else {
+    ta.style.display   = 'none';
+    view.style.display = '';
+    btnEdit.classList.remove('hidden');
+    btnDesar.classList.add('hidden');
+  }
+}
+
+function desarCanvisBiblia() {
+  const ta = document.getElementById('biblia-textarea');
+  ESTAT.biblia = ta.value;
+  ta.style.display   = 'none';
+  document.getElementById('biblia-view').style.display = '';
+  document.getElementById('btn-editar-biblia').classList.remove('hidden');
+  document.getElementById('btn-desar-biblia').classList.add('hidden');
+  renderBibliaView(ESTAT.biblia);
+  toast('Canvis desats a la bíblia.');
+}
+
+// ─── Entrada a Fase 14 (cridat des del botó de Fase 13) ─────
+function iniciarEscripturaCapitol(numCap) {
+  iniciarFase14();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FASE 14: Escriptura capítol a capítol
+// ═══════════════════════════════════════════════════════════
+function iniciarFase14() {
+  if (!ESTAT.outline || ESTAT.outline.length === 0) {
+    toast('Cal tenir l\'outline de capítols per continuar.');
+    return;
+  }
+  ESTAT.fase         = 14;
+  ESTAT.capitols     = ESTAT.outline.map(() => null);
+  ESTAT._capActual   = 0;
+  ESTAT._capGenerant = null;
+
+  updateProgress(14);
+  showCard('fase-14');
+  renderSidebarCapitols();
+  mostrarCapitol(0);
+  setTimeout(() => {
+    document.getElementById('fase-14').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+// ─── Sidebar: renderitza la llista de capítols ──────────────
+function renderSidebarCapitols() {
+  const sidebar = document.getElementById('cap-sidebar');
+  sidebar.innerHTML = ESTAT.outline.map((cap, i) => {
+    const estat   = ESTAT._capGenerant === i ? '⏳' : (ESTAT.capitols[i] ? '✅' : '⬜');
+    const actiu   = ESTAT._capActual === i ? 'actiu' : '';
+    const generat = ESTAT.capitols[i] ? 'generat' : '';
+    const titolBreu = ((cap.titol || cap.text || '').split('|')[0]).trim().substring(0, 28);
+    return `<div class="cap-sidebar-item ${actiu} ${generat}" onclick="seleccionarCapitol(${i})">
+      <span class="cap-sidebar-num">${i + 1}</span>
+      <span class="cap-sidebar-status">${estat}</span>
+      <span class="cap-sidebar-titol">${escHtml(titolBreu)}</span>
+    </div>`;
+  }).join('');
+}
+
+// ─── Seleccionar capítol des de la sidebar ──────────────────
+function seleccionarCapitol(idx) {
+  if (ESTAT._capGenerant !== null && ESTAT._capGenerant !== idx) {
+    toast('Espera que acabi de generar el capítol actual.');
+    return;
+  }
+  ESTAT._capActual = idx;
+  renderSidebarCapitols();
+  mostrarCapitol(idx);
+}
+
+// ─── Mostrar el capítol actiu a l'àrea principal ────────────
+function mostrarCapitol(idx) {
+  const cap      = ESTAT.outline[idx];
+  const text     = ESTAT.capitols[idx];
+  const generat  = !!(text);
+  const generant = ESTAT._capGenerant === idx;
+
+  // Capçalera
+  document.getElementById('cap-main-num').textContent = 'Cap. ' + (idx + 1);
+  const titolBreu = ((cap.titol || cap.text || '').split('|')[0]).trim();
+  document.getElementById('cap-main-titol').textContent = titolBreu;
+  document.getElementById('cap-outline-text').textContent = cap.text || '';
+
+  // Loader
+  document.getElementById('cap-loader').classList.toggle('visible', generant);
+
+  // Àrees de contingut
+  const readerWrap  = document.getElementById('cap-reader-wrap');
+  const pendentWrap = document.getElementById('cap-pendent-wrap');
+
+  if (generat && !generant) {
+    readerWrap.classList.remove('hidden');
+    pendentWrap.classList.add('hidden');
+    mostrarTextCapitol(text);
+  } else if (generant) {
+    readerWrap.classList.add('hidden');
+    pendentWrap.classList.add('hidden');
+  } else {
+    readerWrap.classList.add('hidden');
+    pendentWrap.classList.remove('hidden');
+  }
+
+  // Botons
+  const total = ESTAT.outline.length;
+  document.getElementById('btn-generar-num').textContent = idx + 1;
+  document.getElementById('btn-generar-cap').classList.toggle('hidden', generat || generant);
+  document.getElementById('btn-regenerar-cap').classList.toggle('hidden', !generat || generant);
+  document.getElementById('btn-cap-anterior').classList.toggle('hidden', idx === 0 || generant);
+  document.getElementById('btn-cap-seguent').classList.toggle('hidden', idx >= total - 1 || generant);
+}
+
+// ─── Renderitza el text d'un capítol al reader ──────────────
+function mostrarTextCapitol(text) {
+  const cos  = document.getElementById('cap-reader-cos');
+  const pars = text.split(/\n\n+/).filter(p => p.trim().length > 0);
+  cos.innerHTML = pars.map(p => `<p>${escHtml(p.trim())}</p>`).join('');
+  const wc = compteParaules(text);
+  document.getElementById('cap-reader-wordcount').textContent = wc.toLocaleString('ca') + ' paraules';
+}
+
+// ─── Generar el capítol actiu (Part 1 → Part 2) ─────────────
+function generarCapitolActual() {
+  const idx = ESTAT._capActual;
+  if (ESTAT._capGenerant !== null) { toast('Espera que acabi la generació actual.'); return; }
+
+  ESTAT._capGenerant = idx;
+  renderSidebarCapitols();
+
+  document.getElementById('cap-loader').classList.add('visible');
+  document.getElementById('cap-loader-text').textContent = 'Generant part 1 del capítol ' + (idx + 1) + '…';
+  document.getElementById('cap-pendent-wrap').classList.add('hidden');
+  document.getElementById('cap-reader-wrap').classList.add('hidden');
+  ['btn-generar-cap', 'btn-regenerar-cap', 'btn-cap-anterior', 'btn-cap-seguent'].forEach(id => {
+    document.getElementById(id).classList.add('hidden');
+  });
+
+  const textCapAnterior = idx > 0 ? (ESTAT.capitols[idx - 1] || '') : '';
+  const outlineCapitol  = ESTAT.outline[idx] ? ESTAT.outline[idx].text : '';
+
+  // Part 1
+  google.script.run
+    .withSuccessHandler(function(res) {
+      const part1Text     = res.response;
+      const historialPart = res.history;
+      document.getElementById('cap-loader-text').textContent = 'Generant part 2 del capítol ' + (idx + 1) + '…';
+
+      // Part 2 encadenada
+      google.script.run
+        .withSuccessHandler(function(res2) {
+          ESTAT.capitols[idx]   = part1Text + '\n\n' + res2.response;
+          ESTAT._capGenerant     = null;
+          document.getElementById('cap-loader').classList.remove('visible');
+          renderSidebarCapitols();
+          mostrarCapitol(idx);
+          verificarRevisioDisponible();
+          toast('Capítol ' + (idx + 1) + ' generat!');
+        })
+        .withFailureHandler(function(err) {
+          ESTAT._capGenerant = null;
+          document.getElementById('cap-loader').classList.remove('visible');
+          renderSidebarCapitols();
+          mostrarCapitol(idx);
+          toast('Error a la part 2: ' + err.message);
+        })
+        .escriureCapitol(2, idx + 1, ESTAT.outline.length, ESTAT.biblia,
+          outlineCapitol, textCapAnterior, ESTAT.estil.desc, USER_CONFIG, ESTAT.tematica, historialPart);
+    })
+    .withFailureHandler(function(err) {
+      ESTAT._capGenerant = null;
+      document.getElementById('cap-loader').classList.remove('visible');
+      renderSidebarCapitols();
+      mostrarCapitol(idx);
+      toast('Error a la part 1: ' + err.message);
+    })
+    .escriureCapitol(1, idx + 1, ESTAT.outline.length, ESTAT.biblia,
+      outlineCapitol, textCapAnterior, ESTAT.estil.desc, USER_CONFIG, ESTAT.tematica, null);
+}
+
+// ─── Regenerar el capítol actiu ─────────────────────────────
+function regenerarCapitolActual() {
+  if (!confirm('Vols regenerar el capítol ' + (ESTAT._capActual + 1) + '? El text actual es perdrà.')) return;
+  ESTAT.capitols[ESTAT._capActual] = null;
+  generarCapitolActual();
+}
+
+// ─── Actualitzar UI del panel de poliment (select ↔ input lliure) ──
+function actualitzarMilloraUI() {
+  const sel  = document.getElementById('cap-millora-select');
+  const wrap = document.getElementById('cap-millora-lliure-wrap');
+  if (sel && wrap) wrap.classList.toggle('hidden', sel.value !== 'lliure');
+}
+
+// ─── Millorar el capítol actiu (Fase 16) ────────────────────
+function millorarCapitolActual() {
+  const idx   = ESTAT._capActual;
+  const sel   = document.getElementById('cap-millora-select');
+  const input = document.getElementById('cap-millora-input');
+
+  // Obtenir la instrucció: predefinida o lliure
+  let instruccio;
+  if (sel && sel.value === 'lliure') {
+    instruccio = input ? input.value.trim() : '';
+    if (!instruccio) { toast('Escriu una instrucció de millora.'); return; }
+  } else {
+    instruccio = sel ? sel.value : '';
+  }
+
+  if (!ESTAT.capitols[idx]) { toast('Primer genera el capítol.'); return; }
+
+  // Capítols adjacents: darreres 300 paraules de l'anterior + primeres 300 del posterior
+  const capsAdjacents = {
+    ant:  (idx > 0 && ESTAT.capitols[idx - 1])
+            ? ESTAT.capitols[idx - 1].trim().split(/\s+/).slice(-300).join(' ')
+            : null,
+    post: (idx < ESTAT.capitols.length - 1 && ESTAT.capitols[idx + 1])
+            ? ESTAT.capitols[idx + 1].trim().split(/\s+/).slice(0, 300).join(' ')
+            : null
+  };
+
+  const outlineCapitol = ESTAT.outline[idx] ? ESTAT.outline[idx].text : '';
+
+  document.getElementById('cap-loader').classList.add('visible');
+  document.getElementById('cap-loader-text').textContent = 'Polint el capítol ' + (idx + 1) + '…';
+  document.getElementById('cap-reader-wrap').classList.add('hidden');
+  ['btn-generar-cap', 'btn-regenerar-cap', 'btn-cap-anterior', 'btn-cap-seguent'].forEach(id => {
+    document.getElementById(id).classList.add('hidden');
+  });
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      ESTAT.capitols[idx] = res.response;
+      document.getElementById('cap-loader').classList.remove('visible');
+      // Reinicia el panel de poliment
+      if (input) input.value = '';
+      if (sel)   { sel.selectedIndex = 0; }
+      document.getElementById('cap-millora-lliure-wrap').classList.add('hidden');
+      mostrarCapitol(idx);
+      toast('Capítol ' + (idx + 1) + ' polit.');
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById('cap-loader').classList.remove('visible');
+      mostrarCapitol(idx);
+      toast('Error: ' + err.message);
+    })
+    .millorarCapitol(idx + 1, instruccio, ESTAT.capitols[idx], ESTAT.biblia,
+      outlineCapitol, capsAdjacents, ESTAT.estil.desc, USER_CONFIG, ESTAT.tematica);
+}
+
+// ─── FASE 14 → FASE 17: entrada ─────────────────────────────
+function iniciarFase17() {
+  if (!ESTAT.biblia) { toast('Cal completar la bíblia (Fase 13) primer.'); return; }
+
+  ESTAT.fase = 17;
+  updateProgress(17);
+  showCard('fase-17');
+  document.getElementById('para-content').classList.add('hidden');
+  showLoader(17);
+  setTimeout(() => {
+    document.getElementById('fase-17').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      hideLoader(17);
+      renderParatextos(res.response);
+      document.getElementById('para-content').classList.remove('hidden');
+    })
+    .withFailureHandler(function(err) {
+      hideLoader(17);
+      toast('Error: ' + err.message);
+    })
+    .fase17_paratextos(ESTAT.biblia, ESTAT.outline, ESTAT.tematica, USER_CONFIG);
+}
+
+// ─── Parsejar i renderitzar la resposta del backend ─────────
+function renderParatextos(text) {
+  // Separar per seccions "## NOM"
+  const sections = {};
+  let currentKey  = null;
+  let currentBuf  = [];
+
+  (text + '\n## END').split('\n').forEach(line => {
+    if (/^##\s+/.test(line.trim())) {
+      if (currentKey !== null) sections[currentKey] = currentBuf.join('\n').trim();
+      currentKey = line.trim().replace(/^##\s+/, '').toUpperCase()
+        .replace(/[ÀÁÂÃÄÅ]/g, 'A').replace(/[ÈÉÊË]/g, 'E')
+        .replace(/[ÌÍÎÏ]/g, 'I').replace(/[ÒÓÔÕÖ]/g, 'O')
+        .replace(/[ÙÚÛÜ]/g, 'U');
+      currentBuf = [];
+    } else {
+      currentBuf.push(line);
+    }
+  });
+
+  // Títols
+  renderTitolsProposta(sections['TITOLS'] || sections['TITOL'] || '');
+
+  // Divisió en parts (opcional)
+  const divisio = sections['DIVISIO EN PARTS'] || sections['DIVISIO'] || '';
+  if (divisio) {
+    ESTAT.divisioEnParts = divisio;
+    document.getElementById('para-divisio-ta').value = divisio;
+    document.getElementById('para-divisio-seccio').classList.remove('hidden');
+  } else {
+    document.getElementById('para-divisio-seccio').classList.add('hidden');
+  }
+
+  // Epígraf
+  const epigraf = sections['EPIGRAF'] || sections['EPIGRAFE'] || '';
+  ESTAT.epigraf  = epigraf;
+  document.getElementById('para-epigraf-ta').value = epigraf;
+
+  // Sinopsi
+  const sinopsi = sections['SINOPSI'] || '';
+  ESTAT.sinopsi  = sinopsi;
+  document.getElementById('para-sinopsi-ta').value = sinopsi;
+  actualitzarWCSinopsi();
+}
+
+// ─── Renderitzar la llista de títols com a radio buttons ─────
+function renderTitolsProposta(text) {
+  const wrap  = document.getElementById('para-titols-list');
+  const lines = text.split('\n').filter(l => /^\d+[\.\)]/.test(l.trim()));
+
+  if (lines.length === 0) {
+    // Fallback: mostrar com a text pla
+    wrap.innerHTML = `<pre style="white-space:pre-wrap;font-size:.9rem;color:var(--text2);">${escHtml(text)}</pre>`;
+    return;
+  }
+
+  const list = lines.map(l => l.replace(/^\d+[\.\)]\s*/, '').trim());
+  ESTAT._titolsProposta = list.map(t => t.replace(/\s*\(Recomanat\)\s*/i, '').trim());
+  ESTAT._titolIdx       = null;
+
+  let autoIdx = null;
+  wrap.innerHTML = list.map((item, i) => {
+    const esRec  = /\(Recomanat\)/i.test(item);
+    const titol  = item.replace(/\s*\(Recomanat\)\s*/i, '').trim();
+    if (esRec) autoIdx = i;
+    const badge  = esRec ? '<span class="badge-recomanat">Recomanat</span>' : '';
+    return `<div class="premise-item" id="para-titol-item-${i}" onclick="triarTitol(${i}, this)">
+      <input type="radio" name="para-titol-radio" id="para-titol-r-${i}">
+      <label for="para-titol-r-${i}" style="font-size:1rem;font-weight:600;">${badge}${escHtml(titol)}</label>
+    </div>`;
+  }).join('');
+
+  if (autoIdx !== null) {
+    const el = document.getElementById(`para-titol-item-${autoIdx}`);
+    if (el) {
+      el.classList.add('chosen');
+      el.querySelector('input').checked = true;
+      ESTAT._titolIdx  = autoIdx;
+      ESTAT.titolNovel = ESTAT._titolsProposta[autoIdx];
+    }
+  }
+}
+
+// ─── Selecció de títol ───────────────────────────────────────
+function triarTitol(idx, el) {
+  document.querySelectorAll('#para-titols-list .premise-item').forEach(e => e.classList.remove('chosen'));
+  el.classList.add('chosen');
+  el.querySelector('input').checked = true;
+  ESTAT._titolIdx  = idx;
+  ESTAT.titolNovel = ESTAT._titolsProposta[idx] || '';
+}
+
+// ─── Comptador de paraules per a la sinopsi ──────────────────
+function actualitzarWCSinopsi() {
+  const ta  = document.getElementById('para-sinopsi-ta');
+  const wc  = document.getElementById('para-sinopsi-wc');
+  if (!ta || !wc) return;
+  const n = compteParaules(ta.value);
+  wc.textContent = n + ' paraules' + (n < 80 ? ' (objectiu: ~100)' : n > 130 ? ' (massa llarg)' : '');
+  wc.style.color = (n >= 80 && n <= 130) ? 'var(--success)' : 'var(--warning)';
+}
+
+// ─── Assemblar la novel·la → passar a Fase 18 ─────────────────
+function assemblarNovela() {
+  if (ESTAT._titolIdx === null) { toast('Tria primer el títol de la novel·la.'); return; }
+
+  const capsGenerats = ESTAT.capitols.filter(c => c !== null).length;
+  if (capsGenerats === 0) { toast('Genera almenys un capítol a la Fase 14 primer.'); return; }
+
+  // Desar l'estat actual dels textareas
+  ESTAT.titolNovel     = ESTAT._titolsProposta[ESTAT._titolIdx] || '';
+  ESTAT.sinopsi        = document.getElementById('para-sinopsi-ta').value.trim();
+  ESTAT.epigraf        = document.getElementById('para-epigraf-ta').value.trim();
+  ESTAT.divisioEnParts = (document.getElementById('para-divisio-ta') || {}).value || '';
+  ESTAT.divisioEnParts = ESTAT.divisioEnParts.trim();
+
+  iniciarFase18();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FASE 18: Assemblatge i exportació final
+// ═══════════════════════════════════════════════════════════
+
+// ─── Iniciar Fase 18 ─────────────────────────────────────────
+function iniciarFase18() {
+  ESTAT.fase = 18;
+  updateProgress(18);
+  showCard('fase-18');
+
+  // Estadístiques
+  const capsGenerats = ESTAT.capitols.filter(c => c !== null).length;
+  const totalParaules = ESTAT.capitols.reduce((acc, text) => {
+    return acc + (text ? compteParaules(text) : 0);
+  }, 0);
+  const titolCurt = ESTAT.titolNovel
+    ? (ESTAT.titolNovel.length > 20 ? ESTAT.titolNovel.substring(0, 18) + '…' : ESTAT.titolNovel)
+    : '—';
+
+  document.getElementById('stat-caps').textContent     = capsGenerats;
+  document.getElementById('stat-paraules').textContent = totalParaules.toLocaleString('ca');
+  document.getElementById('stat-titol').textContent    = titolCurt;
+
+  // Amagar links i loader de generacions anteriors
+  document.getElementById('fase18-links').classList.add('hidden');
+  document.getElementById('loader-18').classList.remove('visible');
+  document.getElementById('btn-exportar-novela').disabled = false;
+
+  setTimeout(() => {
+    document.getElementById('fase-18').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    llençarConfetti();
+  }, 150);
+}
+
+// ─── Exportar a Google Docs + DOCX ───────────────────────────
+function exportarNovelaDocs() {
+  const btn = document.getElementById('btn-exportar-novela');
+  btn.disabled = true;
+  document.getElementById('loader-18').classList.add('visible');
+  document.getElementById('fase18-links').classList.add('hidden');
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      document.getElementById('loader-18').classList.remove('visible');
+      btn.disabled = false;
+
+      let html = '';
+      if (res.docUrl) {
+        html += `<a href="${res.docUrl}" target="_blank" class="fase18-export-link">
+          📖 <span>Obrir la novel·la a Google Docs →</span>
+        </a>`;
+      }
+      if (res.docxUrl) {
+        html += `<a href="${res.docxUrl}" target="_blank" class="fase18-export-link">
+          💾 <span>Descarregar DOCX →</span>
+        </a>`;
+      }
+      if (!html) html = '<p style="color:var(--warning);font-size:.9rem;">No s\'ha pogut generar l\'exportació.</p>';
+
+      const linksDiv = document.getElementById('fase18-links');
+      linksDiv.innerHTML = html;
+      linksDiv.classList.remove('hidden');
+      toast('Document generat!');
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById('loader-18').classList.remove('visible');
+      btn.disabled = false;
+      toast('Error en la generació: ' + err.message);
+    })
+    .exportarNovela(
+      ESTAT.titolNovel || 'Novel·la',
+      ESTAT.epigraf        || '',
+      ESTAT.sinopsi        || '',
+      ESTAT.divisioEnParts || '',
+      ESTAT.outline,
+      ESTAT.capitols
+    );
+}
+
+// ─── Confetti ────────────────────────────────────────────────
+function llençarConfetti() {
+  const canvas = document.getElementById('confetti-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const colors = ['#7c6af7', '#a78bfa', '#4ade80', '#fbbf24', '#f472b6', '#38bdf8'];
+  const particles = Array.from({ length: 130 }, () => ({
+    x:    Math.random() * canvas.width,
+    y:    Math.random() * canvas.height - canvas.height,
+    r:    Math.random() * 5 + 3,
+    d:    Math.random() * 90,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    tiltAngle:    0,
+    tiltAngleInc: Math.random() * 0.07 + 0.05
+  }));
+
+  let angle = 0;
+  let frame = 0;
+
+  (function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    angle += 0.01;
+    frame++;
+    particles.forEach(function(p) {
+      p.tiltAngle += p.tiltAngleInc;
+      p.y += (Math.cos(angle + p.d) + 3 + p.r / 2) * 0.9;
+      p.x += Math.sin(angle) * 1.5;
+      const tilt = Math.sin(p.tiltAngle) * 14;
+      ctx.beginPath();
+      ctx.lineWidth   = p.r;
+      ctx.strokeStyle = p.color;
+      ctx.moveTo(p.x + tilt + p.r / 4, p.y);
+      ctx.lineTo(p.x + tilt, p.y + tilt + p.r / 4);
+      ctx.stroke();
+    });
+    if (frame < 220) requestAnimationFrame(draw);
+    else ctx.clearRect(0, 0, canvas.width, canvas.height);
+  })();
+}
+
+// ─── Navegar entre capítols ──────────────────────────────────
+function navegarCapitol(dir) {
+  const nextIdx = ESTAT._capActual + dir;
+  if (nextIdx < 0 || nextIdx >= ESTAT.outline.length) return;
+  seleccionarCapitol(nextIdx);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FASE 15: Revisió de coherència inter-capítols
+// ═══════════════════════════════════════════════════════════
+
+// Emmagatzemar les correccions parseades per accedir-hi per índex
+// (evita problemes d'escapament de cadenes en onclick inline)
+let _revisioCorreccions = [];
+
+// ─── Trigger automàtic cada 3 capítols completats ───────────
+function verificarRevisioDisponible() {
+  const nGenerats = ESTAT.capitols.filter(c => c !== null).length;
+  if (nGenerats > 0 && nGenerats % 3 === 0 && nGenerats > ESTAT._revisioCapTrigger) {
+    ESTAT._revisioCapTrigger = nGenerats;
+    const banner   = document.getElementById('revisio-banner');
+    const bannerTx = document.getElementById('revisio-banner-text');
+    bannerTx.textContent = `Revisió de coherència disponible (caps. 1–${nGenerats})`;
+    banner.classList.remove('hidden');
+  }
+}
+
+// ─── Iniciar la revisió (crida al backend amb l'Editor IA) ──
+function iniciarRevisio() {
+  const capGenerats = ESTAT.capitols.reduce((acc, text, i) => {
+    if (text) acc.push({ num: i + 1, outlineText: (ESTAT.outline[i] || {}).text || '', text });
+    return acc;
+  }, []);
+
+  if (capGenerats.length === 0) { toast('No hi ha capítols generats.'); return; }
+
+  document.getElementById('revisio-banner').classList.add('hidden');
+
+  const panel = document.getElementById('revisio-panel');
+  panel.classList.remove('hidden');
+  document.getElementById('revisio-loader').classList.add('visible');
+  document.getElementById('revisio-result').classList.add('hidden');
+  setTimeout(() => panel.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      document.getElementById('revisio-loader').classList.remove('visible');
+      renderRevisio(res.response);
+      document.getElementById('revisio-result').classList.remove('hidden');
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById('revisio-loader').classList.remove('visible');
+      toast('Error a la revisió: ' + err.message);
+    })
+    .fase15_revisioCoherencia(capGenerats, ESTAT.biblia, USER_CONFIG);
+}
+
+// ─── Renderitzar l'informe de revisió ───────────────────────
+function renderRevisio(text) {
+  const container = document.getElementById('revisio-result');
+  _revisioCorreccions = [];
+
+  if (!text || !text.trim() || /cap inconsistència/i.test(text)) {
+    container.innerHTML = `<div class="revisio-ok">✅ Cap inconsistència detectada als capítols revisats.</div>`;
+    return;
+  }
+
+  // Parsejar blocs PROBLEMA / CORRECCIÓ
+  const blocs  = [];
+  let current  = null;
+
+  text.split('\n').forEach(line => {
+    const l = line.trim();
+    if (/^PROBLEMA:/i.test(l)) {
+      if (current) blocs.push(current);
+      current = { problema: l.replace(/^PROBLEMA:\s*/i, '').trim(), capNum: null, instruccio: '' };
+    } else if (/^CORREC/i.test(l) && current) {
+      // "CORRECCIÓ: [Cap. N] instrucció" o "CORRECCIO: [Cap. N] instrucció"
+      const raw      = l.replace(/^CORREC[CÇ]I[ÓO]:\s*/i, '').trim();
+      const capMatch = raw.match(/^\[?Cap\.?\s*(\d+)\]?\s*/i);
+      if (capMatch) {
+        current.capNum    = parseInt(capMatch[1]);
+        current.instruccio = raw.replace(/^\[?Cap\.?\s*\d+\]?\s*/i, '').trim();
+      } else {
+        current.instruccio = raw;
+      }
+    } else if (current && l && !current.instruccio) {
+      current.problema += ' ' + l;
+    }
+  });
+  if (current) blocs.push(current);
+
+  if (blocs.length === 0) {
+    container.innerHTML = `<pre style="white-space:pre-wrap;font-size:.88rem;color:var(--text2);">${escHtml(text)}</pre>`;
+    return;
+  }
+
+  // Guardar correccions per accés per índex des d'onclick
+  _revisioCorreccions = blocs.map(b => ({ capIdx: b.capNum ? b.capNum - 1 : null, instruccio: b.instruccio }));
+
+  const totalLabel = `${blocs.length} problema${blocs.length !== 1 ? 'es' : ''} detectat${blocs.length !== 1 ? 's' : ''}`;
+  container.innerHTML = `
+    <p style="font-size:.8rem;color:var(--text2);margin-bottom:14px;">${escHtml(totalLabel)}</p>
+    ${blocs.map((b, i) => {
+      const capBadge = b.capNum
+        ? `<span class="revisio-cap-badge">Cap. ${b.capNum}</span>`
+        : '';
+      const btnAplicar = (b.capNum !== null && b.instruccio)
+        ? `<button class="btn btn-secondary" style="font-size:.78rem;padding:5px 12px;flex-shrink:0;" onclick="aplicarCorreccio(${i})">Aplicar →</button>`
+        : '';
+      return `<div class="revisio-problema">
+        <div class="revisio-problema-header">
+          <span class="revisio-label">Problema ${i + 1}</span>
+          ${capBadge}
+        </div>
+        <div class="revisio-desc">${escHtml(b.problema)}</div>
+        ${b.instruccio ? `<div class="revisio-correccio">
+          <span class="revisio-correccio-text">${escHtml(b.instruccio)}</span>
+          ${btnAplicar}
+        </div>` : ''}
+      </div>`;
+    }).join('')}`;
+}
+
+// ─── Aplicar una correcció al capítol afectat ───────────────
+function aplicarCorreccio(idx) {
+  const corr = _revisioCorreccions[idx];
+  if (!corr || corr.capIdx === null) { toast('No s\'ha pogut determinar el capítol afectat.'); return; }
+  if (corr.capIdx < 0 || corr.capIdx >= ESTAT.outline.length) {
+    toast('El capítol ' + (corr.capIdx + 1) + ' no existeix a l\'outline.'); return;
+  }
+
+  // Navegar al capítol afectat
+  seleccionarCapitol(corr.capIdx);
+
+  // Activar mode "lliure" al select i pre-omplir el camp
+  const sel = document.getElementById('cap-millora-select');
+  if (sel) { sel.value = 'lliure'; actualitzarMilloraUI(); }
+
+  const input = document.getElementById('cap-millora-input');
+  if (input) {
+    input.value = corr.instruccio;
+    setTimeout(() => {
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      input.focus();
+    }, 200);
+  }
+  toast('Instrucció carregada al capítol ' + (corr.capIdx + 1) + '. Clica "Millorar capítol" per aplicar-la.');
 }
 </script>
 </body>
