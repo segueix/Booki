@@ -1,5 +1,5 @@
 // ============================================================
-//  NOVEL·LA IA — codigo.gs
+//  CONTE IA — codigo.gs
 // ============================================================
 
 const PROVIDER_DEFAULTS = {
@@ -19,7 +19,7 @@ const PROVIDER_DEFAULTS = {
 
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('index')
-    .setTitle('Novel·la IA — Creador de contes')
+    .setTitle('Conte IA — Creador de contes')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
@@ -32,19 +32,12 @@ function callLLM(messages, systemPrompt, config) {
   const maxTokens = safeConfig.maxTokens || 2048;
 
   if (!provider) throw new Error('Falta el provider al config.');
-  if (!apiKey) throw new Error('Falta l\'apiKey al config.');
+  if (!apiKey)   throw new Error("Falta l'apiKey al config.");
 
-  if (provider === 'anthropic') {
-    return callAnthropic(messages, systemPrompt, apiKey, model, maxTokens);
-  }
-
-  if (provider === 'openai') {
-    return callOpenAI(messages, systemPrompt, apiKey, model, maxTokens);
-  }
-
-  if (provider === 'gemini' || provider === 'google' || provider === 'google-gemini') {
+  if (provider === 'anthropic') return callAnthropic(messages, systemPrompt, apiKey, model, maxTokens);
+  if (provider === 'openai')    return callOpenAI(messages, systemPrompt, apiKey, model, maxTokens);
+  if (provider === 'gemini' || provider === 'google' || provider === 'google-gemini')
     return callGemini(messages, systemPrompt, apiKey, model, maxTokens);
-  }
 
   throw new Error('Provider no suportat: ' + provider);
 }
@@ -56,7 +49,6 @@ function callAnthropic(messages, systemPrompt, apiKey, model, maxTokens) {
     system: systemPrompt || SYSTEM_DEFAULT,
     messages: messages
   };
-
   const options = {
     method: 'post',
     headers: {
@@ -67,18 +59,12 @@ function callAnthropic(messages, systemPrompt, apiKey, model, maxTokens) {
     payload: JSON.stringify(payload),
     muteHttpExceptions: true
   };
-
-  const raw = UrlFetchApp.fetch(PROVIDER_DEFAULTS.anthropic.apiUrl, options);
+  const raw    = UrlFetchApp.fetch(PROVIDER_DEFAULTS.anthropic.apiUrl, options);
   const result = parseJsonResponse(raw, 'Anthropic');
-  if (result.error) throw new Error(result.error.message || 'Error desconegut d\'Anthropic.');
-
+  if (result.error) throw new Error(result.error.message || "Error desconegut d'Anthropic.");
   const text = Array.isArray(result.content)
-    ? result.content
-        .filter(part => part && part.type === 'text')
-        .map(part => part.text || '')
-        .join('\n')
+    ? result.content.filter(p => p && p.type === 'text').map(p => p.text || '').join('\n')
     : '';
-
   return normalizeLLMText(text);
 }
 
@@ -88,7 +74,6 @@ function callOpenAI(messages, systemPrompt, apiKey, model, maxTokens) {
     messages: buildOpenAIMessages(messages, systemPrompt),
     max_tokens: maxTokens
   };
-
   const options = {
     method: 'post',
     headers: {
@@ -98,65 +83,48 @@ function callOpenAI(messages, systemPrompt, apiKey, model, maxTokens) {
     payload: JSON.stringify(payload),
     muteHttpExceptions: true
   };
-
-  const raw = UrlFetchApp.fetch(PROVIDER_DEFAULTS.openai.apiUrl, options);
+  const raw    = UrlFetchApp.fetch(PROVIDER_DEFAULTS.openai.apiUrl, options);
   const result = parseJsonResponse(raw, 'OpenAI');
-  if (result.error) throw new Error(result.error.message || 'Error desconegut d\'OpenAI.');
-
-  const firstChoice = result.choices && result.choices[0];
+  if (result.error) throw new Error(result.error.message || "Error desconegut d'OpenAI.");
+  const firstChoice    = result.choices && result.choices[0];
   const messageContent = firstChoice && firstChoice.message ? firstChoice.message.content : '';
-  const text = extractContentText(messageContent);
-
-  return normalizeLLMText(text);
+  return normalizeLLMText(extractContentText(messageContent));
 }
 
 function callGemini(messages, systemPrompt, apiKey, model, maxTokens) {
   const finalModel = model || PROVIDER_DEFAULTS.gemini.model;
-  const endpoint = PROVIDER_DEFAULTS.gemini.apiUrlBase + '/' + encodeURIComponent(finalModel) + ':generateContent?key=' + encodeURIComponent(apiKey);
-
+  const endpoint   = PROVIDER_DEFAULTS.gemini.apiUrlBase + '/' +
+    encodeURIComponent(finalModel) + ':generateContent?key=' + encodeURIComponent(apiKey);
   const payload = {
     contents: buildGeminiContents(messages),
-    generationConfig: {
-      maxOutputTokens: maxTokens
-    }
+    generationConfig: { maxOutputTokens: maxTokens }
   };
-
   if (systemPrompt || SYSTEM_DEFAULT) {
-    payload.systemInstruction = {
-      parts: [{ text: systemPrompt || SYSTEM_DEFAULT }]
-    };
+    payload.systemInstruction = { parts: [{ text: systemPrompt || SYSTEM_DEFAULT }] };
   }
-
   const options = {
     method: 'post',
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers: { 'Content-Type': 'application/json' },
     payload: JSON.stringify(payload),
     muteHttpExceptions: true
   };
-
-  const raw = UrlFetchApp.fetch(endpoint, options);
+  const raw    = UrlFetchApp.fetch(endpoint, options);
   const result = parseJsonResponse(raw, 'Gemini');
   if (result.error) {
-    throw new Error((result.error.message || 'Error desconegut de Gemini.') + (result.error.status ? ' (' + result.error.status + ')' : ''));
+    throw new Error(
+      (result.error.message || 'Error desconegut de Gemini.') +
+      (result.error.status ? ' (' + result.error.status + ')' : '')
+    );
   }
-
   const firstCandidate = result.candidates && result.candidates[0];
   const parts = firstCandidate && firstCandidate.content ? firstCandidate.content.parts : [];
-  const text = Array.isArray(parts)
-    ? parts.map(part => (part && part.text) ? part.text : '').join('\n')
-    : '';
-
+  const text  = Array.isArray(parts) ? parts.map(p => (p && p.text) ? p.text : '').join('\n') : '';
   return normalizeLLMText(text);
 }
 
 function buildOpenAIMessages(messages, systemPrompt) {
   const base = [];
-  if (systemPrompt || SYSTEM_DEFAULT) {
-    base.push({ role: 'system', content: systemPrompt || SYSTEM_DEFAULT });
-  }
-
+  if (systemPrompt || SYSTEM_DEFAULT) base.push({ role: 'system', content: systemPrompt || SYSTEM_DEFAULT });
   return base.concat((messages || []).map(msg => ({
     role: msg.role,
     content: extractContentText(msg.content)
@@ -172,13 +140,11 @@ function buildGeminiContents(messages) {
 
 function extractContentText(content) {
   if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    return content.map(item => {
-      if (typeof item === 'string') return item;
-      if (item && typeof item.text === 'string') return item.text;
-      return '';
-    }).join('\n');
-  }
+  if (Array.isArray(content)) return content.map(item => {
+    if (typeof item === 'string') return item;
+    if (item && typeof item.text === 'string') return item.text;
+    return '';
+  }).join('\n');
   if (content && typeof content.text === 'string') return content.text;
   return content ? String(content) : '';
 }
@@ -189,37 +155,46 @@ function normalizeLLMText(text) {
 
 function parseJsonResponse(rawResponse, providerName) {
   const statusCode = rawResponse.getResponseCode();
-  const rawText = rawResponse.getContentText() || '';
-
+  const rawText    = rawResponse.getContentText() || '';
   let parsed;
   try {
     parsed = JSON.parse(rawText);
   } catch (e) {
-    throw new Error(providerName + ' ha retornat una resposta no JSON. Codi HTTP: ' + statusCode + '. Resposta: ' + rawText.slice(0, 500));
+    throw new Error(
+      providerName + ' ha retornat una resposta no JSON. Codi HTTP: ' +
+      statusCode + '. Resposta: ' + rawText.slice(0, 500)
+    );
   }
-
   if (statusCode >= 400) {
     const message = parsed && parsed.error
       ? (parsed.error.message || JSON.stringify(parsed.error))
       : rawText.slice(0, 500);
     throw new Error(providerName + ' error HTTP ' + statusCode + ': ' + message);
   }
-
   return parsed;
 }
 
-const SYSTEM_DEFAULT = `Ets un escriptor expert en narrativa catalana i castellana.
-Treballes en flux en cadena i proposes opcions clares, breus i seleccionables.
-Respectes SEMPRE el format numèric sol·licitat i respons en català amb coherència narrativa.`;
+// ─── System prompt per a contes ────────────────────────────
+const SYSTEM_DEFAULT = `Ets un mestre del conte literari breu en català.
+Apliques el principi d'unitat d'efecte de Poe: cada paraula serveix un únic impacte emocional final.
+Escrius amb economia de paraules, primera frase magnètica, tensió creixent i finals memorables que ressonen.
+Mai desperdicies una frase. Prioritzes mostrar sobre explicar (show, don't tell).
+Respons sempre en català, amb veu literària precisa i original.`;
 
-// ─── FASE 1: Genera 10 premisses ──────────────────────────
+// ─── FASE 1: 10 premisses per a contes ─────────────────────
 function fase1_premisses(tematica, history, userConfig) {
   history = history || [];
   const userMsg = {
     role: 'user',
-    content: `Genera 10 premisses narratives originals i ben diferenciades per a una obra del gènere: **${tematica}**.
-Cada premissa és UNA sola frase que captura el conflicte central i el personatge.
-Format ESTRICTE (res més, sense introduccions):
+    content: `Genera 10 premisses originals per a contes breus del gènere: **${tematica}**.
+
+Cada premissa ha de:
+- Ser una sola frase que contingui una situació anòmala o conflicte inicial potent
+- Tenir un ganxo implícit que faci preguntar "i llavors?"
+- Suggerir potencial de twist o revelació inesperada al final
+- Ser concreta, sorprenent, no òbvia ni genèrica
+
+Format ESTRICTE (res més, sense cap introducció):
 1. [premissa]
 2. [premissa]
 3. [premissa]
@@ -231,182 +206,118 @@ Format ESTRICTE (res més, sense introduccions):
 9. [premissa]
 10. [premissa]`
   };
-
-  const msgs = [...history, userMsg];
-  const response = callLLM(msgs, SYSTEM_DEFAULT, userConfig);
+  const msgs       = [...history, userMsg];
+  const response   = callLLM(msgs, SYSTEM_DEFAULT, userConfig);
   const newHistory = [...msgs, { role: 'assistant', content: response }];
   return { response, history: newHistory };
 }
 
-// ─── FASE 2: 10 trames / nussos narratius ──────────────────
-function fase2_estructura(premissaTriada, history, userConfig) {
+// ─── FASE 3: 5 protagonistes rics ──────────────────────────
+function fase3_personatges(premissaTriada, estilDesc, history, userConfig) {
   const msgs = [
     ...history,
-    { role: 'user', content: `He triat la premissa: "${premissaTriada}"` },
-    { role: 'assistant', content: 'Perfecte. Generaré possibles trames breus a partir d'aquesta premissa.' },
-    { role: 'user', content: `Genera 10 possibles trames/nussos narratius, breus i diferenciats, basats en la premissa triada.
+    {
+      role: 'user',
+      content: `He triat la premissa: "${premissaTriada}". L'estil narratiu serà: ${estilDesc}.`
+    },
+    {
+      role: 'assistant',
+      content: "Perfecte. Proposo protagonistes rics en contradiccions, coherents amb la premissa i l'estil triat."
+    },
+    {
+      role: 'user',
+      content: `Genera 5 protagonistes possibles per a aquest conte. Cada un ha de tenir veu pròpia i tensió interna que el faci memorables.
 
-Format ESTRICTE (res més):
-1. [trama breu en 1-2 frases]
-2. [trama breu en 1-2 frases]
-3. [trama breu en 1-2 frases]
-4. [trama breu en 1-2 frases]
-5. [trama breu en 1-2 frases]
-6. [trama breu en 1-2 frases]
-7. [trama breu en 1-2 frases]
-8. [trama breu en 1-2 frases]
-9. [trama breu en 1-2 frases]
-10. [trama breu en 1-2 frases]` }
+Format ESTRICTE (5 opcions, res més):
+1. **[Nom, edat]** | Desig: [el que vol conscientment] | Temor: [el que l'aterroritza o amaga] | Contradicció: [la tensió interna que el fa humà] | Veu: [tret narratiu o tic que el fa distintiu]
+2. **[Nom, edat]** | Desig: [...] | Temor: [...] | Contradicció: [...] | Veu: [...]
+3. **[Nom, edat]** | Desig: [...] | Temor: [...] | Contradicció: [...] | Veu: [...]
+4. **[Nom, edat]** | Desig: [...] | Temor: [...] | Contradicció: [...] | Veu: [...]
+5. **[Nom, edat]** | Desig: [...] | Temor: [...] | Contradicció: [...] | Veu: [...]`
+    }
   ];
-
-  const response = callLLM(msgs, SYSTEM_DEFAULT, Object.assign({}, userConfig, { maxTokens: 1800 }));
+  const response   = callLLM(msgs, SYSTEM_DEFAULT, Object.assign({}, userConfig, { maxTokens: 2200 }));
   const newHistory = [...msgs, { role: 'assistant', content: response }];
   return { response, history: newHistory };
 }
 
-// ─── FASE 3: 10 arquetips de protagonista ──────────────────
-function fase3_personatges(tramaTriada, history, userConfig) {
+// ─── ESCRIPTURA: Conte complet en un sol bloc ───────────────
+function escriureConte(protagonistaTriat, estilDesc, paraules, history, userConfig) {
+  const paraulesNum = parseInt(paraules) || 1500;
   const msgs = [
     ...history,
-    { role: 'user', content: `He triat aquesta trama: "${tramaTriada}"` },
-    { role: 'assistant', content: 'Trama fixada. Proposo possibles protagonistes per continuar el flux en cadena.' },
-    { role: 'user', content: `Genera 10 possibles arquetips de protagonista coherents amb la trama triada.
-Cada ítem ha de contenir: Nom + Rol + Defecte principal.
+    { role: 'user',      content: `He triat el protagonista: "${protagonistaTriat}".` },
+    { role: 'assistant', content: 'Perfecte. Ara escric el conte complet amb màxima qualitat literària.' },
+    {
+      role: 'user',
+      content: `Escriu el CONTE COMPLET. Extensió aproximada: ${paraulesNum} paraules. Estil: ${estilDesc}.
 
-Format ESTRICTE (res més):
-1. Nom: [nom] | Rol: [rol narratiu/social] | Defecte: [defecte]
-2. Nom: [nom] | Rol: [rol narratiu/social] | Defecte: [defecte]
-3. Nom: [nom] | Rol: [rol narratiu/social] | Defecte: [defecte]
-4. Nom: [nom] | Rol: [rol narratiu/social] | Defecte: [defecte]
-5. Nom: [nom] | Rol: [rol narratiu/social] | Defecte: [defecte]
-6. Nom: [nom] | Rol: [rol narratiu/social] | Defecte: [defecte]
-7. Nom: [nom] | Rol: [rol narratiu/social] | Defecte: [defecte]
-8. Nom: [nom] | Rol: [rol narratiu/social] | Defecte: [defecte]
-9. Nom: [nom] | Rol: [rol narratiu/social] | Defecte: [defecte]
-10. Nom: [nom] | Rol: [rol narratiu/social] | Defecte: [defecte]` }
+═══ REQUISITS DE QUALITAT MÀXIMA ═══
+
+OBERTURA:
+→ La primera frase ha de ser impossible de no llegir. Ha de plantar una pregunta o tensió immediata en la ment del lector.
+→ Els primers 3 paràgrafs estableixen el to, el món i el personatge sense cap exposició directa.
+
+ESTRUCTURA:
+→ Unitat d'efecte: cada escena, diàleg i detall serveix l'impacte emocional final únic.
+→ Tensió creixent sense caigudes de ritme. El lector no ha de trobar cap excusa per parar.
+→ Un punt d'inflexió clar i sorprenent a les 2/3 parts del conte.
+
+ESTIL:
+→ Mostra, no expliquis. Mai "estava trist" → mostra com es comporta, com li tremola la veu, com mira el terra.
+→ Detalls sensorials concrets i inesperats (olfacte, tacte, so), mai genèrics ni decoratius.
+→ Ritme variat: frases curtes per a tensió i impacte; frases llargues per a immersió i atmosfera.
+→ Veu narrativa única i consistent de principi a fi.
+→ Diàlegs que revelen caràcter i avancen el conflicte, mai que expliquen ni informen.
+
+FINAL:
+→ L'última frase ha de ressonar, sorprendre o tancar un cercle obert al principi.
+→ El desenllaç ha de ser inevitable en retrospectiva però imprevist durant la lectura.
+
+Escriu directament el conte, sense títol, sense cap introducció ni nota de l'autor.`
+    }
   ];
-
-  const response = callLLM(msgs, SYSTEM_DEFAULT, Object.assign({}, userConfig, { maxTokens: 1800 }));
+  // ~1.8 tokens per paraula catalana + marge de seguretat
+  const maxTokens  = Math.min(Math.round(paraulesNum * 1.9) + 600, 8000);
+  const response   = callLLM(msgs, SYSTEM_DEFAULT, Object.assign({}, userConfig, { maxTokens }));
   const newHistory = [...msgs, { role: 'assistant', content: response }];
   return { response, history: newHistory };
 }
 
-// ─── FASE 4: 10 finals / desenllaços ───────────────────────
-function fase4_desenllac(protagonistaTriat, history, userConfig) {
+// ─── MILLORA: Regenera el conte amb instrucció específica ───
+function millorarConte(instruccio, conteActual, estilDesc, history, userConfig) {
   const msgs = [
     ...history,
-    { role: 'user', content: `He triat aquest protagonista: "${protagonistaTriat}"` },
-    { role: 'assistant', content: 'Perfecte. Amb trama i protagonista triats, generaré possibles finals.' },
-    { role: 'user', content: `Genera 10 possibles finals/desenllaços per a la història, coherents amb la trama i el protagonista triats.
-Els finals han de ser diferenciats entre ells i explicats en 1-2 frases cadascun.
-
-Format ESTRICTE (res més):
-1. [final/desenllaç en 1-2 frases]
-2. [final/desenllaç en 1-2 frases]
-3. [final/desenllaç en 1-2 frases]
-4. [final/desenllaç en 1-2 frases]
-5. [final/desenllaç en 1-2 frases]
-6. [final/desenllaç en 1-2 frases]
-7. [final/desenllaç en 1-2 frases]
-8. [final/desenllaç en 1-2 frases]
-9. [final/desenllaç en 1-2 frases]
-10. [final/desenllaç en 1-2 frases]` }
+    {
+      role: 'user',
+      content: `Aquí tens el conte actual:\n\n${conteActual}\n\n---\nReescriu el conte complet aplicant aquesta millora: "${instruccio}".\n\nMantén tot el que funciona bé. Millora específicament el que es demana. Mantén la mateixa extensió aproximada i l'estil: ${estilDesc}.\n\nEscriu directament el conte millorat, sense cap comentari previ.`
+    }
   ];
-
-  const response = callLLM(msgs, SYSTEM_DEFAULT, Object.assign({}, userConfig, { maxTokens: 2000 }));
+  const maxTokens  = Math.min(Math.round(conteActual.split(' ').length * 2.5) + 600, 8000);
+  const response   = callLLM(msgs, SYSTEM_DEFAULT, Object.assign({}, userConfig, { maxTokens }));
   const newHistory = [...msgs, { role: 'assistant', content: response }];
   return { response, history: newHistory };
 }
 
-// ─── FASE 5: Compila bíblia + escaleta de capítols ─────────
-function fase5_compilarBiblia(desenllacTriat, history, userConfig) {
-  const msgs = [
-    ...history,
-    { role: 'user', content: `He triat aquest desenllaç final: "${desenllacTriat}"` },
-    { role: 'assistant', content: 'Ja tinc premissa, trama, protagonista i desenllaç. Compilo la bíblia narrativa.' },
-    { role: 'user', content: `Compila la història completa i genera l'escaleta definitiva de capítols (entre 10 i 14 capítols), coherent amb totes les seleccions prèvies.
-
-Format per a cada capítol:
-**Capítol [N]: [Títol evocador]**
-Objectiu narratiu: [1 línia]
-Conflicte principal: [1 línia]
-Personatges actius: [llista]
-Escenari: [localització]
-Ganxo final: [1 línia]
----` }
-  ];
-
-  const response = callLLM(msgs, SYSTEM_DEFAULT, Object.assign({}, userConfig, { maxTokens: 3200 }));
-  const newHistory = [...msgs, { role: 'assistant', content: response }];
-  return { response, history: newHistory };
-}
-
-// ─── FASE 6+: Escriptura de cada capítol (1 sola opció) ───
-function fase6_escriureCapitol(numCapitol, titolCapitol, totalCapitols, history, userConfig) {
-  const msgs = [
-    ...history,
-    { role: 'user', content: `Escriu el **Capítol ${numCapitol}: ${titolCapitol}** complet.
-
-Requisits:
-- Coherència absoluta amb tota la bíblia narrativa (premissa, estructura, personatges, món)
-- Narrador i veu consistents amb els capítols anteriors si n'hi ha
-- Diàlegs naturals quan calgui
-- Descripció sensorial de l'entorn (no només visual)
-- Arc emocional del protagonista visible en aquest capítol
-${numCapitol < totalCapitols ? '- Final que crea expectativa cap al capítol següent' : '- Final que tanca l\'arc complet de la novel·la de manera satisfactòria'}
-- Extensió: entre 900 i 1300 paraules
-
-Escriu directament el capítol, sense cap introducció prèvia.` }
-  ];
-
-  const response = callLLM(msgs, SYSTEM_DEFAULT, Object.assign({}, userConfig, { maxTokens: 4000 }));
-  const newHistory = [...msgs, { role: 'assistant', content: response }];
-  return { response, history: newHistory };
-}
-
-// ─── Parseig de premisses ──────────────────────────────────
-function parsePremisses(text) {
-  const lines = text.split('\n').filter(l => /^\d+\./.test(l.trim()));
-  return lines.map(l => l.replace(/^\d+\.\s*/, '').trim());
-}
-
-// ─── Parseig de les 2 opcions ─────────────────────────────
-function parseOpcions(text) {
-  const parts = text.split(/===\s*OPCIÓ\s*[12]\s*===/i).filter(p => p.trim().length > 0);
-  return parts.map(p => p.trim());
-}
-
-// ─── Parseig de la taula de capítols ──────────────────────
-function parseCapitols(text) {
-  const blocks = text.split('---').map(b => b.trim()).filter(b => b.length > 0);
-  return blocks.map(block => {
-    const titolMatch = block.match(/\*\*Capítol\s+(\d+):\s*(.+?)\*\*/i);
-    return {
-      num: titolMatch ? parseInt(titolMatch[1]) : null,
-      titol: titolMatch ? titolMatch[2].trim() : 'Capítol',
-      text: block
-    };
-  }).filter(c => c.num !== null);
-}
-
-// ─── Funció d'exportació a Google Doc ─────────────────────
+// ─── Export a Google Doc (format literari) ──────────────────
 function exportarADoc(titol, contingut) {
-  const doc = DocumentApp.create(titol || 'Novel·la IA');
+  const doc  = DocumentApp.create(titol || 'Conte');
   const body = doc.getBody();
   body.clear();
-  body.appendParagraph(titol || 'Novel·la IA')
-      .setHeading(DocumentApp.ParagraphHeading.TITLE);
 
-  const seccions = contingut.split('\n\n');
-  seccions.forEach(sec => {
-    if (sec.trim()) {
-      if (sec.startsWith('**Capítol')) {
-        body.appendParagraph(sec.replace(/\*\*/g, ''))
-            .setHeading(DocumentApp.ParagraphHeading.HEADING1);
-      } else {
-        body.appendParagraph(sec.trim());
-      }
-    }
+  // Títol centrat
+  const titolPar = body.appendParagraph(titol || 'Conte');
+  titolPar.setHeading(DocumentApp.ParagraphHeading.TITLE);
+
+  // Separador
+  body.appendParagraph('');
+
+  // Cos del conte: un paràgraf per bloc, sagna primera línia (format literari)
+  const paragraphs = contingut.split(/\n\n+/).filter(p => p.trim().length > 0);
+  paragraphs.forEach((par, i) => {
+    const p = body.appendParagraph(par.trim());
+    p.setLineSpacing(1.5);
+    if (i > 0) p.setIndentFirstLine(28.35); // ~1cm
   });
 
   doc.saveAndClose();
