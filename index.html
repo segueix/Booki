@@ -1607,6 +1607,7 @@ const ESTAT = {
   fetsCanonics:             [],  // resum factual compacte per capítol
   _capActual:               0,   // índex 0-based del capítol actiu
   _capGenerant:             null, // índex del capítol en generació (o null)
+  estat_json:               '',   // memòria d'estat dinàmica entre capítols
   _revisioCapTrigger:       0,   // nº de capítols quan es va mostrar l'últim banner
   // Fase 17: paratextos
   titolNovel:               '',
@@ -2324,16 +2325,49 @@ function iniciarFase10() {
   google.script.run
     .withSuccessHandler(res => {
       ESTAT.history = res.history;
-      hideLoader(10);
-      ESTAT.outline = parseOutline(res.response);
-      renderOutline();
-      document.getElementById('outline-wrap').classList.remove('hidden');
-      setTimeout(() => {
-        document.getElementById('fase-10').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 100);
+      document.getElementById('loader-10').querySelector('span').textContent = 'Auditant outline amb editor implacable…';
+
+      google.script.run
+        .withSuccessHandler(auditRes => {
+          hideLoader(10);
+          ESTAT.outline = parseOutline(auditRes.response);
+          renderOutline();
+          document.getElementById('outline-wrap').classList.remove('hidden');
+          document.getElementById('loader-10').querySelector('span').textContent = 'Generant l\'outline de capítols…';
+          setTimeout(() => {
+            document.getElementById('fase-10').scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 100);
+        })
+        .withFailureHandler(err => {
+          hideLoader(10);
+          document.getElementById('loader-10').querySelector('span').textContent = 'Generant l\'outline de capítols…';
+          toast('Error en l\'auditoria d\'outline: ' + err.message);
+        })
+        .fase10_auditarOutline(res.response, USER_CONFIG, ESTAT.tematica);
     })
     .withFailureHandler(err => { hideLoader(10); toast('Error: ' + err.message); })
     .fase10_outline(ctx, ESTAT.estructuraTriada, ESTAT.history, USER_CONFIG, ESTAT.tematica);
+}
+
+function extreureEstatJsonIText(textComplet) {
+  const text = textComplet || '';
+  const regex = /```json\s*([\s\S]*?)```/gi;
+  const blocs = [...text.matchAll(regex)];
+  if (!blocs.length) return { textNet: text.trim(), estatJson: '' };
+
+  const ultimBloc = blocs[blocs.length - 1];
+  const jsonRaw = (ultimBloc[1] || '').trim();
+  let jsonValid = '';
+  try {
+    jsonValid = JSON.stringify(JSON.parse(jsonRaw));
+  } catch (e) {
+    return { textNet: text.replace(regex, '').trim(), estatJson: '' };
+  }
+
+  return {
+    textNet: text.replace(regex, '').trim(),
+    estatJson: jsonValid
+  };
 }
 
 // ─── Parser de l'outline ─────────────────────────────────────
@@ -2707,6 +2741,7 @@ function iniciarFase14() {
   ESTAT.fetsCanonics = ESTAT.outline.map(() => null);
   ESTAT._capActual   = 0;
   ESTAT._capGenerant = null;
+  ESTAT.estat_json   = '';
 
   updateProgress(14);
   showCard('fase-14');
@@ -2813,6 +2848,7 @@ function generarCapitolActual() {
   const textCapAnterior = idx > 0 ? (ESTAT.capitols[idx - 1] || '') : '';
   const outlineCapitol  = ESTAT.outline[idx] ? ESTAT.outline[idx].text : '';
   const fetsCanonics    = construirContextFetsCanonics(8);
+  const estatJsonVigent = ESTAT.estat_json || '';
 
   // Part 1
   google.script.run
@@ -2824,7 +2860,10 @@ function generarCapitolActual() {
       // Part 2 encadenada
       google.script.run
         .withSuccessHandler(function(res2) {
-          ESTAT.capitols[idx]   = part1Text + '\n\n' + res2.response;
+          const capitolRaw = part1Text + '\n\n' + res2.response;
+          const extret = extreureEstatJsonIText(capitolRaw);
+          ESTAT.capitols[idx]     = extret.textNet;
+          ESTAT.estat_json        = extret.estatJson || ESTAT.estat_json;
           ESTAT.fetsCanonics[idx] = extreureFetsCanonicsCapitol(ESTAT.capitols[idx], idx + 1);
           ESTAT._capGenerant     = null;
           document.getElementById('cap-loader').classList.remove('visible');
@@ -2841,7 +2880,7 @@ function generarCapitolActual() {
           toast('Error a la part 2: ' + err.message);
         })
         .escriureCapitol(2, idx + 1, ESTAT.outline.length, ESTAT.biblia,
-          outlineCapitol, textCapAnterior, ESTAT.estil.desc, USER_CONFIG, ESTAT.tematica, historialPart, fetsCanonics);
+          outlineCapitol, textCapAnterior, ESTAT.estil.desc, USER_CONFIG, ESTAT.tematica, historialPart, fetsCanonics, estatJsonVigent);
     })
     .withFailureHandler(function(err) {
       ESTAT._capGenerant = null;
@@ -2851,7 +2890,7 @@ function generarCapitolActual() {
       toast('Error a la part 1: ' + err.message);
     })
     .escriureCapitol(1, idx + 1, ESTAT.outline.length, ESTAT.biblia,
-      outlineCapitol, textCapAnterior, ESTAT.estil.desc, USER_CONFIG, ESTAT.tematica, null, fetsCanonics);
+      outlineCapitol, textCapAnterior, ESTAT.estil.desc, USER_CONFIG, ESTAT.tematica, null, fetsCanonics, estatJsonVigent);
 }
 
 // ─── Regenerar el capítol actiu ─────────────────────────────

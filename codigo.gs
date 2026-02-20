@@ -600,6 +600,25 @@ function fase10_outline(contextComprimit, estructuraTriada, history, userConfig,
   return { response, history: newHistory };
 }
 
+// ─── FASE 10B: Auditoria automàtica de l'outline ───────────
+function fase10_auditarOutline(outlineGenerat, userConfig, tematica) {
+  var systemAuditoria = getSystemPrompt(tematica) +
+    '\n\nActues com un Editor implacable. Detectes forats de guió, capítols redundants i problemes de ritme.';
+  var msgs = [{
+    role: 'user',
+    content:
+      'Auditza aquest outline de capítols:\n\n' + (outlineGenerat || '') + '\n\n' +
+      'Tasques:\n' +
+      '1) Troba forats de guió i problemes de ritme.\n' +
+      '2) Si n\'hi ha, reescriu TOT l\'outline corregint-los.\n' +
+      '3) Si no n\'hi ha, retorna l\'outline igual (admet microajustos de claredat).\n\n' +
+      'Format ESTRICTE (res més):\n' +
+      'Cap. N — [Títol breu] | POV: [Nom] | [Objectiu narratiu en 10 paraules màxim] | Descobriment: [text breu]'
+  }];
+  var response = callLLM(msgs, systemAuditoria, Object.assign({}, userConfig, { maxTokens: 4096 }));
+  return { response: response };
+}
+
 // ─── FASE 13: Compilar bíblia de consistència (sense LLM) ───
 // dades: objecte amb tots els camps acumulats de l'ESTAT frontend.
 // Objectiu: document de ~800-1200 paraules que serà el context
@@ -804,7 +823,7 @@ function fase15_revisioCoherencia(capitolsData, biblia, userConfig, fetsCanonics
 // ─── FASE 14: Escriure un capítol (patró anti-timeout, 2 parts) ──
 // partNum:      1 (primera meitat) o 2 (segona meitat)
 // historialPart: null per Part 1; historial retornat per Part 1 per a Part 2
-function escriureCapitol(partNum, numCapitol, totalCapitols, biblia, outlineCapitol, textCapAnterior, estilDesc, userConfig, tematica, historialPart, fetsCanonicsText) {
+function escriureCapitol(partNum, numCapitol, totalCapitols, biblia, outlineCapitol, textCapAnterior, estilDesc, userConfig, tematica, historialPart, fetsCanonicsText, estatJson) {
   var capitolsRestants = Math.max(0, (totalCapitols || 0) - (numCapitol || 0));
   var systemForCap = getSystemPrompt(tematica) +
     '\n\n=== BÍBLIA DE LA NOVEL·LA ===\n' + (biblia || '');
@@ -822,6 +841,10 @@ function escriureCapitol(partNum, numCapitol, totalCapitols, biblia, outlineCapi
     var words    = textCapAnterior.trim().split(/\s+/);
     var darreres = words.slice(-500).join(' ');
     contextAnterior = '\n\n=== FINAL DEL CAPÍTOL ANTERIOR (per continuïtat de to) ===\n' + darreres;
+  }
+
+  if (estatJson && String(estatJson).trim()) {
+    contextAnterior += '\n\n=== ESTAT JSON VIGENT (context pur) ===\n' + String(estatJson).trim();
   }
 
   var isNoir    = tematica && /noir|negr[ae]|nòrdi/i.test(tematica);
@@ -855,6 +878,7 @@ function escriureCapitol(partNum, numCapitol, totalCapitols, biblia, outlineCapi
       '→ Assegura que s\'ha complert l\'objectiu narratiu al final.\n' +
       '→ Mantén exactament la mateixa veu, to i registre de la primera meitat.\n' +
       '→ L\'última frase ha de deixar el lector amb ganes de continuar.' + noirExtra + '\n' +
+      'IMPORTANT: Just al final del capítol, afegeix un únic bloc ```json amb un objecte JSON vàlid que resumeixi l\'estat exacte d\'aquest moment narratiu (p. ex. inventari_protagonista, estat_fisic, ubicacio_actual).\n' +
       'Continua directament en català des d\'on s\'ha aturat. Cap paraula en anglès. Cap comentari fora de la narració literària.';
 
     var msgs2 = histBase.concat([{ role: 'user', content: part2Content }]);
