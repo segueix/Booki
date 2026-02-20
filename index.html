@@ -331,38 +331,49 @@
   }
   .export-link:hover { background: #1e1b38; }
 
-  /* ── Editor IA (segon LLM) ── */
-  .editor-toggle {
-    margin-top: 16px;
-    border-top: 1px solid var(--border);
-    padding-top: 14px;
-  }
-  .editor-config {
-    margin-top: 12px;
+  /* ── Worldbuilding multi-select ── */
+  .world-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
     background: var(--surface2);
-    border: 1px dashed var(--border);
-    border-radius: 8px;
-    padding: 16px;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all .2s;
   }
-  .editor-result {
-    margin-top: 14px;
-    padding: 16px 20px;
-    background: #12122a;
-    border: 1px solid var(--accent);
-    border-radius: 8px;
-    font-size: .9rem;
-    line-height: 1.75;
+  .world-item:hover  { border-color: var(--accent); }
+  .world-item.chosen { border-color: var(--accent); background: #1e1b38; }
+  .world-item input[type=checkbox] { margin-top: 3px; accent-color: var(--accent); flex-shrink: 0; width: 16px; height: 16px; cursor: pointer; }
+  .world-item label { cursor: pointer; line-height: 1.5; font-size: .95rem; }
+
+  /* ── Resultat worldbuilding ── */
+  .worldbuilding-result {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px 32px;
+    font-size: .95rem;
+    line-height: 1.85;
     color: var(--text);
-    white-space: pre-wrap;
   }
-  .editor-label {
-    display: block;
-    font-size: .72rem;
-    font-weight: 700;
+  .worldbuilding-result .world-bloc {
+    margin-bottom: 22px;
+  }
+  .worldbuilding-result .world-bloc:last-child {
+    margin-bottom: 0;
+  }
+  .worldbuilding-result .world-bloc-titol {
     color: var(--accent2);
-    text-transform: uppercase;
-    letter-spacing: .08em;
-    margin-bottom: 10px;
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 6px;
+  }
+  .worldbuilding-result .world-bloc-desc {
+    color: var(--text);
+    padding-left: 12px;
+    border-left: 2px solid var(--border);
   }
 
   /* ── Secció amagada ── */
@@ -415,6 +426,8 @@
     <div class="step-pill" data-step="5">Final</div>
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="6">Escriptura</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="7">Món</div>
   </div>
 </div>
 
@@ -566,47 +579,37 @@
       <button class="btn btn-secondary" onclick="millorarConte()">✨ Millorar</button>
     </div>
 
-    <!-- Editor IA -->
-    <div class="editor-toggle">
-      <button class="btn btn-ghost" onclick="toggleEditor()" id="btn-toggle-editor" style="font-size:.85rem;padding:7px 16px;">🎭 Usar Editor IA (segon LLM)</button>
-
-      <div id="editor-panel" class="hidden">
-        <div class="editor-config">
-          <label class="field-label" for="editor-provider">Proveïdor de l'Editor</label>
-          <select id="editor-provider" onchange="actualitzarModelEditor()">
-            <option value="anthropic">Anthropic (Claude)</option>
-            <option value="openai">OpenAI (GPT-4o)</option>
-            <option value="gemini">Google (Gemini 1.5)</option>
-          </select>
-
-          <label class="field-label" for="editor-model">Model de l'Editor</label>
-          <input type="text" id="editor-model" value="claude-opus-4-1" placeholder="claude-opus-4-1">
-
-          <label class="field-label" for="editor-apikey">API Key de l'Editor</label>
-          <input type="password" id="editor-apikey" placeholder="API key del segon LLM">
-
-          <div class="btn-row" style="margin-top:12px;">
-            <button class="btn btn-secondary" onclick="analitzarAmbEditor()" style="font-size:.88rem;">🔍 Analitzar amb Editor</button>
-          </div>
-        </div>
-
-        <div id="editor-result-wrap" class="hidden">
-          <div class="editor-result">
-            <span class="editor-label">Crítica de l'Editor</span>
-            <div id="editor-result-text"></div>
-          </div>
-          <div class="btn-row" style="margin-top:10px;">
-            <button class="btn btn-secondary hidden" id="btn-aplicar-editor" onclick="aplicarSuggerimentEditor()" style="font-size:.85rem;">✨ Aplicar suggeriment de l'Editor</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="regenerarConte()">🔄 Regenerar</button>
-      <button class="btn btn-primary"   onclick="exportarDoc()">📄 Exportar a Google Docs</button>
+      <button class="btn btn-secondary" onclick="exportarDoc()">📄 Exportar a Google Docs</button>
+      <button class="btn btn-primary"   onclick="iniciarFase7()">🌍 Expandir a novel·la</button>
     </div>
     <div id="export-link-wrap" class="hidden" style="margin-top:14px;"></div>
+  </div>
+</div>
+
+<!-- FASE 7: Worldbuilding -->
+<div class="card hidden" id="fase-7">
+  <h2><span class="icon">🌍</span> Expansió del món</h2>
+  <div class="loader-wrap" id="loader-7">
+    <div class="spinner"></div>
+    <span id="loader-7-text">Analitzant el conte per proposar elements de món…</span>
+  </div>
+
+  <div id="world-selector" class="hidden">
+    <p style="color:var(--text2);font-size:.9rem;margin-bottom:16px;">Selecciona els elements que vols expandir a la bíblia de món. Els <span style="color:var(--accent2);font-weight:600;">Recomanats</span> ja estan marcats:</p>
+    <div id="llista-world" class="premise-list"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="expandirElementsSeleccionats()">🌍 Expandir seleccionats</button>
+    </div>
+  </div>
+
+  <div id="world-result-wrap" class="hidden">
+    <div class="worldbuilding-result" id="world-result-cos"></div>
+    <div class="btn-row" style="margin-top:20px;">
+      <button class="btn btn-secondary" onclick="tornarASeleccioWorld()">← Tornar a la selecció</button>
+      <button class="btn btn-primary"   onclick="iniciarFase8()">👥 Crear elenc de personatges</button>
+    </div>
   </div>
 </div>
 
@@ -684,7 +687,9 @@ const ESTAT = {
   _totalParts:              1,
   _partActual:              1,
   _partsTexts:              [],
-  conteText:                ''
+  conteText:                '',
+  // Worldbuilding
+  worldbuilding:            null
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -745,7 +750,7 @@ function iniciarFase1() {
     .fase1_premisses(sel, [], USER_CONFIG);
 }
 
-// ─── Render genèric amb badge "Recomanat" ───────────────────
+// ─── Render genèric amb badge "Recomanat" (radio / single-select) ───
 function renderLlistaAmbRecomanat(text, wrapId, listaKey, idxKey, btnId) {
   const wrap  = document.getElementById(wrapId);
   const lines = text.split('\n').filter(l => /^\d+\./.test(l.trim()));
@@ -916,7 +921,7 @@ function iniciarEscriptura() {
   ESTAT.finalTriat = ESTAT._llistaFinals[idx];
 
   // Decidir nombre de parts segons la longitud triada
-  // 500 paraules → 1 part | 1500 → 2 parts | 3000 → 3 parts
+  // 500 paraules → 1 part | 1500 → 2 parts | 3000 → 4 parts
   const p = ESTAT.estil.paraules;
   ESTAT._totalParts  = p <= 600 ? 1 : p <= 1800 ? 2 : 4;
   ESTAT._partActual  = 1;
@@ -1017,73 +1022,6 @@ function millorarConte() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  EDITOR IA (segon LLM)
-// ═══════════════════════════════════════════════════════════
-let EDITOR_CONFIG      = null;
-let _editorSuggeriment = '';
-
-function toggleEditor() {
-  const panel  = document.getElementById('editor-panel');
-  const btn    = document.getElementById('btn-toggle-editor');
-  const hidden = panel.classList.toggle('hidden');
-  btn.textContent = hidden
-    ? '🎭 Usar Editor IA (segon LLM)'
-    : '▲ Amagar Editor IA';
-}
-
-function actualitzarModelEditor() {
-  const provider = document.getElementById('editor-provider').value;
-  const input    = document.getElementById('editor-model');
-  const def      = MODEL_DEFAULTS[provider] || '';
-  input.placeholder = def;
-  input.value       = def;
-}
-
-function analitzarAmbEditor() {
-  if (!ESTAT.conteText) { toast('Primer genera el conte.'); return; }
-
-  const provider = document.getElementById('editor-provider').value;
-  const model    = document.getElementById('editor-model').value.trim();
-  const apiKey   = document.getElementById('editor-apikey').value.trim();
-
-  if (!apiKey) { toast("Introdueix l'API key de l'Editor."); return; }
-  if (!model)  { toast("Introdueix el model de l'Editor."); return; }
-
-  EDITOR_CONFIG = { provider, apiKey, model };
-
-  const wrap = document.getElementById('editor-result-wrap');
-  const txt  = document.getElementById('editor-result-text');
-  wrap.classList.remove('hidden');
-  txt.textContent = 'Analitzant el conte…';
-  document.getElementById('btn-aplicar-editor').classList.add('hidden');
-  _editorSuggeriment = '';
-
-  google.script.run
-    .withSuccessHandler(res => {
-      const text = res.response;
-      txt.textContent = text;
-
-      // Extreure instrucció concreta si l'editor en proposa una
-      const match = text.match(/INSTRUCCIÓ:\s*(.+)$/m);
-      if (match) {
-        _editorSuggeriment = match[1].trim();
-        document.getElementById('btn-aplicar-editor').classList.remove('hidden');
-      }
-    })
-    .withFailureHandler(err => {
-      txt.textContent = 'Error: ' + err.message;
-    })
-    .analitzarAmbEditor(ESTAT.conteText, ESTAT.estil.desc, ESTAT.tematica, EDITOR_CONFIG);
-}
-
-function aplicarSuggerimentEditor() {
-  if (!_editorSuggeriment) return;
-  document.getElementById('millora-input').value = _editorSuggeriment;
-  document.getElementById('millora-input').focus();
-  toast("Instrucció de l'Editor copiada. Edita-la si cal i clica Millorar.");
-}
-
-// ═══════════════════════════════════════════════════════════
 //  EXPORT
 // ═══════════════════════════════════════════════════════════
 function exportarDoc() {
@@ -1101,6 +1039,134 @@ function exportarDoc() {
     })
     .withFailureHandler(err => toast('Error: ' + err.message))
     .exportarADoc(titol, ESTAT.conteText);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FASE 6 → FASE 7: Worldbuilding
+// ═══════════════════════════════════════════════════════════
+function iniciarFase7() {
+  if (!ESTAT.conteText) { toast('Primer genera el conte.'); return; }
+
+  ESTAT.fase = 7;
+  updateProgress(7);
+  showCard('fase-7');
+  document.getElementById('world-selector').classList.add('hidden');
+  document.getElementById('world-result-wrap').classList.add('hidden');
+  showLoader(7);
+  document.getElementById('loader-7-text').textContent = 'Analitzant el conte per proposar elements de món…';
+
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.history = res.history;
+      hideLoader(7);
+      renderLlistaWorldbuilding(res.response);
+    })
+    .withFailureHandler(err => { hideLoader(7); toast('Error: ' + err.message); })
+    .fase7_worldbuilding(ESTAT.conteText, ESTAT.tematica, ESTAT.estil.desc, ESTAT.history, USER_CONFIG);
+}
+
+function renderLlistaWorldbuilding(text) {
+  const wrap  = document.getElementById('llista-world');
+  const lines = text.split('\n').filter(l => /^\d+\./.test(l.trim()));
+
+  if (lines.length === 0) {
+    wrap.innerHTML = `<pre style="white-space:pre-wrap;font-size:.9rem;">${escHtml(text)}</pre>`;
+    document.getElementById('world-selector').classList.remove('hidden');
+    return;
+  }
+
+  const list = lines.map(l => l.replace(/^\d+\.\s*/, '').trim());
+
+  wrap.innerHTML = list.map((item, i) => {
+    const esRecomanat = /\(Recomanat\)/i.test(item);
+    const textNet     = item.replace(/\s*\(Recomanat\)\s*/i, '').trim();
+    // Renderitza **negreta** en el text de l'element
+    const displayHtml = escHtml(textNet).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    const badge       = esRecomanat ? `<span class="badge-recomanat">Recomanat</span>` : '';
+    const checkedAttr = esRecomanat ? 'checked' : '';
+    const chosenClass = esRecomanat ? 'chosen' : '';
+    return `<div class="world-item ${chosenClass}" id="world-item-${i}" data-text="${escHtml(textNet)}" onclick="toggleWorldItem(${i}, this)">
+      <input type="checkbox" id="world-cb-${i}" ${checkedAttr} onclick="event.stopPropagation();" onchange="syncWorldItem(${i})">
+      <label for="world-cb-${i}">${badge}${displayHtml}</label>
+    </div>`;
+  }).join('');
+
+  document.getElementById('world-selector').classList.remove('hidden');
+  setTimeout(() => {
+    document.getElementById('fase-7').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+function toggleWorldItem(idx, el) {
+  const cb = document.getElementById('world-cb-' + idx);
+  cb.checked = !cb.checked;
+  el.classList.toggle('chosen', cb.checked);
+}
+
+function syncWorldItem(idx) {
+  const cb = document.getElementById('world-cb-' + idx);
+  const el = document.getElementById('world-item-' + idx);
+  el.classList.toggle('chosen', cb.checked);
+}
+
+function expandirElementsSeleccionats() {
+  const checkboxes = document.querySelectorAll('#llista-world input[type=checkbox]:checked');
+  if (checkboxes.length === 0) { toast('Selecciona almenys un element per expandir.'); return; }
+
+  const labels = Array.from(checkboxes).map(cb => {
+    const item = document.getElementById(cb.id.replace('world-cb-', 'world-item-'));
+    return item ? item.dataset.text : '';
+  }).filter(t => t.length > 0);
+
+  document.getElementById('world-selector').classList.add('hidden');
+  document.getElementById('world-result-wrap').classList.add('hidden');
+  showLoader(7);
+  document.getElementById('loader-7-text').textContent = 'Generant la bíblia de món…';
+
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.history      = res.history;
+      ESTAT.worldbuilding = res.response;
+      hideLoader(7);
+      mostrarResultatWorldbuilding(res.response);
+    })
+    .withFailureHandler(err => { hideLoader(7); toast('Error: ' + err.message); })
+    .fase7_expandirElements(labels, ESTAT.conteText, ESTAT.tematica, ESTAT.history, USER_CONFIG);
+}
+
+function mostrarResultatWorldbuilding(text) {
+  const cos = document.getElementById('world-result-cos');
+
+  // Parsejar blocs separats per línia en blanc, cada un amb títol **...**
+  const blocs = text.split(/\n\n+/).filter(b => b.trim().length > 0);
+  cos.innerHTML = blocs.map(bloc => {
+    const linies = bloc.trim().split('\n');
+    const primerLinia = linies[0] || '';
+    const esTitol = /^\*\*.+\*\*/.test(primerLinia.trim());
+    if (esTitol) {
+      const titol = escHtml(primerLinia.trim()).replace(/\*\*(.+?)\*\*/g, '$1');
+      const desc  = linies.slice(1).join('\n').trim();
+      return `<div class="world-bloc">
+        <div class="world-bloc-titol">${titol}</div>
+        <div class="world-bloc-desc">${escHtml(desc)}</div>
+      </div>`;
+    }
+    return `<div class="world-bloc"><div class="world-bloc-desc">${escHtml(bloc.trim())}</div></div>`;
+  }).join('');
+
+  document.getElementById('world-result-wrap').classList.remove('hidden');
+  setTimeout(() => {
+    document.getElementById('fase-7').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+function tornarASeleccioWorld() {
+  document.getElementById('world-result-wrap').classList.add('hidden');
+  document.getElementById('world-selector').classList.remove('hidden');
+}
+
+function iniciarFase8() {
+  toast('La fase de creació de personatges arribarà aviat!');
 }
 </script>
 </body>

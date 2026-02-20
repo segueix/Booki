@@ -450,33 +450,34 @@ function millorarConte(instruccio, conteActual, estilDesc, history, userConfig, 
   return { response, history: newHistory };
 }
 
-// ─── EDITOR: Anàlisi crítica amb un segon LLM ───────────────
-// editorConfig: { provider, apiKey, model } del segon LLM
-function analitzarAmbEditor(conteActual, estilDesc, tematica, editorConfig) {
-  const systemEditor =
-`Ets un editor literari expert i crític literari rigorós. La teva tasca és avaluar un conte breu en català i emetre un judici literari honest i constructiu.
-Si el conte és literàriament sòlid i no necessita millores substancials, digues-ho clarament i justifica breument per què funciona.
-Si detectes problemes o àrees de millora, descriu-los amb precisió i proposa UNA instrucció concreta de millora directament accionable.
-En cas de proposar millora, l'última línia de la teva resposta ha de tenir exactament aquest format:
-INSTRUCCIÓ: [instrucció accionable en una sola frase]
-Respons sempre en català. La teva anàlisi ha de ser breu, directa i útil.`;
+// ─── FASE 7: Worldbuilding — Extracció d'elements de món ───
+function fase7_worldbuilding(conteActual, tematica, estilDesc, history, userConfig) {
+  const msgs = [
+    ...history,
+    {
+      role: 'user',
+      content: `Has escrit el conte següent:\n\n${conteActual}\n\n---\nAra, com a arquitecte de mons, analitza el conte i proposa 8 elements del món que es podrien expandir per convertir-lo en una novel·la. Els elements han de ser:\n\n1. Geografia — el territori i els seus llocs rellevants\n2. Política — el sistema de poder i les seves tensions\n3. Màgia/Tecnologia — el sistema màgic o tecnològic que regeix el món\n4. Religions — les creences, rituals i institucions religioses\n5. Faccions — els grups, bandes o organitzacions en conflicte\n6. Història pregressa — els esdeveniments passats que expliquen el present\n7. Economia — els recursos, el comerç i les desigualtats\n8. Cultura quotidiana — els costums, l'art, la gastronomia, les festes\n\nMarca amb "(Recomanat)" els 4 elements més rellevants per expandir basant-te en el que ja apareix al conte. Cada element: nom + descripció d'1 línia del que caldria definir.\n\nFormat ESTRICTE (res més, sense cap introducció):\n1. **Geografia** — [descripció d'1 línia] (Recomanat)\n2. **Política** — [descripció d'1 línia]\n3. **Màgia/Tecnologia** — [descripció d'1 línia] (Recomanat)\n4. **Religions** — [descripció d'1 línia]\n5. **Faccions** — [descripció d'1 línia] (Recomanat)\n6. **Història pregressa** — [descripció d'1 línia]\n7. **Economia** — [descripció d'1 línia] (Recomanat)\n8. **Cultura quotidiana** — [descripció d'1 línia]`
+    }
+  ];
+  const response   = callLLM(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 2048 }));
+  const newHistory = [...msgs, { role: 'assistant', content: response }];
+  return { response, history: newHistory };
+}
 
-  const userMsg =
-`Analitza aquest conte breu:
-
-Gènere: ${tematica}
-Estil objectiu: ${estilDesc}
-
----
-${conteActual}
----
-
-Avalua la qualitat literària. Si és correcte, digues-ho i justifica-ho breument. Si cal millorar, identifica el problema principal i proposa una instrucció concreta de millora (última línia amb el format INSTRUCCIÓ: [...]).`;
-
-  const msgs     = [{ role: 'user', content: userMsg }];
-  const maxTokens = Math.min(Math.round(conteActual.split(' ').length * 0.8) + 1500, 4096);
-  const response = callLLM(msgs, systemEditor, Object.assign({}, editorConfig, { maxTokens }));
-  return { response };
+// ─── FASE 7: Worldbuilding — Expansió dels elements triats ──
+function fase7_expandirElements(elementsTriats, conteActual, tematica, history, userConfig) {
+  const llistaElements = elementsTriats.join('\n');
+  const msgs = [
+    ...history,
+    {
+      role: 'user',
+      content: `A partir del conte i dels elements de món proposats, desenvolupa una bíblia de món per als elements seleccionats.\n\nElements a expandir:\n${llistaElements}\n\nPer a cada element, escriu una descripció de 3-5 línies que:\n- Defineixi l'element amb precisió i profunditat\n- Connecti amb el que ja apareix al conte\n- Suggereixi tensions narratives implícites\n- Sigui útil per a un escriptor que vol expandir el món\n\nFormat ESTRICTE per a cada element:\n**[Nom de l'element]**\n[descripció de 3-5 línies]\n\nSepara els elements amb una línia en blanc. Escriu exclusivament en català.`
+    }
+  ];
+  const maxTokens  = Math.min(400 * elementsTriats.length + 800, 4096);
+  const response   = callLLM(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens }));
+  const newHistory = [...msgs, { role: 'assistant', content: response }];
+  return { response, history: newHistory };
 }
 
 // ─── Export a Google Doc (format literari) ──────────────────
