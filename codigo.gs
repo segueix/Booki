@@ -564,6 +564,23 @@ function fase10_outline(contextComprimit, estructuraTriada, history, userConfig,
   return { response, history: newHistory };
 }
 
+// ─── FASE 12: Cronologia ─────────────────────────────────────
+function fase12_cronologia(contextComprimit, outline, subtrames, history, userConfig, tematica) {
+  const subtramesText = subtrames && subtrames.length > 0
+    ? '\n\nSUBTRAMES ACTIVES:\n' + subtrames.join('\n')
+    : '';
+  const msgs = [
+    ...history,
+    {
+      role: 'user',
+      content: `Tenim definit el món, els personatges, l'outline i les subtrames de la novel·la:\n\n${contextComprimit}${subtramesText}\n\nOUTLINE (capítols):\n${outline}\n\n---\nGenera la línia temporal completa de la novel·la. Ha de cobrir TOTS els capítols de l'outline, integrant la trama principal i les subtrames actives.\n\nCada entrada ha de correspondre a un moment o dia narratiu concret, agrupant els capítols que transcorren en el mateix temps. Indica on es troba cada personatge principal i quin és l'esdeveniment clau.\n\nFormat ESTRICTE (una entrada per línia, res més, sense introducció):\nDia/moment 1 — [Esdeveniment clau] — [On és cada personatge principal] — Cap. N-M\nDia/moment 2 — [Esdeveniment clau] — [On és cada personatge principal] — Cap. N\n...`
+    }
+  ];
+  const response   = callLLM(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 4096 }));
+  const newHistory = [...msgs, { role: 'assistant', content: response }];
+  return { response, history: newHistory };
+}
+
 // ─── FASE 11: Subtrames i fils temàtics ─────────────────────
 // outline: string compacte "Cap. N — Títol" per línia (sense POV ni detalls)
 function fase11_subtrames(contextComprimit, outline, history, userConfig, tematica) {

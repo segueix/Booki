@@ -376,6 +376,64 @@
     border-left: 2px solid var(--border);
   }
 
+  /* ── Taula cronologia ── */
+  .crono-wrap {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    overflow-x: auto;
+    max-height: 62vh;
+    overflow-y: auto;
+  }
+  .crono-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .88rem;
+  }
+  .crono-table th {
+    background: #1a1a2e;
+    color: var(--accent2);
+    font-size: .73rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 2px solid var(--accent);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  .crono-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    line-height: 1.6;
+    color: var(--text);
+  }
+  .crono-table tr:last-child td { border-bottom: none; }
+  .crono-table tr:hover td { background: #1e1e2e; }
+  .crono-table .crono-temps {
+    color: var(--accent2);
+    font-weight: 700;
+    white-space: nowrap;
+    min-width: 100px;
+    font-size: .82rem;
+  }
+  .crono-table .crono-caps {
+    color: var(--accent2);
+    font-weight: 600;
+    white-space: nowrap;
+    font-size: .82rem;
+    min-width: 70px;
+  }
+  .crono-table .crono-personatges {
+    font-size: .82rem;
+    color: var(--text2);
+    margin-top: 4px;
+  }
+
   /* ── Outline editor ── */
   .outline-list {
     display: flex;
@@ -515,6 +573,8 @@
     <div class="step-pill" data-step="10">Capítols</div>
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="11">Subtrames</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="12">Cronologia</div>
   </div>
 </div>
 
@@ -672,6 +732,33 @@
       <button class="btn btn-primary"   onclick="iniciarFase7()">🌍 Expandir a novel·la</button>
     </div>
     <div id="export-link-wrap" class="hidden" style="margin-top:14px;"></div>
+  </div>
+</div>
+
+<!-- FASE 12: Cronologia -->
+<div class="card hidden" id="fase-12">
+  <h2><span class="icon">📅</span> Cronologia</h2>
+  <div class="loader-wrap" id="loader-12">
+    <div class="spinner"></div>
+    <span id="loader-12-text">Generant la línia temporal…</span>
+  </div>
+  <div id="crono-content" class="hidden">
+    <div class="crono-wrap">
+      <table class="crono-table">
+        <thead>
+          <tr>
+            <th>Temps</th>
+            <th>Esdeveniment · Personatges</th>
+            <th>Capítols</th>
+          </tr>
+        </thead>
+        <tbody id="crono-tbody"></tbody>
+      </table>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="regenerarCronologia()">🔄 Regenerar</button>
+      <button class="btn btn-primary"   onclick="confirmarCronologia()">📖 Compilar bíblia</button>
+    </div>
   </div>
 </div>
 
@@ -857,7 +944,9 @@ const ESTAT = {
   // Outline de capítols
   outline:                  [],
   // Subtrames
-  subtrames:                []
+  subtrames:                [],
+  // Cronologia
+  cronologia:               ''
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -1753,8 +1842,97 @@ function confirmarSubtrames() {
     return item ? item.dataset.text : '';
   }).filter(t => t.length > 0);
 
-  toast('Subtrames confirmades. Cronologia en construcció…');
-  // Placeholder per a la fase 12
+  iniciarFase12();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FASE 11 → FASE 12: Cronologia
+// ═══════════════════════════════════════════════════════════
+function iniciarFase12() {
+  ESTAT.fase = 12;
+  updateProgress(12);
+  showCard('fase-12');
+  document.getElementById('crono-content').classList.add('hidden');
+  showLoader(12);
+  document.getElementById('loader-12-text').textContent = 'Generant la línia temporal…';
+
+  const ctx            = comprimirContextClient();
+  const outlineCompacte = ESTAT.outline
+    .map(c => 'Cap. ' + c.num + ' — ' + (c.titol || c.text || '').split('|')[0].trim())
+    .join('\n');
+
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.history    = res.history;
+      ESTAT.cronologia = res.response;
+      hideLoader(12);
+      mostrarCronologia(res.response);
+    })
+    .withFailureHandler(err => { hideLoader(12); toast('Error: ' + err.message); })
+    .fase12_cronologia(ctx, outlineCompacte, ESTAT.subtrames, ESTAT.history, USER_CONFIG, ESTAT.tematica);
+}
+
+function mostrarCronologia(text) {
+  const tbody = document.getElementById('crono-tbody');
+  // Línies que comencen amb "Dia/moment N" o num. seguit de " — "
+  const lines = text.split('\n').filter(l =>
+    /^(Dia\/moment\s+\d+|\d+)\s*[—\-]/i.test(l.trim())
+  );
+
+  if (lines.length === 0) {
+    // Fallback: mostrar com a text pla si el format no encaixa
+    tbody.innerHTML = `<tr><td colspan="3"><pre style="white-space:pre-wrap;font-size:.85rem;">${escHtml(text)}</pre></td></tr>`;
+  } else {
+    tbody.innerHTML = lines.map(line => {
+      // Separar per " — " (guió llarg amb espais)
+      const parts = line.split(/\s+[—\-]\s+/);
+      const temps       = (parts[0] || '').trim();
+      const esdeveniment = (parts[1] || '').trim();
+      const personatges  = (parts[2] || '').trim();
+      const caps         = (parts[3] || '').trim();
+      return `<tr>
+        <td class="crono-temps">${escHtml(temps)}</td>
+        <td>
+          <span>${escHtml(esdeveniment)}</span>
+          ${personatges ? `<div class="crono-personatges">${escHtml(personatges)}</div>` : ''}
+        </td>
+        <td class="crono-caps">${escHtml(caps)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('crono-content').classList.remove('hidden');
+  setTimeout(() => {
+    document.getElementById('fase-12').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+function regenerarCronologia() {
+  document.getElementById('crono-content').classList.add('hidden');
+  showLoader(12);
+  document.getElementById('loader-12-text').textContent = 'Regenerant la línia temporal…';
+
+  const ctx             = comprimirContextClient();
+  const outlineCompacte = ESTAT.outline
+    .map(c => 'Cap. ' + c.num + ' — ' + (c.titol || c.text || '').split('|')[0].trim())
+    .join('\n');
+
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.history    = res.history;
+      ESTAT.cronologia = res.response;
+      hideLoader(12);
+      mostrarCronologia(res.response);
+      toast('Cronologia regenerada.');
+    })
+    .withFailureHandler(err => { hideLoader(12); toast('Error: ' + err.message); })
+    .fase12_cronologia(ctx, outlineCompacte, ESTAT.subtrames, ESTAT.history, USER_CONFIG, ESTAT.tematica);
+}
+
+function confirmarCronologia() {
+  if (!ESTAT.cronologia) { toast('Primer genera la cronologia.'); return; }
+  toast('Cronologia validada. Compilant la bíblia…');
+  // Placeholder per a la fase 13
 }
 </script>
 </body>
