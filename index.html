@@ -563,6 +563,129 @@
 
   /* ── Secció amagada ── */
   .hidden { display: none !important; }
+
+  /* ── Fase 14: Escriptura capítol a capítol ── */
+  .fase14-layout {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+  }
+  .cap-sidebar {
+    width: 200px;
+    flex-shrink: 0;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow-y: auto;
+    max-height: 62vh;
+  }
+  .cap-sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: background .15s;
+    border-bottom: 1px solid var(--border);
+    border-left: 3px solid transparent;
+  }
+  .cap-sidebar-item:last-child { border-bottom: none; }
+  .cap-sidebar-item:hover { background: rgba(124,106,247,.1); }
+  .cap-sidebar-item.actiu {
+    background: rgba(124,106,247,.15);
+    border-left-color: var(--accent);
+  }
+  .cap-sidebar-num {
+    font-weight: 700;
+    font-size: .75rem;
+    color: var(--accent2);
+    flex-shrink: 0;
+    min-width: 26px;
+  }
+  .cap-sidebar-status { flex-shrink: 0; font-size: .85rem; }
+  .cap-sidebar-titol {
+    flex: 1;
+    font-size: .78rem;
+    color: var(--text2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .cap-sidebar-item.actiu .cap-sidebar-titol { color: var(--accent2); }
+  .cap-sidebar-item.generat .cap-sidebar-titol { color: var(--text); }
+  .cap-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+  }
+  .cap-main-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .cap-main-num {
+    font-size: .78rem;
+    font-weight: 700;
+    color: var(--accent2);
+    background: rgba(124,106,247,.15);
+    padding: 3px 12px;
+    border-radius: 99px;
+    flex-shrink: 0;
+  }
+  .cap-main-titol {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+    flex: 1;
+  }
+  .cap-outline-text {
+    font-size: .82rem;
+    color: var(--text2);
+    line-height: 1.6;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .cap-loader {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 40px 0;
+    color: var(--text2);
+    font-size: .9rem;
+  }
+  .cap-loader.visible { display: flex; }
+  @media (max-width: 680px) {
+    .fase14-layout { flex-direction: column; gap: 14px; }
+    .cap-sidebar {
+      width: 100%;
+      max-height: none;
+      display: flex;
+      flex-direction: row;
+      overflow-x: auto;
+      overflow-y: visible;
+    }
+    .cap-sidebar-item {
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 8px 10px;
+      min-width: 54px;
+      flex-shrink: 0;
+      border-bottom: none;
+      border-left: none;
+      border-bottom: 3px solid transparent;
+    }
+    .cap-sidebar-item.actiu {
+      border-left-color: transparent;
+      border-bottom-color: var(--accent);
+    }
+    .cap-sidebar-titol { display: none; }
+    .cap-sidebar-num { min-width: auto; font-size: .8rem; }
+  }
 </style>
 </head>
 <body>
@@ -625,6 +748,8 @@
     <div class="step-pill" data-step="12">Cronologia</div>
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="13">Bíblia</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="14">Novel·la</div>
   </div>
 </div>
 
@@ -928,6 +1053,66 @@
 </div>
 
 
+<!-- FASE 14: Escriptura capítol a capítol -->
+<div class="card hidden" id="fase-14">
+  <h2><span class="icon">📝</span> Escriptura de la novel·la</h2>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:20px;">Genera cada capítol individualment. Pots regenerar o millorar cada un abans de continuar.</p>
+
+  <div class="fase14-layout">
+    <!-- Sidebar: llista de capítols -->
+    <div class="cap-sidebar" id="cap-sidebar"></div>
+
+    <!-- Àrea principal -->
+    <div class="cap-main">
+      <!-- Capçalera del capítol actiu -->
+      <div class="cap-main-header">
+        <span class="cap-main-num" id="cap-main-num">Cap. 1</span>
+        <span class="cap-main-titol" id="cap-main-titol"></span>
+      </div>
+
+      <!-- Outline breu del capítol -->
+      <div class="cap-outline-text" id="cap-outline-text"></div>
+
+      <!-- Loader de generació -->
+      <div class="cap-loader" id="cap-loader">
+        <div class="spinner"></div>
+        <span id="cap-loader-text">Generant capítol…</span>
+      </div>
+
+      <!-- Capítol generat: reader + millora -->
+      <div id="cap-reader-wrap" class="hidden">
+        <div class="conte-reader" id="cap-reader-cos"></div>
+        <div class="conte-wordcount" id="cap-reader-wordcount"></div>
+        <div class="millora-row" style="margin-top:14px;">
+          <input type="text" id="cap-millora-input" placeholder="Millora el capítol (ex: «afegeix tensió al diàleg final»)">
+          <button class="btn btn-secondary" onclick="millorarCapitolActual()">✨ Millorar</button>
+        </div>
+      </div>
+
+      <!-- Capítol pendent (no generat) -->
+      <div id="cap-pendent-wrap" class="hidden" style="text-align:center;padding:28px 0 8px;">
+        <p style="color:var(--text2);font-size:.9rem;">Aquest capítol encara no s'ha generat.</p>
+      </div>
+
+      <!-- Botons d'acció -->
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-generar-cap" onclick="generarCapitolActual()">
+          ✍️ Generar capítol <span id="btn-generar-num">1</span>
+        </button>
+        <button class="btn btn-secondary hidden" id="btn-regenerar-cap" onclick="regenerarCapitolActual()">
+          🔄 Regenerar
+        </button>
+        <button class="btn btn-ghost hidden" id="btn-cap-anterior" onclick="navegarCapitol(-1)">
+          ‹ Anterior
+        </button>
+        <button class="btn btn-primary hidden" id="btn-cap-seguent" onclick="navegarCapitol(1)">
+          Següent ›
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -1017,7 +1202,11 @@ const ESTAT = {
   // Cronologia
   cronologia:               '',
   // Bíblia de consistència
-  biblia:                   ''
+  biblia:                   '',
+  // Fase 14: capítols generats
+  capitols:                 [],  // null o text per a cada capítol
+  _capActual:               0,   // índex 0-based del capítol actiu
+  _capGenerant:             null // índex del capítol en generació (o null)
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -2092,8 +2281,210 @@ function desarCanvisBiblia() {
   toast('Canvis desats a la bíblia.');
 }
 
+// ─── Entrada a Fase 14 (cridat des del botó de Fase 13) ─────
 function iniciarEscripturaCapitol(numCap) {
-  toast('La fase d\'escriptura de capítols s\'activarà aviat. Capítol ' + numCap + ' preparat.');
+  iniciarFase14();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FASE 14: Escriptura capítol a capítol
+// ═══════════════════════════════════════════════════════════
+function iniciarFase14() {
+  if (!ESTAT.outline || ESTAT.outline.length === 0) {
+    toast('Cal tenir l\'outline de capítols per continuar.');
+    return;
+  }
+  ESTAT.fase         = 14;
+  ESTAT.capitols     = ESTAT.outline.map(() => null);
+  ESTAT._capActual   = 0;
+  ESTAT._capGenerant = null;
+
+  updateProgress(14);
+  showCard('fase-14');
+  renderSidebarCapitols();
+  mostrarCapitol(0);
+  setTimeout(() => {
+    document.getElementById('fase-14').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+// ─── Sidebar: renderitza la llista de capítols ──────────────
+function renderSidebarCapitols() {
+  const sidebar = document.getElementById('cap-sidebar');
+  sidebar.innerHTML = ESTAT.outline.map((cap, i) => {
+    const estat   = ESTAT._capGenerant === i ? '⏳' : (ESTAT.capitols[i] ? '✅' : '⬜');
+    const actiu   = ESTAT._capActual === i ? 'actiu' : '';
+    const generat = ESTAT.capitols[i] ? 'generat' : '';
+    const titolBreu = ((cap.titol || cap.text || '').split('|')[0]).trim().substring(0, 28);
+    return `<div class="cap-sidebar-item ${actiu} ${generat}" onclick="seleccionarCapitol(${i})">
+      <span class="cap-sidebar-num">${i + 1}</span>
+      <span class="cap-sidebar-status">${estat}</span>
+      <span class="cap-sidebar-titol">${escHtml(titolBreu)}</span>
+    </div>`;
+  }).join('');
+}
+
+// ─── Seleccionar capítol des de la sidebar ──────────────────
+function seleccionarCapitol(idx) {
+  if (ESTAT._capGenerant !== null && ESTAT._capGenerant !== idx) {
+    toast('Espera que acabi de generar el capítol actual.');
+    return;
+  }
+  ESTAT._capActual = idx;
+  renderSidebarCapitols();
+  mostrarCapitol(idx);
+}
+
+// ─── Mostrar el capítol actiu a l'àrea principal ────────────
+function mostrarCapitol(idx) {
+  const cap      = ESTAT.outline[idx];
+  const text     = ESTAT.capitols[idx];
+  const generat  = !!(text);
+  const generant = ESTAT._capGenerant === idx;
+
+  // Capçalera
+  document.getElementById('cap-main-num').textContent = 'Cap. ' + (idx + 1);
+  const titolBreu = ((cap.titol || cap.text || '').split('|')[0]).trim();
+  document.getElementById('cap-main-titol').textContent = titolBreu;
+  document.getElementById('cap-outline-text').textContent = cap.text || '';
+
+  // Loader
+  document.getElementById('cap-loader').classList.toggle('visible', generant);
+
+  // Àrees de contingut
+  const readerWrap  = document.getElementById('cap-reader-wrap');
+  const pendentWrap = document.getElementById('cap-pendent-wrap');
+
+  if (generat && !generant) {
+    readerWrap.classList.remove('hidden');
+    pendentWrap.classList.add('hidden');
+    mostrarTextCapitol(text);
+  } else if (generant) {
+    readerWrap.classList.add('hidden');
+    pendentWrap.classList.add('hidden');
+  } else {
+    readerWrap.classList.add('hidden');
+    pendentWrap.classList.remove('hidden');
+  }
+
+  // Botons
+  const total = ESTAT.outline.length;
+  document.getElementById('btn-generar-num').textContent = idx + 1;
+  document.getElementById('btn-generar-cap').classList.toggle('hidden', generat || generant);
+  document.getElementById('btn-regenerar-cap').classList.toggle('hidden', !generat || generant);
+  document.getElementById('btn-cap-anterior').classList.toggle('hidden', idx === 0 || generant);
+  document.getElementById('btn-cap-seguent').classList.toggle('hidden', idx >= total - 1 || generant);
+}
+
+// ─── Renderitza el text d'un capítol al reader ──────────────
+function mostrarTextCapitol(text) {
+  const cos  = document.getElementById('cap-reader-cos');
+  const pars = text.split(/\n\n+/).filter(p => p.trim().length > 0);
+  cos.innerHTML = pars.map(p => `<p>${escHtml(p.trim())}</p>`).join('');
+  const wc = compteParaules(text);
+  document.getElementById('cap-reader-wordcount').textContent = wc.toLocaleString('ca') + ' paraules';
+}
+
+// ─── Generar el capítol actiu (Part 1 → Part 2) ─────────────
+function generarCapitolActual() {
+  const idx = ESTAT._capActual;
+  if (ESTAT._capGenerant !== null) { toast('Espera que acabi la generació actual.'); return; }
+
+  ESTAT._capGenerant = idx;
+  renderSidebarCapitols();
+
+  document.getElementById('cap-loader').classList.add('visible');
+  document.getElementById('cap-loader-text').textContent = 'Generant part 1 del capítol ' + (idx + 1) + '…';
+  document.getElementById('cap-pendent-wrap').classList.add('hidden');
+  document.getElementById('cap-reader-wrap').classList.add('hidden');
+  ['btn-generar-cap', 'btn-regenerar-cap', 'btn-cap-anterior', 'btn-cap-seguent'].forEach(id => {
+    document.getElementById(id).classList.add('hidden');
+  });
+
+  const textCapAnterior = idx > 0 ? (ESTAT.capitols[idx - 1] || '') : '';
+  const outlineCapitol  = ESTAT.outline[idx] ? ESTAT.outline[idx].text : '';
+
+  // Part 1
+  google.script.run
+    .withSuccessHandler(function(res) {
+      const part1Text     = res.response;
+      const historialPart = res.history;
+      document.getElementById('cap-loader-text').textContent = 'Generant part 2 del capítol ' + (idx + 1) + '…';
+
+      // Part 2 encadenada
+      google.script.run
+        .withSuccessHandler(function(res2) {
+          ESTAT.capitols[idx]   = part1Text + '\n\n' + res2.response;
+          ESTAT._capGenerant     = null;
+          document.getElementById('cap-loader').classList.remove('visible');
+          renderSidebarCapitols();
+          mostrarCapitol(idx);
+          toast('Capítol ' + (idx + 1) + ' generat!');
+        })
+        .withFailureHandler(function(err) {
+          ESTAT._capGenerant = null;
+          document.getElementById('cap-loader').classList.remove('visible');
+          renderSidebarCapitols();
+          mostrarCapitol(idx);
+          toast('Error a la part 2: ' + err.message);
+        })
+        .escriureCapitol(2, idx + 1, ESTAT.outline.length, ESTAT.biblia,
+          outlineCapitol, textCapAnterior, ESTAT.estil.desc, USER_CONFIG, ESTAT.tematica, historialPart);
+    })
+    .withFailureHandler(function(err) {
+      ESTAT._capGenerant = null;
+      document.getElementById('cap-loader').classList.remove('visible');
+      renderSidebarCapitols();
+      mostrarCapitol(idx);
+      toast('Error a la part 1: ' + err.message);
+    })
+    .escriureCapitol(1, idx + 1, ESTAT.outline.length, ESTAT.biblia,
+      outlineCapitol, textCapAnterior, ESTAT.estil.desc, USER_CONFIG, ESTAT.tematica, null);
+}
+
+// ─── Regenerar el capítol actiu ─────────────────────────────
+function regenerarCapitolActual() {
+  if (!confirm('Vols regenerar el capítol ' + (ESTAT._capActual + 1) + '? El text actual es perdrà.')) return;
+  ESTAT.capitols[ESTAT._capActual] = null;
+  generarCapitolActual();
+}
+
+// ─── Millorar el capítol actiu ──────────────────────────────
+function millorarCapitolActual() {
+  const idx        = ESTAT._capActual;
+  const instruccio = document.getElementById('cap-millora-input').value.trim();
+  if (!instruccio)          { toast('Escriu una instrucció de millora.'); return; }
+  if (!ESTAT.capitols[idx]) { toast('Primer genera el capítol.'); return; }
+
+  document.getElementById('cap-loader').classList.add('visible');
+  document.getElementById('cap-loader-text').textContent = 'Aplicant la millora al capítol ' + (idx + 1) + '…';
+  document.getElementById('cap-reader-wrap').classList.add('hidden');
+  ['btn-generar-cap', 'btn-regenerar-cap', 'btn-cap-anterior', 'btn-cap-seguent'].forEach(id => {
+    document.getElementById(id).classList.add('hidden');
+  });
+
+  // Reutilitza millorarConte del backend amb historial net
+  google.script.run
+    .withSuccessHandler(function(res) {
+      ESTAT.capitols[idx] = res.response;
+      document.getElementById('cap-loader').classList.remove('visible');
+      document.getElementById('cap-millora-input').value = '';
+      mostrarCapitol(idx);
+      toast('Millora aplicada al capítol ' + (idx + 1) + '.');
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById('cap-loader').classList.remove('visible');
+      mostrarCapitol(idx);
+      toast('Error: ' + err.message);
+    })
+    .millorarConte(instruccio, ESTAT.capitols[idx], ESTAT.estil.desc, [], USER_CONFIG, ESTAT.tematica);
+}
+
+// ─── Navegar entre capítols ──────────────────────────────────
+function navegarCapitol(dir) {
+  const nextIdx = ESTAT._capActual + dir;
+  if (nextIdx < 0 || nextIdx >= ESTAT.outline.length) return;
+  seleccionarCapitol(nextIdx);
 }
 </script>
 </body>

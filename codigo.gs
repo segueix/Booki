@@ -672,6 +672,59 @@ function fase13_bibliaPerCapitol(biblia, outlineDetallat, numCapitol, textCapAnt
   return context;
 }
 
+// ─── FASE 14: Escriure un capítol (patró anti-timeout, 2 parts) ──
+// partNum:      1 (primera meitat) o 2 (segona meitat)
+// historialPart: null per Part 1; historial retornat per Part 1 per a Part 2
+function escriureCapitol(partNum, numCapitol, totalCapitols, biblia, outlineCapitol, textCapAnterior, estilDesc, userConfig, tematica, historialPart) {
+  var systemForCap = getSystemPrompt(tematica) +
+    '\n\n=== BÍBLIA DE LA NOVEL·LA ===\n' + (biblia || '');
+
+  var contextAnterior = '';
+  if (textCapAnterior && textCapAnterior.trim()) {
+    var words    = textCapAnterior.trim().split(/\s+/);
+    var darreres = words.slice(-500).join(' ');
+    contextAnterior = '\n\n=== FINAL DEL CAPÍTOL ANTERIOR (per continuïtat de to) ===\n' + darreres;
+  }
+
+  var isNoir    = tematica && /noir|negr[ae]|nòrdi/i.test(tematica);
+  var noirExtra = isNoir
+    ? '\n→ Aplica l\'estil Nordic Noir: prosa crua, procediments detallats, crítica social integrada, entorn nòrdic opressiu.'
+    : '';
+
+  if (partNum === 1) {
+    var part1Content =
+      '=== CAPÍTOL ' + numCapitol + ' DE ' + totalCapitols + ' ===\n' +
+      (outlineCapitol || '') + contextAnterior + '\n\n' +
+      'Escriu la PRIMERA MEITAT d\'aquest capítol (~1500 paraules). Estil: ' + (estilDesc || '') + '.\n' +
+      '→ Comença directament la narració, sense títol ni encapçalament.\n' +
+      '→ Estableix l\'atmosfera i el conflicte central del capítol.\n' +
+      '→ Planta la tensió creixent fins a un punt d\'inflexió.\n' +
+      '→ Acaba en tensió màxima: talla quan la situació sigui més crítica, sense resoldre res.' + noirExtra + '\n' +
+      'Escriu directament en català. Cap paraula en anglès. Cap comentari fora de la narració literària.';
+
+    var msgs1      = [{ role: 'user', content: part1Content }];
+    var resp1      = callLLM(msgs1, systemForCap, Object.assign({}, userConfig, { maxTokens: 6000 }));
+    var newHistory = msgs1.concat([{ role: 'assistant', content: resp1 }]);
+    return { response: resp1, history: newHistory };
+
+  } else {
+    var histBase     = Array.isArray(historialPart) ? historialPart : [];
+    var objectiuBreu = (outlineCapitol || '').split('\n')[0].substring(0, 120);
+    var part2Content =
+      'Continua i finalitza el capítol amb la SEGONA MEITAT (~1500 paraules).\n' +
+      '→ Recull la tensió de la primera meitat i desenvolupa-la fins a la resolució del capítol.\n' +
+      '→ Objectiu del capítol: ' + objectiuBreu + '\n' +
+      '→ Assegura que s\'ha complert l\'objectiu narratiu al final.\n' +
+      '→ Mantén exactament la mateixa veu, to i registre de la primera meitat.\n' +
+      '→ L\'última frase ha de deixar el lector amb ganes de continuar.' + noirExtra + '\n' +
+      'Continua directament en català des d\'on s\'ha aturat. Cap paraula en anglès. Cap comentari fora de la narració literària.';
+
+    var msgs2 = histBase.concat([{ role: 'user', content: part2Content }]);
+    var resp2  = callLLM(msgs2, systemForCap, Object.assign({}, userConfig, { maxTokens: 6000 }));
+    return { response: resp2 };
+  }
+}
+
 // ─── FASE 12: Cronologia ─────────────────────────────────────
 function fase12_cronologia(contextComprimit, outline, subtrames, history, userConfig, tematica) {
   const subtramesText = subtrames && subtrames.length > 0
