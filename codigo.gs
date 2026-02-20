@@ -564,6 +564,114 @@ function fase10_outline(contextComprimit, estructuraTriada, history, userConfig,
   return { response, history: newHistory };
 }
 
+// ─── FASE 13: Compilar bíblia de consistència (sense LLM) ───
+// dades: objecte amb tots els camps acumulats de l'ESTAT frontend.
+// Objectiu: document de ~800-1200 paraules que serà el context
+// injectat a cada crida de generació de capítol.
+function fase13_compilarBiblia(dades) {
+  var d = dades || {};
+  var seccions = [];
+
+  // PREMISSA
+  seccions.push('## PREMISSA\n' + (d.premissa || '—'));
+
+  // ESTIL
+  seccions.push('## ESTIL\n' + (d.estilDesc || '—') + '\nGènere: ' + (d.tematica || '—'));
+
+  // MÓN
+  if (d.worldbuilding && d.worldbuilding.trim()) {
+    var monLines = [];
+    d.worldbuilding.split(/\n\n+/).filter(function(b) { return b.trim(); }).forEach(function(bloc) {
+      var linies = bloc.trim().split('\n');
+      var titol  = linies[0].replace(/\*\*/g, '').trim();
+      var desc   = (linies[1] || '').trim().substring(0, 120);
+      if (titol) monLines.push('• ' + titol + (desc ? ': ' + desc : ''));
+    });
+    seccions.push('## MÓN\n' + monLines.join('\n'));
+  }
+
+  // PERSONATGES
+  if (d.elencPersonatges && d.elencPersonatges.length > 0) {
+    var persList = d.elencPersonatges.map(function(p) {
+      var nomM = p.match(/\*\*(.+?)\*\*/);
+      var arcM = p.match(/Arc:\s*([^|]+)/);
+      var relM = p.match(/Relacions:\s*(.+)/);
+      var nom  = nomM ? nomM[1].trim() : p.substring(0, 25).trim();
+      var arc  = arcM ? arcM[1].trim().substring(0, 100) : '—';
+      var rel  = relM ? relM[1].trim().substring(0, 80) : '';
+      return '• ' + nom + ' — Arc: ' + arc + (rel ? ' | Rel: ' + rel : '');
+    });
+    seccions.push('## PERSONATGES\n' + persList.join('\n'));
+  }
+
+  // ESTRUCTURA
+  if (d.estructuraTriada && d.estructuraTriada.trim()) {
+    var estructLines = d.estructuraTriada.trim().split('\n').slice(0, 10).join('\n');
+    seccions.push('## ESTRUCTURA\n' + estructLines);
+  }
+
+  // OUTLINE
+  if (d.outline && d.outline.length > 0) {
+    var outLines = d.outline.map(function(c) {
+      return 'Cap. ' + c.num + ' — ' + (c.text || '').substring(0, 110);
+    });
+    seccions.push('## OUTLINE\n' + outLines.join('\n'));
+  }
+
+  // SUBTRAMES
+  if (d.subtrames && d.subtrames.length > 0) {
+    var subLines = d.subtrames.map(function(s) {
+      return '• ' + s.replace(/\*\*/g, '').substring(0, 130);
+    });
+    seccions.push('## SUBTRAMES\n' + subLines.join('\n'));
+  }
+
+  // CRONOLOGIA (primeres 10 entrades comprimides)
+  if (d.cronologia && d.cronologia.trim()) {
+    var cronoLines = d.cronologia.trim().split('\n')
+      .filter(function(l) { return /^(Dia\/moment\s+\d+|\d+)\s*[—\-]/i.test(l.trim()); })
+      .slice(0, 10)
+      .map(function(l) {
+        var parts = l.split(/\s+[—\-]\s+/);
+        // Mantenir: temps — esdeveniment — capítols (eliminar personatges si hi ha 4 segments)
+        return parts.length >= 4
+          ? parts[0] + ' — ' + parts[1] + ' — ' + parts[3]
+          : l.substring(0, 140);
+      });
+    seccions.push('## CRONOLOGIA\n' + cronoLines.join('\n'));
+  }
+
+  // VOCABULARI: noms propis del conte original (heurística per regex)
+  if (d.conteText && d.conteText.trim()) {
+    var paraules = d.conteText.match(/\b[A-ZÁÉÍÓÚÀÈÌÒÙÄËÏÖÜ][a-záéíóúàèìòùäëïöü]{2,}\b/g) || [];
+    var excloses = /^(Els?|Les?|Una?|Uns?|Tot|Però|Quan|Com|Qui|Que|Per|Del?|Als?|Era|Ser|Fou|Havia|Molt|Cada|Aquell?|Aquesta?|Aquí|Entre|Fins|Sobre|Encara|Sempre|Ara|Ja|Tant|Sense|Amb|Cap|Des|Mai|Seus?|Seves?|Nostre|Vostre|Davant|Dintre|Mentre|Després|Abans|Sense|Sense)$/i;
+    var vistos   = {};
+    var unics    = paraules.filter(function(w) {
+      if (excloses.test(w) || vistos[w]) return false;
+      vistos[w] = true;
+      return true;
+    }).slice(0, 30);
+    if (unics.length > 0) seccions.push('## VOCABULARI\n' + unics.join(', '));
+  }
+
+  return seccions.join('\n\n');
+}
+
+// ─── FASE 13: Context per a la generació d'un capítol ────────
+// Assembla la bíblia completa + detall del capítol actual +
+// les darreres ~500 paraules del capítol anterior.
+// No crida LLM; retorna un string de context per a callLLM.
+function fase13_bibliaPerCapitol(biblia, outlineDetallat, numCapitol, textCapAnterior) {
+  var context = '=== BÍBLIA DE LA NOVEL·LA ===\n' + (biblia || '') + '\n\n';
+  context += '=== CAPÍTOL A ESCRIURE: ' + numCapitol + ' ===\n' + (outlineDetallat || '') + '\n\n';
+  if (textCapAnterior && textCapAnterior.trim()) {
+    var paraules = textCapAnterior.trim().split(/\s+/);
+    var darreres = paraules.slice(-500).join(' ');
+    context += '=== FINAL DEL CAPÍTOL ANTERIOR (per continuïtat de to) ===\n' + darreres;
+  }
+  return context;
+}
+
 // ─── FASE 12: Cronologia ─────────────────────────────────────
 function fase12_cronologia(contextComprimit, outline, subtrames, history, userConfig, tematica) {
   const subtramesText = subtrames && subtrames.length > 0

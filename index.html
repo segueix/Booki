@@ -376,6 +376,54 @@
     border-left: 2px solid var(--border);
   }
 
+  /* ── Bíblia de consistència ── */
+  .biblia-container {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px 28px;
+    max-height: 65vh;
+    overflow-y: auto;
+  }
+  .biblia-seccio {
+    margin-bottom: 18px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .biblia-seccio:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+  .biblia-titol {
+    color: var(--accent2);
+    font-weight: 700;
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    margin-bottom: 6px;
+  }
+  .biblia-cos {
+    font-family: var(--font);
+    font-size: .88rem;
+    line-height: 1.7;
+    color: var(--text);
+    white-space: pre-wrap;
+    margin: 0;
+  }
+  .biblia-textarea {
+    width: 100%;
+    min-height: 420px;
+    max-height: 65vh;
+    padding: 20px 24px;
+    background: var(--surface2);
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: .88rem;
+    font-family: var(--font);
+    line-height: 1.7;
+    resize: vertical;
+    display: none;
+  }
+  .biblia-textarea:focus { outline: none; }
+
   /* ── Taula cronologia ── */
   .crono-wrap {
     background: var(--surface2);
@@ -575,6 +623,8 @@
     <div class="step-pill" data-step="11">Subtrames</div>
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="12">Cronologia</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="13">Bíblia</div>
   </div>
 </div>
 
@@ -732,6 +782,25 @@
       <button class="btn btn-primary"   onclick="iniciarFase7()">🌍 Expandir a novel·la</button>
     </div>
     <div id="export-link-wrap" class="hidden" style="margin-top:14px;"></div>
+  </div>
+</div>
+
+<!-- FASE 13: Bíblia de consistència -->
+<div class="card hidden" id="fase-13">
+  <h2><span class="icon">📖</span> Bíblia de consistència</h2>
+  <div class="loader-wrap" id="loader-13">
+    <div class="spinner"></div>
+    <span>Compilant la bíblia de la novel·la…</span>
+  </div>
+  <div id="biblia-content" class="hidden">
+    <p style="color:var(--text2);font-size:.9rem;margin-bottom:14px;">Reviseu i editeu la bíblia. Un cop aprovada, podreu escriure els capítols un a un.</p>
+    <div class="biblia-container" id="biblia-view"></div>
+    <textarea class="biblia-textarea" id="biblia-textarea"></textarea>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="btn-editar-biblia" onclick="toggleEditarBiblia()">✏️ Editar</button>
+      <button class="btn btn-ghost hidden" id="btn-desar-biblia" onclick="desarCanvisBiblia()">✔ Desar canvis</button>
+      <button class="btn btn-primary" onclick="iniciarEscripturaCapitol(1)">✍️ Escriure capítol 1</button>
+    </div>
   </div>
 </div>
 
@@ -946,7 +1015,9 @@ const ESTAT = {
   // Subtrames
   subtrames:                [],
   // Cronologia
-  cronologia:               ''
+  cronologia:               '',
+  // Bíblia de consistència
+  biblia:                   ''
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -1932,7 +2003,97 @@ function regenerarCronologia() {
 function confirmarCronologia() {
   if (!ESTAT.cronologia) { toast('Primer genera la cronologia.'); return; }
   toast('Cronologia validada. Compilant la bíblia…');
-  // Placeholder per a la fase 13
+  iniciarFase13();
+}
+
+// ─── FASE 13: Bíblia de consistència ────────────────────────
+function iniciarFase13() {
+  ESTAT.fase = 13;
+  updateProgress(13);
+  showCard('fase-13');
+  document.getElementById('biblia-content').classList.add('hidden');
+  showLoader(13);
+  setTimeout(() => {
+    document.getElementById('fase-13').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+
+  const dades = {
+    tematica:         ESTAT.tematica,
+    estilDesc:        ESTAT.estil.desc || '',
+    premissa:         ESTAT.premissaTriada || '',
+    worldbuilding:    ESTAT.worldbuilding || '',
+    elencPersonatges: ESTAT.elencPersonatges || [],
+    estructuraTriada: ESTAT.estructuraTriada || '',
+    outline:          ESTAT.outline || [],
+    subtrames:        ESTAT.subtrames || [],
+    cronologia:       ESTAT.cronologia || '',
+    conteText:        ESTAT.conteText || ''
+  };
+
+  google.script.run
+    .withSuccessHandler(biblia => {
+      ESTAT.biblia = biblia;
+      hideLoader(13);
+      renderBibliaView(biblia);
+      document.getElementById('biblia-content').classList.remove('hidden');
+    })
+    .withFailureHandler(err => { hideLoader(13); toast('Error: ' + err.message); })
+    .fase13_compilarBiblia(dades);
+}
+
+function renderBibliaView(text) {
+  const container = document.getElementById('biblia-view');
+  if (!text || !text.trim()) {
+    container.innerHTML = '<p style="color:var(--text2)">La bíblia és buida.</p>';
+    return;
+  }
+  const blocks = text.split(/^## /m).filter(b => b.trim());
+  container.innerHTML = blocks.map(block => {
+    const nl    = block.indexOf('\n');
+    const titol = nl >= 0 ? block.substring(0, nl).trim() : block.trim();
+    const cos   = nl >= 0 ? block.substring(nl + 1).trim() : '';
+    return `<div class="biblia-seccio">
+      <div class="biblia-titol">${escHtml(titol)}</div>
+      <pre class="biblia-cos">${escHtml(cos)}</pre>
+    </div>`;
+  }).join('');
+}
+
+function toggleEditarBiblia() {
+  const view     = document.getElementById('biblia-view');
+  const ta       = document.getElementById('biblia-textarea');
+  const btnEdit  = document.getElementById('btn-editar-biblia');
+  const btnDesar = document.getElementById('btn-desar-biblia');
+
+  const editMode = (ta.style.display === 'block');
+  if (!editMode) {
+    ta.value        = ESTAT.biblia;
+    ta.style.display = 'block';
+    view.style.display = 'none';
+    btnEdit.classList.add('hidden');
+    btnDesar.classList.remove('hidden');
+    ta.focus();
+  } else {
+    ta.style.display   = 'none';
+    view.style.display = '';
+    btnEdit.classList.remove('hidden');
+    btnDesar.classList.add('hidden');
+  }
+}
+
+function desarCanvisBiblia() {
+  const ta = document.getElementById('biblia-textarea');
+  ESTAT.biblia = ta.value;
+  ta.style.display   = 'none';
+  document.getElementById('biblia-view').style.display = '';
+  document.getElementById('btn-editar-biblia').classList.remove('hidden');
+  document.getElementById('btn-desar-biblia').classList.add('hidden');
+  renderBibliaView(ESTAT.biblia);
+  toast('Canvis desats a la bíblia.');
+}
+
+function iniciarEscripturaCapitol(numCap) {
+  toast('La fase d\'escriptura de capítols s\'activarà aviat. Capítol ' + numCap + ' preparat.');
 }
 </script>
 </body>
