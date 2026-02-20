@@ -450,6 +450,42 @@ function millorarConte(instruccio, conteActual, estilDesc, history, userConfig, 
   return { response, history: newHistory };
 }
 
+// ─── FASE 16: Millorar un capítol amb context adjacent ──────
+// Igual que millorarConte però amb bíblia + últimes 300 paraules del capítol
+// anterior i primeres 300 del posterior per mantenir transicions.
+// capsAdjacents: {ant: string|null, post: string|null}
+function millorarCapitol(numCapitol, instruccio, capitolActual, biblia, outlineCapitol, capsAdjacents, estilDesc, userConfig, tematica) {
+  var systemForCap = getSystemPrompt(tematica) +
+    '\n\n=== BÍBLIA DE LA NOVEL·LA ===\n' + (biblia || '');
+
+  var contextAdj = '';
+  if (capsAdjacents) {
+    if (capsAdjacents.ant) {
+      contextAdj += '=== FINAL DEL CAPÍTOL ANTERIOR (últimes 300 paraules, referència de continuïtat) ===\n' +
+        capsAdjacents.ant + '\n\n';
+    }
+    if (capsAdjacents.post) {
+      contextAdj += '=== INICI DEL CAPÍTOL POSTERIOR (primeres 300 paraules, referència de continuïtat) ===\n' +
+        capsAdjacents.post + '\n\n';
+    }
+  }
+
+  var userContent =
+    '=== CAPÍTOL ' + numCapitol + ' — OUTLINE ===\n' + (outlineCapitol || '') + '\n\n' +
+    contextAdj +
+    '=== CAPÍTOL ACTUAL ===\n' + (capitolActual || '') + '\n\n---\n' +
+    'Reescriu el capítol complet aplicant aquesta millora: "' + (instruccio || '') + '".\n\n' +
+    '→ Mantén tot el que funciona bé. Millora específicament el que es demana.\n' +
+    '→ Mantén la mateixa extensió aproximada i l\'estil: ' + (estilDesc || '') + '.\n' +
+    '→ Assegura la coherència de transicions amb els capítols adjacents.\n' +
+    '→ Escriu directament el capítol millorat en català, sense cap comentari previ ni títol.';
+
+  var msgs      = [{ role: 'user', content: userContent }];
+  var maxTokens = Math.min(Math.round((capitolActual || '').split(' ').length * 2.5) + 800, 8000);
+  var response  = callLLM(msgs, systemForCap, Object.assign({}, userConfig, { maxTokens: maxTokens }));
+  return { response: response };
+}
+
 // ─── FASE 7: Worldbuilding — Extracció d'elements de món ───
 function fase7_worldbuilding(conteActual, tematica, estilDesc, history, userConfig) {
   const msgs = [

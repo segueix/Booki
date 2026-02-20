@@ -564,6 +564,32 @@
   /* ── Secció amagada ── */
   .hidden { display: none !important; }
 
+  /* ── Fase 16: Panel de poliment ── */
+  .cap-millora-panel {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .cap-millora-label {
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--text2);
+    font-weight: 700;
+    margin-bottom: 10px;
+    display: block;
+  }
+  .cap-millora-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+  .cap-millora-row select {
+    flex: 1;
+    min-width: 180px;
+  }
+
   /* ── Fase 15: Revisió de coherència ── */
   .revisio-banner {
     display: flex;
@@ -1187,9 +1213,22 @@
       <div id="cap-reader-wrap" class="hidden">
         <div class="conte-reader" id="cap-reader-cos"></div>
         <div class="conte-wordcount" id="cap-reader-wordcount"></div>
-        <div class="millora-row" style="margin-top:14px;">
-          <input type="text" id="cap-millora-input" placeholder="Millora el capítol (ex: «afegeix tensió al diàleg final»)">
-          <button class="btn btn-secondary" onclick="millorarCapitolActual()">✨ Millorar</button>
+        <!-- Panel de poliment (Fase 16) -->
+        <div class="cap-millora-panel">
+          <span class="cap-millora-label">Poliment del capítol</span>
+          <div class="cap-millora-row">
+            <select id="cap-millora-select" onchange="actualitzarMilloraUI()">
+              <option value="Enforteix la veu narrativa del personatge protagonista i fes-la més distintiva i personal">Enforteix la veu del personatge</option>
+              <option value="Augmenta la tensió i el ritme narratiu: elimina paraules innecessàries, intensifica els moments clau">Augmenta la tensió</option>
+              <option value="Redueix l'exposició directa: converteix les explicacions en escenes mostrades, usa detalls sensorials concrets">Redueix l'exposició</option>
+              <option value="Millora les transicions entre escenes i moments per garantir una lectura fluida i coherent">Millora transicions</option>
+              <option value="lliure">✏️ Instrucció lliure…</option>
+            </select>
+            <button class="btn btn-secondary" style="flex-shrink:0;" onclick="millorarCapitolActual()">✨ Millorar capítol</button>
+          </div>
+          <div id="cap-millora-lliure-wrap" class="hidden" style="margin-top:10px;">
+            <input type="text" id="cap-millora-input" placeholder="Descriu la millora que vols aplicar al capítol…">
+          </div>
         </div>
       </div>
 
@@ -2568,35 +2607,67 @@ function regenerarCapitolActual() {
   generarCapitolActual();
 }
 
-// ─── Millorar el capítol actiu ──────────────────────────────
+// ─── Actualitzar UI del panel de poliment (select ↔ input lliure) ──
+function actualitzarMilloraUI() {
+  const sel  = document.getElementById('cap-millora-select');
+  const wrap = document.getElementById('cap-millora-lliure-wrap');
+  if (sel && wrap) wrap.classList.toggle('hidden', sel.value !== 'lliure');
+}
+
+// ─── Millorar el capítol actiu (Fase 16) ────────────────────
 function millorarCapitolActual() {
-  const idx        = ESTAT._capActual;
-  const instruccio = document.getElementById('cap-millora-input').value.trim();
-  if (!instruccio)          { toast('Escriu una instrucció de millora.'); return; }
+  const idx   = ESTAT._capActual;
+  const sel   = document.getElementById('cap-millora-select');
+  const input = document.getElementById('cap-millora-input');
+
+  // Obtenir la instrucció: predefinida o lliure
+  let instruccio;
+  if (sel && sel.value === 'lliure') {
+    instruccio = input ? input.value.trim() : '';
+    if (!instruccio) { toast('Escriu una instrucció de millora.'); return; }
+  } else {
+    instruccio = sel ? sel.value : '';
+  }
+
   if (!ESTAT.capitols[idx]) { toast('Primer genera el capítol.'); return; }
 
+  // Capítols adjacents: darreres 300 paraules de l'anterior + primeres 300 del posterior
+  const capsAdjacents = {
+    ant:  (idx > 0 && ESTAT.capitols[idx - 1])
+            ? ESTAT.capitols[idx - 1].trim().split(/\s+/).slice(-300).join(' ')
+            : null,
+    post: (idx < ESTAT.capitols.length - 1 && ESTAT.capitols[idx + 1])
+            ? ESTAT.capitols[idx + 1].trim().split(/\s+/).slice(0, 300).join(' ')
+            : null
+  };
+
+  const outlineCapitol = ESTAT.outline[idx] ? ESTAT.outline[idx].text : '';
+
   document.getElementById('cap-loader').classList.add('visible');
-  document.getElementById('cap-loader-text').textContent = 'Aplicant la millora al capítol ' + (idx + 1) + '…';
+  document.getElementById('cap-loader-text').textContent = 'Polint el capítol ' + (idx + 1) + '…';
   document.getElementById('cap-reader-wrap').classList.add('hidden');
   ['btn-generar-cap', 'btn-regenerar-cap', 'btn-cap-anterior', 'btn-cap-seguent'].forEach(id => {
     document.getElementById(id).classList.add('hidden');
   });
 
-  // Reutilitza millorarConte del backend amb historial net
   google.script.run
     .withSuccessHandler(function(res) {
       ESTAT.capitols[idx] = res.response;
       document.getElementById('cap-loader').classList.remove('visible');
-      document.getElementById('cap-millora-input').value = '';
+      // Reinicia el panel de poliment
+      if (input) input.value = '';
+      if (sel)   { sel.selectedIndex = 0; }
+      document.getElementById('cap-millora-lliure-wrap').classList.add('hidden');
       mostrarCapitol(idx);
-      toast('Millora aplicada al capítol ' + (idx + 1) + '.');
+      toast('Capítol ' + (idx + 1) + ' polit.');
     })
     .withFailureHandler(function(err) {
       document.getElementById('cap-loader').classList.remove('visible');
       mostrarCapitol(idx);
       toast('Error: ' + err.message);
     })
-    .millorarConte(instruccio, ESTAT.capitols[idx], ESTAT.estil.desc, [], USER_CONFIG, ESTAT.tematica);
+    .millorarCapitol(idx + 1, instruccio, ESTAT.capitols[idx], ESTAT.biblia,
+      outlineCapitol, capsAdjacents, ESTAT.estil.desc, USER_CONFIG, ESTAT.tematica);
 }
 
 // ─── Navegar entre capítols ──────────────────────────────────
@@ -2734,7 +2805,10 @@ function aplicarCorreccio(idx) {
   // Navegar al capítol afectat
   seleccionarCapitol(corr.capIdx);
 
-  // Pre-omplir el camp de millora
+  // Activar mode "lliure" al select i pre-omplir el camp
+  const sel = document.getElementById('cap-millora-select');
+  if (sel) { sel.value = 'lliure'; actualitzarMilloraUI(); }
+
   const input = document.getElementById('cap-millora-input');
   if (input) {
     input.value = corr.instruccio;
@@ -2743,7 +2817,7 @@ function aplicarCorreccio(idx) {
       input.focus();
     }, 200);
   }
-  toast('Instrucció carregada al capítol ' + (corr.capIdx + 1) + '. Clica "Millorar" per aplicar-la.');
+  toast('Instrucció carregada al capítol ' + (corr.capIdx + 1) + '. Clica "Millorar capítol" per aplicar-la.');
 }
 </script>
 </body>
