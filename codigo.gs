@@ -480,6 +480,23 @@ function fase7_expandirElements(elementsTriats, conteActual, tematica, history, 
   return { response, history: newHistory };
 }
 
+// ─── FASE 8: Elenc de personatges per a la novel·la ─────────
+function fase8_elenc(conteActual, worldbuilding, tematica, estilDesc, history, userConfig) {
+  const contextMon = worldbuilding
+    ? `\n\nBíblia de món disponible:\n${worldbuilding}`
+    : '';
+  const msgs = [
+    ...history,
+    {
+      role: 'user',
+      content: `A partir del conte i del món creat, genera l'elenc de 8 personatges per a la novel·la. Inclou els personatges que ja apareixen al conte (adaptats a la seva versió novel·lística) i afegeix-ne de nous necessaris per a una trama de major abast.${contextMon}\n\nCada personatge ha de tenir:\n- Una funció clara a la trama principal o a les subtrames\n- Un desig conscient i un temor ocult que generin tensió\n- Un arc de transformació creïble (on comença → on acaba)\n- Relacions concretes amb altres personatges de l'elenc\n\nMarca amb (Recomanat) els 5 personatges més essencials per a la novel·la.\n\nFormat ESTRICTE (8 personatges, res més, sense cap introducció):\n1. **[Nom, edat]** | Rol: [funció a la trama] | Desig: [el que vol conscientment] | Temor: [el que l'aterroritza o amaga] | Arc: [on comença → on acaba] | Relacions: [amb qui i com]\n2. **[Nom, edat]** | Rol: [...] | Desig: [...] | Temor: [...] | Arc: [...] | Relacions: [...]\n3. **[Nom, edat]** | Rol: [...] | Desig: [...] | Temor: [...] | Arc: [...] | Relacions: [...]\n4. **[Nom, edat]** | Rol: [...] | Desig: [...] | Temor: [...] | Arc: [...] | Relacions: [...]\n5. **[Nom, edat]** | Rol: [...] | Desig: [...] | Temor: [...] | Arc: [...] | Relacions: [...]\n6. **[Nom, edat]** | Rol: [...] | Desig: [...] | Temor: [...] | Arc: [...] | Relacions: [...]\n7. **[Nom, edat]** | Rol: [...] | Desig: [...] | Temor: [...] | Arc: [...] | Relacions: [...]\n8. **[Nom, edat]** | Rol: [...] | Desig: [...] | Temor: [...] | Arc: [...] | Relacions: [...]`
+    }
+  ];
+  const response   = callLLM(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 4096 }));
+  const newHistory = [...msgs, { role: 'assistant', content: response }];
+  return { response, history: newHistory };
+}
+
 // ─── Export a Google Doc (format literari) ──────────────────
 function exportarADoc(titol, contingut) {
   const doc  = DocumentApp.create(titol || 'Conte');

@@ -376,6 +376,20 @@
     border-left: 2px solid var(--border);
   }
 
+  /* ── Comptador de seleccionats ── */
+  .seleccio-comptador {
+    font-size: .82rem;
+    color: var(--text2);
+    margin-bottom: 14px;
+  }
+  .seleccio-comptador .num {
+    color: var(--accent2);
+    font-weight: 700;
+  }
+  .seleccio-comptador .rang {
+    color: var(--text2);
+  }
+
   /* ── Secció amagada ── */
   .hidden { display: none !important; }
 </style>
@@ -428,6 +442,8 @@
     <div class="step-pill" data-step="6">Escriptura</div>
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="7">Món</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="8">Personatges</div>
   </div>
 </div>
 
@@ -588,6 +604,26 @@
   </div>
 </div>
 
+<!-- FASE 8: Elenc de personatges -->
+<div class="card hidden" id="fase-8">
+  <h2><span class="icon">👥</span> Elenc de personatges</h2>
+  <div class="loader-wrap" id="loader-8">
+    <div class="spinner"></div>
+    <span>Generant l'elenc de personatges…</span>
+  </div>
+
+  <div id="elenc-selector" class="hidden">
+    <p style="color:var(--text2);font-size:.9rem;margin-bottom:12px;">Selecciona entre 4 i 7 personatges per a la novel·la. Els <span style="color:var(--accent2);font-weight:600;">Recomanats</span> ja estan marcats:</p>
+    <div class="seleccio-comptador" id="elenc-comptador">
+      <span class="num" id="elenc-num">5</span> <span class="rang">seleccionats (mínim 4, màxim 7)</span>
+    </div>
+    <div id="llista-elenc" class="premise-list"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="confirmarElenc()">🏗️ Definir estructura</button>
+    </div>
+  </div>
+</div>
+
 <!-- FASE 7: Worldbuilding -->
 <div class="card hidden" id="fase-7">
   <h2><span class="icon">🌍</span> Expansió del món</h2>
@@ -689,7 +725,9 @@ const ESTAT = {
   _partsTexts:              [],
   conteText:                '',
   // Worldbuilding
-  worldbuilding:            null
+  worldbuilding:            null,
+  // Elenc de personatges
+  elencPersonatges:         []
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -1165,8 +1203,94 @@ function tornarASeleccioWorld() {
   document.getElementById('world-selector').classList.remove('hidden');
 }
 
+// ═══════════════════════════════════════════════════════════
+//  FASE 7 → FASE 8: Elenc de personatges
+// ═══════════════════════════════════════════════════════════
 function iniciarFase8() {
-  toast('La fase de creació de personatges arribarà aviat!');
+  ESTAT.fase = 8;
+  updateProgress(8);
+  showCard('fase-8');
+  document.getElementById('elenc-selector').classList.add('hidden');
+  showLoader(8);
+
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.history = res.history;
+      hideLoader(8);
+      renderLlistaElenc(res.response);
+    })
+    .withFailureHandler(err => { hideLoader(8); toast('Error: ' + err.message); })
+    .fase8_elenc(ESTAT.conteText, ESTAT.worldbuilding, ESTAT.tematica, ESTAT.estil.desc, ESTAT.history, USER_CONFIG);
+}
+
+function renderLlistaElenc(text) {
+  const wrap  = document.getElementById('llista-elenc');
+  const lines = text.split('\n').filter(l => /^\d+\./.test(l.trim()));
+
+  if (lines.length === 0) {
+    wrap.innerHTML = `<pre style="white-space:pre-wrap;font-size:.9rem;">${escHtml(text)}</pre>`;
+    document.getElementById('elenc-selector').classList.remove('hidden');
+    return;
+  }
+
+  const list = lines.map(l => l.replace(/^\d+\.\s*/, '').trim());
+
+  wrap.innerHTML = list.map((item, i) => {
+    const esRecomanat = /\(Recomanat\)/i.test(item);
+    const textNet     = item.replace(/\s*\(Recomanat\)\s*/i, '').trim();
+    const displayHtml = escHtml(textNet).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    const badge       = esRecomanat ? `<span class="badge-recomanat">Recomanat</span>` : '';
+    const checkedAttr = esRecomanat ? 'checked' : '';
+    const chosenClass = esRecomanat ? 'chosen' : '';
+    return `<div class="world-item ${chosenClass}" id="elenc-item-${i}" data-text="${escHtml(textNet)}" onclick="toggleElencItem(${i}, this)">
+      <input type="checkbox" id="elenc-cb-${i}" ${checkedAttr} onclick="event.stopPropagation();" onchange="syncElencItem(${i})">
+      <label for="elenc-cb-${i}">${badge}${displayHtml}</label>
+    </div>`;
+  }).join('');
+
+  actualitzarComptadorElenc();
+  document.getElementById('elenc-selector').classList.remove('hidden');
+  setTimeout(() => {
+    document.getElementById('fase-8').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+function toggleElencItem(idx, el) {
+  const cb = document.getElementById('elenc-cb-' + idx);
+  cb.checked = !cb.checked;
+  el.classList.toggle('chosen', cb.checked);
+  actualitzarComptadorElenc();
+}
+
+function syncElencItem(idx) {
+  const cb = document.getElementById('elenc-cb-' + idx);
+  const el = document.getElementById('elenc-item-' + idx);
+  el.classList.toggle('chosen', cb.checked);
+  actualitzarComptadorElenc();
+}
+
+function actualitzarComptadorElenc() {
+  const n   = document.querySelectorAll('#llista-elenc input[type=checkbox]:checked').length;
+  const num = document.getElementById('elenc-num');
+  if (num) {
+    num.textContent = n;
+    num.style.color = (n >= 4 && n <= 7) ? 'var(--success)' : 'var(--warning)';
+  }
+}
+
+function confirmarElenc() {
+  const checkboxes = document.querySelectorAll('#llista-elenc input[type=checkbox]:checked');
+  const n = checkboxes.length;
+  if (n < 4) { toast('Selecciona almenys 4 personatges.'); return; }
+  if (n > 7) { toast('Selecciona un màxim de 7 personatges.'); return; }
+
+  ESTAT.elencPersonatges = Array.from(checkboxes).map(cb => {
+    const item = document.getElementById(cb.id.replace('elenc-cb-', 'elenc-item-'));
+    return item ? item.dataset.text : '';
+  }).filter(t => t.length > 0);
+
+  toast('Elenc confirmat amb ' + n + ' personatges.');
+  // Placeholder per a la fase 9
 }
 </script>
 </body>
