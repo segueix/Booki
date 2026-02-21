@@ -1627,6 +1627,7 @@ const ESTAT = {
   _capGenerant:             null, // índex del capítol en generació (o null)
   estat_json:               '',   // memòria d'estat dinàmica entre capítols
   _revisioCapTrigger:       0,   // nº de capítols quan es va mostrar l'últim banner
+  informeEstilGlobal:       '',  // tics estilístics detectats (Fase 15B, al 60%)
   // Fase 17: paratextos
   titolNovel:               '',
   sinopsi:                  '',
@@ -2930,7 +2931,7 @@ function generarCapitolActual() {
           toast('Error a la part 2: ' + err.message);
         })
         .escriureCapitol(2, idx + 1, ESTAT.outline.length, ESTAT.biblia,
-          outlineCapitol, textCapAnterior, ESTAT.estil.desc, USER_CONFIG, ESTAT.tematica, historialPart, fetsCanonics, estatJsonVigent);
+          outlineCapitol, textCapAnterior, ESTAT.estil.desc, USER_CONFIG, ESTAT.tematica, historialPart, fetsCanonics, estatJsonVigent, ESTAT.informeEstilGlobal);
     })
     .withFailureHandler(function(err) {
       ESTAT._capGenerant = null;
@@ -2940,7 +2941,7 @@ function generarCapitolActual() {
       toast('Error a la part 1: ' + err.message);
     })
     .escriureCapitol(1, idx + 1, ESTAT.outline.length, ESTAT.biblia,
-      outlineCapitol, textCapAnterior, ESTAT.estil.desc, USER_CONFIG, ESTAT.tematica, null, fetsCanonics, estatJsonVigent);
+      outlineCapitol, textCapAnterior, ESTAT.estil.desc, USER_CONFIG, ESTAT.tematica, null, fetsCanonics, estatJsonVigent, ESTAT.informeEstilGlobal);
 }
 
 // ─── Regenerar el capítol actiu ─────────────────────────────
@@ -3309,6 +3310,22 @@ function verificarRevisioDisponible() {
     const bannerTx = document.getElementById('revisio-banner-text');
     bannerTx.textContent = `Revisió de coherència disponible (caps. 1–${nGenerats})`;
     banner.classList.remove('hidden');
+  }
+
+  // MILLORA 6: Generar informe d'estil al 60% dels capítols (una sola vegada)
+  const percentatge = ESTAT.outline.length > 0 ? nGenerats / ESTAT.outline.length : 0;
+  if (percentatge >= 0.6 && !ESTAT.informeEstilGlobal) {
+    const capsDades = ESTAT.capitols.reduce(function(acc, text, i) {
+      if (text) acc.push({ num: i + 1, text: text });
+      return acc;
+    }, []);
+    google.script.run
+      .withSuccessHandler(function(res) {
+        ESTAT.informeEstilGlobal = res.response || '';
+        toast('Informe d\'estil generat. S\'aplicarà als capítols restants.');
+      })
+      .withFailureHandler(function() { /* silenciós */ })
+      .fase15_informeEstil(capsDades, USER_CONFIG, ESTAT.tematica);
   }
 }
 

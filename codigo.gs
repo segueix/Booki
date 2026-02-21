@@ -179,7 +179,12 @@ const SYSTEM_DEFAULT = `Ets un mestre del conte literari breu en català.
 Apliques el principi d'unitat d'efecte de Poe: cada paraula serveix un únic impacte emocional final.
 Escrius amb economia de paraules, primera frase magnètica, tensió creixent i finals memorables que ressonen.
 Mai desperdicies una frase. Prioritzes mostrar sobre explicar.
-Escrius EXCLUSIVAMENT en català. Mai inclous paraules, frases ni comentaris en anglès o cap altra llengua. Mai afegeixes notes meta, indicacions de número de part ni cap text fora de la narració literària. Escriu directament el text.`;
+Escrius EXCLUSIVAMENT en català. Mai inclous paraules, frases ni comentaris en anglès o cap altra llengua. Mai afegeixes notes meta, indicacions de número de part ni cap text fora de la narració literària. Escriu directament el text.
+
+RESTRICCIONS GENERALS:
+→ No repeteixis la mateixa metàfora o comparació més de 2 vegades en tot el text.
+→ Diàlegs oblics: els personatges mai diuen literalment el que senten. Mostren-ho amb accions, silencis i subtextos.
+→ Cada tancament de secció o capítol ha d'usar un recurs retòric diferent. Mai repeteixis l'estructura de clausura.`;
 
 // ─── System prompt dinàmic per gènere ──────────────────────
 function getSystemPrompt(tematica) {
@@ -197,7 +202,14 @@ Procediments detallats i creïbles: investigació policial o periodística amb l
 Crítica social integrada a la trama, mai com a discurs extern o didàctic.
 Protagonistes durs i traumatitzats amb una tenacitat quasi obsessiva: la ferida personal impulsa la investigació.
 Estructura de revelació progressiva: el que semblava un cas puntual destapa un sistema podrit.
-Ritme pausat i metòdic en la investigació, però amb pics d'acció breu i brutal.`;
+Ritme pausat i metòdic en la investigació, però amb pics d'acció breu i brutal.
+
+RESTRICCIONS ESTILÍSTIQUES OBLIGATÒRIES:
+→ PROHIBIT repetir la mateixa metàfora (fred/formigó/vidre/foscor/glaç) més de 2 vegades per capítol. Usa alternatives sensorials variades: sons, olors, textures, llum, pes.
+→ PROHIBIT que els personatges articulin en veu alta allò que senten. Els diàlegs han de ser oblics, amb subtext. El lector ha de deduir l'emoció per les accions i les omissions, mai per declaracions directes.
+→ PROHIBIT tancar capítols amb la mateixa estructura sintàctica (p.ex. "la foscor l'engolia" o variants). Cada tancament de capítol ha de tenir una estructura i un recurs retòric diferent.
+→ Els antagonistes han de mostrar almenys un moment de vulnerabilitat, dubte o contradicció interna per capítol en què apareguin. Mai poden ser funcions narratives planes.
+→ El vocabulari tècnic (policial, forense, informàtic) s'ha d'integrar amb naturalitat, mai com a catàleg enciclopèdic. Màxim 2 termes tècnics per paràgraf.`;
   }
 
   if (isTolkien) {
@@ -210,7 +222,12 @@ Temes centrals: la corrupció del poder, el pes de la responsabilitat, la camara
 Llenguatge solemne però accessible: frases llargues i rítmiques, ús mesurat de construccions arcaiques, incorporació de cançons, rimes o fragments en llengua inventada quan l'escena ho demana.
 Ambientació concreta i grandiosa: paisatges amb nom i caràcter propi (boscos immòbils, muntanyes impassibles, torres de pedra negra, planes interminables), detalls arquitectònics i culturals que evoquen civilitzacions antigues amb història pròpia.
 La natura com a presència viva: arbres, rius i terres no són decorat sinó actors amb memòria, voluntat i opinió.
-El mal té pes físic: no s'explica, es percep en l'aire que s'espesseix, en la llum que s'apaga, en el silenci sobtat dels ocells i la por als ulls dels animals.`;
+El mal té pes físic: no s'explica, es percep en l'aire que s'espesseix, en la llum que s'apaga, en el silenci sobtat dels ocells i la por als ulls dels animals.
+
+RESTRICCIONS ESTILÍSTIQUES:
+→ PROHIBIT abusar de "les tenebres" o "la foscor" com a recurs de clausura. Varia les imatges: silenci dels ocells, pes de l'aire, fred que puja des de la terra, canvi de llum.
+→ Els discursos dels personatges han de tenir veus diferenciades: un elf no parla com un nan ni com un hobbit. Cadascú té ritme, vocabulari i longitud de frase propis.
+→ El mal no s'explica amb adjectius ("terrible", "fosc", "malèfic") sinó amb efectes físics concrets sobre l'entorn i els personatges.`;
   }
 
   return SYSTEM_DEFAULT;
@@ -525,7 +542,7 @@ function fase8_elenc(conteActual, worldbuilding, tematica, estilDesc, history, u
     ...history,
     {
       role: 'user',
-      content: `A partir del conte i del món creat, genera l'elenc de 8 personatges per a la novel·la. Inclou els personatges que ja apareixen al conte (adaptats a la seva versió novel·lística) i afegeix-ne de nous necessaris per a una trama de major abast.${contextMon}\n\nCada personatge ha de tenir:\n- Una funció clara a la trama principal o a les subtrames\n- Un desig conscient i un temor ocult que generin tensió\n- Un arc de transformació creïble (on comença → on acaba)\n- Relacions concretes amb altres personatges de l'elenc\n\nMarca amb (Recomanat) els 5 personatges més essencials per a la novel·la.\n\nFormat ESTRICTE (8 personatges, res més, sense cap introducció):\n1. **[Nom, edat]** | Rol: [funció a la trama] | Desig: [el que vol conscientment] | Temor: [el que l'aterroritza o amaga] | Arc: [on comença → on acaba] | Relacions: [amb qui i com]\n2. **[Nom, edat]** | Rol: [...] | Desig: [...] | Temor: [...] | Arc: [...] | Relacions: [...]\n3. **[Nom, edat]** | Rol: [...] | Desig: [...] | Temor: [...] | Arc: [...] | Relacions: [...]\n4. **[Nom, edat]** | Rol: [...] | Desig: [...] | Temor: [...] | Arc: [...] | Relacions: [...]\n5. **[Nom, edat]** | Rol: [...] | Desig: [...] | Temor: [...] | Arc: [...] | Relacions: [...]\n6. **[Nom, edat]** | Rol: [...] | Desig: [...] | Temor: [...] | Arc: [...] | Relacions: [...]\n7. **[Nom, edat]** | Rol: [...] | Desig: [...] | Temor: [...] | Arc: [...] | Relacions: [...]\n8. **[Nom, edat]** | Rol: [...] | Desig: [...] | Temor: [...] | Arc: [...] | Relacions: [...]`
+      content: `A partir del conte i del món creat, genera l'elenc de 8 personatges per a la novel·la. Inclou els personatges que ja apareixen al conte (adaptats a la seva versió novel·lística) i afegeix-ne de nous necessaris per a una trama de major abast.${contextMon}\n\nCada personatge ha de tenir:\n- Una funció clara a la trama principal o a les subtrames\n- Un desig conscient i un temor ocult que generin tensió\n- Un arc de transformació creïble (on comença → on acaba)\n- Relacions concretes amb altres personatges de l'elenc\n\nINSTRUCCIÓ CRÍTICA PER ALS ANTAGONISTES:\n→ L'elenc ha d'incloure almenys 1 antagonista principal i 1 antagonista secundari.\n→ L'antagonista principal HA DE tenir una motivació que el lector pugui entendre o fins i tot empatitzar. Ha de creure sincerament que fa el correcte, o estar atrapat en un dilema real amb costos personals.\n→ L'antagonista NO POT ser una funció narrativa plana (el "dolent"). Ha de tenir un arc propi, pèrdues i contradiccions internes.\n→ Indica explícitament al camp "Rol" si el personatge és antagonista.\n\nMarca amb (Recomanat) els 5 personatges més essencials per a la novel·la.\n\nFormat ESTRICTE (8 personatges, res més, sense cap introducció):\n1. **[Nom, edat]** | Rol: [funció a la trama] | Desig: [el que vol conscientment] | Temor: [el que l'aterroritza o amaga] | Arc: [on comença → on acaba] | Veu: [tret narratiu o tic que el fa distintiu] | Relacions: [amb qui i com]\n2. **[Nom, edat]** | Rol: [...] | Desig: [...] | Temor: [...] | Arc: [...] | Veu: [...] | Relacions: [...]\n3. **[Nom, edat]** | Rol: [...] | Desig: [...] | Temor: [...] | Arc: [...] | Veu: [...] | Relacions: [...]\n4. **[Nom, edat]** | Rol: [...] | Desig: [...] | Temor: [...] | Arc: [...] | Veu: [...] | Relacions: [...]\n5. **[Nom, edat]** | Rol: [...] | Desig: [...] | Temor: [...] | Arc: [...] | Veu: [...] | Relacions: [...]\n6. **[Nom, edat]** | Rol: [...] | Desig: [...] | Temor: [...] | Arc: [...] | Veu: [...] | Relacions: [...]\n7. **[Nom, edat]** | Rol: [...] | Desig: [...] | Temor: [...] | Arc: [...] | Veu: [...] | Relacions: [...]\n8. **[Nom, edat]** | Rol: [...] | Desig: [...] | Temor: [...] | Arc: [...] | Veu: [...] | Relacions: [...]`
     }
   ];
   const response   = callLLM(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 4096 }));
@@ -651,12 +668,34 @@ function fase13_compilarBiblia(dades) {
       var nomM = p.match(/\*\*(.+?)\*\*/);
       var arcM = p.match(/Arc:\s*([^|]+)/);
       var relM = p.match(/Relacions:\s*(.+)/);
+      var veuM = p.match(/Veu:\s*([^|]+)/);
+      var temM = p.match(/Temor:\s*([^|]+)/);
       var nom  = nomM ? nomM[1].trim() : p.substring(0, 25).trim();
       var arc  = arcM ? arcM[1].trim().substring(0, 100) : '—';
       var rel  = relM ? relM[1].trim().substring(0, 80) : '';
-      return '• ' + nom + ' — Arc: ' + arc + (rel ? ' | Rel: ' + rel : '');
+      var veu  = veuM ? veuM[1].trim().substring(0, 80) : '';
+      var tem  = temM ? temM[1].trim().substring(0, 60) : '';
+      return '• ' + nom + ' — Arc: ' + arc +
+        (veu ? ' | Veu: ' + veu : '') +
+        (tem ? ' | Temor: ' + tem : '') +
+        (rel ? ' | Rel: ' + rel : '');
     });
     seccions.push('## PERSONATGES\n' + persList.join('\n'));
+  }
+
+  // GUIA DE DIÀLEG
+  if (d.elencPersonatges && d.elencPersonatges.length > 0) {
+    var dialogGuia = d.elencPersonatges.map(function(p) {
+      var nomM = p.match(/\*\*(.+?)\*\*/);
+      var veuM = p.match(/Veu:\s*([^|]+)/);
+      var nom  = nomM ? nomM[1].trim() : '';
+      var veu  = veuM ? veuM[1].trim() : '';
+      if (!nom || !veu) return null;
+      return '• ' + nom + ': ' + veu;
+    }).filter(function(x) { return x; });
+    if (dialogGuia.length > 0) {
+      seccions.push('## GUIA DE DIÀLEG (veu de cada personatge)\nCada personatge ha de parlar de manera recognoscible i diferenciada:\n' + dialogGuia.join('\n'));
+    }
   }
 
   // ESTRUCTURA
@@ -808,7 +847,9 @@ function fase15_revisioCoherencia(capitolsData, biblia, userConfig, fetsCanonics
     '1. Contradiccions factuals (noms, dates, llocs, fets que canvien)\n' +
     '2. Canvis de to o veu narrativa injustificats\n' +
     '3. Fils narratius o detalls plantats que han quedat abandonats\n' +
-    '4. Inconsistències de personatges (comportament, coneixements, relacions)\n\n' +
+    '4. Inconsistències de personatges (comportament, coneixements, relacions)\n' +
+    '5. Patrons estilístics repetitius: metàfores, comparacions, imatges sensorials o estructures de frase que apareixen en múltiples capítols de forma idèntica o quasi idèntica. Inclou repeticions de clàusules de tancament de capítol.\n' +
+    '6. Diàlegs indiferenciats: personatges que parlen amb la mateixa veu, ritme i registre quan haurien de ser distingibles.\n\n' +
     'Per cada problema, proposa una correcció específica al capítol corresponent.\n\n' +
     'Format ESTRICTE per a cada problema (sense cap variació):\n' +
     'PROBLEMA: [descripció clara i breu]\n' +
@@ -870,10 +911,82 @@ function fase15_revisioCoherencia(capitolsData, biblia, userConfig, fetsCanonics
   return { response: aprovades.length ? aprovades.join('\n') : 'Cap inconsistència detectada.' };
 }
 
+// ─── FASE 15B: Informe d'estil global ───────────────────────
+// Es genera un cop després de completar ~60% dels capítols.
+// El resultat s'injecta com a context a totes les millores posteriors.
+function fase15_informeEstil(capitolsData, userConfig, tematica) {
+  var d = capitolsData || [];
+  var fragments = d.map(function(cap) {
+    var words = (cap.text || '').trim().split(/\s+/).filter(function(w) { return w; });
+    // Primeres 150 + últimes 100 paraules de cada capítol
+    var inici = words.slice(0, 150).join(' ');
+    var final = words.slice(-100).join(' ');
+    return '=== CAPÍTOL ' + cap.num + ' ===\nINICI:\n' + inici + '\n[…]\nFINAL:\n' + final;
+  }).join('\n\n');
+
+  var prompt =
+    fragments + '\n\n---\n' +
+    'Analitza els fragments i identifica entre 3 i 5 tics estilístics recurrents de l\'autor.\n' +
+    'Per a cada tic, proposa una alternativa concreta.\n\n' +
+    'Format ESTRICTE:\n' +
+    'TIC: [descripció del patró repetitiu]\n' +
+    'ALTERNATIVA: [proposta concreta i accionable]\n\n' +
+    'Si no detectes tics rellevants, escriu: "Cap tic estilístic recurrent detectat."';
+
+  var response = analitzarAmbEditor(prompt, userConfig);
+  return { response: response };
+}
+
+// ─── Generació d'obertura magnètica per a un capítol ────────
+// Genera 3 opcions de primera frase i selecciona la millor.
+// Retorna la frase guanyadora com a string.
+function generarObertura(numCapitol, outlineCapitol, textCapAnterior, biblia, estilDesc, userConfig, tematica) {
+  var contextAnterior = '';
+  if (textCapAnterior && textCapAnterior.trim()) {
+    var words = textCapAnterior.trim().split(/\s+/);
+    contextAnterior = '\nÚltima frase del capítol anterior: "' + words.slice(-20).join(' ') + '"';
+  }
+
+  var prompt =
+    '=== CAPÍTOL ' + numCapitol + ' ===\n' +
+    'Outline: ' + (outlineCapitol || '').split('\n')[0].substring(0, 150) + '\n' +
+    'Estil: ' + (estilDesc || '') +
+    contextAnterior + '\n\n' +
+    'Genera exactament 3 opcions de PRIMERA FRASE per a aquest capítol. Cada opció ha de:\n' +
+    '→ Ser impossible de no continuar llegint (ganxo immediat)\n' +
+    '→ Establir to, atmosfera o conflicte en una sola frase\n' +
+    '→ Ser radicalment diferent de les altres dues opcions en estil i enfocament\n' +
+    '→ NO repetir l\'estructura de la primera frase del capítol anterior\n\n' +
+    'Després, tria la millor de les 3 i indica-la.\n\n' +
+    'Format ESTRICTE:\n' +
+    'A) [primera frase opció A]\n' +
+    'B) [primera frase opció B]\n' +
+    'C) [primera frase opció C]\n' +
+    'MILLOR: [A/B/C]';
+
+  var msgs = [{ role: 'user', content: prompt }];
+  var systemObertura = getSystemPrompt(tematica) +
+    (biblia ? '\n\n=== BÍBLIA ===\n' + (biblia || '').substring(0, 800) : '');
+  var response = callLLM(msgs, systemObertura, Object.assign({}, userConfig, { maxTokens: 600 }));
+
+  // Parsejar la resposta per extreure la frase guanyadora
+  var millorMatch = (response || '').match(/MILLOR:\s*([ABC])/i);
+  if (millorMatch) {
+    var lletra = millorMatch[1].toUpperCase();
+    var fraseMatch = response.match(new RegExp(lletra + '\\)\\s*(.+)', 'i'));
+    if (fraseMatch) return fraseMatch[1].trim();
+  }
+
+  // Fallback: retornar la primera opció
+  var fallback = response.match(/[ABC]\)\s*(.+)/i);
+  return fallback ? fallback[1].trim() : '';
+}
+
 // ─── FASE 14: Escriure un capítol (patró anti-timeout, 2 parts) ──
-// partNum:      1 (primera meitat) o 2 (segona meitat)
+// partNum:       1 (primera meitat) o 2 (segona meitat)
 // historialPart: null per Part 1; historial retornat per Part 1 per a Part 2
-function escriureCapitol(partNum, numCapitol, totalCapitols, biblia, outlineCapitol, textCapAnterior, estilDesc, userConfig, tematica, historialPart, fetsCanonicsText, estatJson) {
+// informeEstil:  (opcional) tics estilístics detectats per fase15_informeEstil
+function escriureCapitol(partNum, numCapitol, totalCapitols, biblia, outlineCapitol, textCapAnterior, estilDesc, userConfig, tematica, historialPart, fetsCanonicsText, estatJson, informeEstil) {
   var capitolsRestants = Math.max(0, (totalCapitols || 0) - (numCapitol || 0));
   var systemForCap = getSystemPrompt(tematica) +
     '\n\n=== BÍBLIA DE LA NOVEL·LA ===\n' + (biblia || '');
@@ -882,8 +995,31 @@ function escriureCapitol(partNum, numCapitol, totalCapitols, biblia, outlineCapi
     systemForCap += '\n\n[ALERTA DE RITME: Estàs a la fase de desenvolupament. ESTÀ PROHIBIT resoldre el conflicte principal, revelar els grans secrets o matar l\'antagonista en aquest capítol. Mantingues la tensió.]';
   }
 
+  // MILLORA 3: Control de tensió macro per posició al timeline
+  var midPoint = Math.ceil(totalCapitols / 2);
+  if (numCapitol === midPoint) {
+    systemForCap += '\n\n[PUNT MIG DE LA NOVEL·LA — CAPÍTOL ' + numCapitol + ' DE ' + totalCapitols + ']: Aquest capítol ha de contenir LA REVELACIÓ o el GIR que canvia la direcció de tota la trama. El protagonista descobreix que el problema és molt més gran, diferent o més personal del que creia. Res no pot ser igual després d\'aquest capítol. Ha de ser el moment de major densitat informativa i emocional fins ara.';
+  }
+
+  if (capitolsRestants >= 2 && capitolsRestants <= 3) {
+    systemForCap += '\n\n[ACCELERACIÓ PRE-CLÍMAX]: Ritme urgent. Frases més curtes que la mitjana. Decisions irreversibles. Els personatges creuen ponts que no poden tornar a creuar. El temps s\'esgota narrativament. Elimina qualsevol descripció que no sigui estrictament funcional.';
+  }
+
+  if (capitolsRestants === 1) {
+    systemForCap += '\n\n[CLÍMAX]: Aquest és el capítol de màxima tensió. Totes les subtrames convergeixen. El conflicte central arriba al punt de no retorn. Acció concentrada, emoció sense filtres, conseqüències reals i irreversibles.';
+  }
+
+  if (capitolsRestants === 0) {
+    systemForCap += '\n\n[RESOLUCIÓ FINAL]: Últim capítol de la novel·la. Resol els fils oberts amb precisió. L\'última frase ha de ressonar com l\'última nota d\'una simfonia: inevitable, definitiva, memorable. No introdueixis cap element nou. Tanca cercles oberts al principi.';
+  }
+
   if (fetsCanonicsText && String(fetsCanonicsText).trim()) {
     systemForCap += '\n\n=== FETS CANÒNICS RECENTS (NO CONTRADIR) ===\n' + String(fetsCanonicsText).substring(0, 2000);
+  }
+
+  // MILLORA 6: Injectar tics estilístics a evitar
+  if (informeEstil && String(informeEstil).trim()) {
+    systemForCap += '\n\n=== TICS ESTILÍSTICS A EVITAR ===\n' + String(informeEstil).substring(0, 1500);
   }
 
   var contextAnterior = '';
@@ -903,11 +1039,24 @@ function escriureCapitol(partNum, numCapitol, totalCapitols, biblia, outlineCapi
     : '';
 
   if (partNum === 1) {
+    // MILLORA 8: Generar obertura magnètica dedicada
+    var oberturaFrase = '';
+    try {
+      oberturaFrase = generarObertura(numCapitol, outlineCapitol, textCapAnterior, biblia, estilDesc, userConfig, tematica);
+    } catch (e) {
+      oberturaFrase = '';
+    }
+
+    var oberturaInstr = oberturaFrase
+      ? '→ OBLIGATORI: La primera frase del capítol ha de ser exactament: "' + oberturaFrase + '". Continua a partir d\'aquí.\n'
+      : '';
+
     var part1Content =
       '=== CAPÍTOL ' + numCapitol + ' DE ' + totalCapitols + ' ===\n' +
       (outlineCapitol || '') + contextAnterior + '\n\n' +
       'Escriu la PRIMERA MEITAT d\'aquest capítol (~1500 paraules). Estil: ' + (estilDesc || '') + '.\n' +
       '→ Comença directament la narració, sense títol ni encapçalament.\n' +
+      oberturaInstr +
       '→ Estableix l\'atmosfera i el conflicte central del capítol.\n' +
       '→ Planta la tensió creixent fins a un punt d\'inflexió.\n' +
       '→ Acaba en tensió màxima: talla quan la situació sigui més crítica, sense resoldre res.' + noirExtra + '\n' +
@@ -919,9 +1068,24 @@ function escriureCapitol(partNum, numCapitol, totalCapitols, biblia, outlineCapi
     return { response: resp1, history: newHistory };
 
   } else {
-    var histBase     = Array.isArray(historialPart) ? historialPart : [];
+    var histBase = Array.isArray(historialPart) ? historialPart : [];
+
+    // MILLORA 2: Generar micro-resum de la Part 1 per garantir coherència interna
+    var resumPart1Prompt = [
+      { role: 'user', content: 'Resumeix en exactament 3 frases el que ha passat en aquest fragment narratiu. Inclou: (1) situació inicial, (2) conflicte o tensió principal, (3) on s\'ha tallat l\'acció. Només les 3 frases, res més.\n\n' + (histBase.length > 0 && histBase[histBase.length - 1].content ? histBase[histBase.length - 1].content : '') }
+    ];
+    var resumPart1 = '';
+    try {
+      resumPart1 = callLLM(resumPart1Prompt, 'Ets un assistent que resumeix textos narratius en exactament 3 frases en català. Cap comentari addicional.', Object.assign({}, userConfig, { maxTokens: 300 }));
+    } catch (e) {
+      resumPart1 = '';
+    }
+
     var objectiuBreu = (outlineCapitol || '').split('\n')[0].substring(0, 120);
+    var resumContext = resumPart1 ? '\n=== RESUM DE LA PRIMERA MEITAT ===\n' + resumPart1 + '\n\n' : '';
+
     var part2Content =
+      resumContext +
       'Continua i finalitza el capítol amb la SEGONA MEITAT (~1500 paraules).\n' +
       '→ Recull la tensió de la primera meitat i desenvolupa-la fins a la resolució del capítol.\n' +
       '→ Objectiu del capítol: ' + objectiuBreu + '\n' +
@@ -932,7 +1096,7 @@ function escriureCapitol(partNum, numCapitol, totalCapitols, biblia, outlineCapi
       'Continua directament en català des d\'on s\'ha aturat. Cap paraula en anglès. Cap comentari fora de la narració literària.';
 
     var msgs2 = histBase.concat([{ role: 'user', content: part2Content }]);
-    var resp2  = callLLM(msgs2, systemForCap, Object.assign({}, userConfig, { maxTokens: 6000 }));
+    var resp2 = callLLM(msgs2, systemForCap, Object.assign({}, userConfig, { maxTokens: 6000 }));
     return { response: resp2 };
   }
 }
