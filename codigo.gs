@@ -17,6 +17,13 @@ const PROVIDER_DEFAULTS = {
   }
 };
 
+const DIALOGUE_FORMAT_RULES = [
+  'FORMAT DE DIÀLEG (OBLIGATORI): diferencia visualment narració i conversa.',
+  'Cada intervenció de diàleg ha d\'anar en un paràgraf propi.',
+  'En català literari, fes servir la ratlla de diàleg (—) i no cometes per marcar la parla directa.',
+  'Mantén acotacions i pensaments integrats amb naturalitat, però sense barrejar llargues rèpliques dins del mateix bloc narratiu.'
+].join('\n');
+
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('index')
     .setTitle('Conte IA — Creador de contes')
@@ -783,7 +790,8 @@ function millorarConte(instruccio, conteActual, estilDesc, history, userConfig, 
 // capsAdjacents: {ant: string|null, post: string|null}
 function millorarCapitol(numCapitol, instruccio, capitolActual, biblia, outlineCapitol, capsAdjacents, estilDesc, userConfig, tematica) {
   var systemForCap = getSystemPrompt(tematica) +
-    '\n\n=== BÍBLIA DE LA NOVEL·LA ===\n' + (biblia || '');
+    '\n\n=== BÍBLIA DE LA NOVEL·LA ===\n' + (biblia || '') +
+    '\n\n=== NORMES DE MAQUETACIÓ ===\n' + DIALOGUE_FORMAT_RULES;
 
   var contextAdj = '';
   if (capsAdjacents) {
@@ -1713,7 +1721,8 @@ function escriureCapitol(partNum, numCapitol, totalCapitols, biblia, outlineCapi
   var contextAmbientacio = construirContextAmbientacio(ambientacio, tematica);
   var systemForCap = getSystemPrompt(tematica) +
     (contextAmbientacio ? '\n' + contextAmbientacio : '') +
-    '\n\n=== BÍBLIA DE LA NOVEL·LA ===\n' + (biblia || '');
+    '\n\n=== BÍBLIA DE LA NOVEL·LA ===\n' + (biblia || '') +
+    '\n\n=== NORMES DE MAQUETACIÓ ===\n' + DIALOGUE_FORMAT_RULES;
 
   var perfil = getPerfilAutor(tematica);
 
