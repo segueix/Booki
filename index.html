@@ -918,6 +918,55 @@
     pointer-events: none;
     z-index: 9999;
   }
+
+  /* ── Fases col·lapsades (BLOC D) ── */
+  .card.fase-collapsed {
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: all .2s;
+    opacity: .65;
+  }
+  .card.fase-collapsed:hover { opacity: 1; border-color: var(--accent); }
+  .card.fase-collapsed h2 {
+    margin-bottom: 0;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .card.fase-collapsed .fase-resum {
+    font-size: .82rem;
+    color: var(--text2);
+    margin-left: auto;
+    max-width: 340px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .card.fase-collapsed > *:not(h2) { display: none !important; }
+  .card { scroll-margin-top: 16px; }
+
+  /* ── Botó flotant de guardar (BLOC B) ── */
+  .fab-guardar {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    font-size: 1.4rem;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(124,106,247,.4);
+    transition: transform .2s, box-shadow .2s;
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .fab-guardar:hover { transform: scale(1.1); box-shadow: 0 6px 24px rgba(124,106,247,.5); }
 </style>
 </head>
 <body>
@@ -925,7 +974,30 @@
 <header>
   <h1>📖 Conte IA</h1>
   <p>Crea el teu conte pas a pas amb intel·ligència artificial</p>
+  <div style="margin-top:10px;">
+    <button class="btn btn-ghost" style="font-size:.82rem;padding:6px 14px;" onclick="guardarProjecteRapid()">💾 Guardar</button>
+  </div>
 </header>
+
+<!-- GESTOR DE PROJECTES -->
+<div class="card" id="card-projectes">
+  <h2><span class="icon">💾</span> Projectes</h2>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;">
+    <button class="btn btn-primary" style="flex:1;min-width:140px;" onclick="mostrarFormGuardar()">💾 Guardar projecte</button>
+    <label class="btn btn-secondary" style="flex:1;min-width:140px;text-align:center;cursor:pointer;">
+      📥 Importar JSON
+      <input type="file" accept=".json" onchange="importarProjecteJSON(event)" style="display:none;">
+    </label>
+  </div>
+  <div id="form-guardar" class="hidden" style="margin-bottom:18px;">
+    <div style="display:flex;gap:10px;">
+      <input type="text" id="input-nom-projecte" placeholder="Nom del projecte…" style="flex:1;">
+      <button class="btn btn-primary" onclick="guardarProjecte(document.getElementById('input-nom-projecte').value)">Guardar</button>
+    </div>
+  </div>
+  <div id="llista-projectes"></div>
+  <p id="projectes-buit" style="color:var(--text2);font-size:.88rem;text-align:center;padding:18px 0;">Cap projecte guardat.</p>
+</div>
 
 <!-- CONFIGURACIÓ INICIAL -->
 <div class="card" id="card-config">
@@ -992,21 +1064,30 @@
 
 <!-- FASE 0: Selecció de gènere -->
 <div class="card hidden" id="fase-0">
-  <h2><span class="icon">🎭</span> Tria el gènere</h2>
-  <label class="field-label" for="sel-tematica">Tipus de conte</label>
+  <h2><span class="icon">🎭</span> Tria el perfil d'autor</h2>
+  <label class="field-label" for="sel-tematica">Perfil d'autor</label>
   <select id="sel-tematica">
-    <option value="">— Selecciona un gènere —</option>
-    <option value="conte de terror psicològic">Terror psicològic</option>
-    <option value="conte de realisme màgic">Realisme màgic</option>
-    <option value="conte negre nòrdic (Nordic Noir)">Conte negre (Nordic Noir)</option>
-    <option value="conte de ciència-ficció breu">Ciència ficció</option>
-    <option value="conte fantàstic">Conte fantàstic</option>
-    <option value="faula contemporània">Faula contemporània</option>
-    <option value="conte sentimental">Conte sentimental</option>
-    <option value="conte d'humor negre">Humor negre</option>
-    <option value="microconte / flash fiction">Microconte / flash fiction</option>
-    <option value="conte de misteri">Misteri</option>
+    <option value="">— Selecciona un perfil —</option>
+    <option value="larsson">Stieg Larsson — Millennium (Nordic Noir)</option>
+    <option value="tolkien">J.R.R. Tolkien — Alta Fantasia Èpica</option>
+    <option value="dick">Philip K. Dick — Ciència-ficció ontològica</option>
+    <option value="castaneda">Carlos Castaneda — Itinerari iniciàtic</option>
   </select>
+  <label class="field-label" style="margin-top:18px;">Ambientació</label>
+  <div class="opts-row" id="opts-ambientacio">
+    <div class="opt-pill" data-group="ambientacio" data-val="universal" onclick="triarPill(this)">
+      🌍 Universal
+      <small>Sense localització definida</small>
+    </div>
+    <div class="opt-pill chosen" data-group="ambientacio" data-val="catalana" onclick="triarPill(this)">
+      🏔️ Catalana
+      <small>Països Catalans contemporanis</small>
+    </div>
+    <div class="opt-pill" data-group="ambientacio" data-val="catalana_medieval" onclick="triarPill(this)">
+      ⚔️ Medieval Catalana
+      <small>Corona d'Aragó medieval</small>
+    </div>
+  </div>
   <div class="btn-row">
     <button class="btn btn-primary" onclick="iniciarFase1()">✨ Generar premisses</button>
   </div>
@@ -1141,7 +1222,7 @@
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="regenerarConte()">🔄 Regenerar</button>
       <button class="btn btn-secondary" onclick="exportarDoc()">📄 Exportar a Google Docs</button>
-      <button class="btn btn-primary"   onclick="iniciarFase7()">🌍 Expandir a novel·la</button>
+      <button class="btn btn-primary"   onclick="iniciarFase6b()">🗺️ Expandir a novel·la</button>
     </div>
     <div id="export-link-wrap" class="hidden" style="margin-top:14px;"></div>
   </div>
@@ -1264,6 +1345,22 @@
   </div>
 </div>
 
+<!-- FASE 6B: Esquelet de novel·la -->
+<div class="card hidden" id="fase-6b">
+  <h2><span class="icon">🗺️</span> Esquelet de la novel·la</h2>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:16px;">Anàlisi del conte i pla d'expansió amb fils narratius, girs i subtrames calibrats al perfil d'autor.</p>
+  <div class="loader-wrap" id="loader-6b">
+    <div class="spinner"></div>
+    <span id="loader-6b-text">Generant l'esquelet d'expansió…</span>
+  </div>
+  <div id="esquelet-wrap" class="hidden">
+    <div class="worldbuilding-result" id="esquelet-cos"></div>
+    <div class="btn-row" style="margin-top:20px;">
+      <button class="btn btn-primary" onclick="iniciarFase7()">🌍 Continuar amb worldbuilding</button>
+    </div>
+  </div>
+</div>
+
 <!-- FASE 7: Worldbuilding -->
 <div class="card hidden" id="fase-7">
   <h2><span class="icon">🌍</span> Expansió del món</h2>
@@ -1300,6 +1397,13 @@
     <span style="font-size:1.1rem;">🔍</span>
     <span class="revisio-banner-text" id="revisio-banner-text">Revisió de coherència disponible</span>
     <button class="btn btn-secondary" style="padding:7px 16px;font-size:.82rem;" onclick="iniciarRevisio()">Revisar ara</button>
+    <button class="btn btn-ghost" style="padding:7px 10px;font-size:.82rem;" onclick="this.closest('.revisio-banner').classList.add('hidden')" title="Descartar">✕</button>
+  </div>
+  <!-- Banner de lector beta (apareix al 80%) -->
+  <div class="revisio-banner hidden" id="lector-beta-banner" style="border-color:rgba(74,222,128,.28);background:rgba(74,222,128,.07);">
+    <span style="font-size:1.1rem;">📖</span>
+    <span class="revisio-banner-text" id="lector-beta-banner-text" style="color:var(--success);">Anàlisi de lector beta disponible</span>
+    <button class="btn btn-secondary" style="padding:7px 16px;font-size:.82rem;" onclick="iniciarLectorBeta()">Analitzar</button>
     <button class="btn btn-ghost" style="padding:7px 10px;font-size:.82rem;" onclick="this.closest('.revisio-banner').classList.add('hidden')" title="Descartar">✕</button>
   </div>
 
@@ -1386,6 +1490,19 @@
       <span>Analitzant la coherència dels capítols…</span>
     </div>
     <div class="editor-result hidden" id="revisio-result"></div>
+  </div>
+
+  <!-- Panel de lector beta (Fase 15B) -->
+  <div class="revisio-panel hidden" id="lector-beta-panel">
+    <div class="revisio-panel-header">
+      <span class="revisio-panel-titol">📖 Informe de lector beta</span>
+      <button class="btn btn-ghost" style="padding:6px 12px;font-size:.82rem;" onclick="document.getElementById('lector-beta-panel').classList.add('hidden')">✕ Tancar</button>
+    </div>
+    <div class="cap-loader" id="lector-beta-loader">
+      <div class="spinner"></div>
+      <span>Simulant lectura beta…</span>
+    </div>
+    <div class="editor-result hidden" id="lector-beta-result"></div>
   </div>
 </div>
 
@@ -1493,6 +1610,66 @@ function escHtml(str) {
 
 function showCard(id)  { document.getElementById(id).classList.remove('hidden'); }
 function hideCard(id)  { document.getElementById(id).classList.add('hidden'); }
+
+// ─── Flux consecutiu: mostrar fases col·lapsant les anteriors ──
+function mostrarFaseConsecutiva(faseId) {
+  document.querySelectorAll('.card[id^="fase-"]').forEach(function(card) {
+    if (card.id === faseId) {
+      card.classList.remove('hidden', 'fase-collapsed');
+    } else if (!card.classList.contains('hidden')) {
+      card.classList.add('fase-collapsed');
+      var h2 = card.querySelector('h2');
+      if (h2 && !h2.querySelector('.fase-resum')) {
+        var span = document.createElement('span');
+        span.className  = 'fase-resum';
+        span.textContent = obtenirResumFase(card.id);
+        h2.appendChild(span);
+      }
+    }
+  });
+  var cardActiva = document.getElementById(faseId);
+  if (cardActiva) {
+    setTimeout(function() { cardActiva.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
+  }
+}
+
+// Clic en una fase col·lapsada → expandir
+document.addEventListener('click', function(e) {
+  var card = e.target.closest('.card.fase-collapsed');
+  if (card) {
+    document.querySelectorAll('.card[id^="fase-"]:not(.hidden)').forEach(function(c) {
+      if (c !== card) c.classList.add('fase-collapsed');
+    });
+    card.classList.remove('fase-collapsed');
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+});
+
+function obtenirResumFase(faseId) {
+  switch (faseId) {
+    case 'fase-0':  return ESTAT.tematica || '—';
+    case 'fase-1':  return ESTAT.premissaTriada ? ESTAT.premissaTriada.substring(0, 60) + '…' : '—';
+    case 'fase-2':  return ESTAT.estil.desc || '—';
+    case 'fase-3':  return ESTAT.protagonistaTriat ? ESTAT.protagonistaTriat.substring(0, 50) + '…' : '—';
+    case 'fase-4':  return ESTAT.localitzacioTriada ? ESTAT.localitzacioTriada.substring(0, 50) + '…' : '—';
+    case 'fase-5':  return ESTAT.finalTriat ? ESTAT.finalTriat.substring(0, 50) + '…' : '—';
+    case 'fase-6':  return ESTAT.conteText ? compteParaules(ESTAT.conteText) + ' paraules' : '—';
+    case 'fase-6b': return ESTAT.esqueletNovela ? '✅ Esquelet generat' : '—';
+    case 'fase-7':  return ESTAT.worldbuilding ? '✅ Món creat' : '—';
+    case 'fase-8':  return ESTAT.elencPersonatges ? ESTAT.elencPersonatges.length + ' personatges' : '—';
+    case 'fase-9':  return ESTAT.estructuraTriada ? '✅ Estructura triada' : '—';
+    case 'fase-10': return ESTAT.outline ? ESTAT.outline.length + ' capítols' : '—';
+    case 'fase-11': return ESTAT.subtrames ? ESTAT.subtrames.length + ' subtrames' : '—';
+    case 'fase-12': return ESTAT.cronologia ? '✅ Cronologia' : '—';
+    case 'fase-13': return ESTAT.biblia ? '✅ Bíblia compilada' : '—';
+    case 'fase-14': {
+      var nCaps = (ESTAT.capitols || []).filter(function(c) { return c !== null; }).length;
+      return nCaps + '/' + (ESTAT.outline || []).length + ' capítols escrits';
+    }
+    case 'fase-17': return ESTAT.titolNovel || '—';
+    default: return '—';
+  }
+}
 function showLoader(n) { document.getElementById('loader-' + n).classList.add('visible'); }
 function hideLoader(n) { document.getElementById('loader-' + n).classList.remove('visible'); }
 function showBtn(id)   { document.getElementById(id).classList.remove('hidden'); }
@@ -1604,6 +1781,8 @@ const ESTAT = {
   _partActual:              1,
   _partsTexts:              [],
   conteText:                '',
+  // Esquelet de novel·la (Fase 6B)
+  esqueletNovela:           '',
   // Worldbuilding
   worldbuilding:            null,
   // Elenc de personatges
@@ -1627,6 +1806,9 @@ const ESTAT = {
   _capGenerant:             null, // índex del capítol en generació (o null)
   estat_json:               '',   // memòria d'estat dinàmica entre capítols
   _revisioCapTrigger:       0,   // nº de capítols quan es va mostrar l'últim banner
+  informeEstilGlobal:       '',  // tics estilístics detectats (Fase 15B, al 60%)
+  ambientacio:              'catalana',
+  _lectorBetaFet:           false,
   // Fase 17: paratextos
   titolNovel:               '',
   sinopsi:                  '',
@@ -1665,7 +1847,7 @@ function guardarIComencar() {
 
   hideCard('card-config');
   document.getElementById('progress-wrap').classList.remove('hidden');
-  showCard('fase-0');
+  mostrarFaseConsecutiva('fase-0');
   toast('Configuració guardada.');
 }
 
@@ -1681,7 +1863,7 @@ function iniciarFase1() {
   ESTAT.history  = [];
   ESTAT.fase     = 1;
   updateProgress(1);
-  showCard('fase-1');
+  mostrarFaseConsecutiva('fase-1');
   showLoader(1);
 
   google.script.run
@@ -1692,7 +1874,7 @@ function iniciarFase1() {
       autoSeguentFase(iniciarFase2);
     })
     .withFailureHandler(err => { hideLoader(1); toast('Error: ' + err.message); })
-    .fase1_premisses(sel, [], USER_CONFIG);
+    .fase1_premisses(sel, [], USER_CONFIG, ESTAT.ambientacio);
 }
 
 // ─── Render genèric amb badge "Recomanat" (radio / single-select) ───
@@ -1762,7 +1944,7 @@ function iniciarFase2() {
   ESTAT.premissaTriada = ESTAT._premissaLista[idx];
   ESTAT.fase = 2;
   updateProgress(2);
-  showCard('fase-2');
+  mostrarFaseConsecutiva('fase-2');
 }
 
 // Pills de selecció (estil)
@@ -1773,6 +1955,7 @@ function triarPill(el) {
   const val = el.dataset.val;
   if (group === 'perspectiva') ESTAT.estil.perspectiva = val;
   if (group === 'paraules')    ESTAT.estil.paraules    = parseInt(val);
+  if (group === 'ambientacio') ESTAT.ambientacio       = val;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1792,7 +1975,7 @@ function iniciarFase3() {
 
   ESTAT.fase = 3;
   updateProgress(3);
-  showCard('fase-3');
+  mostrarFaseConsecutiva('fase-3');
   showLoader(3);
 
   google.script.run
@@ -1803,7 +1986,7 @@ function iniciarFase3() {
       autoSeguentFase(iniciarFase4);
     })
     .withFailureHandler(err => { hideLoader(3); toast('Error: ' + err.message); })
-    .fase3_personatges(ESTAT.premissaTriada, ESTAT.estil.desc, ESTAT.history, USER_CONFIG, ESTAT.tematica);
+    .fase3_personatges(ESTAT.premissaTriada, ESTAT.estil.desc, ESTAT.history, USER_CONFIG, ESTAT.tematica, ESTAT.ambientacio);
 }
 
 function renderProtagonistes(text) {
@@ -1824,7 +2007,7 @@ function iniciarFase4() {
   ESTAT.protagonistaTriat = ESTAT._llistaProtagonistes[idx];
   ESTAT.fase = 4;
   updateProgress(4);
-  showCard('fase-4');
+  mostrarFaseConsecutiva('fase-4');
   showLoader(4);
 
   google.script.run
@@ -1835,7 +2018,7 @@ function iniciarFase4() {
       autoSeguentFase(iniciarFase5);
     })
     .withFailureHandler(err => { hideLoader(4); toast('Error: ' + err.message); })
-    .fase_localitzacions(ESTAT.protagonistaTriat, ESTAT.estil.desc, ESTAT.history, USER_CONFIG, ESTAT.tematica);
+    .fase_localitzacions(ESTAT.protagonistaTriat, ESTAT.estil.desc, ESTAT.history, USER_CONFIG, ESTAT.tematica, ESTAT.ambientacio);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1850,7 +2033,7 @@ function iniciarFase5() {
   ESTAT.localitzacioTriada = ESTAT._llistaLocalitzacions[idx];
   ESTAT.fase = 5;
   updateProgress(5);
-  showCard('fase-5');
+  mostrarFaseConsecutiva('fase-5');
   showLoader(5);
 
   google.script.run
@@ -1861,7 +2044,7 @@ function iniciarFase5() {
       autoSeguentFase(iniciarEscriptura);
     })
     .withFailureHandler(err => { hideLoader(5); toast('Error: ' + err.message); })
-    .fase4_finals(ESTAT.localitzacioTriada, ESTAT.estil.desc, ESTAT.history, USER_CONFIG, ESTAT.tematica);
+    .fase4_finals(ESTAT.localitzacioTriada, ESTAT.estil.desc, ESTAT.history, USER_CONFIG, ESTAT.tematica, ESTAT.ambientacio);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1886,7 +2069,7 @@ function iniciarEscriptura() {
 
   ESTAT.fase = 6;
   updateProgress(6);
-  showCard('fase-6');
+  mostrarFaseConsecutiva('fase-6');
   hideCard('conte-wrap');
   document.getElementById('export-link-wrap').classList.add('hidden');
 
@@ -1924,7 +2107,7 @@ function escriureSeguentPart() {
       hideLoader(6);
       toast('Error a la part ' + part + ': ' + err.message);
     })
-    .escriureContePart(part, total, perPart, ESTAT.finalTriat, ESTAT.estil.desc, ESTAT.history, USER_CONFIG, ESTAT.tematica);
+    .escriureContePart(part, total, perPart, ESTAT.finalTriat, ESTAT.estil.desc, ESTAT.history, USER_CONFIG, ESTAT.tematica, ESTAT.ambientacio);
 }
 
 function mostrarConte(text) {
@@ -1997,14 +2180,43 @@ function exportarDoc() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 6 → FASE 7: Worldbuilding
+//  FASE 6 → FASE 6B: Esquelet de novel·la
+// ═══════════════════════════════════════════════════════════
+function iniciarFase6b() {
+  if (!ESTAT.conteText) { toast('Primer genera el conte.'); return; }
+
+  ESTAT.fase = 6.5;
+  updateProgress(7);
+  mostrarFaseConsecutiva('fase-6b');
+  document.getElementById('esquelet-wrap').classList.add('hidden');
+  showLoader('6b');
+  document.getElementById('loader-6b-text').textContent = 'Generant l\'esquelet d\'expansió…';
+
+  google.script.run
+    .withSuccessHandler(res => {
+      ESTAT.esqueletNovela = res.response || '';
+      hideLoader('6b');
+      const cos = document.getElementById('esquelet-cos');
+      cos.innerHTML = `<pre style="white-space:pre-wrap;font-size:.9rem;">${escHtml(ESTAT.esqueletNovela)}</pre>`;
+      document.getElementById('esquelet-wrap').classList.remove('hidden');
+      setTimeout(() => {
+        document.getElementById('fase-6b').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+      autoSeguentFase(iniciarFase7);
+    })
+    .withFailureHandler(err => { hideLoader('6b'); toast('Error: ' + err.message); })
+    .fase6b_esqueletNovela(ESTAT.conteText, ESTAT.tematica, ESTAT.estil.desc, USER_CONFIG);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FASE 6B → FASE 7: Worldbuilding
 // ═══════════════════════════════════════════════════════════
 function iniciarFase7() {
   if (!ESTAT.conteText) { toast('Primer genera el conte.'); return; }
 
   ESTAT.fase = 7;
   updateProgress(7);
-  showCard('fase-7');
+  mostrarFaseConsecutiva('fase-7');
   document.getElementById('world-selector').classList.add('hidden');
   document.getElementById('world-result-wrap').classList.add('hidden');
   showLoader(7);
@@ -2018,7 +2230,7 @@ function iniciarFase7() {
       autoSeguentFase(expandirElementsSeleccionats);
     })
     .withFailureHandler(err => { hideLoader(7); toast('Error: ' + err.message); })
-    .fase7_worldbuilding(ESTAT.conteText, ESTAT.tematica, ESTAT.estil.desc, ESTAT.history, USER_CONFIG);
+    .fase7_worldbuilding(ESTAT.conteText, ESTAT.tematica, ESTAT.estil.desc, ESTAT.history, USER_CONFIG, ESTAT.ambientacio);
 }
 
 function renderLlistaWorldbuilding(text) {
@@ -2088,7 +2300,7 @@ function expandirElementsSeleccionats() {
       autoSeguentFase(iniciarFase8);
     })
     .withFailureHandler(err => { hideLoader(7); toast('Error: ' + err.message); })
-    .fase7_expandirElements(labels, ESTAT.conteText, ESTAT.tematica, ESTAT.history, USER_CONFIG);
+    .fase7_expandirElements(labels, ESTAT.conteText, ESTAT.tematica, ESTAT.history, USER_CONFIG, ESTAT.ambientacio);
 }
 
 function mostrarResultatWorldbuilding(text) {
@@ -2128,7 +2340,7 @@ function tornarASeleccioWorld() {
 function iniciarFase8() {
   ESTAT.fase = 8;
   updateProgress(8);
-  showCard('fase-8');
+  mostrarFaseConsecutiva('fase-8');
   document.getElementById('elenc-selector').classList.add('hidden');
   showLoader(8);
 
@@ -2140,7 +2352,7 @@ function iniciarFase8() {
       autoSeguentFase(confirmarElenc);
     })
     .withFailureHandler(err => { hideLoader(8); toast('Error: ' + err.message); })
-    .fase8_elenc(ESTAT.conteText, ESTAT.worldbuilding, ESTAT.tematica, ESTAT.estil.desc, ESTAT.history, USER_CONFIG);
+    .fase8_elenc(ESTAT.conteText, ESTAT.worldbuilding, ESTAT.tematica, ESTAT.estil.desc, ESTAT.history, USER_CONFIG, ESTAT.esqueletNovela, ESTAT.ambientacio);
 }
 
 function renderLlistaElenc(text) {
@@ -2218,7 +2430,7 @@ function confirmarElenc() {
 function iniciarFase9() {
   ESTAT.fase = 9;
   updateProgress(9);
-  showCard('fase-9');
+  mostrarFaseConsecutiva('fase-9');
   document.getElementById('llista-estructura').innerHTML = '';
   document.getElementById('btn-fase9').classList.add('hidden');
   showLoader(9);
@@ -2231,7 +2443,7 @@ function iniciarFase9() {
       autoSeguentFase(confirmarEstructura);
     })
     .withFailureHandler(err => { hideLoader(9); toast('Error: ' + err.message); })
-    .fase9_estructura(ESTAT.conteText, ESTAT.worldbuilding, ESTAT.elencPersonatges, ESTAT.tematica, ESTAT.estil.desc, ESTAT.history, USER_CONFIG);
+    .fase9_estructura(ESTAT.conteText, ESTAT.worldbuilding, ESTAT.elencPersonatges, ESTAT.tematica, ESTAT.estil.desc, ESTAT.history, USER_CONFIG, ESTAT.esqueletNovela, ESTAT.ambientacio);
 }
 
 function renderLlistaEstructura(text) {
@@ -2343,13 +2555,32 @@ function comprimirContextClient() {
     });
   }
 
+  if (ESTAT.esqueletNovela && ESTAT.esqueletNovela.trim()) {
+    parts.push('\nESQUELET DE NOVEL·LA:');
+    let count = 0;
+    let inRellevant = false;
+    ESTAT.esqueletNovela.split('\n').forEach(l => {
+      if (count >= 25) return;
+      if (/^##\s+(FILS NARRATIUS|GIRS NARRATIUS|SUBTRAMES|FIL A|XARXA ANT|TRES FILS|CICLES|CALENDARI)/.test(l)) {
+        inRellevant = true;
+        parts.push(l.trim());
+        count++;
+      } else if (/^##/.test(l)) {
+        inRellevant = false;
+      } else if (inRellevant && l.trim()) {
+        parts.push(l.trim().substring(0, 120));
+        count++;
+      }
+    });
+  }
+
   return parts.join('\n');
 }
 
 function iniciarFase10() {
   ESTAT.fase = 10;
   updateProgress(10);
-  showCard('fase-10');
+  mostrarFaseConsecutiva('fase-10');
   document.getElementById('outline-wrap').classList.add('hidden');
   showLoader(10);
 
@@ -2493,7 +2724,7 @@ function outlineAfegir(afterIdx) {
 function iniciarFase11() {
   ESTAT.fase = 11;
   updateProgress(11);
-  showCard('fase-11');
+  mostrarFaseConsecutiva('fase-11');
   document.getElementById('subtrames-selector').classList.add('hidden');
   showLoader(11);
 
@@ -2588,7 +2819,7 @@ function confirmarSubtrames() {
 function iniciarFase12() {
   ESTAT.fase = 12;
   updateProgress(12);
-  showCard('fase-12');
+  mostrarFaseConsecutiva('fase-12');
   document.getElementById('crono-content').classList.add('hidden');
   showLoader(12);
   document.getElementById('loader-12-text').textContent = 'Generant la línia temporal…';
@@ -2677,7 +2908,7 @@ function confirmarCronologia() {
 function iniciarFase13() {
   ESTAT.fase = 13;
   updateProgress(13);
-  showCard('fase-13');
+  mostrarFaseConsecutiva('fase-13');
   document.getElementById('biblia-content').classList.add('hidden');
   showLoader(13);
   setTimeout(() => {
@@ -2781,7 +3012,7 @@ function iniciarFase14() {
   ESTAT.estat_json   = '';
 
   updateProgress(14);
-  showCard('fase-14');
+  mostrarFaseConsecutiva('fase-14');
   renderSidebarCapitols();
   mostrarCapitol(0);
   setTimeout(() => {
@@ -2898,28 +3129,47 @@ function generarCapitolActual() {
       google.script.run
         .withSuccessHandler(function(res2) {
           const capitolRaw = part1Text + '\n\n' + res2.response;
-          const extret = extreureEstatJsonIText(capitolRaw);
-          ESTAT.capitols[idx]     = extret.textNet;
-          ESTAT.estat_json        = extret.estatJson || ESTAT.estat_json;
-          ESTAT.fetsCanonics[idx] = extreureFetsCanonicsCapitol(ESTAT.capitols[idx], idx + 1);
-          ESTAT._capGenerant     = null;
-          document.getElementById('cap-loader').classList.remove('visible');
-          renderSidebarCapitols();
-          mostrarCapitol(idx);
-          verificarRevisioDisponible();
-          toast('Capítol ' + (idx + 1) + ' generat!');
+          const extret     = extreureEstatJsonIText(capitolRaw);
+          const textNet    = extret.textNet;
 
-          if (isAutoMode) {
-            if (((idx + 1) % 3) === 0) {
-              iniciarRevisio();
-            } else {
-              ESTAT._capActual++;
-              if (ESTAT._capActual < ESTAT.outline.length) {
-                setTimeout(() => generarCapitolActual(), 2000);
-              } else {
-                iniciarFase17();
-              }
+          // Auditoria de ganxo (no en l'últim capítol)
+          if (idx < ESTAT.outline.length - 1) {
+            document.getElementById('cap-loader-text').textContent = 'Auditant ganxo final…';
+            const outlineSeguent = (idx + 1 < ESTAT.outline.length) ? ESTAT.outline[idx + 1].text : '';
+            google.script.run
+              .withSuccessHandler(function(textAmbGanxo) {
+                _finalitzarCapitolGenerat(idx, textAmbGanxo, extret.estatJson);
+              })
+              .withFailureHandler(function() {
+                _finalitzarCapitolGenerat(idx, textNet, extret.estatJson);
+              })
+              .auditarGanxo(textNet, idx + 1, ESTAT.outline.length,
+                outlineCapitol, outlineSeguent, ESTAT.tematica, USER_CONFIG);
+          } else {
+            // Últim capítol: no auditar ganxo, però auditar resolució
+            _finalitzarCapitolGenerat(idx, textNet, extret.estatJson);
+            const capsFinals = [];
+            for (var fi = Math.max(0, ESTAT.outline.length - 3); fi < ESTAT.outline.length; fi++) {
+              if (ESTAT.capitols[fi]) capsFinals.push({ num: fi + 1, text: ESTAT.capitols[fi] });
             }
+            // Afegir el capítol actual que acabem de guardar
+            if (capsFinals.length === 0 || capsFinals[capsFinals.length - 1].num !== idx + 1) {
+              capsFinals.push({ num: idx + 1, text: textNet });
+            }
+            toast('Auditant resolució final…');
+            google.script.run
+              .withSuccessHandler(function(resAudit) {
+                if (resAudit && !/RESOLUCIO_OK/i.test(resAudit.response || '')) {
+                  document.getElementById('revisio-panel').classList.remove('hidden');
+                  renderRevisio(resAudit.response);
+                  document.getElementById('revisio-result').classList.remove('hidden');
+                  toast('Auditoria detecta problemes al final. Revisa\'ls abans d\'exportar.');
+                } else {
+                  toast('✅ Resolució final aprovada!');
+                }
+              })
+              .withFailureHandler(function() { /* Silenciós */ })
+              .auditarResolucio(capsFinals, ESTAT.capitols[0] || '', ESTAT.subtrames, ESTAT.biblia, ESTAT.tematica, USER_CONFIG);
           }
         })
         .withFailureHandler(function(err) {
@@ -2930,7 +3180,7 @@ function generarCapitolActual() {
           toast('Error a la part 2: ' + err.message);
         })
         .escriureCapitol(2, idx + 1, ESTAT.outline.length, ESTAT.biblia,
-          outlineCapitol, textCapAnterior, ESTAT.estil.desc, USER_CONFIG, ESTAT.tematica, historialPart, fetsCanonics, estatJsonVigent);
+          outlineCapitol, textCapAnterior, ESTAT.estil.desc, USER_CONFIG, ESTAT.tematica, historialPart, fetsCanonics, estatJsonVigent, ESTAT.informeEstilGlobal, ESTAT.ambientacio);
     })
     .withFailureHandler(function(err) {
       ESTAT._capGenerant = null;
@@ -2940,7 +3190,146 @@ function generarCapitolActual() {
       toast('Error a la part 1: ' + err.message);
     })
     .escriureCapitol(1, idx + 1, ESTAT.outline.length, ESTAT.biblia,
-      outlineCapitol, textCapAnterior, ESTAT.estil.desc, USER_CONFIG, ESTAT.tematica, null, fetsCanonics, estatJsonVigent);
+      outlineCapitol, textCapAnterior, ESTAT.estil.desc, USER_CONFIG, ESTAT.tematica, null, fetsCanonics, estatJsonVigent, ESTAT.informeEstilGlobal, ESTAT.ambientacio);
+}
+
+// ─── Helper: finalitzar un capítol generat ───────────────────
+function _finalitzarCapitolGenerat(idx, textFinal, estatJson) {
+  ESTAT.capitols[idx]     = textFinal;
+  ESTAT.estat_json        = estatJson || ESTAT.estat_json;
+  ESTAT.fetsCanonics[idx] = extreureFetsCanonicsCapitol(textFinal, idx + 1);
+  ESTAT._capGenerant      = null;
+  document.getElementById('cap-loader').classList.remove('visible');
+  renderSidebarCapitols();
+  mostrarCapitol(idx);
+  verificarRevisioDisponible();
+  verificarLectorBeta();
+  toast('Capítol ' + (idx + 1) + ' generat!');
+
+  if (isAutoMode) {
+    if (((idx + 1) % 3) === 0) {
+      iniciarRevisio();
+    } else {
+      ESTAT._capActual++;
+      if (ESTAT._capActual < ESTAT.outline.length) {
+        setTimeout(() => generarCapitolActual(), 2000);
+      } else {
+        iniciarFase17();
+      }
+    }
+  }
+}
+
+// ─── Trigger lector beta al 80% ─────────────────────────────
+function verificarLectorBeta() {
+  var nGenerats   = ESTAT.capitols.filter(function(c) { return c !== null; }).length;
+  var total       = ESTAT.outline.length;
+  var percentatge = total > 0 ? nGenerats / total : 0;
+
+  if (percentatge >= 0.8 && !ESTAT._lectorBetaFet) {
+    ESTAT._lectorBetaFet = true;
+    var banner   = document.getElementById('lector-beta-banner');
+    var bannerTx = document.getElementById('lector-beta-banner-text');
+    if (banner && bannerTx) {
+      bannerTx.textContent = 'Anàlisi de lector beta disponible (' + nGenerats + ' de ' + total + ' capítols)';
+      banner.classList.remove('hidden');
+    }
+  }
+}
+
+function iniciarLectorBeta() {
+  var capGenerats = ESTAT.capitols.reduce(function(acc, text, i) {
+    if (text) acc.push({ num: i + 1, text: text });
+    return acc;
+  }, []);
+  if (capGenerats.length < 4) { toast('Cal tenir almenys 4 capítols generats.'); return; }
+
+  document.getElementById('lector-beta-banner').classList.add('hidden');
+  var panel = document.getElementById('lector-beta-panel');
+  panel.classList.remove('hidden');
+  document.getElementById('lector-beta-loader').classList.add('visible');
+  document.getElementById('lector-beta-result').classList.add('hidden');
+  setTimeout(function() { panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      document.getElementById('lector-beta-loader').classList.remove('visible');
+      renderLectorBeta(res.response);
+      document.getElementById('lector-beta-result').classList.remove('hidden');
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById('lector-beta-loader').classList.remove('visible');
+      toast('Error al lector beta: ' + err.message);
+    })
+    .fase15b_lectorBeta(capGenerats, ESTAT.subtrames, ESTAT.biblia, USER_CONFIG, ESTAT.tematica);
+}
+
+function renderLectorBeta(text) {
+  var container = document.getElementById('lector-beta-result');
+  if (!text || /LECTURA_FLUIDA/i.test(text)) {
+    container.innerHTML = '<div class="revisio-ok">✅ Lectura fluida. Cap problema d\'engagement detectat.</div>';
+    return;
+  }
+
+  var blocs   = [];
+  var current = null;
+  text.split('\n').forEach(function(line) {
+    var l = (line || '').trim();
+    if (/^TIPUS:/i.test(l)) {
+      if (current) blocs.push(current);
+      current = { tipus: l.replace(/^TIPUS:\s*/i, '').trim(), capNum: null, diagnostic: '', millora: '' };
+    } else if (/^CAP[ÍI]TOL:/i.test(l) && current) {
+      var m = l.match(/(\d+)/);
+      if (m) current.capNum = parseInt(m[1]);
+    } else if (/^DIAGN[ÒO]STIC:/i.test(l) && current) {
+      current.diagnostic = l.replace(/^DIAGN[ÒO]STIC:\s*/i, '').trim();
+    } else if (/^MILLORA:/i.test(l) && current) {
+      current.millora = l.replace(/^MILLORA:\s*/i, '').trim();
+    }
+  });
+  if (current) blocs.push(current);
+
+  if (blocs.length === 0) {
+    container.innerHTML = '<pre style="white-space:pre-wrap;font-size:.88rem;color:var(--text2);">' + escHtml(text) + '</pre>';
+    return;
+  }
+
+  _lectorBetaCorreccions = blocs.map(function(b) {
+    return { capIdx: b.capNum ? b.capNum - 1 : null, instruccio: b.millora };
+  });
+
+  var iconesTipus = { RITME: '🐌', PRESCINDIBLE: '✂️', EMPATIA: '💔', SUBTRAMA: '🧵', GANXO: '🪝' };
+
+  container.innerHTML =
+    '<p style="font-size:.8rem;color:var(--text2);margin-bottom:14px;">' + blocs.length + ' problema' + (blocs.length !== 1 ? 'es' : '') + ' d\'experiència de lectura</p>' +
+    blocs.map(function(b, i) {
+      var icona    = iconesTipus[b.tipus.toUpperCase()] || '⚠️';
+      var capBadge = b.capNum ? '<span class="revisio-cap-badge">Cap. ' + b.capNum + '</span>' : '';
+      var btnApl   = (b.capNum !== null && b.millora)
+        ? '<button class="btn btn-secondary" style="font-size:.78rem;padding:5px 12px;flex-shrink:0;" onclick="aplicarCorreccioLectorBeta(' + i + ')">Aplicar →</button>'
+        : '';
+      return '<div class="revisio-problema">' +
+        '<div class="revisio-problema-header"><span class="revisio-label">' + icona + ' ' + escHtml(b.tipus) + '</span>' + capBadge + '</div>' +
+        '<div class="revisio-desc">' + escHtml(b.diagnostic) + '</div>' +
+        (b.millora ? '<div class="revisio-correccio"><span class="revisio-correccio-text">' + escHtml(b.millora) + '</span>' + btnApl + '</div>' : '') +
+        '</div>';
+    }).join('');
+}
+
+var _lectorBetaCorreccions = [];
+
+function aplicarCorreccioLectorBeta(idx) {
+  var corr = _lectorBetaCorreccions[idx];
+  if (!corr || corr.capIdx === null) { toast('No s\'ha pogut determinar el capítol.'); return; }
+  seleccionarCapitol(corr.capIdx);
+  var sel = document.getElementById('cap-millora-select');
+  if (sel) { sel.value = 'lliure'; actualitzarMilloraUI(); }
+  var input = document.getElementById('cap-millora-input');
+  if (input) {
+    input.value = corr.instruccio;
+    setTimeout(function() { input.scrollIntoView({ behavior: 'smooth', block: 'center' }); input.focus(); }, 200);
+  }
+  toast('Instrucció carregada al capítol ' + (corr.capIdx + 1) + '.');
 }
 
 // ─── Regenerar el capítol actiu ─────────────────────────────
@@ -3024,7 +3413,7 @@ function iniciarFase17() {
 
   ESTAT.fase = 17;
   updateProgress(17);
-  showCard('fase-17');
+  mostrarFaseConsecutiva('fase-17');
   document.getElementById('para-content').classList.add('hidden');
   showLoader(17);
   setTimeout(() => {
@@ -3171,7 +3560,7 @@ function assemblarNovela() {
 function iniciarFase18() {
   ESTAT.fase = 18;
   updateProgress(18);
-  showCard('fase-18');
+  mostrarFaseConsecutiva('fase-18');
 
   // Estadístiques
   const capsGenerats = ESTAT.capitols.filter(c => c !== null).length;
@@ -3310,6 +3699,22 @@ function verificarRevisioDisponible() {
     bannerTx.textContent = `Revisió de coherència disponible (caps. 1–${nGenerats})`;
     banner.classList.remove('hidden');
   }
+
+  // MILLORA 6: Generar informe d'estil al 60% dels capítols (una sola vegada)
+  const percentatge = ESTAT.outline.length > 0 ? nGenerats / ESTAT.outline.length : 0;
+  if (percentatge >= 0.6 && !ESTAT.informeEstilGlobal) {
+    const capsDades = ESTAT.capitols.reduce(function(acc, text, i) {
+      if (text) acc.push({ num: i + 1, text: text });
+      return acc;
+    }, []);
+    google.script.run
+      .withSuccessHandler(function(res) {
+        ESTAT.informeEstilGlobal = res.response || '';
+        toast('Informe d\'estil generat. S\'aplicarà als capítols restants.');
+      })
+      .withFailureHandler(function() { /* silenciós */ })
+      .fase15_informeEstil(capsDades, USER_CONFIG, ESTAT.tematica);
+  }
 }
 
 // ─── Iniciar la revisió (crida al backend amb l'Editor IA) ──
@@ -3345,7 +3750,7 @@ function iniciarRevisio() {
       document.getElementById('revisio-loader').classList.remove('visible');
       toast('Error a la revisió: ' + err.message);
     })
-    .fase15_revisioCoherencia(capGeneratsFinestra, ESTAT.biblia, USER_CONFIG, construirContextFetsCanonics(12), outlineFutur);
+    .fase15_revisioCoherencia(capGeneratsFinestra, ESTAT.biblia, USER_CONFIG, construirContextFetsCanonics(12), outlineFutur, ESTAT.tematica);
 }
 
 // ─── Renderitzar l'informe de revisió ───────────────────────
@@ -3458,6 +3863,231 @@ function aplicarCorreccio(idx) {
   }
   toast('Instrucció carregada al capítol ' + (corr.capIdx + 1) + '. Clica "Millorar capítol" per aplicar-la.');
 }
+
+// ═══════════════════════════════════════════════════════════
+//  PERSISTÈNCIA — Guardar/Carregar projectes a localStorage
+// ═══════════════════════════════════════════════════════════
+
+var STORAGE_PREFIX = 'conteIA_';
+
+var CLAUS_PERSISTENTS = [
+  'fase', 'tematica', 'ambientacio', 'premissaTriada', 'estil', 'protagonistaTriat',
+  'localitzacioTriada', 'finalTriat', 'conteText', 'esqueletNovela', 'worldbuilding',
+  'elencPersonatges', 'estructuraTriada', 'outline', 'subtrames',
+  'cronologia', 'biblia', 'capitols', 'fetsCanonics', '_capActual',
+  'estat_json', 'informeEstilGlobal', 'titolNovel', 'sinopsi', 'epigraf', 'divisioEnParts',
+  '_lectorBetaFet', '_revisioCapTrigger'
+];
+
+function guardarProjecte(nom) {
+  if (!nom || !nom.trim()) { toast('Cal un nom pel projecte.'); return; }
+  var clau  = STORAGE_PREFIX + nom.trim();
+  var dades = {};
+  CLAUS_PERSISTENTS.forEach(function(k) { if (ESTAT[k] !== undefined) dades[k] = ESTAT[k]; });
+  dades._nom         = nom.trim();
+  dades._dataGuardat = new Date().toISOString();
+  dades._userConfig  = USER_CONFIG ? { provider: USER_CONFIG.provider, model: USER_CONFIG.model } : null;
+  try {
+    localStorage.setItem(clau, JSON.stringify(dades));
+    actualitzarLlistaProjectes();
+    toast('Projecte "' + nom.trim() + '" guardat.');
+  } catch(e) { toast('Error guardant: ' + e.message); }
+}
+
+function carregarProjecte(nom) {
+  var raw = null;
+  try { raw = localStorage.getItem(STORAGE_PREFIX + nom); } catch(e) {}
+  if (!raw) { toast('Projecte no trobat.'); return; }
+  try {
+    var dades = JSON.parse(raw);
+    CLAUS_PERSISTENTS.forEach(function(k) { if (dades[k] !== undefined) ESTAT[k] = dades[k]; });
+    if (dades._userConfig && USER_CONFIG) {
+      USER_CONFIG.provider = dades._userConfig.provider || USER_CONFIG.provider;
+      USER_CONFIG.model    = dades._userConfig.model    || USER_CONFIG.model;
+    }
+    restaurarUIDesFase(ESTAT.fase);
+    toast('Projecte "' + nom + '" carregat.');
+  } catch(e) { toast('Error carregant: ' + e.message); }
+}
+
+function eliminarProjecte(nom) {
+  if (!confirm('Eliminar el projecte "' + nom + '"?')) return;
+  try { localStorage.removeItem(STORAGE_PREFIX + nom); } catch(e) {}
+  actualitzarLlistaProjectes();
+  toast('Projecte eliminat.');
+}
+
+function obtenirProjectesGuardats() {
+  var projectes = [];
+  try {
+    for (var i = 0; i < localStorage.length; i++) {
+      var clau = localStorage.key(i);
+      if (clau && clau.indexOf(STORAGE_PREFIX) === 0) {
+        try {
+          var d = JSON.parse(localStorage.getItem(clau));
+          projectes.push({
+            nom:      d._nom || clau.replace(STORAGE_PREFIX, ''),
+            data:     d._dataGuardat || '',
+            fase:     d.fase || 0,
+            titol:    d.titolNovel || d.premissaTriada || '—',
+            nCaps:    (d.capitols || []).filter(function(c) { return c !== null; }).length,
+            tematica: d.tematica || '—'
+          });
+        } catch(e) {}
+      }
+    }
+  } catch(e) {}
+  projectes.sort(function(a, b) { return (b.data || '').localeCompare(a.data || ''); });
+  return projectes;
+}
+
+function exportarProjecteJSON(nom) {
+  var raw = null;
+  try { raw = localStorage.getItem(STORAGE_PREFIX + nom); } catch(e) {}
+  if (!raw) { toast('Projecte no trobat.'); return; }
+  var blob = new Blob([raw], { type: 'application/json' });
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href   = url;
+  a.download = 'conteIA_' + nom.replace(/[^a-zA-Z0-9àèéíòóúïü_-]/g, '_') + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Projecte exportat com a JSON.');
+}
+
+function importarProjecteJSON(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var dades = JSON.parse(e.target.result);
+      var nom   = dades._nom || file.name.replace('.json', '').replace('conteIA_', '');
+      var clau  = STORAGE_PREFIX + nom;
+      var i = 1;
+      while (true) {
+        try { if (!localStorage.getItem(clau)) break; } catch(ex) { break; }
+        nom  = (dades._nom || 'importat') + '_' + i;
+        clau = STORAGE_PREFIX + nom;
+        i++;
+      }
+      dades._nom = nom;
+      try { localStorage.setItem(clau, JSON.stringify(dades)); } catch(ex) { toast('Error important: ' + ex.message); return; }
+      actualitzarLlistaProjectes();
+      toast('Projecte "' + nom + '" importat.');
+    } catch(err) { toast('Error important: ' + err.message); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function crearNissaga(nomOrigen) {
+  var raw = null;
+  try { raw = localStorage.getItem(STORAGE_PREFIX + nomOrigen); } catch(e) {}
+  if (!raw) { toast('Projecte no trobat.'); return; }
+  var dades  = JSON.parse(raw);
+  var nomNou = nomOrigen + ' — Seqüela';
+  var i = 2;
+  while (true) {
+    try { if (!localStorage.getItem(STORAGE_PREFIX + nomNou)) break; } catch(e) { break; }
+    nomNou = nomOrigen + ' — Seqüela ' + i; i++;
+  }
+  dades._nom           = nomNou;
+  dades._dataGuardat   = new Date().toISOString();
+  dades._nissagaOrigen = nomOrigen;
+  dades.fase           = 9;
+  dades.outline = []; dades.subtrames = []; dades.cronologia = '';
+  dades.capitols = []; dades.fetsCanonics = [];
+  dades.titolNovel = ''; dades.sinopsi = ''; dades.epigraf = ''; dades.divisioEnParts = '';
+  dades._capActual = 0; dades.estat_json = ''; dades._lectorBetaFet = false; dades._revisioCapTrigger = 0;
+  try { localStorage.setItem(STORAGE_PREFIX + nomNou, JSON.stringify(dades)); } catch(e) { toast('Error: ' + e.message); return; }
+  actualitzarLlistaProjectes();
+  toast('Nissaga "' + nomNou + '" creada. Conserva món, personatges i bíblia.');
+}
+
+function restaurarUIDesFase(fase) {
+  for (var f = 0; f <= 18; f++) {
+    var elF = document.getElementById('fase-' + f);
+    if (elF) elF.classList.add('hidden');
+  }
+  var elFaseB = document.getElementById('fase-6b');
+  if (elFaseB) elFaseB.classList.add('hidden');
+  document.getElementById('card-config').classList.add('hidden');
+  document.getElementById('progress-wrap').classList.remove('hidden');
+  document.getElementById('card-projectes').classList.add('hidden');
+  updateProgress(fase);
+  var faseId = 'fase-' + fase;
+  var elAct  = document.getElementById(faseId);
+  if (elAct) elAct.classList.remove('hidden');
+  if (fase >= 13 && ESTAT.biblia) {
+    renderBibliaView(ESTAT.biblia);
+    var bc = document.getElementById('biblia-content');
+    if (bc) bc.classList.remove('hidden');
+  }
+  if (fase >= 14 && ESTAT.outline && ESTAT.outline.length > 0) {
+    renderSidebarCapitols();
+    mostrarCapitol(ESTAT._capActual || 0);
+  }
+  setTimeout(function() { if (elAct) elAct.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
+}
+
+function mostrarFormGuardar() {
+  var form = document.getElementById('form-guardar');
+  form.classList.toggle('hidden');
+  if (!form.classList.contains('hidden')) {
+    var input = document.getElementById('input-nom-projecte');
+    input.value = (ESTAT.titolNovel || ESTAT.premissaTriada || '').substring(0, 40);
+    input.focus();
+  }
+}
+
+function actualitzarLlistaProjectes() {
+  var projectes = obtenirProjectesGuardats();
+  var wrap      = document.getElementById('llista-projectes');
+  var buit      = document.getElementById('projectes-buit');
+  if (!wrap) return;
+  if (projectes.length === 0) { wrap.innerHTML = ''; buit.classList.remove('hidden'); return; }
+  buit.classList.add('hidden');
+  wrap.innerHTML = projectes.map(function(p) {
+    var dataF = p.data ? new Date(p.data).toLocaleDateString('ca') + ' ' + new Date(p.data).toLocaleTimeString('ca', { hour: '2-digit', minute: '2-digit' }) : '';
+    var nom   = escHtml(p.nom);
+    var nomJS = p.nom.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    return '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-weight:600;font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + nom + '</div>' +
+        '<div style="font-size:.78rem;color:var(--text2);">' + escHtml(p.tematica) + ' · ' + p.nCaps + ' caps · Fase ' + p.fase + ' · ' + dataF + '</div>' +
+      '</div>' +
+      '<button class="btn btn-primary"  style="padding:6px 14px;font-size:.82rem;" onclick="carregarProjecte(\'' + nomJS + '\')">Obrir</button>' +
+      '<button class="btn btn-ghost"    style="padding:6px 10px;font-size:.82rem;" onclick="crearNissaga(\'' + nomJS + '\')" title="Crear seqüela">🌿</button>' +
+      '<button class="btn btn-ghost"    style="padding:6px 10px;font-size:.82rem;" onclick="exportarProjecteJSON(\'' + nomJS + '\')" title="Exportar JSON">📤</button>' +
+      '<button class="btn btn-ghost"    style="padding:6px 10px;font-size:.82rem;color:#f87171;" onclick="eliminarProjecte(\'' + nomJS + '\')" title="Eliminar">×</button>' +
+    '</div>';
+  }).join('');
+}
+
+function guardarProjecteRapid() {
+  var nom = ESTAT.titolNovel || ESTAT.premissaTriada || ('Projecte_' + new Date().toISOString().slice(0, 10));
+  guardarProjecte(nom.substring(0, 50));
+}
+
+// Inicialitzar la llista de projectes en carregar
+try { actualitzarLlistaProjectes(); } catch(e) {}
+
+// ─── Autoguardat cada 2 minuts ──────────────────────────────
+var _ultimEstatGuardat = '';
+setInterval(function() {
+  if (!USER_CONFIG || ESTAT.fase < 6) return;
+  var nom = ESTAT.titolNovel || ESTAT.premissaTriada || 'Autosave';
+  if (!nom) return;
+  var estatActual = JSON.stringify(ESTAT.capitols || []);
+  if (estatActual !== _ultimEstatGuardat) {
+    _ultimEstatGuardat = estatActual;
+    try { guardarProjecte('~autosave_' + nom.substring(0, 30)); } catch(e) {}
+  }
+}, 120000);
+
 </script>
+<!-- Botó flotant de guardar -->
+<button class="fab-guardar" onclick="guardarProjecteRapid()" title="Guardar projecte">💾</button>
 </body>
 </html>
