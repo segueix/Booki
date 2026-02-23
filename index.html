@@ -1008,7 +1008,7 @@
   <select id="config-provider" onchange="actualitzarModelDefault()">
     <option value="anthropic">Anthropic (Claude)</option>
     <option value="openai">OpenAI (GPT-4o)</option>
-    <option value="gemini">Google (Gemini 1.5)</option>
+    <option value="gemini">Google (Gemini 2.0 Flash)</option>
   </select>
 
   <label class="field-label" for="config-model">Model</label>
@@ -1824,7 +1824,7 @@ const ESTAT = {
 const MODEL_DEFAULTS = {
   anthropic: 'claude-opus-4-1',
   openai:    'gpt-4o',
-  gemini:    'gemini-1.5-pro'
+  gemini:    'gemini-2.0-flash'
 };
 
 function actualitzarModelDefault() {

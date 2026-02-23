@@ -13,7 +13,7 @@ const PROVIDER_DEFAULTS = {
   },
   gemini: {
     apiUrlBase: 'https://generativelanguage.googleapis.com/v1beta/models',
-    model: 'gemini-1.5-pro'
+    model: 'gemini-2.0-flash'
   }
 };
 
@@ -410,8 +410,17 @@ function callGemini(messages, systemPrompt, apiKey, model, maxTokens) {
     );
   }
   const firstCandidate = result.candidates && result.candidates[0];
+  if (!firstCandidate) {
+    throw new Error('Gemini no ha retornat cap candidat de resposta. Revisa el model configurat i els límits de la clau API.');
+  }
+  if (firstCandidate.finishReason && firstCandidate.finishReason !== 'STOP') {
+    throw new Error('Gemini ha aturat la resposta amb finishReason=' + firstCandidate.finishReason + '.');
+  }
   const parts = firstCandidate && firstCandidate.content ? firstCandidate.content.parts : [];
   const text  = Array.isArray(parts) ? parts.map(p => (p && p.text) ? p.text : '').join('\n') : '';
+  if (!text) {
+    throw new Error('Gemini ha retornat una resposta buida. Pot estar bloquejada per seguretat o pel model seleccionat.');
+  }
   return normalizeLLMText(text);
 }
 
