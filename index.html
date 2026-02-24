@@ -2628,14 +2628,38 @@ async function reescriureCapitol(idx) {
   }
 }
 
+
+function resumAutomaticCapitol(textCapitol) {
+  const net = String(textCapitol || '').replace(/\s+/g, ' ').trim();
+  if (!net) return '(sense resum)';
+  const frases = net.match(/[^.!?…]+[.!?…]+/g) || [];
+  if (frases.length >= 2) return (frases[0] + ' ' + frases[1]).trim().slice(0, 420);
+  return net.slice(0, 420) + (net.length > 420 ? '…' : '');
+}
+
+function normalitzarEntradaRegistre(dades, textCapitol, idx) {
+  const base = (dades && typeof dades === 'object') ? dades : {};
+  const resum = String(base.resum_capitol || '').trim() || resumAutomaticCapitol(textCapitol);
+  return {
+    resum_capitol: resum,
+    estat_personatges: Array.isArray(base.estat_personatges) ? base.estat_personatges : [],
+    fils_oberts: Array.isArray(base.fils_oberts) ? base.fils_oberts : [],
+    fils_tancats: Array.isArray(base.fils_tancats) ? base.fils_tancats : [],
+    prefiguracions_detectades: Array.isArray(base.prefiguracions_detectades) ? base.prefiguracions_detectades : [],
+    _fallback: !dades,
+    _capitol_idx: idx
+  };
+}
+
 // FASE 8: registre síncron amb retry — s'awaita des de generarCapitol
 async function actualitzarLlibreRegistreBackgroundLegacy(textCapitol, idx) {
   let intents = 0;
   while (intents < 2) {
     try {
       const res   = await actualitzarRegistre(textCapitol, idx, USER_CONFIG);
-      const dades = parseJsonRobust(res.response);
-      if (dades) {
+      const dadesRaw = parseJsonRobust(res.response);
+      if (dadesRaw) {
+        const dades = normalitzarEntradaRegistre(dadesRaw, textCapitol, idx);
         if (!ESTAT.llibreRegistre.capitols) ESTAT.llibreRegistre.capitols = [];
         ESTAT.llibreRegistre.capitols[idx] = dades;
 
@@ -2660,7 +2684,10 @@ async function actualitzarLlibreRegistreBackgroundLegacy(textCapitol, idx) {
       intents++;
     }
   }
-  console.warn('Registre: no s\'ha pogut actualitzar després de 2 intents');
+
+  if (!ESTAT.llibreRegistre.capitols) ESTAT.llibreRegistre.capitols = [];
+  ESTAT.llibreRegistre.capitols[idx] = normalitzarEntradaRegistre(null, textCapitol, idx);
+  console.warn('Registre: fallback local aplicat (entrada mínima) per al capítol', idx + 1);
 }
 
 async function actualitzarLlibreRegistreBackground(textCapitol, idx) {
@@ -3245,6 +3272,184 @@ async function callLLMWithContinuation(messages, systemPrompt, config, tag, maxC
   }
 
   return fullText;
+}
+
+function textSemblaIncomplet(text) {
+  const net = String(text || '').trim();
+  if (!net) return true;
+  if (net.length < 80) return true;
+  const final = net.slice(-1);
+  const tancaFrase = '.!?…»”"\'';
+  if (!tancaFrase.includes(final)) return true;
+  const opens = (net.match(/[\(\[\{"«]/g) || []).length;
+  const closes = (net.match(/[\)\]\}"»]/g) || []).length;
+  return opens > closes;
+}
+
+async function callLLMOneShotPlusCompletion(messages, systemPrompt, config, tag) {
+  const safeConfig = config || {};
+
+  let modelId;
+  if (tag === 'arquitecte' || tag === 'arquitectura') {
+    modelId = safeConfig.modelArquitectura || safeConfig.model;
+  } else {
+    modelId = safeConfig.modelGeneracio || safeConfig.model;
+  }
+
+  const proveidor = safeConfig.provider || 'anthropic';
+  let apiKey;
+  if (proveidor === 'anthropic') apiKey = ESTAT._anthropicApiKey || safeConfig.apiKey;
+  if (proveidor === 'google' || proveidor === 'gemini') apiKey = ESTAT._geminiApiKey || safeConfig.apiKey;
+  if (proveidor === 'openai') apiKey = ESTAT._openaiApiKey || safeConfig.apiKey;
+  if (!apiKey) throw new Error(`Cal una clau API per al proveïdor: ${proveidor}`);
+
+  const maxTokens = safeConfig.maxTokens || 2048;
+
+  let primera;
+  if (proveidor === 'anthropic') {
+    primera = await callAnthropicWithFinishReason(messages, systemPrompt, apiKey, modelId, maxTokens);
+  } else if (proveidor === 'google' || proveidor === 'gemini') {
+    primera = await callGeminiWithFinishReason(messages, systemPrompt, apiKey, modelId, maxTokens);
+  } else if (proveidor === 'openai') {
+    primera = await callOpenAIWithFinishReason(messages, systemPrompt, apiKey, modelId, maxTokens);
+  } else {
+    throw new Error(`Proveïdor desconegut: ${proveidor}`);
+  }
+
+  let text = primera.text || '';
+
+  // Segona crida: només verificació de tancament (i, si cal, micro-completat).
+  console.log('[callLLMOneShotPlusCompletion] Segona crida de validació final.');
+  const missatgesTancament = [
+    ...messages,
+    { role: 'assistant', content: text },
+    { role: 'user', content: `Revisa NOMÉS el final del text anterior.
+Si el text ja està ben tancat, respon EXACTAMENT: OK
+Si ha quedat tallat o incomplet, respon EXACTAMENT en aquest format:
+APPEND: <text mínim necessari per tancar bé la frase o el paràgraf final>
+No repeteixis contingut ja escrit. No afegeixis res més.` }
+  ];
+  const configTancament = Object.assign({}, safeConfig, { maxTokens: 220 });
+
+  try {
+    const revisio = (await callLLMMulti(missatgesTancament, systemPrompt, configTancament, tag) || '').trim();
+    if (/^OK\s*$/i.test(revisio)) return text;
+
+    const match = revisio.match(/^APPEND:\s*([\s\S]*)$/i);
+    if (match && match[1] && match[1].trim()) {
+      text += match[1].trimStart();
+      return text;
+    }
+
+    // Fallback robust: només si el detector local veu final incomplet.
+    if ((primera.finishReason === 'length') || textSemblaIncomplet(text)) {
+      const rescat = await callLLMMulti([
+        ...messages,
+        { role: 'assistant', content: text },
+        { role: 'user', content: "Completa NOMÉS el tram final si havia quedat tallat. No repeteixis res. Escriu només el mínim per tancar correctament la frase o l'últim paràgraf." }
+      ], systemPrompt, Object.assign({}, safeConfig, { maxTokens: 240 }), tag);
+      if (rescat && rescat.trim()) text += rescat;
+    }
+  } catch (err) {
+    console.warn('[callLLMOneShotPlusCompletion] Validació final fallida:', err.message);
+  }
+
+  return text;
+}
+
+async function callLLMOneShotConditionalCompletion(messages, systemPrompt, config, tag) {
+  const safeConfig = config || {};
+
+  let modelId;
+  if (tag === 'arquitecte' || tag === 'arquitectura') {
+    modelId = safeConfig.modelArquitectura || safeConfig.model;
+  } else {
+    modelId = safeConfig.modelGeneracio || safeConfig.model;
+  }
+
+  const proveidor = safeConfig.provider || 'anthropic';
+  let apiKey;
+  if (proveidor === 'anthropic') apiKey = ESTAT._anthropicApiKey || safeConfig.apiKey;
+  if (proveidor === 'google' || proveidor === 'gemini') apiKey = ESTAT._geminiApiKey || safeConfig.apiKey;
+  if (proveidor === 'openai') apiKey = ESTAT._openaiApiKey || safeConfig.apiKey;
+  if (!apiKey) throw new Error(`Cal una clau API per al proveïdor: ${proveidor}`);
+
+  const maxTokens = safeConfig.maxTokens || 2048;
+
+  let primera;
+  if (proveidor === 'anthropic') {
+    primera = await callAnthropicWithFinishReason(messages, systemPrompt, apiKey, modelId, maxTokens);
+  } else if (proveidor === 'google' || proveidor === 'gemini') {
+    primera = await callGeminiWithFinishReason(messages, systemPrompt, apiKey, modelId, maxTokens);
+  } else if (proveidor === 'openai') {
+    primera = await callOpenAIWithFinishReason(messages, systemPrompt, apiKey, modelId, maxTokens);
+  } else {
+    throw new Error(`Proveïdor desconegut: ${proveidor}`);
+  }
+
+  let text = primera.text || '';
+  const necessitaTancament = (primera.finishReason === 'length') || textSemblaIncomplet(text);
+  if (!necessitaTancament) return text;
+
+  const missatgesTancament = [
+    ...messages,
+    { role: 'assistant', content: text },
+    { role: 'user', content: `Continua el text exactament des d'on t'has aturat i tanca bé el final.
+INSTRUCCIONS ESTRICTES:
+- NO repeteixis cap frase ni cap idea ja escrita
+- NO resumeixis
+- Afegeix només el mínim necessari per completar el capítol
+- Acaba amb un final ben tancat` }
+  ];
+
+  const append = await callLLMMulti(
+    missatgesTancament,
+    systemPrompt,
+    Object.assign({}, safeConfig, { maxTokens: 320 }),
+    tag
+  );
+
+  if (append && append.trim()) text += append.trimStart();
+  return text;
+}
+
+
+
+function parseEscenesUnificades(text, totalEscenes) {
+  const net = String(text || '').replace(/
+/g, '').trim();
+  const out = [];
+  if (!net) return out;
+
+  const re = /(?:^|
+)\[\[ESCENA_(\d+)\]\]\s*
+?/g;
+  const marks = [];
+  let m;
+  while ((m = re.exec(net)) !== null) {
+    marks.push({ idx: parseInt(m[1], 10), pos: m.index, len: m[0].length });
+  }
+
+  if (marks.length === 0) return out;
+
+  for (let i = 0; i < marks.length; i++) {
+    const curr = marks[i];
+    const next = marks[i + 1];
+    const start = curr.pos + curr.len;
+    const end = next ? next.pos : net.length;
+    const txt = net.slice(start, end).trim();
+    if (!txt) continue;
+    out.push({ escena: curr.idx, text: txt });
+  }
+
+  const uniq = {};
+  out.forEach(e => { if (!uniq[e.escena]) uniq[e.escena] = e.text; });
+  const ordered = Object.keys(uniq)
+    .map(k => ({ escena: parseInt(k, 10), text: uniq[k] }))
+    .sort((a, b) => a.escena - b.escena)
+    .filter(e => e.escena >= 1 && e.escena <= Math.max(1, totalEscenes || 1));
+
+  return ordered;
 }
 
 // ─── Crida genèrica a LLM ───────────────────────────────────
@@ -4342,30 +4547,55 @@ function llistarPrefiguracions() {
 // ═══════════════════════════════════════════════════════════
 //  FASE 3: Context complet per a cada capítol
 // ═══════════════════════════════════════════════════════════
+
+function buildContextCapitolsComplets(idx, opts = {}) {
+  const capitols = (ESTAT._capitols_generats || []).slice(0, idx).filter(t => t && t.trim());
+  if (capitols.length === 0) return '';
+
+  const modelId = opts.modelId || ESTAT._modelGeneracio || 'claude-sonnet-4-6';
+  const regModel = MODEL_REGISTRY[modelId] || {};
+  const contextMax = regModel.context_max || 200000;
+
+  // Reserva aproximada: no volem consumir tot el context amb capítols literals.
+  const pressupostChars = Math.max(18000, Math.floor(contextMax * 1.8));
+
+  const blocs = capitols.map((txt, i) => `### CAPÍTOL ${i + 1}\n${txt.trim()}`);
+  const complet = blocs.join('\n\n');
+  if (complet.length <= pressupostChars) {
+    return '\n\nCAPÍTOLS ANTERIORS (TEXT COMPLET):\n' + complet;
+  }
+
+  // Si no hi cap tot, mantenim els més recents complets i compactem els primers.
+  const sortida = [];
+  let usats = 0;
+  for (let i = blocs.length - 1; i >= 0; i--) {
+    const bloc = blocs[i];
+    if (usats + bloc.length <= pressupostChars) {
+      sortida.unshift(bloc);
+      usats += bloc.length;
+      continue;
+    }
+    const restant = pressupostChars - usats;
+    if (restant > 1200) {
+      const retall = bloc.slice(0, Math.max(700, restant - 90)) + '\n[…retallat per context…]';
+      sortida.unshift(retall);
+      usats += retall.length;
+    }
+    break;
+  }
+
+  return `\n\nCAPÍTOLS ANTERIORS (TEXT COMPLET DINS EL LÍMIT DE CONTEXT):\n${sortida.join('\n\n')}\n\n[Nota: els capítols més antics poden quedar retallats si el context del model no permet incloure-ho tot literalment.]`;
+}
+
 function buildContextCapitolLegacy(idx) {
   const parts = [];
 
   // 1. Brief narratiu
   parts.push(buildBriefNarratiu());
 
-  // 2. Resums de capítols anteriors (amb compressió si n'hi ha)
-  const resumsReg = (ESTAT.llibreRegistre.capitols || []).map(c => c ? c.resum_capitol : null);
-  const compressionsOrdenades = (ESTAT._memoriasComprimides || []).filter(m => m.finsCap <= idx).sort((a,b) => b.finsCap - a.finsCap);
-  if (compressionsOrdenades.length > 0) {
-    const darrera = compressionsOrdenades[0];
-    parts.push(`\n\n## SINOPSI COMPRIMIDA (caps. 1-${darrera.finsCap})\n${darrera.text}`);
-    // Resums individuals posteriors a la compressió
-    const posteriores = resumsReg.slice(darrera.finsCap).filter(r => r);
-    if (posteriores.length > 0) {
-      parts.push('\n\n## RESUMS RECENTS\n' + posteriores.map((r, i) => `Cap. ${darrera.finsCap + 1 + i}: ${r}`).join('\n'));
-    }
-  } else {
-    // Fallback: resums individuals
-    const resumsAnteriors = resumsReg.slice(0, idx).filter(r => r);
-    if (resumsAnteriors.length > 0) {
-      parts.push('\n\nRESUMS DELS CAPÍTOLS ANTERIORS:\n' + resumsAnteriors.map((r, i) => `Cap. ${i + 1}: ${r}`).join('\n'));
-    }
-  }
+  // 2. Capítols anteriors literals (prioritari sobre resums)
+  const capsContext = buildContextCapitolsComplets(idx);
+  if (capsContext) parts.push(capsContext);
 
   // 3. Últims 2 paràgrafs del capítol anterior (continuïtat de to)
   if (idx > 0 && ESTAT._capitols_generats[idx - 1]) {
@@ -4718,7 +4948,7 @@ ${context}
 ${instruccionsVeu}
 
 INSTRUCCIONS D'ESCRIPTURA:
-- Entre 1800 i 2500 paraules
+- Entre 4000 i 5000 caràcters
 - Comença directament amb la narració, sense titular el capítol
 - Si hi ha prefiguracions a plantar, integra-les de forma subtil i natural (el lector no ha de notar-les en primera lectura)
 - Si hi ha prefiguracions a recollir, dona'ls resolució satisfactòria
@@ -4728,7 +4958,7 @@ INSTRUCCIONS D'ESCRIPTURA:
 - Escriu en català`
   }];
 
-  const response = await callLLMWithContinuation(msgs, systemPrompt, Object.assign({}, userConfig, { maxTokens: 6000 }), 'generacio');
+  const response = await callLLMOneShotPlusCompletion(msgs, systemPrompt, Object.assign({}, userConfig, { maxTokens: 1900 }), 'generacio');
   return { response };
 }
 
@@ -5730,16 +5960,10 @@ function nkgGenerarContextMinim(escenaSpec) {
   const contextNKG = nkgQueryEscenaContext(escenaSpec);
   if (contextNKG) parts.push(contextNKG);
 
-  // CAPA 2: Resum narratiu compacte (~400 tokens fix)
-  if (ESTAT._resumCompacte) {
-    parts.push('\nFINS ARA A LA NOVEL·LA:\n' + ESTAT._resumCompacte);
-  } else {
-    // Fallback: resums del registre si no hi ha resum compacte
-    const resumsReg = (ESTAT.llibreRegistre.capitols || []).map(c => c ? c.resum_capitol : null).filter(r => r);
-    if (resumsReg.length > 0) {
-      parts.push('\nRESUMS DELS CAPÍTOLS ANTERIORS:\n' + resumsReg.map((r, i) => `Cap. ${i + 1}: ${r}`).join('\n'));
-    }
-  }
+  // CAPA 2: Capítols anteriors literals (si hi caben en context)
+  const capIdxActual = Math.max(0, (escenaSpec.capitol || 1) - 1);
+  const capsContext = buildContextCapitolsComplets(capIdxActual);
+  if (capsContext) parts.push(capsContext);
 
   // CAPA 3: Últimes 2 escenes literals (~800 tokens)
   const ultimesEscenes = obtenirUltimesEscenes(2, escenaSpec.capitol, escenaSpec.escena || 1);
@@ -6247,16 +6471,75 @@ async function generarCapitolNKG(idx, userConfig) {
   let textComplet = '';
 
   if (ESTAT._nkg && escenes && Array.isArray(escenes) && escenes.length > 0) {
-    // Escriptura per escenes amb Dual-Pass
-    for (let i = 0; i < escenes.length; i++) {
-      const escena = escenes[i];
-      const loaderEl = document.getElementById('loader-11-text');
-      if (loaderEl) {
-        loaderEl.textContent = `✍️ Capítol ${capitol}: Escena ${i + 1}/${escenes.length} (draft → expansió)…`;
-      }
-      const text = await escriureEscenaDualPass(capitol, i, escena, userConfig);
-      textComplet += (i > 0 ? '\n\n' : '') + text;
+    // Escriptura d'un sol missatge per capítol (NKG + totes les escenes)
+    const loaderEl = document.getElementById('loader-11-text');
+    if (loaderEl) loaderEl.textContent = `✍️ Capítol ${capitol}: generació unificada (1 missatge + tancament opcional)…`;
+
+    const contextNKG = nkgGenerarContextMinim({
+      capitol,
+      escena: 1,
+      personatges: [...new Set(escenes.flatMap(sc => sc.personatges || []))],
+      lloc: escenes[0] ? (escenes[0].lloc || escenes[0].localitzacio || '') : '',
+      escaleta: { capítol: capitol, escenes }
+    });
+    const contextCapitol = buildContextCapitol(idx);
+    const instruccionsFinalCapitol = generarInstruccionsGanxoFinalCapitol(idx);
+
+    const escenesText = escenes.map((sc, i) => {
+      return `ESCENA ${i + 1}/${escenes.length}
+- Nom: ${sc.nom || ''}
+- Funció narrativa: ${sc.funcio_narrativa || ''}
+- Personatges: ${(sc.personatges || []).join(', ')}
+- Paraules objectiu: ${sc.paraules_objectiu || 500}
+- Beat narratiu: ${sc.beat_narratiu || 'equilibrat'}`;
+    }).join('\n\n');
+
+    const paraulesTotal = escenes.reduce((acc, sc) => acc + (sc.paraules_objectiu || 500), 0);
+    const systemPrompt = buildSystemPromptCapitol();
+    const msgs = [{
+      role: 'user',
+      content: `Escriu el CAPÍTOL ${capitol} complet en una sola resposta, integrant TOTES les escenes de l'escaleta en ordre.
+
+${contextNKG}
+
+${contextCapitol}
+
+ESCALETA DEL CAPÍTOL:
+${escenesText}
+
+INSTRUCCIONS ESTRICTES:
+- Escriu totes les escenes en ordre i posa aquest marcador al començament de cada escena: [[ESCENA_1]], [[ESCENA_2]], etc.
+- NO afegeixis cap altre encapçalament ni metadades
+- Dins de cada escena escriu prosa literària completa i transicions naturals
+- Respecta personatges, continuïtat factual i estat del NKG
+- No repeteixis informació, accions ni frases
+- Mantén català natural i consistent
+- Objectiu aproximat de longitud: ${Math.round(paraulesTotal * 0.9)}-${Math.round(paraulesTotal * 1.1)} paraules
+- ${instruccionsFinalCapitol}`
+    }];
+
+    const textRaw = await callLLMOneShotConditionalCompletion(
+      msgs,
+      systemPrompt,
+      Object.assign({}, userConfig, { maxTokens: 5200 }),
+      'generacio'
+    );
+
+    const escenesParsejades = parseEscenesUnificades(textRaw, escenes.length);
+    if (escenesParsejades.length > 0) {
+      textComplet = escenesParsejades.map(e => e.text).join('\n\n');
+      if (!ESTAT._escenes_generades) ESTAT._escenes_generades = {};
+      ESTAT._escenes_generades[idx] = {};
+      escenesParsejades.forEach((e, i) => {
+        ESTAT._escenes_generades[idx][i] = e.text;
+      });
+    } else {
+      textComplet = textRaw;
+      if (!ESTAT._escenes_generades) ESTAT._escenes_generades = {};
+      ESTAT._escenes_generades[idx] = { 0: textComplet };
     }
+
+    await nkgActualitzarPostEscena(textComplet, capitol, escenes.length, userConfig);
   } else if (ESTAT._nkg) {
     // NKG actiu però sense escaleta: escriptura dual-pass del capítol com una sola escena
     const cap = ESTAT._estructuraCapitols ? ESTAT._estructuraCapitols[idx] : null;
