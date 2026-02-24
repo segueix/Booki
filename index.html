@@ -5401,6 +5401,26 @@ function nkgDetectarContradiccions(nouFet) {
   return contradiccions;
 }
 
+function obtenirContextCapitolEnCurs(capitol, escenaIdx) {
+  const capIdx = capitol - 1;
+  if (!ESTAT._escenes_generades || !ESTAT._escenes_generades[capIdx] || escenaIdx <= 0) return '';
+
+  const escenesCap = ESTAT._escenes_generades[capIdx];
+  const blocs = [];
+  for (let i = 0; i < escenaIdx; i++) {
+    const txt = escenesCap[i];
+    if (!txt) continue;
+    const resumCurt = txt.length > 900 ? txt.slice(-900) : txt;
+    blocs.push(`Escena ${i + 1}: ${resumCurt}`);
+  }
+
+  if (blocs.length === 0) return '';
+  return `
+CONTINUÏTAT DEL CAPÍTOL EN CURS (NO REPETIR AQUEST CONTINGUT):
+${blocs.join('\n\n')}`;
+}
+
+
 function obtenirUltimesEscenes(n, capitolActual, escenaActual) {
   const fragments = [];
 
@@ -5786,6 +5806,7 @@ async function escriureEscenaDualPass(capitol, escenaIdx, escenaSpec, userConfig
 
   // Obtenir context mínim del NKG
   const contextNKG = nkgGenerarContextMinim(nkgSpec);
+  const contextCapitolEnCurs = obtenirContextCapitolEnCurs(capitol, escenaIdx);
 
   // Instruccions de ritme
   const tensio = (ESTAT._corbaTensio || []).find(t => t.capitol === capitol);
@@ -5796,9 +5817,11 @@ async function escriureEscenaDualPass(capitol, escenaIdx, escenaSpec, userConfig
     role: 'user',
     content: `DRAFT NARRATIU — Capítol ${capitol}, Escena ${escenaIdx + 1}
 
-${contextNKG}
+${contextNKG}${contextCapitolEnCurs}
 
 INSTRUCCIONS DE DRAFT:
+- Continuïtat estricta amb les escenes anteriors del mateix capítol
+- PROHIBIT repetir literalment escenes, diàlegs o descripcions ja escrites
 - Escriu l'ESQUELET narratiu d'aquesta escena en ~300 paraules
 - Prioritza: QUÈ PASSA, en quin ordre, quins diàlegs avancen la trama
 - NO et preocupis per la prosa, les descripcions ni els detalls sensorials
@@ -5904,6 +5927,7 @@ Reescriu el draft corregint NOMÉS els errors indicats. Manté la mateixa estruc
 
 DRAFT (esquelet narratiu — manté l'estructura i els beats):
 ${draft}
+${contextCapitolEnCurs}
 ${goldenRef}
 ${estilsPresents}${manualRef}
 
@@ -5913,6 +5937,7 @@ INSTRUCCIONS D'EXPANSIÓ:
 - Afegeix: detalls sensorials (mínim 2 sentits per escena), subtexte als diàlegs, ritme de la prosa
 - ${instruccionsBeat || 'Equilibra narració, diàleg i descripció'}
 - Mostra, no expliquis: NO escriguis "estava trist" → mostra-ho amb gestos, paraules, mirada
+- No repeteixis informació, accions ni frases de les escenes anteriors del mateix capítol; avança sempre
 - Comença directament amb la narració, sense titular${instruccionsVariancia ? '\n- VARIÀNCIA: ' + instruccionsVariancia : ''}
 - Escriu en català`
   }];
