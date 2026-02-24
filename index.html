@@ -3317,18 +3317,43 @@ async function callLLMOneShotPlusCompletion(messages, systemPrompt, config, tag)
   }
 
   let text = primera.text || '';
-  const calSegona = (primera.finishReason === 'length') || textSemblaIncomplet(text);
-  if (!calSegona) return text;
 
-  console.log('[callLLMOneShotPlusCompletion] Segona crida de tancament.');
+  // Segona crida: només verificació de tancament (i, si cal, micro-completat).
+  console.log('[callLLMOneShotPlusCompletion] Segona crida de validació final.');
   const missatgesTancament = [
     ...messages,
     { role: 'assistant', content: text },
-    { role: 'user', content: "Completa NOMÉS el tram final si havia quedat tallat. No repeteixis res. Escriu només el mínim per tancar correctament la frase o l'últim paràgraf." }
+    { role: 'user', content: `Revisa NOMÉS el final del text anterior.
+Si el text ja està ben tancat, respon EXACTAMENT: OK
+Si ha quedat tallat o incomplet, respon EXACTAMENT en aquest format:
+APPEND: <text mínim necessari per tancar bé la frase o el paràgraf final>
+No repeteixis contingut ja escrit. No afegeixis res més.` }
   ];
-  const configTancament = Object.assign({}, safeConfig, { maxTokens: Math.min(700, Math.max(220, Math.floor(maxTokens * 0.2))) });
-  const tancament = await callLLMMulti(missatgesTancament, systemPrompt, configTancament, tag);
-  if (tancament && tancament.trim()) text += tancament;
+  const configTancament = Object.assign({}, safeConfig, { maxTokens: 220 });
+
+  try {
+    const revisio = (await callLLMMulti(missatgesTancament, systemPrompt, configTancament, tag) || '').trim();
+    if (/^OK\s*$/i.test(revisio)) return text;
+
+    const match = revisio.match(/^APPEND:\s*([\s\S]*)$/i);
+    if (match && match[1] && match[1].trim()) {
+      text += match[1].trimStart();
+      return text;
+    }
+
+    // Fallback robust: només si el detector local veu final incomplet.
+    if ((primera.finishReason === 'length') || textSemblaIncomplet(text)) {
+      const rescat = await callLLMMulti([
+        ...messages,
+        { role: 'assistant', content: text },
+        { role: 'user', content: "Completa NOMÉS el tram final si havia quedat tallat. No repeteixis res. Escriu només el mínim per tancar correctament la frase o l'últim paràgraf." }
+      ], systemPrompt, Object.assign({}, safeConfig, { maxTokens: 240 }), tag);
+      if (rescat && rescat.trim()) text += rescat;
+    }
+  } catch (err) {
+    console.warn('[callLLMOneShotPlusCompletion] Validació final fallida:', err.message);
+  }
+
   return text;
 }
 
