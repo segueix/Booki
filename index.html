@@ -1364,8 +1364,15 @@ function guardarIComencar() {
       fluxAutomatic
     };
 
-    poblarSelectorsModels();
-    actualitzarModelsDisponibles();
+    if (typeof poblarSelectorsModels === 'function') {
+      poblarSelectorsModels();
+    } else {
+      console.warn("poblarSelectorsModels no definit; s'omet la inicialització del panell de models.");
+    }
+
+    if (typeof actualitzarModelsDisponibles === 'function') {
+      actualitzarModelsDisponibles();
+    }
 
     hideCard('card-config');
     document.getElementById('progress-wrap').classList.remove('hidden');
@@ -7287,8 +7294,8 @@ document.addEventListener('DOMContentLoaded', function() {
   // Aplicar preset econòmic per defecte i poblar selectors
   aplicarPreset('economic');
   actualitzarConfigProvider();
-  poblarSelectorsModels();
-  guardarClausAPI();
+  if (typeof poblarSelectorsModels === 'function') poblarSelectorsModels();
+  if (typeof guardarClausAPI === 'function') guardarClausAPI();
 });
 
 </script>
