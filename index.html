@@ -3192,8 +3192,59 @@ async function callLLMMulti(messages, systemPrompt, config, tag) {
   if (proveidor === 'anthropic') return await callAnthropic(messages, systemPrompt, apiKey, modelId, maxTokens);
   if (proveidor === 'google' || proveidor === 'gemini') return await callGemini(messages, systemPrompt, apiKey, modelId, maxTokens);
   if (proveidor === 'openai') return await callOpenAI(messages, systemPrompt, apiKey, modelId, maxTokens);
-  
+
   throw new Error(`Proveïdor desconegut: ${proveidor}`);
+}
+
+async function callLLMWithContinuation(messages, systemPrompt, config, tag, maxCont = 3) {
+  const safeConfig = config || {};
+
+  let modelId;
+  if (tag === 'arquitecte' || tag === 'arquitectura') {
+    modelId = safeConfig.modelArquitectura || safeConfig.model;
+  } else {
+    modelId = safeConfig.modelGeneracio || safeConfig.model;
+  }
+
+  const proveidor = safeConfig.provider || 'anthropic';
+
+  let apiKey;
+  if (proveidor === 'anthropic') apiKey = ESTAT._anthropicApiKey || safeConfig.apiKey;
+  if (proveidor === 'google' || proveidor === 'gemini') apiKey = ESTAT._geminiApiKey || safeConfig.apiKey;
+  if (proveidor === 'openai') apiKey = ESTAT._openaiApiKey || safeConfig.apiKey;
+
+  if (!apiKey) throw new Error(`Cal una clau API per al proveïdor: ${proveidor}`);
+
+  const maxTokens = safeConfig.maxTokens || 2048;
+
+  let fullText = '';
+  let currentMessages = [...messages];
+
+  for (let i = 0; i <= maxCont; i++) {
+    let result;
+    if (proveidor === 'anthropic') {
+      result = await callAnthropicWithFinishReason(currentMessages, systemPrompt, apiKey, modelId, maxTokens);
+    } else if (proveidor === 'google' || proveidor === 'gemini') {
+      result = await callGeminiWithFinishReason(currentMessages, systemPrompt, apiKey, modelId, maxTokens);
+    } else if (proveidor === 'openai') {
+      result = await callOpenAIWithFinishReason(currentMessages, systemPrompt, apiKey, modelId, maxTokens);
+    } else {
+      throw new Error(`Proveïdor desconegut: ${proveidor}`);
+    }
+
+    fullText += result.text;
+
+    if (result.finishReason !== 'length') break;
+
+    console.log(`[callLLMWithContinuation] Text tallat (iteració ${i + 1}/${maxCont}), sol·licitant continuació...`);
+    currentMessages = [
+      ...currentMessages,
+      { role: 'assistant', content: result.text },
+      { role: 'user', content: "Continua el text exactament des d'on t'has aturat, sense repetir ni resumir res." }
+    ];
+  }
+
+  return fullText;
 }
 
 // ─── Crida genèrica a LLM ───────────────────────────────────
@@ -3260,6 +3311,35 @@ async function callAnthropic(messages, systemPrompt, apiKey, model, maxTokens) {
   return normalizeLLMText(text);
 }
 
+async function callAnthropicWithFinishReason(messages, systemPrompt, apiKey, model, maxTokens) {
+  const payload = {
+    model:      model || PROVIDER_DEFAULTS.anthropic.model,
+    max_tokens: maxTokens,
+    system:     systemPrompt || SYSTEM_DEFAULT,
+    messages:   messages
+  };
+
+  const raw = await fetch(PROVIDER_DEFAULTS.anthropic.apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type':                            'application/json',
+      'x-api-key':                               apiKey,
+      'anthropic-version':                       '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const result = await parseJsonResponse(raw, 'Anthropic');
+  if (result.error) throw new Error(result.error.message || "Error desconegut d'Anthropic.");
+
+  const text = Array.isArray(result.content)
+    ? result.content.filter(p => p && p.type === 'text').map(p => p.text || '').join('\n')
+    : '';
+  const finishReason = result.stop_reason === 'max_tokens' ? 'length' : 'stop';
+  return { text: normalizeLLMText(text), finishReason };
+}
+
 // ─── OpenAI (GPT) ───────────────────────────────────────────
 // OpenAI permet CORS des del navegador amb la seva API pública,
 // de manera que no cal proxy.
@@ -3285,6 +3365,31 @@ async function callOpenAI(messages, systemPrompt, apiKey, model, maxTokens) {
   const firstChoice    = result.choices && result.choices[0];
   const messageContent = firstChoice && firstChoice.message ? firstChoice.message.content : '';
   return normalizeLLMText(extractContentText(messageContent));
+}
+
+async function callOpenAIWithFinishReason(messages, systemPrompt, apiKey, model, maxTokens) {
+  const payload = {
+    model:      model || PROVIDER_DEFAULTS.openai.model,
+    messages:   buildOpenAIMessages(messages, systemPrompt),
+    max_tokens: maxTokens
+  };
+
+  const raw = await fetch(PROVIDER_DEFAULTS.openai.apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': 'Bearer ' + apiKey
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const result = await parseJsonResponse(raw, 'OpenAI');
+  if (result.error) throw new Error(result.error.message || "Error desconegut d'OpenAI.");
+
+  const firstChoice    = result.choices && result.choices[0];
+  const messageContent = firstChoice && firstChoice.message ? firstChoice.message.content : '';
+  const finishReason   = firstChoice && firstChoice.finish_reason === 'length' ? 'length' : 'stop';
+  return { text: normalizeLLMText(extractContentText(messageContent)), finishReason };
 }
 
 // ─── Google Gemini ──────────────────────────────────────────
@@ -3334,8 +3439,54 @@ async function callGemini(messages, systemPrompt, apiKey, model, maxTokens) {
 
   const parts = firstCandidate && firstCandidate.content ? firstCandidate.content.parts : [];
   const text  = Array.isArray(parts) ? parts.map(p => (p && p.text) ? p.text : '').join('\n') : '';
-  
+
   return normalizeLLMText(text);
+}
+
+async function callGeminiWithFinishReason(messages, systemPrompt, apiKey, model, maxTokens) {
+  const finalModel = model || PROVIDER_DEFAULTS.gemini.model;
+  const endpoint   = PROVIDER_DEFAULTS.gemini.apiUrlBase + '/' +
+    encodeURIComponent(finalModel) + ':generateContent?key=' + encodeURIComponent(apiKey);
+
+  const payload = {
+    contents:         buildGeminiContents(messages),
+    generationConfig: { maxOutputTokens: maxTokens },
+    safetySettings: [
+      { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+      { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+      { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+      { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+    ]
+  };
+
+  if (systemPrompt || SYSTEM_DEFAULT) {
+    payload.systemInstruction = { parts: [{ text: systemPrompt || SYSTEM_DEFAULT }] };
+  }
+
+  const raw = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  const result = await parseJsonResponse(raw, 'Gemini');
+  if (result.error) {
+    throw new Error(
+      (result.error.message || 'Error desconegut de Gemini.') +
+      (result.error.status ? ' (' + result.error.status + ')' : '')
+    );
+  }
+
+  const firstCandidate = result.candidates && result.candidates[0];
+
+  if (firstCandidate && firstCandidate.finishReason === 'SAFETY') {
+    throw new Error("Gemini ha bloquejat la resposta per filtres de seguretat extrems. Prova amb un fragment menys sensible.");
+  }
+
+  const parts = firstCandidate && firstCandidate.content ? firstCandidate.content.parts : [];
+  const text  = Array.isArray(parts) ? parts.map(p => (p && p.text) ? p.text : '').join('\n') : '';
+  const finishReason = firstCandidate && firstCandidate.finishReason === 'MAX_TOKENS' ? 'length' : 'stop';
+  return { text: normalizeLLMText(text), finishReason };
 }
 
 // ─── Helpers de construcció de missatges ────────────────────
@@ -4577,7 +4728,7 @@ INSTRUCCIONS D'ESCRIPTURA:
 - Escriu en català`
   }];
 
-  const response = await callLLMMulti(msgs, systemPrompt, Object.assign({}, userConfig, { maxTokens: 6000 }), 'generacio');
+  const response = await callLLMWithContinuation(msgs, systemPrompt, Object.assign({}, userConfig, { maxTokens: 6000 }), 'generacio');
   return { response };
 }
 
@@ -5907,7 +6058,7 @@ INSTRUCCIONS:
 - Mostra, no expliquis`
   }];
 
-  const res = await callLLMMulti(msgs, systemPrompt, Object.assign({}, userConfig, { maxTokens: 3000 }), 'generacio');
+  const res = await callLLMWithContinuation(msgs, systemPrompt, Object.assign({}, userConfig, { maxTokens: 3000 }), 'generacio');
   return res || '';
 }
 
@@ -6071,7 +6222,7 @@ INSTRUCCIONS D'EXPANSIÓ:
   }];
 
   try {
-    const textFinal = await callLLMMulti(promptExpansio, systemPrompt,
+    const textFinal = await callLLMWithContinuation(promptExpansio, systemPrompt,
       Object.assign({}, userConfig, { maxTokens: 3000, model: models.modelGeneracio }), 'generacio');
 
     if (!ESTAT._escenes_generades) ESTAT._escenes_generades = {};
