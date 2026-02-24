@@ -4400,30 +4400,55 @@ function llistarPrefiguracions() {
 // ═══════════════════════════════════════════════════════════
 //  FASE 3: Context complet per a cada capítol
 // ═══════════════════════════════════════════════════════════
+
+function buildContextCapitolsComplets(idx, opts = {}) {
+  const capitols = (ESTAT._capitols_generats || []).slice(0, idx).filter(t => t && t.trim());
+  if (capitols.length === 0) return '';
+
+  const modelId = opts.modelId || ESTAT._modelGeneracio || 'claude-sonnet-4-6';
+  const regModel = MODEL_REGISTRY[modelId] || {};
+  const contextMax = regModel.context_max || 200000;
+
+  // Reserva aproximada: no volem consumir tot el context amb capítols literals.
+  const pressupostChars = Math.max(18000, Math.floor(contextMax * 1.8));
+
+  const blocs = capitols.map((txt, i) => `### CAPÍTOL ${i + 1}\n${txt.trim()}`);
+  const complet = blocs.join('\n\n');
+  if (complet.length <= pressupostChars) {
+    return '\n\nCAPÍTOLS ANTERIORS (TEXT COMPLET):\n' + complet;
+  }
+
+  // Si no hi cap tot, mantenim els més recents complets i compactem els primers.
+  const sortida = [];
+  let usats = 0;
+  for (let i = blocs.length - 1; i >= 0; i--) {
+    const bloc = blocs[i];
+    if (usats + bloc.length <= pressupostChars) {
+      sortida.unshift(bloc);
+      usats += bloc.length;
+      continue;
+    }
+    const restant = pressupostChars - usats;
+    if (restant > 1200) {
+      const retall = bloc.slice(0, Math.max(700, restant - 90)) + '\n[…retallat per context…]';
+      sortida.unshift(retall);
+      usats += retall.length;
+    }
+    break;
+  }
+
+  return `\n\nCAPÍTOLS ANTERIORS (TEXT COMPLET DINS EL LÍMIT DE CONTEXT):\n${sortida.join('\n\n')}\n\n[Nota: els capítols més antics poden quedar retallats si el context del model no permet incloure-ho tot literalment.]`;
+}
+
 function buildContextCapitolLegacy(idx) {
   const parts = [];
 
   // 1. Brief narratiu
   parts.push(buildBriefNarratiu());
 
-  // 2. Resums de capítols anteriors (amb compressió si n'hi ha)
-  const resumsReg = (ESTAT.llibreRegistre.capitols || []).map(c => c ? c.resum_capitol : null);
-  const compressionsOrdenades = (ESTAT._memoriasComprimides || []).filter(m => m.finsCap <= idx).sort((a,b) => b.finsCap - a.finsCap);
-  if (compressionsOrdenades.length > 0) {
-    const darrera = compressionsOrdenades[0];
-    parts.push(`\n\n## SINOPSI COMPRIMIDA (caps. 1-${darrera.finsCap})\n${darrera.text}`);
-    // Resums individuals posteriors a la compressió
-    const posteriores = resumsReg.slice(darrera.finsCap).filter(r => r);
-    if (posteriores.length > 0) {
-      parts.push('\n\n## RESUMS RECENTS\n' + posteriores.map((r, i) => `Cap. ${darrera.finsCap + 1 + i}: ${r}`).join('\n'));
-    }
-  } else {
-    // Fallback: resums individuals
-    const resumsAnteriors = resumsReg.slice(0, idx).filter(r => r);
-    if (resumsAnteriors.length > 0) {
-      parts.push('\n\nRESUMS DELS CAPÍTOLS ANTERIORS:\n' + resumsAnteriors.map((r, i) => `Cap. ${i + 1}: ${r}`).join('\n'));
-    }
-  }
+  // 2. Capítols anteriors literals (prioritari sobre resums)
+  const capsContext = buildContextCapitolsComplets(idx);
+  if (capsContext) parts.push(capsContext);
 
   // 3. Últims 2 paràgrafs del capítol anterior (continuïtat de to)
   if (idx > 0 && ESTAT._capitols_generats[idx - 1]) {
@@ -5788,16 +5813,10 @@ function nkgGenerarContextMinim(escenaSpec) {
   const contextNKG = nkgQueryEscenaContext(escenaSpec);
   if (contextNKG) parts.push(contextNKG);
 
-  // CAPA 2: Resum narratiu compacte (~400 tokens fix)
-  if (ESTAT._resumCompacte) {
-    parts.push('\nFINS ARA A LA NOVEL·LA:\n' + ESTAT._resumCompacte);
-  } else {
-    // Fallback: resums del registre si no hi ha resum compacte
-    const resumsReg = (ESTAT.llibreRegistre.capitols || []).map(c => c ? c.resum_capitol : null).filter(r => r);
-    if (resumsReg.length > 0) {
-      parts.push('\nRESUMS DELS CAPÍTOLS ANTERIORS:\n' + resumsReg.map((r, i) => `Cap. ${i + 1}: ${r}`).join('\n'));
-    }
-  }
+  // CAPA 2: Capítols anteriors literals (si hi caben en context)
+  const capIdxActual = Math.max(0, (escenaSpec.capitol || 1) - 1);
+  const capsContext = buildContextCapitolsComplets(capIdxActual);
+  if (capsContext) parts.push(capsContext);
 
   // CAPA 3: Últimes 2 escenes literals (~800 tokens)
   const ultimesEscenes = obtenirUltimesEscenes(2, escenaSpec.capitol, escenaSpec.escena || 1);
