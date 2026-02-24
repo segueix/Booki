@@ -6078,13 +6078,24 @@ function detectarRepeticions() {
 // MILLORA 6: VEU SEMILLA — Analitzar estil de referència (Opus)
 // ══════════════════════════════════════════════════════════════
 
+function manualEstilMassaCurt(manual) {
+  if (!manual || typeof manual !== 'object') return true;
+  const camps = ['longitud_frases', 'estil_dialeg', 'sensorialitat', 'ritme', 'vocabulari', 'punt_de_vista'];
+  const presents = camps.filter(c => manual[c] != null && String(manual[c]).trim().length > 20);
+  const charsTotals = presents.reduce((acc, c) => acc + String(manual[c]).trim().length, 0);
+  return presents.length < 4 || charsTotals < 260;
+}
+
 async function analitzarVeuSemilla(textReferencia, userConfig) {
-  const prompt = [{
-    role: 'user',
-    content: `Ets un expert en estil literari. Analitza el fragment de text d'un autor de referència i genera un MANUAL D'ESTIL concret i accionable per a un escriptor.
+  const promptBase = `Ets un expert en estil literari. Analitza el fragment de text d'un autor de referència i genera un MANUAL D'ESTIL concret i accionable per a un escriptor.
 
 FRAGMENT DE REFERÈNCIA:
 ${textReferencia.substring(0, 4000)}
+
+IMPORTANT:
+- Cada camp textual ha de tenir com a mínim 2 frases i ser específic.
+- No retallis idees a mitja frase.
+- Evita resumir en una sola línia.
 
 Retorna EXCLUSIVAMENT JSON (sense cap altre text) amb el format:
 {
@@ -6095,13 +6106,26 @@ Retorna EXCLUSIVAMENT JSON (sense cap altre text) amb el format:
   "vocabulari": "registre i trets lexicals (ex: col·loquial amb arcaismes puntuals, evita adjectius abstractes)",
   "punt_de_vista": "focalització i distància narrativa",
   "trets_distinctius": ["tret 1", "tret 2", "tret 3"]
-}`
-  }]; 
+}`;
+
+  const prompt = [{ role: 'user', content: promptBase }];
+
   const res = await callLLMMulti(prompt, 'Ets un crític literari expert en anàlisi estilística. Analitza amb precisió quirúrgica.',
-    Object.assign({}, userConfig, { maxTokens: 800 }), 'arquitectura');
-  const parsed = parseJsonRobust(res);
-  if (parsed) return parsed;
-  return parseManualEstilFallback(res);
+    Object.assign({}, userConfig, { maxTokens: 1500 }), 'arquitectura');
+
+  let manual = parseJsonRobust(res) || parseManualEstilFallback(res);
+  if (!manualEstilMassaCurt(manual)) return manual;
+
+  const promptRetry = [{
+    role: 'user',
+    content: promptBase + '\n\nReescriu la resposta amb MÉS DETALL i assegura que tots els camps estiguin complets i no tallats.'
+  }];
+
+  const resRetry = await callLLMMulti(promptRetry, 'Ets un crític literari expert en anàlisi estilística. Analitza amb precisió quirúrgica.',
+    Object.assign({}, userConfig, { maxTokens: 2200 }), 'arquitectura');
+
+  manual = parseJsonRobust(resRetry) || parseManualEstilFallback(resRetry);
+  return manual;
 }
 
 function parseManualEstilFallback(text) {
