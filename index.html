@@ -2628,14 +2628,38 @@ async function reescriureCapitol(idx) {
   }
 }
 
+
+function resumAutomaticCapitol(textCapitol) {
+  const net = String(textCapitol || '').replace(/\s+/g, ' ').trim();
+  if (!net) return '(sense resum)';
+  const frases = net.match(/[^.!?…]+[.!?…]+/g) || [];
+  if (frases.length >= 2) return (frases[0] + ' ' + frases[1]).trim().slice(0, 420);
+  return net.slice(0, 420) + (net.length > 420 ? '…' : '');
+}
+
+function normalitzarEntradaRegistre(dades, textCapitol, idx) {
+  const base = (dades && typeof dades === 'object') ? dades : {};
+  const resum = String(base.resum_capitol || '').trim() || resumAutomaticCapitol(textCapitol);
+  return {
+    resum_capitol: resum,
+    estat_personatges: Array.isArray(base.estat_personatges) ? base.estat_personatges : [],
+    fils_oberts: Array.isArray(base.fils_oberts) ? base.fils_oberts : [],
+    fils_tancats: Array.isArray(base.fils_tancats) ? base.fils_tancats : [],
+    prefiguracions_detectades: Array.isArray(base.prefiguracions_detectades) ? base.prefiguracions_detectades : [],
+    _fallback: !dades,
+    _capitol_idx: idx
+  };
+}
+
 // FASE 8: registre síncron amb retry — s'awaita des de generarCapitol
 async function actualitzarLlibreRegistreBackgroundLegacy(textCapitol, idx) {
   let intents = 0;
   while (intents < 2) {
     try {
       const res   = await actualitzarRegistre(textCapitol, idx, USER_CONFIG);
-      const dades = parseJsonRobust(res.response);
-      if (dades) {
+      const dadesRaw = parseJsonRobust(res.response);
+      if (dadesRaw) {
+        const dades = normalitzarEntradaRegistre(dadesRaw, textCapitol, idx);
         if (!ESTAT.llibreRegistre.capitols) ESTAT.llibreRegistre.capitols = [];
         ESTAT.llibreRegistre.capitols[idx] = dades;
 
@@ -2660,7 +2684,10 @@ async function actualitzarLlibreRegistreBackgroundLegacy(textCapitol, idx) {
       intents++;
     }
   }
-  console.warn('Registre: no s\'ha pogut actualitzar després de 2 intents');
+
+  if (!ESTAT.llibreRegistre.capitols) ESTAT.llibreRegistre.capitols = [];
+  ESTAT.llibreRegistre.capitols[idx] = normalitzarEntradaRegistre(null, textCapitol, idx);
+  console.warn('Registre: fallback local aplicat (entrada mínima) per al capítol', idx + 1);
 }
 
 async function actualitzarLlibreRegistreBackground(textCapitol, idx) {
