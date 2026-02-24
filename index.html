@@ -4470,11 +4470,30 @@ CRÍTIC: Han de ser EXACTAMENT ${capsQueFalten} capítols. L'últim (${capsEsper
 // ═══════════════════════════════════════════════════════════
 //  FASE 11: Escriure capítol (Sonnet) — FASE 3: Context complet
 // ═══════════════════════════════════════════════════════════
+function generarInstruccionsGanxoFinalCapitol(idx) {
+  const esUltimCapitol = idx >= ((ESTAT._estructuraCapitols && ESTAT._estructuraCapitols.length) ? ESTAT._estructuraCapitols.length - 1 : 0);
+  const oberts = (ESTAT.llibreRegistre && Array.isArray(ESTAT.llibreRegistre.fils_oberts))
+    ? ESTAT.llibreRegistre.fils_oberts.filter(Boolean)
+    : [];
+
+  if (esUltimCapitol) {
+    return `Com que és l'últim capítol, tanca els fils prioritaris i deixa només una reverberació emocional final (sense cliffhanger fort).`;
+  }
+
+  if (oberts.length > 0) {
+    const mostra = oberts.slice(0, 3).join(' · ');
+    return `Al tram final del capítol crea una tensió adictiva amb un mini-cliffhanger clar, i fes que l'escena final connecti amb algun fil obert del registre (${mostra}) obrint-lo més o encaminant-ne el tancament posterior.`;
+  }
+
+  return `Al tram final del capítol crea una tensió adictiva amb un mini-cliffhanger clar, formulant una pregunta dramàtica concreta que obligui a llegir el següent capítol.`;
+}
+
 async function escriureCapitol(idx, userConfig) {
   const cap          = ESTAT._estructuraCapitols[idx];
   const capPlanificacio = cap ? (cap.resum || cap.text) : `Capítol ${idx + 1}`;
   const context      = buildContextCapitol(idx);
   const systemPrompt = buildSystemPromptCapitol();
+  const instruccionsFinalCapitol = generarInstruccionsGanxoFinalCapitol(idx);
 
   // Instruccions de personatges presents i els seus estils
   const persPresents = cap && cap.personatges ? cap.personatges : [];
@@ -4503,6 +4522,7 @@ INSTRUCCIONS D'ESCRIPTURA:
 - Si hi ha prefiguracions a recollir, dona'ls resolució satisfactòria
 - Respecta el nivell de tensió objectiu i el to indicat
 - Si no és el primer capítol, la primera frase ha de connectar fluïdament amb el final del capítol anterior
+- ${instruccionsFinalCapitol}
 - Escriu en català`
   }];
 
@@ -5266,12 +5286,14 @@ async function escriureCapitolPerEscenes(idx, userConfig) {
   const systemPrompt = buildSystemPromptCapitol();
   const contextCapitol = buildContextCapitol(idx);
   const escenes = escaletaCapitol.escenes;
+  const instruccionsFinalCapitol = generarInstruccionsGanxoFinalCapitol(idx);
   let textsEscenes = [];
   for (let i = 0; i < escenes.length; i++) {
     const escena = escenes[i];
     if (document.getElementById('loader-11-text')) {
       document.getElementById('loader-11-text').textContent = `Escrivint capítol ${idx + 1} — Escena ${i + 1}/${escenes.length}: ${escena.nom || ''}…`;
     }
+    const esUltimaEscena = i === escenes.length - 1;
     const promptEscena = `${contextCapitol}
 
 ## ESCENA ACTUAL A ESCRIURE
@@ -5281,7 +5303,10 @@ Personatges: ${(escena.personatges || []).join(', ')}
 Paraules objectiu: ${escena.paraules_objectiu || 400}
 ${escena.punt_inflexio ? '⚡ Aquesta escena conté un punt d\'inflexió important.' : ''}
 
-${i > 0 ? `TEXT DE L'ESCENA ANTERIOR:\n${textsEscenes[i-1].slice(-500)}\n\n` : ''}Escriu ara aquesta escena en prosa literària completa, sense títols ni metadades. Aproximadament ${escena.paraules_objectiu || 400} paraules.`;
+${i > 0 ? `TEXT DE L'ESCENA ANTERIOR:\n${textsEscenes[i-1].slice(-500)}\n\n` : ''}${esUltimaEscena ? `TANCAMENT DEL CAPÍTOL:
+${instruccionsFinalCapitol}
+
+` : ''}Escriu ara aquesta escena en prosa literària completa, sense títols ni metadades. Aproximadament ${escena.paraules_objectiu || 400} paraules.`;
     const msgs = [{ role: 'user', content: promptEscena }];
     const res = await callLLMMulti(
       msgs,
@@ -5850,6 +5875,12 @@ async function escriureEscenaDualPass(capitol, escenaIdx, escenaSpec, userConfig
   // Obtenir context mínim del NKG
   const contextNKG = nkgGenerarContextMinim(nkgSpec);
   const contextCapitolEnCurs = obtenirContextCapitolEnCurs(capitol, escenaIdx);
+  const escaletaCap = ESTAT._escaletes ? ESTAT._escaletes.find(e => e.capitol === capitol) : null;
+  const totalEscenesCapitol = escaletaCap && Array.isArray(escaletaCap.escenes) ? escaletaCap.escenes.length : 1;
+  const esUltimaEscenaCapitol = escenaIdx >= totalEscenesCapitol - 1;
+  const instruccionsFinalCapitol = esUltimaEscenaCapitol
+    ? generarInstruccionsGanxoFinalCapitol(capitol - 1)
+    : '';
 
   // Instruccions de ritme
   const tensio = (ESTAT._corbaTensio || []).find(t => t.capitol === capitol);
@@ -5984,6 +6015,7 @@ INSTRUCCIONS D'EXPANSIÓ:
 - Mostra, no expliquis: NO escriguis "estava trist" → mostra-ho amb gestos, paraules, mirada
 - No repeteixis informació, accions ni frases de les escenes anteriors del mateix capítol; avança sempre
 - Comença directament amb la narració, sense titular${instruccionsVariancia ? '\n- VARIÀNCIA: ' + instruccionsVariancia : ''}
+- ${instruccionsFinalCapitol || 'Mantén la progressió narrativa de l\'escena.'}
 - Escriu en català`
   }];
 
