@@ -3413,6 +3413,45 @@ INSTRUCCIONS ESTRICTES:
   return text;
 }
 
+
+
+function parseEscenesUnificades(text, totalEscenes) {
+  const net = String(text || '').replace(/
+/g, '').trim();
+  const out = [];
+  if (!net) return out;
+
+  const re = /(?:^|
+)\[\[ESCENA_(\d+)\]\]\s*
+?/g;
+  const marks = [];
+  let m;
+  while ((m = re.exec(net)) !== null) {
+    marks.push({ idx: parseInt(m[1], 10), pos: m.index, len: m[0].length });
+  }
+
+  if (marks.length === 0) return out;
+
+  for (let i = 0; i < marks.length; i++) {
+    const curr = marks[i];
+    const next = marks[i + 1];
+    const start = curr.pos + curr.len;
+    const end = next ? next.pos : net.length;
+    const txt = net.slice(start, end).trim();
+    if (!txt) continue;
+    out.push({ escena: curr.idx, text: txt });
+  }
+
+  const uniq = {};
+  out.forEach(e => { if (!uniq[e.escena]) uniq[e.escena] = e.text; });
+  const ordered = Object.keys(uniq)
+    .map(k => ({ escena: parseInt(k, 10), text: uniq[k] }))
+    .sort((a, b) => a.escena - b.escena)
+    .filter(e => e.escena >= 1 && e.escena <= Math.max(1, totalEscenes || 1));
+
+  return ordered;
+}
+
 // ─── Crida genèrica a LLM ───────────────────────────────────
 // rol: 'generacio' (Sonnet) | 'arquitectura' (Opus) — només per a Anthropic
 async function callLLM(messages, systemPrompt, config, rol) {
@@ -6469,9 +6508,9 @@ ESCALETA DEL CAPÍTOL:
 ${escenesText}
 
 INSTRUCCIONS ESTRICTES:
-- Escriu el capítol en prosa contínua, sense títols ni metadades
-- Ha d'incloure totes les escenes, en el mateix ordre de l'escaleta
-- Marca canvis d'escena de forma natural amb transicions narratives (sense encapçalaments)
+- Escriu totes les escenes en ordre i posa aquest marcador al començament de cada escena: [[ESCENA_1]], [[ESCENA_2]], etc.
+- NO afegeixis cap altre encapçalament ni metadades
+- Dins de cada escena escriu prosa literària completa i transicions naturals
 - Respecta personatges, continuïtat factual i estat del NKG
 - No repeteixis informació, accions ni frases
 - Mantén català natural i consistent
@@ -6479,15 +6518,26 @@ INSTRUCCIONS ESTRICTES:
 - ${instruccionsFinalCapitol}`
     }];
 
-    textComplet = await callLLMOneShotConditionalCompletion(
+    const textRaw = await callLLMOneShotConditionalCompletion(
       msgs,
       systemPrompt,
       Object.assign({}, userConfig, { maxTokens: 5200 }),
       'generacio'
     );
 
-    if (!ESTAT._escenes_generades) ESTAT._escenes_generades = {};
-    ESTAT._escenes_generades[idx] = { 0: textComplet };
+    const escenesParsejades = parseEscenesUnificades(textRaw, escenes.length);
+    if (escenesParsejades.length > 0) {
+      textComplet = escenesParsejades.map(e => e.text).join('\n\n');
+      if (!ESTAT._escenes_generades) ESTAT._escenes_generades = {};
+      ESTAT._escenes_generades[idx] = {};
+      escenesParsejades.forEach((e, i) => {
+        ESTAT._escenes_generades[idx][i] = e.text;
+      });
+    } else {
+      textComplet = textRaw;
+      if (!ESTAT._escenes_generades) ESTAT._escenes_generades = {};
+      ESTAT._escenes_generades[idx] = { 0: textComplet };
+    }
 
     await nkgActualitzarPostEscena(textComplet, capitol, escenes.length, userConfig);
   } else if (ESTAT._nkg) {
