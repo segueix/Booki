@@ -1323,53 +1323,58 @@ function actualitzarConfigProvider() {
 function actualitzarModelDefault() { actualitzarConfigProvider(); }
 
 function guardarIComencar() {
-  const provider = document.getElementById('config-provider').value;
-  if (!provider) { toast('Selecciona un proveïdor.'); return; }
+  try {
+    const provider = document.getElementById('config-provider').value;
+    if (!provider) { toast('Selecciona un proveïdor.'); return; }
 
-  const anthropicKey = document.getElementById('anthropicApiKey')?.value?.trim() || '';
-  const geminiKey    = document.getElementById('geminiApiKey')?.value?.trim();
-  const openaiKey    = document.getElementById('openaiApiKey')?.value?.trim();
+    const anthropicKey = document.getElementById('anthropicApiKey')?.value?.trim() || '';
+    const geminiKey    = document.getElementById('geminiApiKey')?.value?.trim() || '';
+    const openaiKey    = document.getElementById('openaiApiKey')?.value?.trim() || '';
 
-  let apiKey = '';
-  if (provider === 'anthropic') apiKey = anthropicKey;
-  if (provider === 'gemini')    apiKey = geminiKey;
-  if (provider === 'openai')    apiKey = openaiKey;
+    let apiKey = '';
+    if (provider === 'anthropic') apiKey = anthropicKey;
+    if (provider === 'gemini')    apiKey = geminiKey;
+    if (provider === 'openai')    apiKey = openaiKey;
 
-  if (!apiKey) { toast("Introdueix una API key per al proveïdor seleccionat."); return; }
+    if (!apiKey) { toast("Introdueix una API key per al proveïdor seleccionat."); return; }
 
-  if (anthropicKey) ESTAT._anthropicApiKey = anthropicKey;
-  if (geminiKey)    ESTAT._geminiApiKey    = geminiKey;
-  if (openaiKey)    ESTAT._openaiApiKey    = openaiKey;
+    if (anthropicKey) ESTAT._anthropicApiKey = anthropicKey;
+    if (geminiKey)    ESTAT._geminiApiKey    = geminiKey;
+    if (openaiKey)    ESTAT._openaiApiKey    = openaiKey;
 
-  const modelGeneracio    = document.getElementById('config-model-generacio').value.trim();
-  const modelArquitectura = document.getElementById('config-model-arquitectura').value.trim();
-  const fluxAutomatic     = document.getElementById('config-flux-automatic').checked;
+    const modelGeneracio    = document.getElementById('config-model-generacio').value.trim();
+    const modelArquitectura = document.getElementById('config-model-arquitectura').value.trim();
+    const fluxAutomatic     = document.getElementById('config-flux-automatic').checked;
 
-  if (!modelGeneracio)    { toast('Introdueix el model de generació.'); return; }
-  if (!modelArquitectura) { toast("Introdueix el model d'arquitectura."); return; }
+    if (!modelGeneracio)    { toast('Introdueix el model de generació.'); return; }
+    if (!modelArquitectura) { toast("Introdueix el model d'arquitectura."); return; }
 
-  // AQUESTA ÉS LA CLAU: Sobreescriure l'ESTAT intern perquè oblidi Claude
-  ESTAT._modelGeneracio  = modelGeneracio;
-  ESTAT._modelArquitecte = modelArquitectura;
-  ESTAT._modelDraft      = modelGeneracio; 
+    // AQUESTA ÉS LA CLAU: Sobreescriure l'ESTAT intern perquè oblidi Claude
+    ESTAT._modelGeneracio  = modelGeneracio;
+    ESTAT._modelArquitecte = modelArquitectura;
+    ESTAT._modelDraft      = modelGeneracio;
 
-  USER_CONFIG = {
-    provider,
-    apiKey,
-    modelGeneracio,
-    modelArquitectura,
-    modelDraft: modelGeneracio,
-    modelArquitecte: modelArquitectura,
-    fluxAutomatic
-  };
+    USER_CONFIG = {
+      provider,
+      apiKey,
+      modelGeneracio,
+      modelArquitectura,
+      modelDraft: modelGeneracio,
+      modelArquitecte: modelArquitectura,
+      fluxAutomatic
+    };
 
-  poblarSelectorsModels();
-  actualitzarModelsDisponibles();
+    poblarSelectorsModels();
+    actualitzarModelsDisponibles();
 
-  hideCard('card-config');
-  document.getElementById('progress-wrap').classList.remove('hidden');
-  showCard('fase-0');
-  toast('Configuració guardada.');
+    hideCard('card-config');
+    document.getElementById('progress-wrap').classList.remove('hidden');
+    showCard('fase-0');
+    toast('Configuració guardada.');
+  } catch (err) {
+    console.error('Error guardant configuració:', err);
+    toast("No s'ha pogut guardar la configuració. Mira la consola (F12).");
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -5208,7 +5213,7 @@ async function executarLoopCoherenciaFinal(userConfig) {
     }
   }
 
-  toast('ℹ️ Revisió final completada amb marge de millora. Revisa control d'arcs per ajustos addicionals.');
+  toast("ℹ️ Revisió final completada amb marge de millora. Revisa control d'arcs per ajustos addicionals.");
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -6745,8 +6750,8 @@ function guardarClausAPI() {
 
 function actualitzarModelsDisponibles() {
   const teAnthropic = !!(ESTAT._anthropicApiKey || (USER_CONFIG && USER_CONFIG.provider === 'anthropic' && USER_CONFIG.apiKey));
-  const teGemini    = !!ESTAT._geminiApiKey;
-  const teOpenai    = !!ESTAT._openaiApiKey;
+  const teGemini    = !!(ESTAT._geminiApiKey || (USER_CONFIG && (USER_CONFIG.provider === 'gemini' || USER_CONFIG.provider === 'google') && USER_CONFIG.apiKey));
+  const teOpenai    = !!(ESTAT._openaiApiKey || (USER_CONFIG && USER_CONFIG.provider === 'openai' && USER_CONFIG.apiKey));
 
   document.querySelectorAll('#panellModels select option').forEach(option => {
     const model = MODEL_REGISTRY[option.value];
