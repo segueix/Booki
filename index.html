@@ -6077,7 +6077,75 @@ Retorna EXCLUSIVAMENT JSON (sense cap altre text) amb el format:
   }]; 
   const res = await callLLMMulti(prompt, 'Ets un crític literari expert en anàlisi estilística. Analitza amb precisió quirúrgica.',
     Object.assign({}, userConfig, { maxTokens: 800 }), 'arquitectura');
-  return parseJsonRobust(res);
+  const parsed = parseJsonRobust(res);
+  if (parsed) return parsed;
+  return parseManualEstilFallback(res);
+}
+
+function parseManualEstilFallback(text) {
+  if (!text || typeof text !== 'string') return null;
+
+  const clean = text
+    .replace(/```(?:json)?/gi, '')
+    .replace(/```/g, '')
+    .replace(/\r/g, '')
+    .trim();
+
+  const manual = {};
+  const fieldMap = {
+    longitud_frases: ['longitud_frases', 'longitud de frases'],
+    estil_dialeg: ['estil_dialeg', 'estil de dialeg', 'estil de diàleg', 'dialeg', 'diàleg'],
+    sensorialitat: ['sensorialitat'],
+    ritme: ['ritme'],
+    vocabulari: ['vocabulari'],
+    punt_de_vista: ['punt_de_vista', 'punt de vista']
+  };
+
+  const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
+  for (const line of lines) {
+    const normalized = line
+      .replace(/^[-*•\d.)\s]+/, '')
+      .replace(/^\*\*(.*?)\*\*$/, '$1')
+      .trim();
+
+    const m = normalized.match(/^([^:]+):\s*(.+)$/);
+    if (!m) continue;
+
+    const key = m[1].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const value = m[2].trim();
+    if (!value) continue;
+
+    for (const [target, aliases] of Object.entries(fieldMap)) {
+      if (aliases.includes(key)) {
+        manual[target] = value;
+        break;
+      }
+    }
+  }
+
+  const trets = [];
+  const tretsBlock = clean.match(/trets?_distinctius\s*:\s*([\s\S]{0,400})/i);
+  if (tretsBlock) {
+    const tretsLines = tretsBlock[1]
+      .split('\n')
+      .map(l => l.replace(/^[-*•\d.)\s]+/, '').trim())
+      .filter(Boolean)
+      .slice(0, 6);
+    trets.push(...tretsLines);
+  }
+
+  if (trets.length === 0) {
+    lines
+      .filter(l => /^[-*•]/.test(l) || /^\d+[.)]/.test(l))
+      .map(l => l.replace(/^[-*•\d.)\s]+/, '').trim())
+      .filter(Boolean)
+      .slice(0, 3)
+      .forEach(t => trets.push(t));
+  }
+
+  if (trets.length > 0) manual.trets_distinctius = trets;
+
+  return Object.keys(manual).length > 0 ? manual : null;
 }
 
 async function processarVeuSemilla() {
@@ -6535,4 +6603,3 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 </body>
 </html>
-
