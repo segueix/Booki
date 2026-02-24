@@ -3416,14 +3416,11 @@ INSTRUCCIONS ESTRICTES:
 
 
 function parseEscenesUnificades(text, totalEscenes) {
-  const net = String(text || '').replace(/
-/g, '').trim();
+  const net = String(text || '').replace(/\r/g, '').trim();
   const out = [];
   if (!net) return out;
 
-  const re = /(?:^|
-)\[\[ESCENA_(\d+)\]\]\s*
-?/g;
+  const re = /(?:^|\n)\[\[ESCENA_(\d+)\]\]\s*\n?/g;
   const marks = [];
   let m;
   while ((m = re.exec(net)) !== null) {
