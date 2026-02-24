@@ -3247,6 +3247,64 @@ async function callLLMWithContinuation(messages, systemPrompt, config, tag, maxC
   return fullText;
 }
 
+function textSemblaIncomplet(text) {
+  const net = String(text || '').trim();
+  if (!net) return true;
+  if (net.length < 80) return true;
+  const final = net.slice(-1);
+  const tancaFrase = '.!?…»”"\'';
+  if (!tancaFrase.includes(final)) return true;
+  const opens = (net.match(/[\(\[\{"«]/g) || []).length;
+  const closes = (net.match(/[\)\]\}"»]/g) || []).length;
+  return opens > closes;
+}
+
+async function callLLMOneShotPlusCompletion(messages, systemPrompt, config, tag) {
+  const safeConfig = config || {};
+
+  let modelId;
+  if (tag === 'arquitecte' || tag === 'arquitectura') {
+    modelId = safeConfig.modelArquitectura || safeConfig.model;
+  } else {
+    modelId = safeConfig.modelGeneracio || safeConfig.model;
+  }
+
+  const proveidor = safeConfig.provider || 'anthropic';
+  let apiKey;
+  if (proveidor === 'anthropic') apiKey = ESTAT._anthropicApiKey || safeConfig.apiKey;
+  if (proveidor === 'google' || proveidor === 'gemini') apiKey = ESTAT._geminiApiKey || safeConfig.apiKey;
+  if (proveidor === 'openai') apiKey = ESTAT._openaiApiKey || safeConfig.apiKey;
+  if (!apiKey) throw new Error(`Cal una clau API per al proveïdor: ${proveidor}`);
+
+  const maxTokens = safeConfig.maxTokens || 2048;
+
+  let primera;
+  if (proveidor === 'anthropic') {
+    primera = await callAnthropicWithFinishReason(messages, systemPrompt, apiKey, modelId, maxTokens);
+  } else if (proveidor === 'google' || proveidor === 'gemini') {
+    primera = await callGeminiWithFinishReason(messages, systemPrompt, apiKey, modelId, maxTokens);
+  } else if (proveidor === 'openai') {
+    primera = await callOpenAIWithFinishReason(messages, systemPrompt, apiKey, modelId, maxTokens);
+  } else {
+    throw new Error(`Proveïdor desconegut: ${proveidor}`);
+  }
+
+  let text = primera.text || '';
+  const calSegona = (primera.finishReason === 'length') || textSemblaIncomplet(text);
+  if (!calSegona) return text;
+
+  console.log('[callLLMOneShotPlusCompletion] Segona crida de tancament.');
+  const missatgesTancament = [
+    ...messages,
+    { role: 'assistant', content: text },
+    { role: 'user', content: "Completa NOMÉS el tram final si havia quedat tallat. No repeteixis res. Escriu només el mínim per tancar correctament la frase o l'últim paràgraf." }
+  ];
+  const configTancament = Object.assign({}, safeConfig, { maxTokens: Math.min(700, Math.max(220, Math.floor(maxTokens * 0.2))) });
+  const tancament = await callLLMMulti(missatgesTancament, systemPrompt, configTancament, tag);
+  if (tancament && tancament.trim()) text += tancament;
+  return text;
+}
+
 // ─── Crida genèrica a LLM ───────────────────────────────────
 // rol: 'generacio' (Sonnet) | 'arquitectura' (Opus) — només per a Anthropic
 async function callLLM(messages, systemPrompt, config, rol) {
@@ -4718,7 +4776,7 @@ ${context}
 ${instruccionsVeu}
 
 INSTRUCCIONS D'ESCRIPTURA:
-- Entre 1800 i 2500 paraules
+- Entre 3800 i 4200 caràcters
 - Comença directament amb la narració, sense titular el capítol
 - Si hi ha prefiguracions a plantar, integra-les de forma subtil i natural (el lector no ha de notar-les en primera lectura)
 - Si hi ha prefiguracions a recollir, dona'ls resolució satisfactòria
@@ -4728,7 +4786,7 @@ INSTRUCCIONS D'ESCRIPTURA:
 - Escriu en català`
   }];
 
-  const response = await callLLMWithContinuation(msgs, systemPrompt, Object.assign({}, userConfig, { maxTokens: 6000 }), 'generacio');
+  const response = await callLLMOneShotPlusCompletion(msgs, systemPrompt, Object.assign({}, userConfig, { maxTokens: 3200 }), 'generacio');
   return { response };
 }
 
