@@ -3671,7 +3671,12 @@ async function fase7_worldbuilding(conteActual, tematica, estilDesc, history, us
       content: `Has escrit el conte següent:\n\n${conteActual}\n\n---\nAra, com a arquitecte de mons, analitza el conte i proposa 8 elements del món que es podrien expandir per convertir-lo en una novel·la. Els elements han de ser:\n\n1. Geografia — el territori i els seus llocs rellevants\n2. Política — el sistema de poder i les seves tensions\n3. Màgia/Tecnologia — el sistema màgic o tecnològic que regeix el món\n4. Religions — les creences, rituals i institucions religioses\n5. Faccions — els grups, bandes o organitzacions en conflicte\n6. Història pregressa — els esdeveniments passats que expliquen el present\n7. Economia — els recursos, el comerç i les desigualtats\n8. Cultura quotidiana — els costums, l'art, la gastronomia, les festes\n\nMarca amb "(Recomanat)" els 4 elements més rellevants per expandir basant-te en el que ja apareix al conte. Cada element: nom + descripció d'1 línia del que caldria definir.\n\nFormat ESTRICTE (res més, sense cap introducció):\n1. **Geografia** — [descripció d'1 línia] (Recomanat)\n2. **Política** — [descripció d'1 línia]\n3. **Màgia/Tecnologia** — [descripció d'1 línia] (Recomanat)\n4. **Religions** — [descripció d'1 línia]\n5. **Faccions** — [descripció d'1 línia] (Recomanat)\n6. **Història pregressa** — [descripció d'1 línia]\n7. **Economia** — [descripció d'1 línia] (Recomanat)\n8. **Cultura quotidiana** — [descripció d'1 línia]`
     }
   ];
-  const response   = await callLLMMulti(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 2048 }));
+  const response   = await callLLMMulti(
+    msgs,
+    getSystemPrompt(tematica),
+    Object.assign({}, userConfig, { maxTokens: 3072 }),
+    'arquitectura'
+  );
   const newHistory = [...msgs, { role: 'assistant', content: response }];
   return { response, history: newHistory };
 }
@@ -3686,8 +3691,49 @@ async function fase7_expandirElements(elementsTriats, conteActual, tematica, his
       content: `A partir del conte i dels elements de món proposats, desenvolupa una bíblia de món per als elements seleccionats.\n\nElements a expandir:\n${llistaElements}\n\nPer a cada element, escriu una descripció de 3-5 línies que:\n- Defineixi l'element amb precisió i profunditat\n- Connecti amb el que ja apareix al conte\n- Suggereixi tensions narratives implícites\n- Sigui útil per a un escriptor que vol expandir el món\n\nFormat ESTRICTE per a cada element:\n**[Nom de l'element]**\n[descripció de 3-5 línies]\n\nSepara els elements amb una línia en blanc. Escriu exclusivament en català.`
     }
   ];
-  const maxTokens  = Math.min(400 * elementsTriats.length + 800, 4096);
-  const response   = await callLLMMulti(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens }));
+  const maxTokens  = Math.min(550 * elementsTriats.length + 1200, 8192);
+  const proveidor  = String((userConfig && userConfig.provider) || '').toLowerCase().trim();
+
+  let response = await callLLMMulti(
+    msgs,
+    getSystemPrompt(tematica),
+    Object.assign({}, userConfig, { maxTokens }),
+    'arquitectura'
+  );
+
+  // Gemini a vegades retorna blocs massa breus o incomplets en una sola passada.
+  // Si detectem poca densitat, fem una segona passada d'ampliació guiada.
+  const tePocsBlocs = (response.match(/\*\*[^*]+\*\*/g) || []).length < Math.max(2, elementsTriats.length - 1);
+  const esCurt = response.split(/\s+/).length < Math.max(220, elementsTriats.length * 90);
+
+  if ((proveidor === 'gemini' || proveidor === 'google' || proveidor === 'google-gemini') && (tePocsBlocs || esCurt)) {
+    const msgsAmpl = [
+      ...msgs,
+      { role: 'assistant', content: response },
+      {
+        role: 'user',
+        content: `La resposta anterior ha quedat massa curta o fragmentada. Torna-la a escriure COMPLETA i ben estructurada.
+
+Requisits obligatoris:
+- Inclou TOTS els elements seleccionats.
+- Cada element ha de tenir entre 120 i 180 paraules útils.
+- Sense frases telegràfiques ni llistes tallades.
+- Mantén exactament el format:
+**[Nom de l'element]**
+[descripció extensa i cohesionada]
+
+Escriu només el resultat final en català.`
+      }
+    ];
+
+    response = await callLLMMulti(
+      msgsAmpl,
+      getSystemPrompt(tematica),
+      Object.assign({}, userConfig, { maxTokens: Math.min(maxTokens + 1200, 8192) }),
+      'arquitectura'
+    );
+  }
+
   const newHistory = [...msgs, { role: 'assistant', content: response }];
   return { response, history: newHistory };
 }
