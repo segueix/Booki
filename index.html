@@ -3901,18 +3901,40 @@ function parseJsonRobust(text) {
   if (!text || typeof text !== 'string') return null;
   const s = text.trim();
 
+  function parseLenientJson(candidate) {
+    if (!candidate || typeof candidate !== 'string') return null;
+    const cleaned = candidate
+      .replace(/[“”]/g, '"')
+      .replace(/[‘’]/g, "'")
+      .replace(/,\s*([}\]])/g, '$1');
+    try { return JSON.parse(cleaned); } catch (e) { return null; }
+  }
+
   // 1. Parse directe
-  try { return JSON.parse(s); } catch (e) {}
+  const direct = parseLenientJson(s);
+  if (direct) return direct;
 
   // 2. Bloc de codi markdown ```json ... ```
-  const codeMatch = s.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (codeMatch) { try { return JSON.parse(codeMatch[1].trim()); } catch (e) {} }
+  const codeMatch = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (codeMatch) {
+    const parsedCode = parseLenientJson(codeMatch[1].trim());
+    if (parsedCode) return parsedCode;
+  }
 
   // 3. Primer objecte { ... } complet
   const objStart = s.indexOf('{');
   const objEnd   = s.lastIndexOf('}');
   if (objStart !== -1 && objEnd > objStart) {
-    try { return JSON.parse(s.slice(objStart, objEnd + 1)); } catch (e) {}
+    const parsedObject = parseLenientJson(s.slice(objStart, objEnd + 1));
+    if (parsedObject) return parsedObject;
+  }
+
+  // 4. Primer array [ ... ] complet
+  const arrStart = s.indexOf('[');
+  const arrEnd   = s.lastIndexOf(']');
+  if (arrStart !== -1 && arrEnd > arrStart) {
+    const parsedArray = parseLenientJson(s.slice(arrStart, arrEnd + 1));
+    if (parsedArray) return parsedArray;
   }
 
   return null;
@@ -6111,8 +6133,9 @@ function parseManualEstilFallback(text) {
     const m = normalized.match(/^([^:]+):\s*(.+)$/);
     if (!m) continue;
 
-    const key = m[1].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-    const value = m[2].trim();
+    const rawKey = m[1].trim().replace(/^"|"$/g, '').replace(/^'|'$/g, '');
+    const key = rawKey.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const value = m[2].trim().replace(/^"|"$/g, '').replace(/^'|'$/g, '').replace(/,$/, '').trim();
     if (!value) continue;
 
     for (const [target, aliases] of Object.entries(fieldMap)) {
@@ -6124,14 +6147,25 @@ function parseManualEstilFallback(text) {
   }
 
   const trets = [];
-  const tretsBlock = clean.match(/trets?_distinctius\s*:\s*([\s\S]{0,400})/i);
+  const tretsBlock = clean.match(/(?:trets?_distinctius|trets? distintius)\s*:\s*([\s\S]{0,500})/i);
   if (tretsBlock) {
-    const tretsLines = tretsBlock[1]
-      .split('\n')
-      .map(l => l.replace(/^[-*•\d.)\s]+/, '').trim())
-      .filter(Boolean)
-      .slice(0, 6);
-    trets.push(...tretsLines);
+    const rawTrets = tretsBlock[1].trim();
+    const arrayMatch = rawTrets.match(/^\[(.*)\]$/s);
+    if (arrayMatch) {
+      arrayMatch[1]
+        .split(',')
+        .map(v => v.replace(/^\s*["']?|["']?\s*$/g, '').trim())
+        .filter(Boolean)
+        .slice(0, 6)
+        .forEach(t => trets.push(t));
+    } else {
+      const tretsLines = rawTrets
+        .split('\n')
+        .map(l => l.replace(/^[-*•\d.)\s]+/, '').replace(/[",]$/g, '').trim())
+        .filter(Boolean)
+        .slice(0, 6);
+      trets.push(...tretsLines);
+    }
   }
 
   if (trets.length === 0) {
