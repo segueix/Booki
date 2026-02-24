@@ -614,8 +614,8 @@
     <input type="text" id="config-model-single" placeholder="gpt-4o" value="gpt-4o">
   </div>
 
-  <label class="field-label" for="config-apikey">🔑 Anthropic API Key</label>
-  <input type="password" id="config-apikey" id="anthropicApiKey" placeholder="sk-ant-...">
+  <label class="field-label" for="anthropicApiKey">🔑 Anthropic API Key</label>
+  <input type="password" id="anthropicApiKey" placeholder="sk-ant-...">
 
   <label class="field-label" for="geminiApiKey" style="margin-top:6px;">🔑 Google Gemini API Key <span style="color:var(--text2);font-size:.78rem;">(opcional — per a models Gemini)</span></label>
   <input type="password" id="geminiApiKey" placeholder="AIza...">
@@ -1326,7 +1326,7 @@ function guardarIComencar() {
   const provider = document.getElementById('config-provider').value;
   if (!provider) { toast('Selecciona un proveïdor.'); return; }
 
-  const anthropicKey = document.getElementById('config-apikey').value.trim();
+  const anthropicKey = document.getElementById('anthropicApiKey')?.value?.trim() || '';
   const geminiKey    = document.getElementById('geminiApiKey')?.value?.trim();
   const openaiKey    = document.getElementById('openaiApiKey')?.value?.trim();
 
@@ -1835,15 +1835,26 @@ async function iniciarFase8() {
 
 function renderElencPersonatges(text) {
   const wrap  = document.getElementById('llista-elenc');
-  const lines = text.split('\n').filter(l => /^\d+\./.test(l.trim()));
+  const lines = text
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean)
+    .filter(l => /^\d+[.)]\s+/.test(l) || /^[-*•]\s+/.test(l) || /\bRol\s*:/i.test(l));
 
   if (lines.length === 0) {
     wrap.innerHTML = `<pre style="white-space:pre-wrap;font-size:.9rem;">${escHtml(text)}</pre>`;
+    ESTAT._elencPersonatges = [];
     document.getElementById('elenc-selector').classList.remove('hidden');
     return;
   }
 
-  const list = lines.map(l => l.replace(/^\d+\.\s*/, '').trim());
+  const list = lines
+    .map(l => l
+      .replace(/^\d+[.)]\s*/, '')
+      .replace(/^[-*•]\s*/, '')
+      .trim())
+    .filter(Boolean)
+    .slice(0, 8);
   ESTAT._elencPersonatges = list.map(item => item.replace(/\s*\(Recomanat\)\s*/i, '').trim());
 
   wrap.innerHTML = list.map((item, i) => {
@@ -2357,6 +2368,7 @@ function actualitzarEstatCapitol(idx, estat) {
 async function generarCapitol(idx) {
   if (idx >= ESTAT._estructuraCapitols.length) {
     document.getElementById('btn-control-arcs-wrap').classList.remove('hidden');
+    await executarLoopCoherenciaFinal(USER_CONFIG);
     iniciarRevisioGlobal();  // FASE 6: auto-trigger revisió global
     return;
   }
@@ -3734,6 +3746,7 @@ Per a cada personatge defineix els 5 eixos de la seva veu única:
 - **Exemple**: una frase representativa del personatge en situació de tensió o conflicte (entre cometes)
 
 Els perfils han de ser contrastats entre ells: cada personatge ha de sonar inconfusiblement diferent dels altres.
+Evita paraules rebuscades o massa literàries en els diàlegs si el personatge no les justificaria. Prioritza oralitat natural.
 
 Format ESTRICTE per a cada personatge (res més, sense cap introducció):
 **[Nom del personatge]**
@@ -3901,18 +3914,40 @@ function parseJsonRobust(text) {
   if (!text || typeof text !== 'string') return null;
   const s = text.trim();
 
+  function parseLenientJson(candidate) {
+    if (!candidate || typeof candidate !== 'string') return null;
+    const cleaned = candidate
+      .replace(/[“”]/g, '"')
+      .replace(/[‘’]/g, "'")
+      .replace(/,\s*([}\]])/g, '$1');
+    try { return JSON.parse(cleaned); } catch (e) { return null; }
+  }
+
   // 1. Parse directe
-  try { return JSON.parse(s); } catch (e) {}
+  const direct = parseLenientJson(s);
+  if (direct) return direct;
 
   // 2. Bloc de codi markdown ```json ... ```
-  const codeMatch = s.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (codeMatch) { try { return JSON.parse(codeMatch[1].trim()); } catch (e) {} }
+  const codeMatch = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (codeMatch) {
+    const parsedCode = parseLenientJson(codeMatch[1].trim());
+    if (parsedCode) return parsedCode;
+  }
 
   // 3. Primer objecte { ... } complet
   const objStart = s.indexOf('{');
   const objEnd   = s.lastIndexOf('}');
   if (objStart !== -1 && objEnd > objStart) {
-    try { return JSON.parse(s.slice(objStart, objEnd + 1)); } catch (e) {}
+    const parsedObject = parseLenientJson(s.slice(objStart, objEnd + 1));
+    if (parsedObject) return parsedObject;
+  }
+
+  // 4. Primer array [ ... ] complet
+  const arrStart = s.indexOf('[');
+  const arrEnd   = s.lastIndexOf(']');
+  if (arrStart !== -1 && arrEnd > arrStart) {
+    const parsedArray = parseLenientJson(s.slice(arrStart, arrEnd + 1));
+    if (parsedArray) return parsedArray;
   }
 
   return null;
@@ -3927,7 +3962,8 @@ Apliques les tècniques de Donna Tartt, Elena Ferrante i Carlos Ruiz Zafón: atm
 Escrius EXCLUSIVAMENT en català. Mai inclous paraules ni comentaris en anglès o qualsevol altra llengua.
 Mai afegeixes notes meta, indicacions de capítol ni cap text fora de la narració literària. Escriu directament el text.
 DIÀLEGS: Usa SEMPRE el guió llarg (—) per introduir el parlament i les acotacions. PROHIBIT usar cometes («», "", '') per al diàleg directe. Format correcte: —Hola —va dir ella. / —Bon dia. / —Vine aquí —li ordenà.
-NOMS DE PERSONA: Aplica l'article personal (en, la, l', na) i les preposicions contractes quan la normativa catalana ho requereix. Exemples: la Maria, en Pere, l'Anna, en Marc, na Joana; amb la Júlia, amb en Tomàs; del senyor Puig, al doctor Ferrer.`;
+NOMS DE PERSONA: Aplica l'article personal (en, la, l', na) i les preposicions contractes quan la normativa catalana ho requereix. Exemples: la Maria, en Pere, l'Anna, en Marc, na Joana; amb la Júlia, amb en Tomàs; del senyor Puig, al doctor Ferrer.
+ESTIL DE PROSA: Evita el barroquisme. Prioritza paraules d'ús habitual i precises; evita adjectivació excessiva (màxim 1 adjectiu rellevant per substantiu, excepte si és imprescindible). En diàleg, fes parlar els personatges de manera natural i versemblant.`;
   return base + getGenreStyle(tematica || ESTAT.tematica);
 }
 
@@ -4434,11 +4470,30 @@ CRÍTIC: Han de ser EXACTAMENT ${capsQueFalten} capítols. L'últim (${capsEsper
 // ═══════════════════════════════════════════════════════════
 //  FASE 11: Escriure capítol (Sonnet) — FASE 3: Context complet
 // ═══════════════════════════════════════════════════════════
+function generarInstruccionsGanxoFinalCapitol(idx) {
+  const esUltimCapitol = idx >= ((ESTAT._estructuraCapitols && ESTAT._estructuraCapitols.length) ? ESTAT._estructuraCapitols.length - 1 : 0);
+  const oberts = (ESTAT.llibreRegistre && Array.isArray(ESTAT.llibreRegistre.fils_oberts))
+    ? ESTAT.llibreRegistre.fils_oberts.filter(Boolean)
+    : [];
+
+  if (esUltimCapitol) {
+    return `Com que és l'últim capítol, tanca els fils prioritaris i deixa només una reverberació emocional final (sense cliffhanger fort).`;
+  }
+
+  if (oberts.length > 0) {
+    const mostra = oberts.slice(0, 3).join(' · ');
+    return `Al tram final del capítol crea una tensió adictiva amb un mini-cliffhanger clar, i fes que l'escena final connecti amb algun fil obert del registre (${mostra}) obrint-lo més o encaminant-ne el tancament posterior.`;
+  }
+
+  return `Al tram final del capítol crea una tensió adictiva amb un mini-cliffhanger clar, formulant una pregunta dramàtica concreta que obligui a llegir el següent capítol.`;
+}
+
 async function escriureCapitol(idx, userConfig) {
   const cap          = ESTAT._estructuraCapitols[idx];
   const capPlanificacio = cap ? (cap.resum || cap.text) : `Capítol ${idx + 1}`;
   const context      = buildContextCapitol(idx);
   const systemPrompt = buildSystemPromptCapitol();
+  const instruccionsFinalCapitol = generarInstruccionsGanxoFinalCapitol(idx);
 
   // Instruccions de personatges presents i els seus estils
   const persPresents = cap && cap.personatges ? cap.personatges : [];
@@ -4467,6 +4522,7 @@ INSTRUCCIONS D'ESCRIPTURA:
 - Si hi ha prefiguracions a recollir, dona'ls resolució satisfactòria
 - Respecta el nivell de tensió objectiu i el to indicat
 - Si no és el primer capítol, la primera frase ha de connectar fluïdament amb el final del capítol anterior
+- ${instruccionsFinalCapitol}
 - Escriu en català`
   }];
 
@@ -5112,7 +5168,47 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid:
 
   const dades = parseJsonRobust(response);
   mostrarCheckpoint(dades, idx);
-  return { response };
+  return { response, dades };
+}
+
+async function executarLoopCoherenciaFinal(userConfig) {
+  const total = ESTAT._estructuraCapitols ? ESTAT._estructuraCapitols.length : 0;
+  if (total <= 0) return;
+
+  const idxFinal = total - 1;
+  const puntuacioObjectiu = 8;
+  const maxIteracions = 3;
+
+  for (let iter = 1; iter <= maxIteracions; iter++) {
+    const loaderEl = document.getElementById('loader-11-text');
+    if (loaderEl) loaderEl.textContent = `🔍 Revisió final de coherència (${iter}/${maxIteracions})…`;
+
+    let dades = null;
+    try {
+      const checkpoint = await executarCheckpoint(idxFinal, userConfig);
+      dades = checkpoint ? checkpoint.dades : null;
+    } catch (err) {
+      console.warn('Loop final coherència: checkpoint fallit:', err.message);
+      break;
+    }
+
+    const punts = Number((dades && dades.puntuacio_coherencia) || 0);
+    if (punts >= puntuacioObjectiu) {
+      toast(`✅ Coherència final validada (${punts}/10).`);
+      return;
+    }
+
+    const blocInici = Math.max(0, idxFinal - (2 + (iter - 1) * 2));
+    try {
+      if (loaderEl) loaderEl.textContent = `🛠️ Aplicant correccions finals (${iter}/${maxIteracions})…`;
+      await microReescripturaBlocOpus(blocInici, idxFinal, userConfig);
+    } catch (err) {
+      console.warn('Loop final coherència: micro-reescriptura fallida:', err.message);
+      break;
+    }
+  }
+
+  toast('ℹ️ Revisió final completada amb marge de millora. Revisa control d'arcs per ajustos addicionals.');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -5190,12 +5286,14 @@ async function escriureCapitolPerEscenes(idx, userConfig) {
   const systemPrompt = buildSystemPromptCapitol();
   const contextCapitol = buildContextCapitol(idx);
   const escenes = escaletaCapitol.escenes;
+  const instruccionsFinalCapitol = generarInstruccionsGanxoFinalCapitol(idx);
   let textsEscenes = [];
   for (let i = 0; i < escenes.length; i++) {
     const escena = escenes[i];
     if (document.getElementById('loader-11-text')) {
       document.getElementById('loader-11-text').textContent = `Escrivint capítol ${idx + 1} — Escena ${i + 1}/${escenes.length}: ${escena.nom || ''}…`;
     }
+    const esUltimaEscena = i === escenes.length - 1;
     const promptEscena = `${contextCapitol}
 
 ## ESCENA ACTUAL A ESCRIURE
@@ -5205,7 +5303,10 @@ Personatges: ${(escena.personatges || []).join(', ')}
 Paraules objectiu: ${escena.paraules_objectiu || 400}
 ${escena.punt_inflexio ? '⚡ Aquesta escena conté un punt d\'inflexió important.' : ''}
 
-${i > 0 ? `TEXT DE L'ESCENA ANTERIOR:\n${textsEscenes[i-1].slice(-500)}\n\n` : ''}Escriu ara aquesta escena en prosa literària completa, sense títols ni metadades. Aproximadament ${escena.paraules_objectiu || 400} paraules.`;
+${i > 0 ? `TEXT DE L'ESCENA ANTERIOR:\n${textsEscenes[i-1].slice(-500)}\n\n` : ''}${esUltimaEscena ? `TANCAMENT DEL CAPÍTOL:
+${instruccionsFinalCapitol}
+
+` : ''}Escriu ara aquesta escena en prosa literària completa, sense títols ni metadades. Aproximadament ${escena.paraules_objectiu || 400} paraules.`;
     const msgs = [{ role: 'user', content: promptEscena }];
     const res = await callLLMMulti(
       msgs,
@@ -5367,6 +5468,26 @@ function nkgDetectarContradiccions(nouFet) {
 
   return contradiccions;
 }
+
+function obtenirContextCapitolEnCurs(capitol, escenaIdx) {
+  const capIdx = capitol - 1;
+  if (!ESTAT._escenes_generades || !ESTAT._escenes_generades[capIdx] || escenaIdx <= 0) return '';
+
+  const escenesCap = ESTAT._escenes_generades[capIdx];
+  const blocs = [];
+  for (let i = 0; i < escenaIdx; i++) {
+    const txt = escenesCap[i];
+    if (!txt) continue;
+    const resumCurt = txt.length > 900 ? txt.slice(-900) : txt;
+    blocs.push(`Escena ${i + 1}: ${resumCurt}`);
+  }
+
+  if (blocs.length === 0) return '';
+  return `
+CONTINUÏTAT DEL CAPÍTOL EN CURS (NO REPETIR AQUEST CONTINGUT):
+${blocs.join('\n\n')}`;
+}
+
 
 function obtenirUltimesEscenes(n, capitolActual, escenaActual) {
   const fragments = [];
@@ -5753,6 +5874,13 @@ async function escriureEscenaDualPass(capitol, escenaIdx, escenaSpec, userConfig
 
   // Obtenir context mínim del NKG
   const contextNKG = nkgGenerarContextMinim(nkgSpec);
+  const contextCapitolEnCurs = obtenirContextCapitolEnCurs(capitol, escenaIdx);
+  const escaletaCap = ESTAT._escaletes ? ESTAT._escaletes.find(e => e.capitol === capitol) : null;
+  const totalEscenesCapitol = escaletaCap && Array.isArray(escaletaCap.escenes) ? escaletaCap.escenes.length : 1;
+  const esUltimaEscenaCapitol = escenaIdx >= totalEscenesCapitol - 1;
+  const instruccionsFinalCapitol = esUltimaEscenaCapitol
+    ? generarInstruccionsGanxoFinalCapitol(capitol - 1)
+    : '';
 
   // Instruccions de ritme
   const tensio = (ESTAT._corbaTensio || []).find(t => t.capitol === capitol);
@@ -5763,9 +5891,11 @@ async function escriureEscenaDualPass(capitol, escenaIdx, escenaSpec, userConfig
     role: 'user',
     content: `DRAFT NARRATIU — Capítol ${capitol}, Escena ${escenaIdx + 1}
 
-${contextNKG}
+${contextNKG}${contextCapitolEnCurs}
 
 INSTRUCCIONS DE DRAFT:
+- Continuïtat estricta amb les escenes anteriors del mateix capítol
+- PROHIBIT repetir literalment escenes, diàlegs o descripcions ja escrites
 - Escriu l'ESQUELET narratiu d'aquesta escena en ~300 paraules
 - Prioritza: QUÈ PASSA, en quin ordre, quins diàlegs avancen la trama
 - NO et preocupis per la prosa, les descripcions ni els detalls sensorials
@@ -5871,6 +6001,7 @@ Reescriu el draft corregint NOMÉS els errors indicats. Manté la mateixa estruc
 
 DRAFT (esquelet narratiu — manté l'estructura i els beats):
 ${draft}
+${contextCapitolEnCurs}
 ${goldenRef}
 ${estilsPresents}${manualRef}
 
@@ -5878,9 +6009,13 @@ INSTRUCCIONS D'EXPANSIÓ:
 - Expandeix el draft a prosa literària completa: ${escenaSpec.paraules_objectiu || 500}-${(escenaSpec.paraules_objectiu || 500) + 150} paraules
 - El draft és l'esquelet; tu poses la carn, la pell i la sang
 - Afegeix: detalls sensorials (mínim 2 sentits per escena), subtexte als diàlegs, ritme de la prosa
+- Evita sobrecarregar d'adjectius: tria noms i verbs concrets abans que ornaments
+- Evita mots infreqüents o artificiosos en la parla quotidiana; usa català natural i creïble
 - ${instruccionsBeat || 'Equilibra narració, diàleg i descripció'}
 - Mostra, no expliquis: NO escriguis "estava trist" → mostra-ho amb gestos, paraules, mirada
+- No repeteixis informació, accions ni frases de les escenes anteriors del mateix capítol; avança sempre
 - Comença directament amb la narració, sense titular${instruccionsVariancia ? '\n- VARIÀNCIA: ' + instruccionsVariancia : ''}
+- ${instruccionsFinalCapitol || 'Mantén la progressió narrativa de l\'escena.'}
 - Escriu en català`
   }];
 
@@ -6056,13 +6191,24 @@ function detectarRepeticions() {
 // MILLORA 6: VEU SEMILLA — Analitzar estil de referència (Opus)
 // ══════════════════════════════════════════════════════════════
 
+function manualEstilMassaCurt(manual) {
+  if (!manual || typeof manual !== 'object') return true;
+  const camps = ['longitud_frases', 'estil_dialeg', 'sensorialitat', 'ritme', 'vocabulari', 'punt_de_vista'];
+  const presents = camps.filter(c => manual[c] != null && String(manual[c]).trim().length > 20);
+  const charsTotals = presents.reduce((acc, c) => acc + String(manual[c]).trim().length, 0);
+  return presents.length < 4 || charsTotals < 260;
+}
+
 async function analitzarVeuSemilla(textReferencia, userConfig) {
-  const prompt = [{
-    role: 'user',
-    content: `Ets un expert en estil literari. Analitza el fragment de text d'un autor de referència i genera un MANUAL D'ESTIL concret i accionable per a un escriptor.
+  const promptBase = `Ets un expert en estil literari. Analitza el fragment de text d'un autor de referència i genera un MANUAL D'ESTIL concret i accionable per a un escriptor.
 
 FRAGMENT DE REFERÈNCIA:
 ${textReferencia.substring(0, 4000)}
+
+IMPORTANT:
+- Cada camp textual ha de tenir com a mínim 2 frases i ser específic.
+- No retallis idees a mitja frase.
+- Evita resumir en una sola línia.
 
 Retorna EXCLUSIVAMENT JSON (sense cap altre text) amb el format:
 {
@@ -6073,11 +6219,104 @@ Retorna EXCLUSIVAMENT JSON (sense cap altre text) amb el format:
   "vocabulari": "registre i trets lexicals (ex: col·loquial amb arcaismes puntuals, evita adjectius abstractes)",
   "punt_de_vista": "focalització i distància narrativa",
   "trets_distinctius": ["tret 1", "tret 2", "tret 3"]
-}`
-  }]; 
+}`;
+
+  const prompt = [{ role: 'user', content: promptBase }];
+
   const res = await callLLMMulti(prompt, 'Ets un crític literari expert en anàlisi estilística. Analitza amb precisió quirúrgica.',
-    Object.assign({}, userConfig, { maxTokens: 800 }), 'arquitectura');
-  return parseJsonRobust(res);
+    Object.assign({}, userConfig, { maxTokens: 1500 }), 'arquitectura');
+
+  let manual = parseJsonRobust(res) || parseManualEstilFallback(res);
+  if (!manualEstilMassaCurt(manual)) return manual;
+
+  const promptRetry = [{
+    role: 'user',
+    content: promptBase + '\n\nReescriu la resposta amb MÉS DETALL i assegura que tots els camps estiguin complets i no tallats.'
+  }];
+
+  const resRetry = await callLLMMulti(promptRetry, 'Ets un crític literari expert en anàlisi estilística. Analitza amb precisió quirúrgica.',
+    Object.assign({}, userConfig, { maxTokens: 2200 }), 'arquitectura');
+
+  manual = parseJsonRobust(resRetry) || parseManualEstilFallback(resRetry);
+  return manual;
+}
+
+function parseManualEstilFallback(text) {
+  if (!text || typeof text !== 'string') return null;
+
+  const clean = text
+    .replace(/```(?:json)?/gi, '')
+    .replace(/```/g, '')
+    .replace(/\r/g, '')
+    .trim();
+
+  const manual = {};
+  const fieldMap = {
+    longitud_frases: ['longitud_frases', 'longitud de frases'],
+    estil_dialeg: ['estil_dialeg', 'estil de dialeg', 'estil de diàleg', 'dialeg', 'diàleg'],
+    sensorialitat: ['sensorialitat'],
+    ritme: ['ritme'],
+    vocabulari: ['vocabulari'],
+    punt_de_vista: ['punt_de_vista', 'punt de vista']
+  };
+
+  const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
+  for (const line of lines) {
+    const normalized = line
+      .replace(/^[-*•\d.)\s]+/, '')
+      .replace(/^\*\*(.*?)\*\*$/, '$1')
+      .trim();
+
+    const m = normalized.match(/^([^:]+):\s*(.+)$/);
+    if (!m) continue;
+
+    const rawKey = m[1].trim().replace(/^"|"$/g, '').replace(/^'|'$/g, '');
+    const key = rawKey.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const value = m[2].trim().replace(/^"|"$/g, '').replace(/^'|'$/g, '').replace(/,$/, '').trim();
+    if (!value) continue;
+
+    for (const [target, aliases] of Object.entries(fieldMap)) {
+      if (aliases.includes(key)) {
+        manual[target] = value;
+        break;
+      }
+    }
+  }
+
+  const trets = [];
+  const tretsBlock = clean.match(/(?:trets?_distinctius|trets? distintius)\s*:\s*([\s\S]{0,500})/i);
+  if (tretsBlock) {
+    const rawTrets = tretsBlock[1].trim();
+    const arrayMatch = rawTrets.match(/^\[(.*)\]$/s);
+    if (arrayMatch) {
+      arrayMatch[1]
+        .split(',')
+        .map(v => v.replace(/^\s*["']?|["']?\s*$/g, '').trim())
+        .filter(Boolean)
+        .slice(0, 6)
+        .forEach(t => trets.push(t));
+    } else {
+      const tretsLines = rawTrets
+        .split('\n')
+        .map(l => l.replace(/^[-*•\d.)\s]+/, '').replace(/[",]$/g, '').trim())
+        .filter(Boolean)
+        .slice(0, 6);
+      trets.push(...tretsLines);
+    }
+  }
+
+  if (trets.length === 0) {
+    lines
+      .filter(l => /^[-*•]/.test(l) || /^\d+[.)]/.test(l))
+      .map(l => l.replace(/^[-*•\d.)\s]+/, '').trim())
+      .filter(Boolean)
+      .slice(0, 3)
+      .forEach(t => trets.push(t));
+  }
+
+  if (trets.length > 0) manual.trets_distinctius = trets;
+
+  return Object.keys(manual).length > 0 ? manual : null;
 }
 
 async function processarVeuSemilla() {
@@ -6535,4 +6774,3 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 </body>
 </html>
-
