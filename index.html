@@ -2368,6 +2368,7 @@ function actualitzarEstatCapitol(idx, estat) {
 async function generarCapitol(idx) {
   if (idx >= ESTAT._estructuraCapitols.length) {
     document.getElementById('btn-control-arcs-wrap').classList.remove('hidden');
+    await executarLoopCoherenciaFinal(USER_CONFIG);
     iniciarRevisioGlobal();  // FASE 6: auto-trigger revisió global
     return;
   }
@@ -5147,7 +5148,47 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid:
 
   const dades = parseJsonRobust(response);
   mostrarCheckpoint(dades, idx);
-  return { response };
+  return { response, dades };
+}
+
+async function executarLoopCoherenciaFinal(userConfig) {
+  const total = ESTAT._estructuraCapitols ? ESTAT._estructuraCapitols.length : 0;
+  if (total <= 0) return;
+
+  const idxFinal = total - 1;
+  const puntuacioObjectiu = 8;
+  const maxIteracions = 3;
+
+  for (let iter = 1; iter <= maxIteracions; iter++) {
+    const loaderEl = document.getElementById('loader-11-text');
+    if (loaderEl) loaderEl.textContent = `🔍 Revisió final de coherència (${iter}/${maxIteracions})…`;
+
+    let dades = null;
+    try {
+      const checkpoint = await executarCheckpoint(idxFinal, userConfig);
+      dades = checkpoint ? checkpoint.dades : null;
+    } catch (err) {
+      console.warn('Loop final coherència: checkpoint fallit:', err.message);
+      break;
+    }
+
+    const punts = Number((dades && dades.puntuacio_coherencia) || 0);
+    if (punts >= puntuacioObjectiu) {
+      toast(`✅ Coherència final validada (${punts}/10).`);
+      return;
+    }
+
+    const blocInici = Math.max(0, idxFinal - (2 + (iter - 1) * 2));
+    try {
+      if (loaderEl) loaderEl.textContent = `🛠️ Aplicant correccions finals (${iter}/${maxIteracions})…`;
+      await microReescripturaBlocOpus(blocInici, idxFinal, userConfig);
+    } catch (err) {
+      console.warn('Loop final coherència: micro-reescriptura fallida:', err.message);
+      break;
+    }
+  }
+
+  toast('ℹ️ Revisió final completada amb marge de millora. Revisa control d'arcs per ajustos addicionals.');
 }
 
 // ═══════════════════════════════════════════════════════════
