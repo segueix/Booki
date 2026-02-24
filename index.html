@@ -6740,7 +6740,52 @@ function guardarClausAPI() {
   if (anthropic) ESTAT._anthropicApiKey = anthropic;
   if (gemini)    ESTAT._geminiApiKey    = gemini;
   if (openai)    ESTAT._openaiApiKey    = openai;
+
+  // Persistim les claus per poder recuperar-les en recarregar la pàgina.
+  // Nota: això és només per ús local del navegador.
+  localStorage.setItem('conteia_api_keys', JSON.stringify({
+    anthropic: anthropic || '',
+    gemini: gemini || '',
+    openai: openai || ''
+  }));
+
   actualitzarModelsDisponibles();
+}
+
+function carregarClausAPI() {
+  let raw = null;
+  try {
+    raw = localStorage.getItem('conteia_api_keys');
+  } catch (err) {
+    console.warn('No s\'ha pogut llegir localStorage per a les claus API:', err);
+    return;
+  }
+
+  if (!raw) return;
+
+  let saved;
+  try {
+    saved = JSON.parse(raw);
+  } catch (err) {
+    console.warn('Format de claus API guardades invàlid:', err);
+    return;
+  }
+
+  const anthropic = (saved && saved.anthropic) ? String(saved.anthropic).trim() : '';
+  const gemini    = (saved && saved.gemini)    ? String(saved.gemini).trim() : '';
+  const openai    = (saved && saved.openai)    ? String(saved.openai).trim() : '';
+
+  const anthropicInput = document.getElementById('anthropicApiKey');
+  const geminiInput    = document.getElementById('geminiApiKey');
+  const openaiInput    = document.getElementById('openaiApiKey');
+
+  if (anthropicInput && anthropic) anthropicInput.value = anthropic;
+  if (geminiInput && gemini)       geminiInput.value    = gemini;
+  if (openaiInput && openai)       openaiInput.value    = openai;
+
+  if (anthropic) ESTAT._anthropicApiKey = anthropic;
+  if (gemini)    ESTAT._geminiApiKey    = gemini;
+  if (openai)    ESTAT._openaiApiKey    = openai;
 }
 
 function actualitzarModelsDisponibles() {
@@ -6766,9 +6811,19 @@ function actualitzarModelsDisponibles() {
 
 // ── Inicialització del selector de models en carregar la pàgina ──
 document.addEventListener('DOMContentLoaded', function() {
+  carregarClausAPI();
+
+  ['anthropicApiKey', 'geminiApiKey', 'openaiApiKey'].forEach((id) => {
+    const input = document.getElementById(id);
+    if (!input) return;
+    input.addEventListener('change', guardarClausAPI);
+    input.addEventListener('blur', guardarClausAPI);
+  });
+
   // Aplicar preset econòmic per defecte i poblar selectors
   aplicarPreset('economic');
   poblarSelectorsModels();
+  actualitzarModelsDisponibles();
 });
 
 </script>
