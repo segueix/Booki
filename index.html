@@ -4828,7 +4828,7 @@ ${context}
 ${instruccionsVeu}
 
 INSTRUCCIONS D'ESCRIPTURA:
-- Entre 3800 i 4200 caràcters
+- Entre 4000 i 5000 caràcters
 - Comença directament amb la narració, sense titular el capítol
 - Si hi ha prefiguracions a plantar, integra-les de forma subtil i natural (el lector no ha de notar-les en primera lectura)
 - Si hi ha prefiguracions a recollir, dona'ls resolució satisfactòria
@@ -4838,7 +4838,7 @@ INSTRUCCIONS D'ESCRIPTURA:
 - Escriu en català`
   }];
 
-  const response = await callLLMOneShotPlusCompletion(msgs, systemPrompt, Object.assign({}, userConfig, { maxTokens: 3200 }), 'generacio');
+  const response = await callLLMOneShotPlusCompletion(msgs, systemPrompt, Object.assign({}, userConfig, { maxTokens: 1900 }), 'generacio');
   return { response };
 }
 
