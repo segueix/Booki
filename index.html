@@ -615,13 +615,13 @@
   </div>
 
   <label class="field-label" for="anthropicApiKey">🔑 Anthropic API Key</label>
-  <input type="password" id="anthropicApiKey" placeholder="sk-ant-...">
+  <input type="password" id="anthropicApiKey" placeholder="sk-ant-..." oninput="guardarClausAPI()">
 
   <label class="field-label" for="geminiApiKey" style="margin-top:6px;">🔑 Google Gemini API Key <span style="color:var(--text2);font-size:.78rem;">(opcional — per a models Gemini)</span></label>
-  <input type="password" id="geminiApiKey" placeholder="AIza...">
+  <input type="password" id="geminiApiKey" placeholder="AIza..." oninput="guardarClausAPI()">
 
   <label class="field-label" for="openaiApiKey" style="margin-top:6px;">🔑 OpenAI API Key <span style="color:var(--text2);font-size:.78rem;">(opcional — per a models GPT)</span></label>
-  <input type="password" id="openaiApiKey" placeholder="sk-...">
+  <input type="password" id="openaiApiKey" placeholder="sk-..." oninput="guardarClausAPI()">
 
   <div class="btn-row">
     <button class="btn btn-primary" onclick="guardarIComencar()">Guardar i Començar</button>
@@ -7289,7 +7289,9 @@ function actualitzarModelsDisponibles() {
 document.addEventListener('DOMContentLoaded', function() {
   // Aplicar preset econòmic per defecte i poblar selectors
   aplicarPreset('economic');
+  actualitzarConfigProvider();
   poblarSelectorsModels();
+  guardarClausAPI();
 });
 
 </script>
