@@ -614,8 +614,8 @@
     <input type="text" id="config-model-single" placeholder="gpt-4o" value="gpt-4o">
   </div>
 
-  <label class="field-label" for="config-apikey">🔑 Anthropic API Key</label>
-  <input type="password" id="config-apikey" id="anthropicApiKey" placeholder="sk-ant-...">
+  <label class="field-label" for="anthropicApiKey">🔑 Anthropic API Key</label>
+  <input type="password" id="anthropicApiKey" placeholder="sk-ant-...">
 
   <label class="field-label" for="geminiApiKey" style="margin-top:6px;">🔑 Google Gemini API Key <span style="color:var(--text2);font-size:.78rem;">(opcional — per a models Gemini)</span></label>
   <input type="password" id="geminiApiKey" placeholder="AIza...">
@@ -1326,7 +1326,7 @@ function guardarIComencar() {
   const provider = document.getElementById('config-provider').value;
   if (!provider) { toast('Selecciona un proveïdor.'); return; }
 
-  const anthropicKey = document.getElementById('config-apikey').value.trim();
+  const anthropicKey = document.getElementById('anthropicApiKey')?.value?.trim() || '';
   const geminiKey    = document.getElementById('geminiApiKey')?.value?.trim();
   const openaiKey    = document.getElementById('openaiApiKey')?.value?.trim();
 
