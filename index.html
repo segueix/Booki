@@ -4935,15 +4935,25 @@ function generarInstruccionsGanxoFinalCapitol(idx) {
     : [];
 
   if (esUltimCapitol) {
-    return `Com que és l'últim capítol, tanca els fils prioritaris i deixa només una reverberació emocional final (sense cliffhanger fort).`;
+    return `Com que és l'últim capítol, tanca els fils prioritaris i deixa una reverberació emocional final potent: una última imatge, una realització del personatge o una resolució que ressoni. Sense cliffhanger fort, però que la darrera frase es quedi gravada.`;
   }
+
+  const tecniques = `Tria la tècnica que encaixi millor amb el moment narratiu — NO forçis una pregunta retòrica si no és la més efectiva:
+  · Revelació: una informació nova que ho canvia tot o qüestiona el que el lector creia saber
+  · Amenaça imminent: el perill arriba i el capítol talla just abans de la col·lisió
+  · Ruptura: traïció, pèrdua o descobriment que trenca l'equilibri emocional establert
+  · Decisió congelada: el personatge davant d'una elecció impossible, el lector no sap què farà
+  · Inversió: el poder, la veritat o la situació s'inverteixen de cop
+  · Imatge final: una última escena o detall que ressona emocionalment i obre una promesa no dita
+  · Escalada d'apostes: un element nou (personatge, objecte, informació) que puja el risc de tot el que ve
+  L'objectiu és que el lector NECESSITI girar la pàgina, no que es faci una pregunta.`;
 
   if (oberts.length > 0) {
     const mostra = oberts.slice(0, 3).join(' · ');
-    return `Al tram final del capítol crea una tensió adictiva amb un mini-cliffhanger clar, i fes que l'escena final connecti amb algun fil obert del registre (${mostra}) obrint-lo més o encaminant-ne el tancament posterior.`;
+    return `Al tram final crea un moment que faci la lectura addictiva, connectant l'escena final amb algun fil obert del registre (${mostra}) per intensificar-lo o encaminar-ne la resolució futura. ${tecniques}`;
   }
 
-  return `Al tram final del capítol crea una tensió adictiva amb un mini-cliffhanger clar, formulant una pregunta dramàtica concreta que obligui a llegir el següent capítol.`;
+  return `Al tram final crea un moment que faci la lectura addictiva. ${tecniques}`;
 }
 
 async function escriureCapitol(idx, userConfig) {
@@ -5064,10 +5074,10 @@ Verifica específicament:
 
 AVALUACIÓ DE GANXOS (Hook Review):
 Avalua els elements narratius de ganxo del capítol:
-1. OBERTURA: El primer paràgraf captura l'atenció? (escena in medias res, pregunta o tensió immediata?)
-2. CLIFFHANGER: El final del capítol deixa el lector amb ganes de continuar? Hi ha una tensió sense resoldre, una revelació o un dilema?
+1. OBERTURA: El primer paràgraf captura l'atenció? (escena in medias res, tensió immediata, imatge potent — no necessàriament una pregunta)
+2. CLIFFHANGER: El final fa que el lector NECESSITI llegir el següent capítol? Avalua si usa la tècnica més efectiva per a aquest moment narratiu: revelació que ho canvia tot, amenaça imminent tallada just abans, ruptura emocional (traïció/pèrdua/descobriment), decisió congelada, inversió de situació, imatge final que ressona, o escalada d'apostes. Penalitza els finals que es limiten a una pregunta retòrica quan el moment narratiu permetia alguna cosa més visceral.
 3. RITME INTERN: El capítol manté un ritme adequat al seu tipus (acció/respiració)? Hi ha un equilibri entre diàleg, acció i descripció?
-4. PROMESA NARRATIVA: El capítol avança alguna trama o planteja una pregunta que el lector vol veure resolta?
+4. PROMESA NARRATIVA: El capítol avança alguna trama o obre una tensió que el lector vol veure resolta?
 
 SELECCIÓ DE PASSATGE:
 A més de la revisió, selecciona el MILLOR passatge del capítol (entre 150 i 250 paraules) que millor exemplifiqui la veu narrativa. Copia'l literalment del text.
