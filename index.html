@@ -1835,15 +1835,26 @@ async function iniciarFase8() {
 
 function renderElencPersonatges(text) {
   const wrap  = document.getElementById('llista-elenc');
-  const lines = text.split('\n').filter(l => /^\d+\./.test(l.trim()));
+  const lines = text
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean)
+    .filter(l => /^\d+[.)]\s+/.test(l) || /^[-*•]\s+/.test(l) || /\bRol\s*:/i.test(l));
 
   if (lines.length === 0) {
     wrap.innerHTML = `<pre style="white-space:pre-wrap;font-size:.9rem;">${escHtml(text)}</pre>`;
+    ESTAT._elencPersonatges = [];
     document.getElementById('elenc-selector').classList.remove('hidden');
     return;
   }
 
-  const list = lines.map(l => l.replace(/^\d+\.\s*/, '').trim());
+  const list = lines
+    .map(l => l
+      .replace(/^\d+[.)]\s*/, '')
+      .replace(/^[-*•]\s*/, '')
+      .trim())
+    .filter(Boolean)
+    .slice(0, 8);
   ESTAT._elencPersonatges = list.map(item => item.replace(/\s*\(Recomanat\)\s*/i, '').trim());
 
   wrap.innerHTML = list.map((item, i) => {
