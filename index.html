@@ -2929,7 +2929,91 @@ function mostrarResultatRevisioGlobal(dades) {
       }).join('')}`;
   }
 
+  // --- INICI BOTÓ META-ENGINYERIA ---
+  const divMeta = document.createElement('div');
+  divMeta.style.marginTop = "20px";
+  divMeta.innerHTML = `
+    <button class="btn btn-ghost" style="width:100%; border:1px dashed var(--accent2); color:var(--accent2); font-weight:600;" onclick="generarPromptMetaCodi()">
+      ⚙️ L'app falla? Genera un prompt d'Arquitectura per millorar el codi font
+    </button>
+    <div id="meta-codi-resultat" class="hidden" style="margin-top:14px;"></div>
+  `;
+  resultEl.appendChild(divMeta);
+  // --- FI BOTÓ META-ENGINYERIA ---
+
   btnControl.classList.remove('hidden');
+}
+
+async function generarPromptMetaCodi() {
+  const resultDiv = document.getElementById('meta-codi-resultat');
+  resultDiv.classList.remove('hidden');
+  resultDiv.innerHTML = `<div style="color:var(--text2);font-size:.9rem; display:flex; align-items:center; gap:8px;">
+    <div class="spinner" style="width:16px; height:16px; border-width:2px;"></div>
+    L'app està llegint la seva pròpia lògica JS i dissenyant una millora d'arquitectura...
+  </div>`;
+
+  try {
+    // 1. OPTIMITZACIÓ: Extraiem només la lògica JavaScript (estalvi brutal de tokens)
+    const codiJS = Array.from(document.scripts)
+      .map(script => script.innerText)
+      .filter(text => text.trim().length > 0)
+      .join('\n\n// --- SEGÜENT BLOC DE SCRIPT ---\n\n');
+
+    // 2. RECUPEREM ELS PROBLEMES NARRATIUS DETECTATS
+    const problemes = ESTAT._revisioGlobal ? ESTAT._revisioGlobal.problemes : [];
+    const textProblemes = problemes.length > 0
+      ? JSON.stringify(problemes, null, 2)
+      : "Incoherències generals de continuïtat i ritme detectades al text.";
+
+    // 3. PROMPT PER A L'IA (Actuant com a Arquitecte de Sistemes)
+    const promptEnginyer = `Ets un Arquitecte de Software de Sistemes IA (Agentic Workflows).
+
+Aquesta és la lògica JavaScript de la meva aplicació (Booki):
+<codi_app_js>
+${codiJS}
+</codi_app_js>
+
+En executar aquesta app per escriure una novel·la, l'editor intern ha detectat aquests errors recurrents:
+<errors_narratius>
+${textProblemes}
+</errors_narratius>
+
+LA TEVA TASCA:
+Dissenya una MILLORA ARQUITECTÒNICA GENÈRICA al codi JS que solucioni aquest tipus d'errors d'arrel per sempre. No solucionis només el símptoma actual (ex: si el personatge oblida que està ferit, no demanis un camp "ferides", demana un mòdul de persistència d'estats físics al NKG).
+
+Genera un PROMPT MESTRE que jo pugui copiar i enganxar al meu assistent de codi (Cursor/Codex) per implementar la teva solució.
+El prompt ha de:
+1. Explicar breument el problema sistèmic detectat al codi.
+2. Definir la nova arquitectura proposada.
+3. Donar instruccions tècniques clares sobre quines funcions JavaScript exactes s'han de modificar i com.
+
+Retorna EXCLUSIVAMENT el text del prompt llest per copiar i enganxar, escrit en català.`;
+
+    // 4. CRIDA AL MODEL (Opus)
+    const msgs = [{ role: 'user', content: promptEnginyer }];
+    const models = getModelConfig(USER_CONFIG);
+
+    const respostaLLM = await callLLMMulti(
+      msgs,
+      "Ets un Enginyer de Software Meta-Analític.",
+      Object.assign({}, USER_CONFIG, { maxTokens: 4000, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+
+    // 5. MOSTRAR EL RESULTAT PER COPIAR
+    resultDiv.innerHTML = `
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px; margin-top:14px;">
+        <div style="font-weight:600; color:var(--success); margin-bottom:10px; display:flex; justify-content:space-between;">
+          <span>✅ Prompt d'Arquitectura generat</span>
+          <span style="font-size:.8rem; font-weight:normal; color:var(--text2);">Copia'l i enganxa'l al teu editor</span>
+        </div>
+        <textarea style="width:100%; height:280px; background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:12px; font-family:monospace; font-size:.85rem; resize:vertical; line-height:1.5;" readonly onclick="this.select()">${escHtml(respostaLLM)}</textarea>
+      </div>
+    `;
+
+  } catch (err) {
+    resultDiv.innerHTML = `<div style="color:#f87171; background:rgba(248,113,113,0.1); padding:10px; border-radius:6px; margin-top:10px; font-size:.9rem;">⚠️ Error generant el prompt: ${err.message}</div>`;
+  }
 }
 
 async function reescriureCapitolGlobal(idx, instruccions) {
