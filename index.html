@@ -846,7 +846,7 @@
 
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="regenerarConte()">🔄 Regenerar</button>
-      <button class="btn btn-secondary" onclick="exportarDoc()">📄 Descarregar HTML</button>
+      <button class="btn btn-secondary" onclick="exportarDoc()">📄 Descarregar DOCX</button>
       <button class="btn btn-primary"   onclick="iniciarFase7()">🌍 Expandir a novel·la</button>
     </div>
     <div id="export-link-wrap" class="hidden" style="margin-top:14px;"></div>
@@ -2576,6 +2576,8 @@ function mostrarRevisioCapitol(revisat, idx, isLast) {
     ? (puntuacio >= 8 ? 'var(--success)' : puntuacio >= 6 ? 'var(--warning)' : '#f87171')
     : 'var(--text2)';
 
+  const comentariFinal = revisat.comentari_editor_final || revisat.valoracio_general || revisat.veredicte || '';
+
   panel.innerHTML = `
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;">
       <div style="font-size:1.8rem;font-weight:700;color:${color};">${puntuacio}<span style="font-size:1rem;color:var(--text2);">/10</span></div>
@@ -2590,7 +2592,9 @@ function mostrarRevisioCapitol(revisat, idx, isLast) {
         ${problemes.map(p => `<li>${escHtml(String(p))}</li>`).join('')}
       </ul></div>` : ''}
     ${instruccions && !ok ? `<div style="font-size:.8rem;color:var(--text2);margin-top:8px;padding:10px 14px;background:var(--surface);border-radius:6px;border-left:2px solid var(--warning);">
-      <strong>Instruccions:</strong> ${escHtml(instruccions)}</div>` : ''}`;
+      <strong>Instruccions:</strong> ${escHtml(instruccions)}</div>` : ''}
+    ${comentariFinal ? `<div style="font-size:.8rem;color:var(--text2);margin-top:8px;padding:10px 14px;background:var(--surface2);border-radius:6px;border-left:2px solid var(--accent);">
+      <strong>Comentari final de l'editor:</strong> ${escHtml(comentariFinal)}</div>` : ''}`;
 
   // Hook Review
   const hook = revisat.hook_review;
@@ -3130,11 +3134,22 @@ function tancarModalBiblia() {
   document.getElementById('modal-biblia').classList.add('hidden');
 }
 
+function normalitzarFetsCanonics(fets) {
+  if (!Array.isArray(fets)) return [];
+  return [...new Set(
+    fets
+      .map(f => typeof f === 'string' ? f : (f && typeof f.descripcio === 'string' ? f.descripcio : ''))
+      .map(f => String(f || '').trim())
+      .filter(Boolean)
+  )];
+}
+
 function aplicarCanvisBiblia(canvis) {
   if (!canvis) return;
   const b = ESTAT.bibliaNarrativa;
-  if (canvis.nous_fets_canonics && canvis.nous_fets_canonics.length > 0) {
-    b.fets_canonics = (b.fets_canonics || []).concat(canvis.nous_fets_canonics);
+  const fetsNous = normalitzarFetsCanonics([...(canvis.nous_fets_canonics || []), ...(canvis.fets_canonics || [])]);
+  if (fetsNous.length > 0) {
+    b.fets_canonics = normalitzarFetsCanonics([...(b.fets_canonics || []), ...fetsNous]);
   }
   if (canvis.actualitzar_personatges && canvis.actualitzar_personatges.length > 0) {
     canvis.actualitzar_personatges.forEach(upd => {
@@ -4488,7 +4503,7 @@ ${paragrafsHtml}
 </html>`;
 
   // ── 2. Crear Blob i forçar descàrrega ─────────────────────
-  const blob = new Blob([htmlDoc], { type: 'text/html;charset=utf-8' });
+  const blob = new Blob([htmlDoc], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document;charset=utf-8' });
   const url  = URL.createObjectURL(blob);
 
   // Netejar el títol per convertir-lo en nom de fitxer vàlid
@@ -4496,7 +4511,7 @@ ${paragrafsHtml}
     .replace(/[<>:"/\\|?*]/g, '')   // caràcters no vàlids a fitxers
     .trim()
     .replace(/\s+/g, '_')
-    .substring(0, 80) + '.html';
+    .substring(0, 80) + '.docx';
 
   const a = document.createElement('a');
   a.href     = url;
@@ -4565,9 +4580,9 @@ ${cosHtml}
 </body>
 </html>`;
 
-  const blob      = new Blob([htmlDoc], { type: 'text/html;charset=utf-8' });
+  const blob      = new Blob([htmlDoc], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document;charset=utf-8' });
   const url       = URL.createObjectURL(blob);
-  const nomFitxer = titol.replace(/\s+/g, '_').substring(0, 80) + '.html';
+  const nomFitxer = titol.replace(/\s+/g, '_').substring(0, 80) + '.docx';
   const a         = document.createElement('a');
   a.href = url; a.download = nomFitxer;
   document.body.appendChild(a); a.click();
@@ -5449,6 +5464,7 @@ IMPORTANT: Si detectes solapament de diàlegs entre personatges en un mateix par
     "promesa_comentari": "comentari breu sobre la promesa narrativa"
   },
   "instruccions_cliffhanger": "instruccions concretes per millorar el cliffhanger si la puntuació és < 6 (buit si no cal)",
+  "comentari_editor_final": "possible millora global de capítol (buit si no cal)",
   "golden_passage": "el text del millor passatge (150-250 paraules)"
 }`
   }];
@@ -5738,7 +5754,10 @@ IMPORTANT: El JSON ha de ser COMPLET amb TOTS els personatges de l'elenc. Manté
     if (dades.llocs_importants)   ESTAT.bibliaNarrativa.llocs_importants   = dades.llocs_importants;
     if (dades.objectes_clau)      ESTAT.bibliaNarrativa.objectes_clau      = dades.objectes_clau;
     if (dades.fitxes_personatges) ESTAT.bibliaNarrativa.fitxes_personatges = dades.fitxes_personatges;
-    if (dades.fets_canonics)      ESTAT.bibliaNarrativa.fets_canonics      = dades.fets_canonics;
+    const fetsInicials = normalitzarFetsCanonics(dades.fets_canonics || []);
+    ESTAT.bibliaNarrativa.fets_canonics = fetsInicials.length > 0
+      ? fetsInicials
+      : normalitzarFetsCanonics(((ESTAT._nkg && ESTAT._nkg.fets_canonics) || []).map(f => f.descripcio));
   }
   return { response };
 }
@@ -5825,7 +5844,13 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid:
     'arquitectura'
   );
 
-  const canvis = parseJsonRobust(response);
+  const canvis = parseJsonRobust(response) || {};
+  if (!Array.isArray(canvis.nous_fets_canonics) || canvis.nous_fets_canonics.length === 0) {
+    const fetsNkgCapitol = ((ESTAT._nkg && ESTAT._nkg.fets_canonics) || [])
+      .filter(f => Number(f.capitol_origen) === idx + 1)
+      .map(f => f.descripcio);
+    if (fetsNkgCapitol.length > 0) canvis.nous_fets_canonics = fetsNkgCapitol;
+  }
   aplicarCanvisBiblia(canvis);
   return { response };
 }
