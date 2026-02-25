@@ -558,6 +558,25 @@
     </label>
     <input type="text" id="config-model-arquitectura" value="claude-opus-4-6" placeholder="claude-opus-4-6">
 
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
+      <div>
+        <label class="field-label" for="config-provider-generacio" style="margin-bottom:4px;">Proveïdor Generació</label>
+        <select id="config-provider-generacio">
+          <option value="anthropic">Anthropic (Claude)</option>
+          <option value="gemini">Google (Gemini)</option>
+          <option value="openai">OpenAI (GPT)</option>
+        </select>
+      </div>
+      <div>
+        <label class="field-label" for="config-provider-arquitectura" style="margin-bottom:4px;">Proveïdor Arquitectura</label>
+        <select id="config-provider-arquitectura">
+          <option value="anthropic">Anthropic (Claude)</option>
+          <option value="gemini">Google (Gemini)</option>
+          <option value="openai">OpenAI (GPT)</option>
+        </select>
+      </div>
+    </div>
+
     <div class="checkbox-row" onclick="document.getElementById('config-flux-automatic').click()">
       <input type="checkbox" id="config-flux-automatic" onclick="event.stopPropagation()">
       <label for="config-flux-automatic">
@@ -622,6 +641,19 @@
 
   <label class="field-label" for="openaiApiKey" style="margin-top:6px;">🔑 OpenAI API Key <span style="color:var(--text2);font-size:.78rem;">(opcional — per a models GPT)</span></label>
   <input type="password" id="openaiApiKey" placeholder="sk-..." oninput="guardarClausAPI()">
+
+  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+    <h3 style="margin:0 0 10px;font-size:1em;">🎭 Estil i To Global del Projecte</h3>
+
+    <label class="field-label" for="config-genere">Gènere Literari</label>
+    <input type="text" id="config-genere" value="Thriller / Nordic Noir" placeholder="ex: Ciència-Ficció, Nordic Noir...">
+
+    <label class="field-label" for="config-autor">Autor de Referència</label>
+    <input type="text" id="config-autor" value="Stieg Larsson" placeholder="ex: Stieg Larsson, Tolkien...">
+
+    <label class="field-label" for="config-focus-climax">Focus del Clímax (Cost acumulat)</label>
+    <input type="text" id="config-focus-climax" value="Cost físic extrem, esgotament mental, entorns freds i hostils, cinisme" placeholder="ex: Esgotament físic, xoc moral...">
+  </div>
 
   <div class="btn-row">
     <button class="btn btn-primary" onclick="guardarIComencar()">Guardar i Començar</button>
@@ -814,7 +846,7 @@
 
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="regenerarConte()">🔄 Regenerar</button>
-      <button class="btn btn-secondary" onclick="exportarDoc()">📄 Descarregar HTML</button>
+      <button class="btn btn-secondary" onclick="exportarDoc()">📄 Descarregar DOCX</button>
       <button class="btn btn-primary"   onclick="iniciarFase7()">🌍 Expandir a novel·la</button>
     </div>
     <div id="export-link-wrap" class="hidden" style="margin-top:14px;"></div>
@@ -1305,6 +1337,11 @@ function actualitzarConfigProvider() {
 
   const genInput = document.getElementById('config-model-generacio');
   const arqInput = document.getElementById('config-model-arquitectura');
+  const provGenSel = document.getElementById('config-provider-generacio');
+  const provArqSel = document.getElementById('config-provider-arquitectura');
+
+  if (provGenSel) provGenSel.value = provider;
+  if (provArqSel) provArqSel.value = provider;
 
   // Actualitzem els valors per defecte recomanats segons el proveïdor
   if (provider === 'anthropic') {
@@ -1327,16 +1364,25 @@ function guardarIComencar() {
     const provider = document.getElementById('config-provider').value;
     if (!provider) { toast('Selecciona un proveïdor.'); return; }
 
+    const providerGeneracio = (document.getElementById('config-provider-generacio')?.value || provider).trim();
+    const providerArquitectura = (document.getElementById('config-provider-arquitectura')?.value || provider).trim();
+
     const anthropicKey = document.getElementById('anthropicApiKey')?.value?.trim() || '';
     const geminiKey    = document.getElementById('geminiApiKey')?.value?.trim() || '';
     const openaiKey    = document.getElementById('openaiApiKey')?.value?.trim() || '';
 
-    let apiKey = '';
-    if (provider === 'anthropic') apiKey = anthropicKey;
-    if (provider === 'gemini')    apiKey = geminiKey;
-    if (provider === 'openai')    apiKey = openaiKey;
+    const getKeyForProvider = (prov) => {
+      if (prov === 'anthropic') return anthropicKey;
+      if (prov === 'gemini' || prov === 'google') return geminiKey;
+      if (prov === 'openai') return openaiKey;
+      return '';
+    };
 
-    if (!apiKey) { toast("Introdueix una API key per al proveïdor seleccionat."); return; }
+    const providersNecessaris = Array.from(new Set([providerGeneracio, providerArquitectura]));
+    const senseKey = providersNecessaris.find(p => !getKeyForProvider(p));
+    if (senseKey) { toast(`Introdueix una API key per al proveïdor seleccionat (${senseKey}).`); return; }
+
+    const apiKey = getKeyForProvider(providerGeneracio);
 
     if (anthropicKey) ESTAT._anthropicApiKey = anthropicKey;
     if (geminiKey)    ESTAT._geminiApiKey    = geminiKey;
@@ -1354,8 +1400,15 @@ function guardarIComencar() {
     ESTAT._modelArquitecte = modelArquitectura;
     ESTAT._modelDraft      = modelGeneracio;
 
+    const genere = document.getElementById('config-genere') ? document.getElementById('config-genere').value : '';
+    const autor = document.getElementById('config-autor') ? document.getElementById('config-autor').value : '';
+    const focusClimax = document.getElementById('config-focus-climax') ? document.getElementById('config-focus-climax').value : '';
+    ESTAT.configProjecte = { genere, autor_referencia: autor, focus_climax: focusClimax };
+
     USER_CONFIG = {
       provider,
+      providerGeneracio,
+      providerArquitectura,
       apiKey,
       modelGeneracio,
       modelArquitectura,
@@ -2296,6 +2349,16 @@ async function iniciarFaseEscaleta() {
     hideLoader('10-5');
     mostrarEscaleta(totsResultats);
     document.getElementById('btn-fase11').classList.remove('hidden');
+
+    if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
+      document.getElementById('btn-fase11').classList.add('hidden');
+      showLoader('10-5');
+      document.getElementById('loader-10-5-text').textContent = '🔵 Escaleta completada. Iniciant escriptura autònoma en 3 segons...';
+      setTimeout(() => {
+        hideLoader('10-5');
+        iniciarFase11();
+      }, 3000);
+    }
   } catch (e) {
     hideLoader('10-5');
     toast('Error generant escaleta: ' + e.message);
@@ -2377,7 +2440,7 @@ function actualitzarEstatCapitol(idx, estat) {
   el.querySelector('.capitol-num').textContent = estat === 'fet' ? '✓' : estat === 'actiu' ? '✍️' : '○';
 }
 
-async function generarCapitol(idx) {
+async function generarCapitol(idx, intents = 0) {
   if (idx >= ESTAT._estructuraCapitols.length) {
     document.getElementById('btn-control-arcs-wrap').classList.remove('hidden');
     await executarLoopCoherenciaFinal(USER_CONFIG);
@@ -2428,6 +2491,12 @@ async function generarCapitol(idx) {
 
     mostrarAccionsCapitol(idx, res.response);
   } catch (err) {
+    if (USER_CONFIG && USER_CONFIG.fluxAutomatic && intents < 3) {
+      document.getElementById('loader-11-text').textContent = `⚠️ Error detectat. Reintentant capítol en 5 segons (Intent ${intents + 1}/3)...`;
+      setTimeout(() => generarCapitol(idx, intents + 1), 5000);
+      return;
+    }
+
     hideLoader(11);
     toast('Error Sonnet: ' + err.message);
   }
@@ -2507,6 +2576,8 @@ function mostrarRevisioCapitol(revisat, idx, isLast) {
     ? (puntuacio >= 8 ? 'var(--success)' : puntuacio >= 6 ? 'var(--warning)' : '#f87171')
     : 'var(--text2)';
 
+  const comentariFinal = revisat.comentari_editor_final || revisat.valoracio_general || revisat.veredicte || '';
+
   panel.innerHTML = `
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;">
       <div style="font-size:1.8rem;font-weight:700;color:${color};">${puntuacio}<span style="font-size:1rem;color:var(--text2);">/10</span></div>
@@ -2521,7 +2592,9 @@ function mostrarRevisioCapitol(revisat, idx, isLast) {
         ${problemes.map(p => `<li>${escHtml(String(p))}</li>`).join('')}
       </ul></div>` : ''}
     ${instruccions && !ok ? `<div style="font-size:.8rem;color:var(--text2);margin-top:8px;padding:10px 14px;background:var(--surface);border-radius:6px;border-left:2px solid var(--warning);">
-      <strong>Instruccions:</strong> ${escHtml(instruccions)}</div>` : ''}`;
+      <strong>Instruccions:</strong> ${escHtml(instruccions)}</div>` : ''}
+    ${comentariFinal ? `<div style="font-size:.8rem;color:var(--text2);margin-top:8px;padding:10px 14px;background:var(--surface2);border-radius:6px;border-left:2px solid var(--accent);">
+      <strong>Comentari final de l'editor:</strong> ${escHtml(comentariFinal)}</div>` : ''}`;
 
   // Hook Review
   const hook = revisat.hook_review;
@@ -2613,7 +2686,7 @@ function mostrarAccionsCapitolSimple(idx, isLast) {
   actualitzarEstatCapitol(idx, 'fet');
 }
 
-async function reescriureCapitol(idx) {
+async function reescriureCapitol(idx, intents = 0) {
   const instruccions = ESTAT._revisioInstruccions[idx] || '';
   document.getElementById('capitol-actual-wrap').classList.add('hidden');
   document.getElementById('revisio-panel').classList.add('hidden');
@@ -2629,8 +2702,22 @@ async function reescriureCapitol(idx) {
     mostrarAccionsCapitolSimple(idx, isLast);
     toast('Capítol reescrit.');
   } catch (err) {
+    if (USER_CONFIG && USER_CONFIG.fluxAutomatic && intents < 3) {
+      document.getElementById('loader-11-text').textContent = `⚠️ Error detectat. Reintentant capítol en 5 segons (Intent ${intents + 1}/3)...`;
+      setTimeout(() => reescriureCapitol(idx, intents + 1), 5000);
+      return;
+    }
+
     hideLoader(11);
     document.getElementById('capitol-actual-wrap').classList.remove('hidden');
+
+    if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
+      const isLast = idx >= ESTAT._estructuraCapitols.length - 1;
+      mostrarAccionsCapitolSimple(idx, isLast);
+      toast("Error Sonnet (reescriptura): s'han exhaurit els reintents. Continuant flux automàtic.");
+      return;
+    }
+
     toast('Error Sonnet: ' + err.message);
   }
 }
@@ -2911,7 +2998,91 @@ function mostrarResultatRevisioGlobal(dades) {
       }).join('')}`;
   }
 
+  // --- INICI BOTÓ META-ENGINYERIA ---
+  const divMeta = document.createElement('div');
+  divMeta.style.marginTop = "20px";
+  divMeta.innerHTML = `
+    <button class="btn btn-ghost" style="width:100%; border:1px dashed var(--accent2); color:var(--accent2); font-weight:600;" onclick="generarPromptMetaCodi()">
+      ⚙️ L'app falla? Genera un prompt d'Arquitectura per millorar el codi font
+    </button>
+    <div id="meta-codi-resultat" class="hidden" style="margin-top:14px;"></div>
+  `;
+  resultEl.appendChild(divMeta);
+  // --- FI BOTÓ META-ENGINYERIA ---
+
   btnControl.classList.remove('hidden');
+}
+
+async function generarPromptMetaCodi() {
+  const resultDiv = document.getElementById('meta-codi-resultat');
+  resultDiv.classList.remove('hidden');
+  resultDiv.innerHTML = `<div style="color:var(--text2);font-size:.9rem; display:flex; align-items:center; gap:8px;">
+    <div class="spinner" style="width:16px; height:16px; border-width:2px;"></div>
+    L'app està llegint la seva pròpia lògica JS i dissenyant una millora d'arquitectura...
+  </div>`;
+
+  try {
+    // 1. OPTIMITZACIÓ: Extraiem només la lògica JavaScript (estalvi brutal de tokens)
+    const codiJS = Array.from(document.scripts)
+      .map(script => script.innerText)
+      .filter(text => text.trim().length > 0)
+      .join('\n\n// --- SEGÜENT BLOC DE SCRIPT ---\n\n');
+
+    // 2. RECUPEREM ELS PROBLEMES NARRATIUS DETECTATS
+    const problemes = ESTAT._revisioGlobal ? ESTAT._revisioGlobal.problemes : [];
+    const textProblemes = problemes.length > 0
+      ? JSON.stringify(problemes, null, 2)
+      : "Incoherències generals de continuïtat i ritme detectades al text.";
+
+    // 3. PROMPT PER A L'IA (Actuant com a Arquitecte de Sistemes)
+    const promptEnginyer = `Ets un Arquitecte de Software de Sistemes IA (Agentic Workflows).
+
+Aquesta és la lògica JavaScript de la meva aplicació (Booki):
+<codi_app_js>
+${codiJS}
+</codi_app_js>
+
+En executar aquesta app per escriure una novel·la, l'editor intern ha detectat aquests errors recurrents:
+<errors_narratius>
+${textProblemes}
+</errors_narratius>
+
+LA TEVA TASCA:
+Dissenya una MILLORA ARQUITECTÒNICA GENÈRICA al codi JS que solucioni aquest tipus d'errors d'arrel per sempre. No solucionis només el símptoma actual (ex: si el personatge oblida que està ferit, no demanis un camp "ferides", demana un mòdul de persistència d'estats físics al NKG).
+
+Genera un PROMPT MESTRE que jo pugui copiar i enganxar al meu assistent de codi (Cursor/Codex) per implementar la teva solució.
+El prompt ha de:
+1. Explicar breument el problema sistèmic detectat al codi.
+2. Definir la nova arquitectura proposada.
+3. Donar instruccions tècniques clares sobre quines funcions JavaScript exactes s'han de modificar i com.
+
+Retorna EXCLUSIVAMENT el text del prompt llest per copiar i enganxar, escrit en català.`;
+
+    // 4. CRIDA AL MODEL (Opus)
+    const msgs = [{ role: 'user', content: promptEnginyer }];
+    const models = getModelConfig(USER_CONFIG);
+
+    const respostaLLM = await callLLMMulti(
+      msgs,
+      "Ets un Enginyer de Software Meta-Analític.",
+      Object.assign({}, USER_CONFIG, { maxTokens: 4000, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+
+    // 5. MOSTRAR EL RESULTAT PER COPIAR
+    resultDiv.innerHTML = `
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px; margin-top:14px;">
+        <div style="font-weight:600; color:var(--success); margin-bottom:10px; display:flex; justify-content:space-between;">
+          <span>✅ Prompt d'Arquitectura generat</span>
+          <span style="font-size:.8rem; font-weight:normal; color:var(--text2);">Copia'l i enganxa'l al teu editor</span>
+        </div>
+        <textarea style="width:100%; height:280px; background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:12px; font-family:monospace; font-size:.85rem; resize:vertical; line-height:1.5;" readonly onclick="this.select()">${escHtml(respostaLLM)}</textarea>
+      </div>
+    `;
+
+  } catch (err) {
+    resultDiv.innerHTML = `<div style="color:#f87171; background:rgba(248,113,113,0.1); padding:10px; border-radius:6px; margin-top:10px; font-size:.9rem;">⚠️ Error generant el prompt: ${err.message}</div>`;
+  }
 }
 
 async function reescriureCapitolGlobal(idx, instruccions) {
@@ -2963,11 +3134,22 @@ function tancarModalBiblia() {
   document.getElementById('modal-biblia').classList.add('hidden');
 }
 
+function normalitzarFetsCanonics(fets) {
+  if (!Array.isArray(fets)) return [];
+  return [...new Set(
+    fets
+      .map(f => typeof f === 'string' ? f : (f && typeof f.descripcio === 'string' ? f.descripcio : ''))
+      .map(f => String(f || '').trim())
+      .filter(Boolean)
+  )];
+}
+
 function aplicarCanvisBiblia(canvis) {
   if (!canvis) return;
   const b = ESTAT.bibliaNarrativa;
-  if (canvis.nous_fets_canonics && canvis.nous_fets_canonics.length > 0) {
-    b.fets_canonics = (b.fets_canonics || []).concat(canvis.nous_fets_canonics);
+  const fetsNous = normalitzarFetsCanonics([...(canvis.nous_fets_canonics || []), ...(canvis.fets_canonics || [])]);
+  if (fetsNous.length > 0) {
+    b.fets_canonics = normalitzarFetsCanonics([...(b.fets_canonics || []), ...fetsNous]);
   }
   if (canvis.actualitzar_personatges && canvis.actualitzar_personatges.length > 0) {
     canvis.actualitzar_personatges.forEach(upd => {
@@ -3198,9 +3380,18 @@ async function parseJsonResponse(rawResponse, providerName) {
 // tag: 'generacio' | 'arquitecte' | 'arquitectura'
 // config._esDraft: true → usa model Draft (Haiku o equivalent)
 // config.model: override explícit del model (màxima prioritat)
+function getProviderPerRol(config, tag) {
+  const cfg = config || {};
+  const isArq = (tag === 'arquitecte' || tag === 'arquitectura');
+  const roleProvider = isArq
+    ? (cfg.providerArquitectura || cfg.provider_arq)
+    : (cfg.providerGeneracio || cfg.provider_gen || cfg.providerDraft);
+  return (roleProvider || cfg.provider || 'anthropic');
+}
+
 async function callLLMMulti(messages, systemPrompt, config, tag) {
   const safeConfig = config || {};
-  
+
   // Assignem el model segons si la tasca és d'arquitectura o de generació
   let modelId;
   if (tag === 'arquitecte' || tag === 'arquitectura') {
@@ -3210,8 +3401,8 @@ async function callLLMMulti(messages, systemPrompt, config, tag) {
     modelId = safeConfig.modelGeneracio || safeConfig.model;
   }
 
-  const proveidor = safeConfig.provider || 'anthropic';
-  
+  const proveidor = getProviderPerRol(safeConfig, tag);
+
   // Obtenim la clau API corresponent
   let apiKey;
   if (proveidor === 'anthropic') apiKey = ESTAT._anthropicApiKey || safeConfig.apiKey;
@@ -3240,7 +3431,7 @@ async function callLLMWithContinuation(messages, systemPrompt, config, tag, maxC
     modelId = safeConfig.modelGeneracio || safeConfig.model;
   }
 
-  const proveidor = safeConfig.provider || 'anthropic';
+  const proveidor = getProviderPerRol(safeConfig, tag);
 
   let apiKey;
   if (proveidor === 'anthropic') apiKey = ESTAT._anthropicApiKey || safeConfig.apiKey;
@@ -3303,7 +3494,7 @@ async function callLLMOneShotPlusCompletion(messages, systemPrompt, config, tag)
     modelId = safeConfig.modelGeneracio || safeConfig.model;
   }
 
-  const proveidor = safeConfig.provider || 'anthropic';
+  const proveidor = getProviderPerRol(safeConfig, tag);
   let apiKey;
   if (proveidor === 'anthropic') apiKey = ESTAT._anthropicApiKey || safeConfig.apiKey;
   if (proveidor === 'google' || proveidor === 'gemini') apiKey = ESTAT._geminiApiKey || safeConfig.apiKey;
@@ -3330,11 +3521,12 @@ async function callLLMOneShotPlusCompletion(messages, systemPrompt, config, tag)
   const missatgesTancament = [
     ...messages,
     { role: 'assistant', content: text },
-    { role: 'user', content: `Revisa NOMÉS el final del text anterior.
-Si el text ja està ben tancat, respon EXACTAMENT: OK
-Si ha quedat tallat o incomplet, respon EXACTAMENT en aquest format:
-APPEND: <text mínim necessari per tancar bé la frase o el paràgraf final>
-No repeteixis contingut ja escrit. No afegeixis res més.` }
+    { role: 'user', content: `VERIFICACIÓ DE TANCAMENT (PASSADA 2):
+Revisa l'últim paràgraf que acabes d'escriure.
+1. Si el text està perfectament tancat a nivell narratiu, no s'ha tallat a mitja frase i la longitud és l'adequada, respon EXACTAMENT amb la paraula: OK
+2. Si el text s'ha tallat, ha quedat incomplet o necessita una expansió final per tancar bé l'escena/capítol, respon EXACTAMENT en aquest format:
+APPEND: <escriu aquí la continuació directa des del punt exacte on t'has aturat, afegint el desenvolupament final necessari per tancar-ho amb excel·lència>.
+No repeteixis res del que ja has escrit.` }
   ];
   const configTancament = Object.assign({}, safeConfig, { maxTokens: 220 });
 
@@ -3374,7 +3566,7 @@ async function callLLMOneShotConditionalCompletion(messages, systemPrompt, confi
     modelId = safeConfig.modelGeneracio || safeConfig.model;
   }
 
-  const proveidor = safeConfig.provider || 'anthropic';
+  const proveidor = getProviderPerRol(safeConfig, tag);
   let apiKey;
   if (proveidor === 'anthropic') apiKey = ESTAT._anthropicApiKey || safeConfig.apiKey;
   if (proveidor === 'google' || proveidor === 'gemini') apiKey = ESTAT._geminiApiKey || safeConfig.apiKey;
@@ -3620,7 +3812,7 @@ async function callGemini(messages, systemPrompt, apiKey, model, maxTokens) {
       { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
     ]
   };
-  
+
   if (systemPrompt || SYSTEM_DEFAULT) {
     payload.systemInstruction = { parts: [{ text: systemPrompt || SYSTEM_DEFAULT }] };
   }
@@ -3735,6 +3927,7 @@ const SYSTEM_DEFAULT = `Ets un mestre del conte literari breu en català.
 Apliques el principi d'unitat d'efecte de Poe: cada paraula serveix un únic impacte emocional final.
 Escrius amb economia de paraules, primera frase magnètica, tensió creixent i finals memorables que ressonen.
 Mai desperdicies una frase. Prioritzes mostrar sobre explicar.
+DIÀLEGS — SEPARACIÓ DE PARÀGRAFS: És OBLIGATORI fer un punt i a part (nova línia) cada vegada que canvia el personatge que parla o hi ha un canvi d'acció important. MAI barregis intervencions de dos personatges diferents en el mateix paràgraf.
 Escrius EXCLUSIVAMENT en català. Mai inclous paraules, frases ni comentaris en anglès o cap altra llengua. Mai afegeixes notes meta, indicacions de número de part ni cap text fora de la narració literària. Escriu directament el text.`;
 
 // ─── Extensió d'estil per autor (reutilitzable per conte i novel·la) ───
@@ -3953,7 +4146,8 @@ async function escriureContePart(partNum, totalParts, paraulesPerPart, finalTria
     userContent =
 `He triat el final: "${finalTriat}".
 
-Escriu el CONTE COMPLET (~${pp} paraules). Estil: ${estilDesc}.
+Escriu el CONTE COMPLET. Estil: ${estilDesc}.
+Extensió objectiu: ~${pp} PARAULES. Desenvolupa a fons cada detall, no resumeixis.
 Final obligatori: "${finalTriat}"
 
 OBERTURA: primera frase magnètica, tensió immediata. Primers 3 paràgrafs sense exposició directa.
@@ -3966,7 +4160,8 @@ Escriu directament el conte en català, sense títol ni nota de l'autor. Cap par
     userContent =
 `He triat el final: "${finalTriat}".
 
-Escriu la PRIMERA PART del conte (~${pp} paraules). Estil: ${estilDesc}.
+Escriu la PRIMERA PART del conte. Estil: ${estilDesc}.
+Extensió objectiu: ~${pp} PARAULES. Desenvolupa a fons cada detall, no resumeixis.
 
 Objectiu d'aquesta part:
 → Primera frase impossible de no llegir (pregunta o tensió immediata).
@@ -3978,7 +4173,8 @@ Escriu directament en català, sense títol ni cap indicació de "Part 1". Cap p
 
   } else if (partNum < totalParts) {
     userContent =
-`Continua el conte amb la PART ${partNum} (~${pp} paraules).
+`Continua el conte amb la PART ${partNum}.
+Extensió objectiu: ~${pp} PARAULES. Desenvolupa a fons cada detall, no resumeixis.
 
 Objectiu d'aquesta part:
 → Augmenta el conflicte i la pressió sobre el protagonista.
@@ -3989,7 +4185,8 @@ Continua directament la narració en català, des d'on s'ha aturat el text anter
 
   } else {
     userContent =
-`Finalitza el conte amb la PART FINAL (~${pp} paraules).
+`Finalitza el conte amb la PART FINAL.
+Extensió objectiu: ~${pp} PARAULES. Desenvolupa a fons cada detall, no resumeixis.
 
 El desenllaç OBLIGATORI és: "${finalTriat}"
 
@@ -4000,11 +4197,51 @@ El desenllaç OBLIGATORI és: "${finalTriat}"
 Continua directament la narració en català, des d'on s'ha aturat el text anterior. Sense cap indicació de número de part ni comentari fora de la ficció. Cap paraula en anglès ni cap altra llengua.`;
   }
 
-  const msgs      = [...history, { role: 'user', content: userContent }];
-  const maxTokens = Math.min(Math.round(pp * 4) + 1000, 8192);
-  const response   = await callLLMMulti(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens }));
-  const newHistory = [...msgs, { role: 'assistant', content: response }];
-  return { response, history: newHistory };
+  const msgs = [...history, { role: 'user', content: userContent }];
+  const models = getModelConfig(userConfig);
+
+  const responseGeneracio = await callLLMOneShotPlusCompletion(
+    msgs,
+    getSystemPrompt(tematica),
+    Object.assign({}, userConfig, { maxTokens: 8192, model: models.modelGeneracio }),
+    'generacio'
+  );
+
+  let responseFinal = responseGeneracio;
+  try {
+    const msgsRefina = [
+      ...msgs,
+      { role: 'assistant', content: responseGeneracio },
+      {
+        role: 'user',
+        content: `REFINAMENT ARQUITECTÒNIC DE PROSA:
+Reescriu íntegrament aquesta mateixa part mantenint els mateixos fets, ordre narratiu i continuïtat, però millorant coherència estructural, ritme i veu.
+Mantén una longitud equivalent (en paraules) i evita resumir.
+Retorna NOMÉS el text final en català.`
+      }
+    ];
+
+    const responseArquitectura = await callLLMOneShotPlusCompletion(
+      msgsRefina,
+      getSystemPrompt(tematica),
+      Object.assign({}, userConfig, {
+        maxTokens: 8192,
+        model: models.modelArquitecte,
+        modelArquitectura: models.modelArquitecte,
+        modelGeneracio: models.modelArquitecte
+      }),
+      'arquitectura'
+    );
+
+    if (responseArquitectura && responseArquitectura.trim()) {
+      responseFinal = responseArquitectura;
+    }
+  } catch (err) {
+    console.warn("Refinament amb model d'arquitectura no disponible, es manté la versió de generació:", err.message);
+  }
+
+  const newHistory = [...msgs, { role: 'assistant', content: responseFinal }];
+  return { response: responseFinal, history: newHistory };
 }
 
 // ─── MILLORA ─────────────────────────────────────────────────
@@ -4135,14 +4372,20 @@ Format ESTRICTE (res més, sense cap introducció):
 // Genera el perfil de veu per al protagonista + tots els personatges
 // secundaris seleccionats, per guiar l'escriptura dels diàlegs.
 async function fase9_estilParla(protagonistaTriat, personatgesSecundaris, conteActual, tematica, estilDesc, history, userConfig) {
-  const totsPersonatges = [protagonistaTriat, ...personatgesSecundaris];
-  const llista = totsPersonatges.map((p, i) => `${i + 1}. ${p}`).join('\n');
+  const totsPersonatges = Array.from(new Set([protagonistaTriat, ...personatgesSecundaris].filter(Boolean)));
+  const historyCurt = Array.isArray(history) ? history.slice(-6) : [];
+  const CHUNK = 6;
+  const partsResposta = [];
 
-  const msgs = [
-    ...history,
-    {
-      role: 'user',
-      content: `Defineix el perfil de veu i estil de parla de cada personatge de l'elenc per guiar l'escriptura dels diàlegs de la novel·la.
+  for (let i = 0; i < totsPersonatges.length; i += CHUNK) {
+    const blocPersonatges = totsPersonatges.slice(i, i + CHUNK);
+    const llista = blocPersonatges.map((p, j) => `${j + 1}. ${p}`).join('\n');
+
+    const msgs = [
+      ...historyCurt,
+      {
+        role: 'user',
+        content: `Defineix el perfil de veu i estil de parla de cada personatge de l'elenc per guiar l'escriptura dels diàlegs de la novel·la.
 
 Personatges:
 ${llista}
@@ -4159,7 +4402,7 @@ Per a cada personatge defineix els 5 eixos de la seva veu única:
 Els perfils han de ser contrastats entre ells: cada personatge ha de sonar inconfusiblement diferent dels altres.
 Evita paraules rebuscades o massa literàries en els diàlegs si el personatge no les justificaria. Prioritza oralitat natural.
 
-Format ESTRICTE per a cada personatge (res més, sense cap introducció):
+Format ESTRICTE que has de repetir per a TOTS I CADA UN dels personatges de la llista (no t'aturis fins a fer-los tots, sense cap introducció):
 **[Nom del personatge]**
 Vocabulari: [...]
 Frases: [...]
@@ -4167,13 +4410,42 @@ Tics: [...]
 Registre: [...]
 Exemple: «[frase representativa]»
 
+No tallis la resposta a mitges. Si no hi ha espai, prioritza completar TOTS els personatges d'aquest bloc abans d'afegir floritures.
 Separa cada personatge amb una línia en blanc. Escriu exclusivament en català.`
+      }
+    ];
+
+    const models = getModelConfig(userConfig);
+    const configBloc = Object.assign({}, userConfig, {
+      maxTokens: 8192,
+      model: models.modelArquitecte,
+      modelArquitectura: models.modelArquitecte,
+      modelGeneracio: models.modelArquitecte
+    });
+
+    let respostaBloc = await callLLMOneShotPlusCompletion(msgs, getSystemPrompt(tematica), configBloc, 'arquitectura');
+
+    const missing = blocPersonatges.filter(nom => !respostaBloc.includes(`**${nom}**`));
+    if (missing.length > 0) {
+      const msgsRetry = [
+        ...msgs,
+        { role: 'assistant', content: respostaBloc },
+        { role: 'user', content: `Has deixat personatges sense fitxa o la resposta s'ha tallat. Escriu NOMÉS les fitxes que falten, en el mateix format estricte, sense repetir les que ja has fet.\nFalten: ${missing.join(', ')}` }
+      ];
+      const retry = await callLLMOneShotPlusCompletion(msgsRetry, getSystemPrompt(tematica), configBloc, 'arquitectura');
+      if (retry && retry.trim()) respostaBloc += '\n\n' + retry.trim();
     }
-  ];
-  const maxTokens  = Math.min(700 * totsPersonatges.length + 800, 6000);
-  // Opus: definir veus és tasca d'arquitectura narrativa
-  const response   = await callLLMMulti(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens }), 'arquitectura');
-  const newHistory = [...msgs, { role: 'assistant', content: response }];
+
+    const missingFinal = blocPersonatges.filter(nom => !respostaBloc.includes(`**${nom}**`));
+    if (missingFinal.length > 0) {
+      respostaBloc += '\n\n' + missingFinal.map(nom => `**${nom}**\nVocabulari: pendent de generar\nFrases: pendent de generar\nTics: pendent de generar\nRegistre: pendent de generar\nExemple: «pend…»`).join('\n\n');
+    }
+
+    partsResposta.push(respostaBloc.trim());
+  }
+
+  const response = partsResposta.join('\n\n');
+  const newHistory = [...history, { role: 'assistant', content: response }];
   return { response, history: newHistory };
 }
 
@@ -4231,7 +4503,7 @@ ${paragrafsHtml}
 </html>`;
 
   // ── 2. Crear Blob i forçar descàrrega ─────────────────────
-  const blob = new Blob([htmlDoc], { type: 'text/html;charset=utf-8' });
+  const blob = new Blob([htmlDoc], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document;charset=utf-8' });
   const url  = URL.createObjectURL(blob);
 
   // Netejar el títol per convertir-lo en nom de fitxer vàlid
@@ -4239,7 +4511,7 @@ ${paragrafsHtml}
     .replace(/[<>:"/\\|?*]/g, '')   // caràcters no vàlids a fitxers
     .trim()
     .replace(/\s+/g, '_')
-    .substring(0, 80) + '.html';
+    .substring(0, 80) + '.docx';
 
   const a = document.createElement('a');
   a.href     = url;
@@ -4308,9 +4580,9 @@ ${cosHtml}
 </body>
 </html>`;
 
-  const blob      = new Blob([htmlDoc], { type: 'text/html;charset=utf-8' });
+  const blob      = new Blob([htmlDoc], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document;charset=utf-8' });
   const url       = URL.createObjectURL(blob);
-  const nomFitxer = titol.replace(/\s+/g, '_').substring(0, 80) + '.html';
+  const nomFitxer = titol.replace(/\s+/g, '_').substring(0, 80) + '.docx';
   const a         = document.createElement('a');
   a.href = url; a.download = nomFitxer;
   document.body.appendChild(a); a.click();
@@ -4372,9 +4644,9 @@ function getSystemPromptNovella(tematica) {
 Apliques les tècniques de Donna Tartt, Elena Ferrante i Carlos Ruiz Zafón: atmòsferes denses, personatges amb contradiccions genuïnes i trames que s'informen mútuament.
 Escrius EXCLUSIVAMENT en català. Mai inclous paraules ni comentaris en anglès o qualsevol altra llengua.
 Mai afegeixes notes meta, indicacions de capítol ni cap text fora de la narració literària. Escriu directament el text.
-DIÀLEGS: Usa SEMPRE el guió llarg (—) per introduir el parlament i les acotacions. PROHIBIT usar cometes («», "", '') per al diàleg directe. Format correcte: —Hola —va dir ella. / —Bon dia. / —Vine aquí —li ordenà.
+DIÀLEGS: Usa SEMPRE el guió llarg (—) per introduir el parlament i les acotacions. PROHIBIT usar cometes («», "", '') per al diàleg directe. Format correcte: —Hola —va dir ella. / —Bon dia. / —Vine aquí —li ordenà. SEPARACIÓ DE PARÀGRAFS: És OBLIGATORI fer un punt i a part (nova línia) cada vegada que canvia el personatge que parla o hi ha un canvi d'acció important. MAI barregis intervencions de dos personatges diferents en el mateix paràgraf.
 NOMS DE PERSONA: Aplica l'article personal (en, la, l', na) i les preposicions contractes quan la normativa catalana ho requereix. Exemples: la Maria, en Pere, l'Anna, en Marc, na Joana; amb la Júlia, amb en Tomàs; del senyor Puig, al doctor Ferrer.
-ESTIL DE PROSA: Evita el barroquisme. Prioritza paraules d'ús habitual i precises; evita adjectivació excessiva (màxim 1 adjectiu rellevant per substantiu, excepte si és imprescindible). En diàleg, fes parlar els personatges de manera natural i versemblant.`;
+ESTIL DE PROSA: Evita el barroquisme. Prioritza paraules d'ús habitual i precises; evita adjectivació excessiva (màxim 1 adjectiu rellevant per substantiu, excepte si és imprescindible). En diàleg, fes parlar els personatges de manera natural i versemblant. Aplica la norma de 'Show, don't tell' especialment als conflictes: resol les tensions a través de diàlegs incisius i acció, no amb resums de la veu narradora. Recorda que estàs escrivint una novel·la completa, no un guió ni un conte breu. Pren-te el teu temps per descriure l'atmosfera, explorar el monòleg intern dels personatges i coreografiar els seus moviments per l'espai. Sigues exhaustiu i detallista.`;
   return base + getGenreStyle(tematica || ESTAT.tematica);
 }
 
@@ -4425,7 +4697,11 @@ BÍBLIA DE MÓN:
 ${world}
 
 ESTILS DE PARLA DELS PERSONATGES:
-${veus}`;
+${veus}
+
+REGLA D'ESTIL OBLIGATÒRIA (SHOW, DON'T TELL): Tens totalment prohibit utilitzar etiquetes emocionals explícites per descriure com se sent un personatge (ex: prohibit dir \"estava trist\", \"se sentia enfadat\", \"estava nerviós\"). En comptes d'això, has de MOSTRAR l'emoció a través d'accions físiques, interaccions amb els objectes del seu inventari, la seva vestimenta, el llenguatge corporal o detalls de l'entorn (ex: \"jugava compulsivament amb el botó descosit de l'abric\", \"va prémer les claus fins que els artells se li van posar blancs\").
+
+REGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que és el final del capítol, NO resolguis la situació ni facis que els personatges abandonin l'escenari al final del text. Deixa l'acció fluint, oberta o en suspens dramàtic, de manera que la següent generació pugui recollir el testimoni de forma natural.`;
 
   if (ESTAT._goldenPassage) {
     base += `\n\nREFERÈNCIA DE VEU:\nEl següent passatge exemplifica la veu i l'estil que ha de tenir la novel·la. Usa'l com a referència de qualitat:\n\n${ESTAT._goldenPassage}`;
@@ -4474,6 +4750,14 @@ function buildSystemPromptCapitol() {
       if (m.vocabulari) linies.push(`• Vocabulari: ${m.vocabulari}`);
       if (linies.length > 0) parts.push('\nMANUAL D\'ESTIL DE REFERÈNCIA:\n' + linies.join('\n'));
     }
+    const tensioActiva = (ESTAT._corbaTensio || []).find(t => t.capitol === (Number(ESTAT._capitolActual || 0) + 1));
+    if (tensioActiva && Number(tensioActiva.nivell) > 7) {
+      parts.push("\nCONTROL DE CONTRAST SENSORIAL (NKG>7): Trenca qualsevol fredor comptable amb detalls viscerals o orgànics (olors, suor, brutícia, reaccions físiques involuntàries). Quan la tensió és alta, aquests detalls són OBLIGATORIS i han d'entrar dins l'acció.");
+    } else {
+      parts.push('\nCONTROL DE CONTRAST SENSORIAL: Evita la prosa asèptica. Integra textura física i sensorial (cos, entorn, fricció material) per humanitzar la tensió.');
+    }
+    parts.push("\nREGLA D'ESTIL OBLIGATÒRIA (SHOW, DON'T TELL): Tens totalment prohibit utilitzar etiquetes emocionals explícites per descriure com se sent un personatge (ex: prohibit dir \"estava trist\", \"se sentia enfadat\", \"estava nerviós\"). En comptes d'això, has de MOSTRAR l'emoció a través d'accions físiques, interaccions amb objectes, vestimenta, llenguatge corporal o detalls de l'entorn.");
+    parts.push("\nREGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que és el final del capítol, NO resolguis la situació ni facis que els personatges abandonin l'escenari al final del text. Deixa l'acció fluint, oberta o en suspens dramàtic, de manera que la següent generació pugui recollir el testimoni de forma natural.");
     return parts.join('\n');
   }
   return buildSystemPromptCapitolLegacy();
@@ -4518,13 +4802,91 @@ function buildRegistreContext(idx) {
 // ═══════════════════════════════════════════════════════════
 //  FASE 4: Control de Ritme i Tensió
 // ═══════════════════════════════════════════════════════════
-function getInstruccionsRitme(nivell, tipus) {
-  if (nivell <= 3) return 'Ritme pausat. Frases llargues i descriptives. Permet digressions. Estableix atmosfera. Pocs diàlegs, i si n\'hi ha, són reflexius.';
-  if (nivell <= 5) return 'Ritme moderat. Alterna descripció amb diàleg. Introdueix tensió subtilment a través de detalls, no d\'acció.';
-  if (nivell <= 7) return 'Ritme creixent. Frases més curtes a mesura que avança el capítol. Diàlegs amb subtexte. Les escenes s\'acceleren cap al final.';
-  if (nivell <= 9) return 'Ritme alt. Frases curtes i directes. Diàlegs tensos, tallants. Poc espai per respirar. Cada paràgraf augmenta la pressió.';
-  return 'CLÍMAX. Ritme frenètic. Frases mínimes. Acció directa. El moment de màxima tensió. Tot s\'accelera cap a la resolució.';
+function obtenirInstruccionsDeTensio(nivellTensio) {
+  const nivell = Math.max(1, Math.min(10, Number(nivellTensio) || 5));
+  if (nivell <= 3) {
+    return `ESTIL I RITME: Tensió baixa (${nivell}/10). Escriu amb un ritme pausat. Crea una atmosfera introspectiva, centra't en descripcions sensorials riques de l'entorn i allarga els paràgrafs. Deixa que els personatges reflexionin.`;
+  }
+  if (nivell <= 7) {
+    return `ESTIL I RITME: Tensió mitjana (${nivell}/10). Ritme equilibrat. Combina diàleg fluid amb accions concretes. L'escena ha d'avançar de manera constant cap al seu objectiu.`;
+  }
+  return `ESTIL I RITME: Tensió alta (${nivell}/10). Ritme frenètic. Utilitza frases més curtes i contundents. Elimina descripcions innecessàries. L'acció i la urgència són primordials.`;
 }
+
+function getInstruccionsRitme(nivell, tipus) {
+  const base = obtenirInstruccionsDeTensio(nivell);
+  return tipus ? `${base} Focus de corba: ${tipus}.` : base;
+}
+
+
+function obtenirTextEnllac(textEscenaAnterior) {
+  const raw = String(textEscenaAnterior || '').replace(/\r/g, '').trim();
+  if (!raw) return '';
+
+  // Neteja marcadors tècnics i línies de metadades que poden contaminar el punt d'enganx.
+  const net = raw
+    .replace(/\[\[ESCENA_\d+\]\]/g, '')
+    .split('\n')
+    .filter(l => !/^\s*(ESCENA\s+\d+|CAP[IÍ]TOL\s+\d+)\b/i.test(l.trim()))
+    .join('\n')
+    .trim();
+
+  if (!net) return '';
+
+  const paragrafs = net.split(/\n\s*\n+/).map(p => p.trim()).filter(Boolean);
+  if (paragrafs.length === 0) return '';
+
+  // Prioritza els darrers 2-3 paràgrafs; si són molt curts, completa fins ~1000 caràcters.
+  let text = paragrafs.slice(-3).join('\n\n').trim();
+  if (text.length < 600 && paragrafs.length > 3) {
+    text = paragrafs.slice(-4).join('\n\n').trim();
+  }
+
+  const maxChars = 1000;
+  if (text.length > maxChars) {
+    text = text.slice(-maxChars).trim();
+    const idx = text.indexOf('\n\n');
+    if (idx > 0 && idx < 250) text = text.slice(idx + 2).trim();
+  }
+
+  return text;
+}
+
+function determinarTipusTransicio(escenaAnterior, escenaActual) {
+  if (!escenaAnterior) return 'continuacio_directa';
+
+  const llocAnt = (escenaAnterior.lloc || escenaAnterior.localitzacio || '').trim().toLowerCase();
+  const llocAct = (escenaActual.lloc || escenaActual.localitzacio || '').trim().toLowerCase();
+  const canviLloc = llocAnt && llocAct && llocAnt !== llocAct;
+
+  const pistaSalt = `${escenaActual?.nom || ''} ${escenaActual?.funcio_narrativa || ''} ${escenaActual?.beat_narratiu || ''}`
+    .toLowerCase();
+  const teSaltTemporal = /(m[eé]s\s+tard|hores\s+despr[eé]s|l'?endem[aà]|dies\s+despr[eé]s|setmanes\s+despr[eé]s|mentrestant|temps\s+despr[eé]s|al\s+cap\s+de)/.test(pistaSalt);
+
+  if (canviLloc || teSaltTemporal) return 'salt_temporal';
+  return 'continuacio_directa';
+}
+
+
+function buildInstruccionsTransicio(textEnllac, tipusTransicio) {
+  if (!textEnllac) return '';
+
+  let instruccionsTransicio = `TEXT ANTERIOR (PUNT D'ENGANX): Així és com ha acabat l'escena just anterior:
+"${textEnllac}"
+
+`;
+
+  if (tipusTransicio === 'salt_temporal') {
+    instruccionsTransicio += `INSTRUCCIÓ DE TRANSICIÓ: Inicia aquesta escena fent una transició temporal o espacial elegant respecte al text anterior. Fes servir el primer paràgraf per situar el lector en el nou context sense fer un tall abrupte.
+`;
+  } else {
+    instruccionsTransicio += `INSTRUCCIÓ DE TRANSICIÓ: L'acció d'aquesta nova escena continua EXACTAMENT en el mateix lloc i segon on ho ha deixat el text anterior. El teu primer paràgraf ha de ser una continuació completament fluida i natural d'aquest punt d'enganx, mantenint la mateixa cadència literària. No facis introduccions, segueix l'acció.
+`;
+  }
+
+  return instruccionsTransicio;
+}
+
 
 // ═══════════════════════════════════════════════════════════
 //  FASE 5: Sistema de Prefiguració
@@ -4988,7 +5350,8 @@ ${context}
 ${instruccionsVeu}
 
 INSTRUCCIONS D'ESCRIPTURA:
-- Entre 4000 i 5000 caràcters
+- LONGITUD OBLIGATÒRIA: Aquest text ha de tenir entre 600 i 700 paraules. Presa't el teu temps per desenvolupar l'escena amb el ritme adequat. Utilitza descripcions sensorials riques, un diàleg ben construït i accions físiques per expandir el text. NO precipitis el final ni resumeixis els esdeveniments per acabar ràpid. Desenvolupa la prosa de manera literària fins a assolir aquesta extensió de paraules.
+- Desenvolupa les escenes a fons, utilitza diàleg ric i descripcions sensorials. NO resumeixis.
 - Comença directament amb la narració, sense titular el capítol
 - Si hi ha prefiguracions a plantar, integra-les de forma subtil i natural (el lector no ha de notar-les en primera lectura)
 - Si hi ha prefiguracions a recollir, dona'ls resolució satisfactòria
@@ -5075,6 +5438,7 @@ Verifica específicament:
 - Si el capítol havia de plantar una prefiguració, s'ha fet de forma subtil?
 - Si el capítol havia de recollir una prefiguració, s'ha resolt satisfactòriament?
 - Hi ha algun element que contradigui una prefiguració plantada anteriorment?
+- Format de diàlegs: Hi ha intervencions de diferents personatges solapades en un mateix paràgraf sense punt i a part? Si és així, marca-ho com a error greu de format.
 
 AVALUACIÓ DE GANXOS (Hook Review):
 Avalua els elements narratius de ganxo del capítol:
@@ -5087,9 +5451,10 @@ SELECCIÓ DE PASSATGE:
 A més de la revisió, selecciona el MILLOR passatge del capítol (entre 150 i 250 paraules) que millor exemplifiqui la veu narrativa. Copia'l literalment del text.
 
 Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense cap text addicional, sense markdown):
+IMPORTANT: Si detectes solapament de diàlegs entre personatges en un mateix paràgraf, "ok_per_continuar" HA DE ser false i has de donar "instruccions_correccio" explícites per reescriure separant els paràgrafs.
 {
   "puntuacio": 8,
-  "problemes": ["descripció concreta del problema 1"],
+  "problemes": ["descripció concreta del problema 1", "Solapament de diàlegs detectat: intervencions de diferents personatges en un mateix paràgraf. Cal reescriure separant-los."],
   "instruccions_correccio": "instruccions clares per a Sonnet per reescriure si cal (buit si no cal)",
   "ok_per_continuar": true,
   "prefiguracions_ok": true,
@@ -5105,6 +5470,7 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense cap text addicional, sense m
     "promesa_comentari": "comentari breu sobre la promesa narrativa"
   },
   "instruccions_cliffhanger": "instruccions concretes per millorar el cliffhanger si la puntuació és < 6 (buit si no cal)",
+  "comentari_editor_final": "possible millora global de capítol (buit si no cal)",
   "golden_passage": "el text del millor passatge (150-250 paraules)"
 }`
   }];
@@ -5394,7 +5760,10 @@ IMPORTANT: El JSON ha de ser COMPLET amb TOTS els personatges de l'elenc. Manté
     if (dades.llocs_importants)   ESTAT.bibliaNarrativa.llocs_importants   = dades.llocs_importants;
     if (dades.objectes_clau)      ESTAT.bibliaNarrativa.objectes_clau      = dades.objectes_clau;
     if (dades.fitxes_personatges) ESTAT.bibliaNarrativa.fitxes_personatges = dades.fitxes_personatges;
-    if (dades.fets_canonics)      ESTAT.bibliaNarrativa.fets_canonics      = dades.fets_canonics;
+    const fetsInicials = normalitzarFetsCanonics(dades.fets_canonics || []);
+    ESTAT.bibliaNarrativa.fets_canonics = fetsInicials.length > 0
+      ? fetsInicials
+      : normalitzarFetsCanonics(((ESTAT._nkg && ESTAT._nkg.fets_canonics) || []).map(f => f.descripcio));
   }
   return { response };
 }
@@ -5481,7 +5850,13 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid:
     'arquitectura'
   );
 
-  const canvis = parseJsonRobust(response);
+  const canvis = parseJsonRobust(response) || {};
+  if (!Array.isArray(canvis.nous_fets_canonics) || canvis.nous_fets_canonics.length === 0) {
+    const fetsNkgCapitol = ((ESTAT._nkg && ESTAT._nkg.fets_canonics) || [])
+      .filter(f => Number(f.capitol_origen) === idx + 1)
+      .map(f => f.descripcio);
+    if (fetsNkgCapitol.length > 0) canvis.nous_fets_canonics = fetsNkgCapitol;
+  }
   aplicarCanvisBiblia(canvis);
   return { response };
 }
@@ -5699,10 +6074,11 @@ CAPÍTOLS A ESCALETEJAR:
 ${capsText}
 
 ESCENES PER CAPÍTOL (adapta al ritme del capítol):
-- Capítols d'exposició/respiració (nivell tensió ≤4): 3 escenes (~450 paraules/escena)
-- Capítols de desenvolupament (nivell tensió 5-7): 3-4 escenes (~500 paraules/escena)
-- Capítols de clímax/acció (nivell tensió ≥8): 4 escenes curtes (~400 paraules/escena, ritme ràpid)
-- Capítol final/resolució: 3 escenes (~550 paraules/escena, ritme pausat)
+- Genera entre 4 i 6 escenes per a aquest capítol. (No menys de 4).
+- Capítols d'exposició/respiració (nivell tensió ≤4): 4 escenes (~450 paraules/escena)
+- Capítols de desenvolupament (nivell tensió 5-7): 4-5 escenes (~500 paraules/escena)
+- Capítols de clímax/acció (nivell tensió ≥8): 5-6 escenes (~400 paraules/escena, ritme ràpid). REGLA CRÍTICA: En els clímaxs, crea SEMPRE una escena de beat "introspecció" per a la PRESA DE DECISIÓ (mostrant el cost físic/mental), separada i prèvia a l'escena d'"acció" posterior.
+- Capítol final/resolució: 4 escenes (~550 paraules/escena, ritme pausat)
 
 TOTAL OBJECTIU: ~1800-2200 paraules per capítol. La novel·la completa ha de fer entre 24.000 i 31.000 paraules (12-14 capítols × ~2000 paraules).
 
@@ -5715,6 +6091,8 @@ Cada escena ha d'incloure (camps OBLIGATORIS, res més):
 - funcio_narrativa: 1 frase curta (màxim 10 paraules)
 - personatges: array de noms
 - beat_narratiu: "diàleg" | "acció" | "introspecció" | "descripció"
+- REGLA DE DIÀLEG: Com a mínim el 50% de les escenes d'un capítol han de tenir el "beat_narratiu" fixat a "diàleg". Prioritza sempre la interacció verbal.
+- Cada escena ha de tenir un objectiu físic (avançar en la trama) i un objectiu emocional o reflexiu (introspecció, record, subtrama).
 
 NO incloguis emocio_entrada, emocio_sortida ni punt_inflexio per estalviar espai.
 
@@ -5747,6 +6125,75 @@ Retorna EXCLUSIVAMENT JSON vàlid:
   return { response };
 }
 
+async function cridaAPI_GenerarText(promptEscena, systemPrompt, userConfig, maxTokensOverride) {
+  const cfg = Object.assign({}, userConfig, {
+    maxTokens: maxTokensOverride || Math.max(1500, (promptEscena.length / 2) | 0)
+  });
+  return await callLLMMulti([{ role: 'user', content: promptEscena }], systemPrompt, cfg, 'generacio');
+}
+
+async function avaluarQualitatLiteraria(textEscena, userConfig) {
+  const models = getModelConfig(userConfig);
+  const textNet = String(textEscena || '').slice(0, 6000);
+  const promptAvaluador = `Ets un editor literari exigent i un filòleg expert en llengua catalana. Llegeix aquest text:
+
+"""${textNet}"""
+
+La teva tasca té dues parts:
+1. AVALUACIÓ LITERÀRIA: Avalua si conté clixés evidents, resolucions mandroses o diàlegs robòtics.
+2. CORRECCIÓ LINGÜÍSTICA: Identifica qualsevol falta d'ortografia, castellanisme, expressió calcada d'altres idiomes o gramàtica incorrecta en català.
+
+Retorna ÚNICAMENT un objecte JSON amb aquest format exacte:
+{
+  "aprovat": true/false,
+  "critiques": "Descriu els errors narratius i/o llista les paraules/expressions incorrectes en català i la seva forma correcta. Si tot és perfecte, deixa-ho buit."
+}`;
+
+  try {
+    const raw = await callLLMMulti(
+      [{ role: 'user', content: promptAvaluador }],
+      'Ets un jutge literari i corrector lingüístic expert en català. Retorna únicament JSON vàlid.',
+      Object.assign({}, userConfig, { maxTokens: 500, model: models.modelArquitecte || models.modelGeneracio }),
+      'arquitectura'
+    );
+    const parsed = parseJsonRobust(raw);
+    if (parsed && typeof parsed.aprovat === 'boolean') {
+      return {
+        aprovat: parsed.aprovat,
+        critiques: typeof parsed.critiques === 'string' ? parsed.critiques : ''
+      };
+    }
+  } catch (err) {
+    console.warn('Jutge Literari: error de validació, s\'aprova per no bloquejar:', err.message);
+  }
+
+  return { aprovat: true, critiques: '' };
+}
+
+async function generarIValidarEscena(promptEscena, systemPrompt, userConfig, opts = {}) {
+  const intentsMaxims = Math.max(1, Number(opts.intentsMaxims) || 2);
+  const maxTokens = opts.maxTokens || 3000;
+  let escenaAprovada = false;
+  let textEscenaGenerada = '';
+  let intents = 0;
+  let promptTreball = String(promptEscena || '');
+
+  while (!escenaAprovada && intents < intentsMaxims) {
+    intents++;
+    textEscenaGenerada = await cridaAPI_GenerarText(promptTreball, systemPrompt, userConfig, maxTokens);
+
+    const veredicte = await avaluarQualitatLiteraria(textEscenaGenerada, userConfig);
+    if (veredicte.aprovat) {
+      escenaAprovada = true;
+    } else {
+      console.log('El Jutge Literari ha rebutjat l\'escena. Reescrivint... Motius:', veredicte.critiques);
+      promptTreball += `\n\nCRÍTICA DE L'EDITOR: La versió anterior tenia els següents problemes: ${veredicte.critiques || 'massa clixés o prosa plana'}. Reescriu l'escena solucionant AQUESTS problemes específics i evitant llocs comuns.`;
+    }
+  }
+
+  return textEscenaGenerada || '';
+}
+
 // ═══════════════════════════════════════════════════════════
 //  FASE 11: Escriure capítol per escenes (usa escaleta)
 // ═══════════════════════════════════════════════════════════
@@ -5766,6 +6213,11 @@ async function escriureCapitolPerEscenes(idx, userConfig) {
       document.getElementById('loader-11-text').textContent = `Escrivint capítol ${idx + 1} — Escena ${i + 1}/${escenes.length}: ${escena.nom || ''}…`;
     }
     const esUltimaEscena = i === escenes.length - 1;
+    const tensioEscena = (ESTAT._corbaTensio || []).find(t => t.capitol === idx + 1);
+    const instruccioTensioEscena = obtenirInstruccionsDeTensio(tensioEscena ? tensioEscena.nivell : 5);
+    const textEnllac = i > 0 ? obtenirTextEnllac(textsEscenes[i - 1]) : '';
+    const tipusTransicio = i > 0 ? determinarTipusTransicio(escenes[i - 1], escena) : 'continuacio_directa';
+    const instruccionsTransicio = buildInstruccionsTransicio(textEnllac, tipusTransicio);
     const promptEscena = `${contextCapitol}
 
 ## ESCENA ACTUAL A ESCRIURE
@@ -5774,17 +6226,17 @@ Funció narrativa: ${escena.funcio_narrativa || ''}
 Personatges: ${(escena.personatges || []).join(', ')}
 Paraules objectiu: ${escena.paraules_objectiu || 400}
 ${escena.punt_inflexio ? '⚡ Aquesta escena conté un punt d\'inflexió important.' : ''}
+Ritme i tensió objectiu: ${instruccioTensioEscena}
 
-${i > 0 ? `TEXT DE L'ESCENA ANTERIOR:\n${textsEscenes[i-1].slice(-500)}\n\n` : ''}${esUltimaEscena ? `TANCAMENT DEL CAPÍTOL:
+${instruccionsTransicio}${esUltimaEscena ? `TANCAMENT DEL CAPÍTOL:
 ${instruccionsFinalCapitol}
 
-` : ''}Escriu ara aquesta escena en prosa literària completa, sense títols ni metadades. Aproximadament ${escena.paraules_objectiu || 400} paraules.`;
-    const msgs = [{ role: 'user', content: promptEscena }];
-    const res = await callLLMMulti(
-      msgs,
+` : ''}Escriu ara aquesta escena en prosa literària completa, sense títols ni metadades. Aproximadament ${escena.paraules_objectiu || 400} paraules.${!esUltimaEscena ? ' IMPORTANT: no tanquis la situació al final; deixa-la en continuïtat orgànica cap a la següent escena.' : ''}`;
+    const res = await generarIValidarEscena(
+      promptEscena,
       systemPrompt,
-      Object.assign({}, userConfig, { maxTokens: Math.max(1200, (escena.paraules_objectiu || 400) * 2) }),
-      'generacio'
+      userConfig,
+      { intentsMaxims: 2, maxTokens: Math.max(1500, (escena.paraules_objectiu || 400) * 2) }
     );
     textsEscenes.push(res || '');
   }
@@ -5876,8 +6328,20 @@ function nkgQueryEscenaContext(escenaSpec) {
       const p = nkgQueryPersonatge(nom);
       if (p) {
         let desc = `• ${p.nom}: ${p.estat_emocional || 'neutre'}`;
+        if (p.estat_fisic) desc += ` | Físic: ${p.estat_fisic}`;
+        if (p.indumentaria_actual) desc += ` | Roba: ${p.indumentaria_actual}`;
+        if (p.objectes_inventari && p.objectes_inventari.length > 0) desc += ` | Inventari: ${p.objectes_inventari.join(', ')}`;
         if (p.ubicacio) desc += ` | A: ${p.ubicacio}`;
         if (p.objectius && p.objectius.length > 0) desc += ` | Vol: ${p.objectius[0]}`;
+        let passiuEmocional = p.passiu_emocional || '';
+        if (!passiuEmocional && Array.isArray(p.traumes) && p.traumes.length > 0) passiuEmocional = p.traumes[0];
+        if (!passiuEmocional && Array.isArray(p.pors) && p.pors.length > 0) passiuEmocional = p.pors[0];
+        if (!passiuEmocional && Array.isArray(p.deutes) && p.deutes.length > 0) passiuEmocional = p.deutes[0];
+        if (!passiuEmocional && ESTAT.bibliaNarrativa && Array.isArray(ESTAT.bibliaNarrativa.fitxes_personatges)) {
+          const fitxa = ESTAT.bibliaNarrativa.fitxes_personatges.find(f => nkgNormalitzarNom(f.nom || '') === nkgNormalitzarNom(nom));
+          if (fitxa) passiuEmocional = fitxa.secrets || fitxa.estat_actual || '';
+        }
+        if (passiuEmocional) desc += ` | Passiu emocional latent: ${passiuEmocional}`;
         if (p.secrets && p.secrets.length > 0) desc += ` | Amaga: ${p.secrets[0]}`;
         parts.push(desc);
 
@@ -6048,6 +6512,9 @@ function nkgInicialitzar() {
           nom: nom,
           estat_fisic: '',
           estat_emocional: 'neutre',
+          indumentaria_actual: '',
+          objectes_inventari: [],
+          objectes_descartats: [],
           ubicacio: '',
           objectius: [],
           secrets: [],
@@ -6086,18 +6553,23 @@ function nkgInicialitzar() {
   console.log('NKG inicialitzat:', Object.keys(nkg.personatges).length, 'personatges,', Object.keys(nkg.llocs).length, 'llocs');
 }
 
+
 function nkgAplicarActualitzacions(dades, capitol, escena) {
   const nkg = ESTAT._nkg;
   if (!nkg) return;
 
-  if (dades.personatges_actualitzats) {
-    dades.personatges_actualitzats.forEach(p => {
+  const personatgesActualitzats = dades.personatges || dades.personatges_actualitzats || [];
+  if (personatgesActualitzats.length > 0) {
+    personatgesActualitzats.forEach(p => {
       const clau = nkgNormalitzarNom(p.nom);
       if (!nkg.personatges[clau]) {
         nkg.personatges[clau] = {
           nom: p.nom,
           estat_fisic: '',
           estat_emocional: p.estat_emocional || '',
+          indumentaria_actual: p.indumentaria_actual || '',
+          objectes_inventari: Array.isArray(p.objectes_inventari) ? p.objectes_inventari : [],
+          objectes_descartats: Array.isArray(p.objectes_descartats) ? p.objectes_descartats : [],
           ubicacio: p.ubicacio || '',
           objectius: p.nous_objectius || [],
           secrets: p.nous_secrets || [],
@@ -6107,6 +6579,14 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
       } else {
         const ex = nkg.personatges[clau];
         if (p.estat_emocional) ex.estat_emocional = p.estat_emocional;
+        if (p.estat_fisic) ex.estat_fisic = p.estat_fisic;
+        if (p.indumentaria_actual) ex.indumentaria_actual = p.indumentaria_actual;
+        if (Array.isArray(p.objectes_inventari)) ex.objectes_inventari = p.objectes_inventari;
+        if (Array.isArray(p.objectes_descartats) && p.objectes_descartats.length > 0) {
+          if (!Array.isArray(ex.objectes_descartats)) ex.objectes_descartats = [];
+          ex.objectes_descartats = ex.objectes_descartats.concat(p.objectes_descartats);
+          if (ex.objectes_descartats.length > 20) ex.objectes_descartats = ex.objectes_descartats.slice(-20);
+        }
         if (p.ubicacio) ex.ubicacio = p.ubicacio;
         if (p.viu !== undefined) ex.viu = p.viu;
         if (p.nous_objectius) {
@@ -6177,7 +6657,7 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
       capitol: capitol,
       escena: escena,
       descripcio: dades.resum_esdeveniment,
-      personatges_involucrats: (dades.personatges_actualitzats || []).map(p => p.nom),
+      personatges_involucrats: personatgesActualitzats.map(p => p.nom),
       consequencies: []
     });
     if (nkg.esdeveniments.length > 30) nkg.esdeveniments = nkg.esdeveniments.slice(-30);
@@ -6186,11 +6666,19 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
   nkg.ultima_actualitzacio = { capitol, escena };
 }
 
+
 async function nkgActualitzarPostEscena(textEscena, capitol, escena, userConfig) {
   const nkg = ESTAT._nkg;
   if (!nkg) return;
 
   const persConeguts = Object.values(nkg.personatges).map(p => p.nom).join(', ');
+  const estatPersistent = Object.values(nkg.personatges).map(p => {
+    const inv = Array.isArray(p.objectes_inventari) && p.objectes_inventari.length > 0 ? p.objectes_inventari.join(', ') : '(buit)';
+    const desc = Array.isArray(p.objectes_descartats) && p.objectes_descartats.length > 0
+      ? p.objectes_descartats.slice(-3).map(o => `${o.objecte || '?'}@${o.ubicacio || '?'}`).join(' | ')
+      : '(cap)';
+    return `- ${p.nom}: emoció=${p.estat_emocional || 'neutre'} | roba=${p.indumentaria_actual || '(sense dades)'} | inventari=${inv} | descartats=${desc}`;
+  }).join('\n');
 
   const msgs = [{
     role: 'user',
@@ -6198,48 +6686,30 @@ async function nkgActualitzarPostEscena(textEscena, capitol, escena, userConfig)
 
 PERSONATGES CONEGUTS: ${persConeguts || '(cap encara)'}
 
+ESTAT PERSISTENT ABANS D'AQUESTA ESCENA (usa'l per mantenir continuïtat):
+${estatPersistent || '(sense estat persistent previ)'}
+
+IMPORTANT: Per omplir aquest JSON, has de llegir el text de la nova escena i tenir en compte l'inventari i la vestimenta que ja tenien els personatges prèviament. Si un personatge tenia una 'Pistola' a l'inventari i en aquest capítol no la fa servir ni la llença, la 'Pistola' HA DE CONTINUAR dins del seu array \`objectes_inventari\`. Només has de modificar la vestimenta, l'inventari o l'emoció si els esdeveniments d'aquest capítol ho justifiquen explícitament (per exemple, si el personatge es canvia de roba, perd un objecte, pateix un accident o rep una mala notícia que n'alteri l'estat d'ànim).
+
 TEXT:
 ${textEscena.substring(0, 3000)}${textEscena.length > 3000 ? '\n[…text truncat…]' : ''}
 
 Retorna EXCLUSIVAMENT un JSON vàlid:
 {
-  "personatges_actualitzats": [
+  "personatges": [
     {
-      "nom": "Nom Exacte",
-      "estat_emocional": "descripció breu del seu estat emocional al FINAL del fragment",
-      "ubicacio": "on és al final",
-      "nous_objectius": ["objectiu nou si n'hi ha"],
-      "nous_secrets": ["secret revelat o adquirit"],
-      "viu": true
+      "nom": "Nom del personatge",
+      "estat_emocional": "Descripció concisa del seu estat d'ànim a l'acabar l'escena.",
+      "indumentaria_actual": "Què porta posat i en quin estat es troba (ex: 'Abric negre mullat, camisa arrugada').",
+      "objectes_inventari": ["Pistola carregada", "Claus del cotxe", "Carta arrugada"],
+      "objectes_descartats": [
+        {
+          "objecte": "Ganivet",
+          "ubicacio": "A terra, sota la taula de la cuina"
+        }
+      ]
     }
-  ],
-  "nous_llocs": [
-    {
-      "nom": "Nom del lloc",
-      "descripcio_sensorial": "descripció amb detalls de sentits",
-      "ambient": "atmosfera"
-    }
-  ],
-  "nous_objectes": [
-    {
-      "nom": "Nom objecte",
-      "ubicacio": "on és",
-      "posseidor": null,
-      "significat_simbolic": "significat narratiu si en té"
-    }
-  ],
-  "canvis_relacions": [
-    {
-      "personatge_a": "Nom",
-      "personatge_b": "Nom",
-      "tipus": "tipus de relació",
-      "confianca": 7,
-      "tensio": 3,
-      "nota": "breu descripció del canvi"
-    }
-  ],
-  "nous_fets_canonics": ["fet immutable establert en aquest fragment"],
-  "resum_esdeveniment": "1-2 frases: què ha passat en aquest fragment"
+  ]
 }`
   }];
 
@@ -6247,17 +6717,18 @@ Retorna EXCLUSIVAMENT un JSON vàlid:
   try {
     const response = await callLLMMulti(
       msgs,
-      'Ets un analista narratiu. Extreu NOMÉS informació explícita del text, no infereixis. Respon EXCLUSIVAMENT amb JSON vàlid.',
+      'Ets un analista narratiu. Extreu NOMÉS informació explícita del text, no infereixis. IMPORTANT: Per omplir el JSON, conserva inventari i vestimenta prèvia dels personatges i només canvia aquests camps si el text ho justifica explícitament. Respon EXCLUSIVAMENT amb JSON vàlid.',
       Object.assign({}, userConfig, { maxTokens: 2000, model: models.modelDraft, _esDraft: true }),
       'generacio'
     );
     const dades = parseJsonRobust(response);
     if (dades) nkgAplicarActualitzacions(dades, capitol, escena);
-    else console.warn('NKG: No s\'ha pogut parsejar la resposta d\'actualització');
+    else console.warn("NKG: No s'ha pogut parsejar la resposta d'actualització");
   } catch (err) {
     console.warn('NKG: Error actualitzant post-escena:', err.message);
   }
 }
+
 
 async function generarResumCompacte(finsCapitol, userConfig) {
   const nkg = ESTAT._nkg;
@@ -6348,9 +6819,20 @@ async function escriureEscenaDualPass(capitol, escenaIdx, escenaSpec, userConfig
     ? generarInstruccionsGanxoFinalCapitol(capitol - 1)
     : '';
 
+  const escenaAnterior = escenaIdx > 0 && escaletaCap && Array.isArray(escaletaCap.escenes)
+    ? escaletaCap.escenes[escenaIdx - 1]
+    : null;
+  const textEscenaAnterior = (ESTAT._escenes_generades && ESTAT._escenes_generades[idx])
+    ? ESTAT._escenes_generades[idx][escenaIdx - 1]
+    : '';
+  const textEnllac = obtenirTextEnllac(textEscenaAnterior);
+  const tipusTransicio = determinarTipusTransicio(escenaAnterior, escenaSpec);
+  const instruccionsTransicio = buildInstruccionsTransicio(textEnllac, tipusTransicio);
+
   // Instruccions de ritme
   const tensio = (ESTAT._corbaTensio || []).find(t => t.capitol === capitol);
-  const instruccionsRitme = tensio ? getInstruccionsRitme(tensio.nivell, tensio.tipus) : 'moderat';
+  const nivellTensio = tensio ? Number(tensio.nivell) : 5;
+  const instruccionsRitme = obtenirInstruccionsDeTensio(nivellTensio);
 
   // ── PAS 1: DRAFT NARRATIU ──
   const promptDraft = [{
@@ -6359,6 +6841,7 @@ async function escriureEscenaDualPass(capitol, escenaIdx, escenaSpec, userConfig
 
 ${contextNKG}${contextCapitolEnCurs}
 
+${instruccionsTransicio}
 INSTRUCCIONS DE DRAFT:
 - Continuïtat estricta amb les escenes anteriors del mateix capítol
 - PROHIBIT repetir literalment escenes, diàlegs o descripcions ja escrites
@@ -6433,12 +6916,26 @@ Reescriu el draft corregint NOMÉS els errors indicats. Manté la mateixa estruc
 
   let instruccionsBeat = '';
   const beat = (escenaSpec.beat_narratiu || escenaSpec.funcio_narrativa || '').toLowerCase();
+
+  // Recuperem el nivell de tensió de l'obra per a l'escena actual
+  const tensioObj = (ESTAT._corbaTensio || []).find(t => t.capitol === capitol);
+  const tensioNivell = tensioObj ? tensioObj.nivell : 5;
+  const conf = ESTAT.configProjecte || { genere: '', autor_referencia: '', focus_climax: '' };
+
   if (beat.includes('diàleg') || beat.includes('dialog')) {
-    instruccionsBeat = 'Mínim 60% diàleg directe. Cada personatge ha de sonar diferent. Acotacions mínimes.';
+    instruccionsBeat = "Mínim 70% diàleg directe. Els personatges han de parlar, interrompre's i reaccionar en temps real. Cada personatge ha de sonar diferent. Acotacions mínimes i zero resums de conversa.";
+  } else if (beat.includes('introspecció') || beat.includes('introspeccio') || beat.includes('decisió')) {
+    // LLÒGICA DINÀMICA DE PACING DEL CLÍMAX
+    if (tensioNivell >= 8) {
+      instruccionsBeat = `MOMENT DE DECISIÓ CLIMÀTICA. Atura el temps narratiu i NO acceleris el tempo emocional.
+      Respecta l'estil de l'obra (Gènere: ${conf.genere} / Autor: ${conf.autor_referencia}).
+      El personatge lluita amb la seva resistència interna. Mostra el pes del seu COST ACUMULAT (físic o emocional) abans de prendre la decisió.
+      Enfoca't en detalls minúsculs coherents amb: ${conf.focus_climax}.`;
+    } else {
+      instruccionsBeat = 'Ritme pausat. Pensaments del personatge. Reflexions internes.';
+    }
   } else if (beat.includes('acció') || beat.includes('accio')) {
     instruccionsBeat = 'Frases curtes i directes. Ritme trepidant. Verbs d\'acció. Poc diàleg.';
-  } else if (beat.includes('introspecció') || beat.includes('introspeccio')) {
-    instruccionsBeat = 'Ritme pausat. Pensaments del personatge. Reflexions internes.';
   } else if (beat.includes('descripció') || beat.includes('descripcio')) {
     instruccionsBeat = 'Detalls sensorials: olors, sons, textures, llum. El lloc cobra vida.';
   }
@@ -6461,9 +6958,7 @@ Reescriu el draft corregint NOMÉS els errors indicats. Manté la mateixa estruc
     if (linies.length > 0) manualRef = '\nMANUAL D\'ESTIL:\n' + linies.join('\n');
   }
 
-  const promptExpansio = [{
-    role: 'user',
-    content: `EXPANSIÓ LITERÀRIA — Capítol ${capitol}, Escena ${escenaIdx + 1}
+  const promptExpansio = `EXPANSIÓ LITERÀRIA — Capítol ${capitol}, Escena ${escenaIdx + 1}
 
 DRAFT (esquelet narratiu — manté l'estructura i els beats):
 ${draft}
@@ -6471,23 +6966,33 @@ ${contextCapitolEnCurs}
 ${goldenRef}
 ${estilsPresents}${manualRef}
 
+${instruccionsTransicio}
 INSTRUCCIONS D'EXPANSIÓ:
 - Expandeix el draft a prosa literària completa: ${escenaSpec.paraules_objectiu || 500}-${(escenaSpec.paraules_objectiu || 500) + 150} paraules
 - El draft és l'esquelet; tu poses la carn, la pell i la sang
 - Afegeix: detalls sensorials (mínim 2 sentits per escena), subtexte als diàlegs, ritme de la prosa
 - Evita sobrecarregar d'adjectius: tria noms i verbs concrets abans que ornaments
 - Evita mots infreqüents o artificiosos en la parla quotidiana; usa català natural i creïble
+- ${obtenirInstruccionsDeTensio(tensioNivell)}
 - ${instruccionsBeat || 'Equilibra narració, diàleg i descripció'}
+- PROHIBIT RESUMIR: No resumeixis l'acció, el pas del temps ni les converses. Mostra l'acció en temps real, segon a segon. Escriu els diàlegs complets amb interrupcions, silencis, llenguatge corporal i micro-expressions.
+- INTEGRACIÓ DE L'ENTORN: Utilitza les dades del context (clima, objectes de l'inventari, detalls de la localització) de manera activa. Els personatges han d'interactuar físicament amb l'entorn abans o durant les converses per alentir el ritme i donar volum i realisme al text.
+- Mostra les interaccions en temps real. Assegura't que almenys el 40% del text de l'escena sigui diàleg directe amb intercanvis ràpids i incisius.
 - Mostra, no expliquis: NO escriguis "estava trist" → mostra-ho amb gestos, paraules, mirada
+- FUNCIÓ D'INSINUACIÓ (ANTI-EXPOSICIÓ): PROHIBIT explicar directament mecanismes tècnics (cripto, fluxos, arquitectura interna). Mostra la conseqüència, no el mecanisme.
+- Respecta escrupolosament els salts de línia en els diàlegs: un paràgraf nou per a cada personatge que parla.
 - No repeteixis informació, accions ni frases de les escenes anteriors del mateix capítol; avança sempre
 - Comença directament amb la narració, sense titular${instruccionsVariancia ? '\n- VARIÀNCIA: ' + instruccionsVariancia : ''}
-- ${instruccionsFinalCapitol || 'Mantén la progressió narrativa de l\'escena.'}
-- Escriu en català`
-  }];
+- ${instruccionsFinalCapitol || "Mantén la progressió narrativa de l'escena."}
+- Escriu en català`;
 
   try {
-    const textFinal = await callLLMWithContinuation(promptExpansio, systemPrompt,
-      Object.assign({}, userConfig, { maxTokens: 3000, model: models.modelGeneracio }), 'generacio');
+    const textFinal = await generarIValidarEscena(
+      promptExpansio,
+      systemPrompt,
+      Object.assign({}, userConfig, { model: models.modelGeneracio }),
+      { intentsMaxims: 2, maxTokens: 3000 }
+    );
 
     if (!ESTAT._escenes_generades) ESTAT._escenes_generades = {};
     if (!ESTAT._escenes_generades[idx]) ESTAT._escenes_generades[idx] = {};
@@ -6554,7 +7059,7 @@ INSTRUCCIONS ESTRICTES:
 - Respecta personatges, continuïtat factual i estat del NKG
 - No repeteixis informació, accions ni frases
 - Mantén català natural i consistent
-- Objectiu aproximat de longitud: ${Math.round(paraulesTotal * 0.9)}-${Math.round(paraulesTotal * 1.1)} paraules
+- LONGITUD OBLIGATÒRIA: Aquest text ha de tenir entre 600 i 700 paraules. Presa't el teu temps per desenvolupar l'escena amb el ritme adequat. Utilitza descripcions sensorials riques, un diàleg ben construït i accions físiques per expandir el text. NO precipitis el final ni resumeixis els esdeveniments per acabar ràpid. Desenvolupa la prosa de manera literària fins a assolir aquesta extensió de paraules.
 - ${instruccionsFinalCapitol}`
     }];
 
@@ -6747,9 +7252,10 @@ Retorna EXCLUSIVAMENT JSON (sense cap altre text) amb el format:
 }`;
 
   const prompt = [{ role: 'user', content: promptBase }];
+  const models = getModelConfig(userConfig);
 
   const res = await callLLMMulti(prompt, 'Ets un crític literari expert en anàlisi estilística. Analitza amb precisió quirúrgica.',
-    Object.assign({}, userConfig, { maxTokens: 1500 }), 'arquitectura');
+    Object.assign({}, userConfig, { maxTokens: 2500, model: models.modelArquitecte }), 'arquitectura');
 
   let manual = parseJsonRobust(res) || parseManualEstilFallback(res);
   if (!manualEstilMassaCurt(manual)) return manual;
@@ -6960,6 +7466,9 @@ function generarInstruccionsVariancia(metriques) {
   if (metriques.adverbisPerfrase > 0.5) {
     instruccions.push('substitueix adverbis en -ment per verbs més precisos');
   }
+  if (metriques.cv < 0.2 && metriques.ratioConsecutives > 0.65 && metriques.ratioDialeg < 0.7) {
+    instruccions.push("to quirúrgic detectat: trenca la monotonia amb diàlegs fragmentats, interrupcions i un paràgraf d'introspecció emocional pura que mostri vulnerabilitat sense explicar-la");
+  }
 
   return instruccions.join('; ');
 }
@@ -7007,7 +7516,7 @@ async function microReescripturaBlocOpus(blocIniciIdx, blocFinalIdx, userConfig)
 
   const promptDiagnosi = [{
     role: 'user',
-    content: `Analitza els capítols i identifica exactament 3-5 passatges febles (telling, clixés, prosa plana, diàleg genèric).
+    content: `Analitza els capítols i identifica exactament 3-5 passatges febles (telling, clixés, prosa plana, diàleg genèric) o ERRORS DE FORMAT (com ara solapament de diàlegs de diferents personatges en un mateix paràgraf).
 
 ${textsPerDiagnosi}
 
@@ -7029,7 +7538,7 @@ Retorna EXCLUSIVAMENT JSON:
   try {
     const res = await callLLMMulti(promptDiagnosi,
       'Ets un editor literari professional. Sigues precís i exigent. Respon EXCLUSIVAMENT amb JSON vàlid.',
-      Object.assign({}, userConfig, { maxTokens: 1200, model: models.modelArquitecte }), 'arquitectura');
+      Object.assign({}, userConfig, { maxTokens: 1500, model: models.modelArquitecte }), 'arquitectura');
     diagnosi = parseJsonRobust(res);
   } catch (err) {
     console.warn('Micro-reescriptura: diagnosi fallida:', err.message);
@@ -7060,7 +7569,7 @@ Retorna NOMÉS el text reescrit, sense cap explicació ni metadades.`
     try {
       const reescrit = await callLLMMulti(promptReescriptura,
         'Ets un escriptor literari expert en revisió de prosa. Reescriu amb precisió quirúrgica.',
-        Object.assign({}, userConfig, { maxTokens: 600, model: models.modelGeneracio }), 'generacio');
+        Object.assign({}, userConfig, { maxTokens: 1500, model: models.modelGeneracio }), 'generacio');
 
       if (reescrit && reescrit.length > 50) {
         const capActual = ESTAT._capitols_generats[capIdx];
