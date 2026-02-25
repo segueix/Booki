@@ -6133,6 +6133,8 @@ function nkgQueryEscenaContext(escenaSpec) {
       if (p) {
         let desc = `• ${p.nom}: ${p.estat_emocional || 'neutre'}`;
         if (p.estat_fisic) desc += ` | Físic: ${p.estat_fisic}`;
+        if (p.indumentaria_actual) desc += ` | Roba: ${p.indumentaria_actual}`;
+        if (p.objectes_inventari && p.objectes_inventari.length > 0) desc += ` | Inventari: ${p.objectes_inventari.join(', ')}`;
         if (p.ubicacio) desc += ` | A: ${p.ubicacio}`;
         if (p.objectius && p.objectius.length > 0) desc += ` | Vol: ${p.objectius[0]}`;
         if (p.secrets && p.secrets.length > 0) desc += ` | Amaga: ${p.secrets[0]}`;
@@ -6305,6 +6307,9 @@ function nkgInicialitzar() {
           nom: nom,
           estat_fisic: '',
           estat_emocional: 'neutre',
+          indumentaria_actual: '',
+          objectes_inventari: [],
+          objectes_descartats: [],
           ubicacio: '',
           objectius: [],
           secrets: [],
@@ -6343,18 +6348,23 @@ function nkgInicialitzar() {
   console.log('NKG inicialitzat:', Object.keys(nkg.personatges).length, 'personatges,', Object.keys(nkg.llocs).length, 'llocs');
 }
 
+
 function nkgAplicarActualitzacions(dades, capitol, escena) {
   const nkg = ESTAT._nkg;
   if (!nkg) return;
 
-  if (dades.personatges_actualitzats) {
-    dades.personatges_actualitzats.forEach(p => {
+  const personatgesActualitzats = dades.personatges || dades.personatges_actualitzats || [];
+  if (personatgesActualitzats.length > 0) {
+    personatgesActualitzats.forEach(p => {
       const clau = nkgNormalitzarNom(p.nom);
       if (!nkg.personatges[clau]) {
         nkg.personatges[clau] = {
           nom: p.nom,
           estat_fisic: '',
           estat_emocional: p.estat_emocional || '',
+          indumentaria_actual: p.indumentaria_actual || '',
+          objectes_inventari: Array.isArray(p.objectes_inventari) ? p.objectes_inventari : [],
+          objectes_descartats: Array.isArray(p.objectes_descartats) ? p.objectes_descartats : [],
           ubicacio: p.ubicacio || '',
           objectius: p.nous_objectius || [],
           secrets: p.nous_secrets || [],
@@ -6365,6 +6375,13 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
         const ex = nkg.personatges[clau];
         if (p.estat_emocional) ex.estat_emocional = p.estat_emocional;
         if (p.estat_fisic) ex.estat_fisic = p.estat_fisic;
+        if (p.indumentaria_actual) ex.indumentaria_actual = p.indumentaria_actual;
+        if (Array.isArray(p.objectes_inventari)) ex.objectes_inventari = p.objectes_inventari;
+        if (Array.isArray(p.objectes_descartats) && p.objectes_descartats.length > 0) {
+          if (!Array.isArray(ex.objectes_descartats)) ex.objectes_descartats = [];
+          ex.objectes_descartats = ex.objectes_descartats.concat(p.objectes_descartats);
+          if (ex.objectes_descartats.length > 20) ex.objectes_descartats = ex.objectes_descartats.slice(-20);
+        }
         if (p.ubicacio) ex.ubicacio = p.ubicacio;
         if (p.viu !== undefined) ex.viu = p.viu;
         if (p.nous_objectius) {
@@ -6435,7 +6452,7 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
       capitol: capitol,
       escena: escena,
       descripcio: dades.resum_esdeveniment,
-      personatges_involucrats: (dades.personatges_actualitzats || []).map(p => p.nom),
+      personatges_involucrats: personatgesActualitzats.map(p => p.nom),
       consequencies: []
     });
     if (nkg.esdeveniments.length > 30) nkg.esdeveniments = nkg.esdeveniments.slice(-30);
@@ -6444,11 +6461,19 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
   nkg.ultima_actualitzacio = { capitol, escena };
 }
 
+
 async function nkgActualitzarPostEscena(textEscena, capitol, escena, userConfig) {
   const nkg = ESTAT._nkg;
   if (!nkg) return;
 
   const persConeguts = Object.values(nkg.personatges).map(p => p.nom).join(', ');
+  const estatPersistent = Object.values(nkg.personatges).map(p => {
+    const inv = Array.isArray(p.objectes_inventari) && p.objectes_inventari.length > 0 ? p.objectes_inventari.join(', ') : '(buit)';
+    const desc = Array.isArray(p.objectes_descartats) && p.objectes_descartats.length > 0
+      ? p.objectes_descartats.slice(-3).map(o => `${o.objecte || '?'}@${o.ubicacio || '?'}`).join(' | ')
+      : '(cap)';
+    return `- ${p.nom}: emoció=${p.estat_emocional || 'neutre'} | roba=${p.indumentaria_actual || '(sense dades)'} | inventari=${inv} | descartats=${desc}`;
+  }).join('\n');
 
   const msgs = [{
     role: 'user',
@@ -6456,49 +6481,30 @@ async function nkgActualitzarPostEscena(textEscena, capitol, escena, userConfig)
 
 PERSONATGES CONEGUTS: ${persConeguts || '(cap encara)'}
 
+ESTAT PERSISTENT ABANS D'AQUESTA ESCENA (usa'l per mantenir continuïtat):
+${estatPersistent || '(sense estat persistent previ)'}
+
+IMPORTANT: Per omplir aquest JSON, has de llegir el text de la nova escena i tenir en compte l'inventari i la vestimenta que ja tenien els personatges prèviament. Si un personatge tenia una 'Pistola' a l'inventari i en aquest capítol no la fa servir ni la llença, la 'Pistola' HA DE CONTINUAR dins del seu array \`objectes_inventari\`. Només has de modificar la vestimenta, l'inventari o l'emoció si els esdeveniments d'aquest capítol ho justifiquen explícitament (per exemple, si el personatge es canvia de roba, perd un objecte, pateix un accident o rep una mala notícia que n'alteri l'estat d'ànim).
+
 TEXT:
 ${textEscena.substring(0, 3000)}${textEscena.length > 3000 ? '\n[…text truncat…]' : ''}
 
 Retorna EXCLUSIVAMENT un JSON vàlid:
 {
-  "personatges_actualitzats": [
+  "personatges": [
     {
-      "nom": "Nom Exacte",
-      "estat_fisic": "grau de fatiga, ferides, esgotament o dolor al final",
-      "estat_emocional": "descripció breu del seu estat emocional al FINAL del fragment",
-      "ubicacio": "on és al final",
-      "nous_objectius": ["objectiu nou si n'hi ha"],
-      "nous_secrets": ["secret revelat o adquirit"],
-      "viu": true
+      "nom": "Nom del personatge",
+      "estat_emocional": "Descripció concisa del seu estat d'ànim a l'acabar l'escena.",
+      "indumentaria_actual": "Què porta posat i en quin estat es troba (ex: 'Abric negre mullat, camisa arrugada').",
+      "objectes_inventari": ["Pistola carregada", "Claus del cotxe", "Carta arrugada"],
+      "objectes_descartats": [
+        {
+          "objecte": "Ganivet",
+          "ubicacio": "A terra, sota la taula de la cuina"
+        }
+      ]
     }
-  ],
-  "nous_llocs": [
-    {
-      "nom": "Nom del lloc",
-      "descripcio_sensorial": "descripció amb detalls de sentits",
-      "ambient": "atmosfera"
-    }
-  ],
-  "nous_objectes": [
-    {
-      "nom": "Nom objecte",
-      "ubicacio": "on és",
-      "posseidor": null,
-      "significat_simbolic": "significat narratiu si en té"
-    }
-  ],
-  "canvis_relacions": [
-    {
-      "personatge_a": "Nom",
-      "personatge_b": "Nom",
-      "tipus": "tipus de relació",
-      "confianca": 7,
-      "tensio": 3,
-      "nota": "breu descripció del canvi"
-    }
-  ],
-  "nous_fets_canonics": ["fet immutable establert en aquest fragment"],
-  "resum_esdeveniment": "1-2 frases: què ha passat en aquest fragment"
+  ]
 }`
   }];
 
@@ -6506,17 +6512,18 @@ Retorna EXCLUSIVAMENT un JSON vàlid:
   try {
     const response = await callLLMMulti(
       msgs,
-      'Ets un analista narratiu. Extreu NOMÉS informació explícita del text, no infereixis. Respon EXCLUSIVAMENT amb JSON vàlid.',
+      'Ets un analista narratiu. Extreu NOMÉS informació explícita del text, no infereixis. IMPORTANT: Per omplir el JSON, conserva inventari i vestimenta prèvia dels personatges i només canvia aquests camps si el text ho justifica explícitament. Respon EXCLUSIVAMENT amb JSON vàlid.',
       Object.assign({}, userConfig, { maxTokens: 2000, model: models.modelDraft, _esDraft: true }),
       'generacio'
     );
     const dades = parseJsonRobust(response);
     if (dades) nkgAplicarActualitzacions(dades, capitol, escena);
-    else console.warn('NKG: No s\'ha pogut parsejar la resposta d\'actualització');
+    else console.warn("NKG: No s'ha pogut parsejar la resposta d'actualització");
   } catch (err) {
     console.warn('NKG: Error actualitzant post-escena:', err.message);
   }
 }
+
 
 async function generarResumCompacte(finsCapitol, userConfig) {
   const nkg = ESTAT._nkg;
