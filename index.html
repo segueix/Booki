@@ -2314,6 +2314,16 @@ async function iniciarFaseEscaleta() {
     hideLoader('10-5');
     mostrarEscaleta(totsResultats);
     document.getElementById('btn-fase11').classList.remove('hidden');
+
+    if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
+      document.getElementById('btn-fase11').classList.add('hidden');
+      showLoader('10-5');
+      document.getElementById('loader-10-5-text').textContent = '🔵 Escaleta completada. Iniciant escriptura autònoma en 3 segons...';
+      setTimeout(() => {
+        hideLoader('10-5');
+        iniciarFase11();
+      }, 3000);
+    }
   } catch (e) {
     hideLoader('10-5');
     toast('Error generant escaleta: ' + e.message);
@@ -2395,7 +2405,7 @@ function actualitzarEstatCapitol(idx, estat) {
   el.querySelector('.capitol-num').textContent = estat === 'fet' ? '✓' : estat === 'actiu' ? '✍️' : '○';
 }
 
-async function generarCapitol(idx) {
+async function generarCapitol(idx, intents = 0) {
   if (idx >= ESTAT._estructuraCapitols.length) {
     document.getElementById('btn-control-arcs-wrap').classList.remove('hidden');
     await executarLoopCoherenciaFinal(USER_CONFIG);
@@ -2446,6 +2456,12 @@ async function generarCapitol(idx) {
 
     mostrarAccionsCapitol(idx, res.response);
   } catch (err) {
+    if (USER_CONFIG && USER_CONFIG.fluxAutomatic && intents < 3) {
+      document.getElementById('loader-11-text').textContent = `⚠️ Error detectat. Reintentant capítol en 5 segons (Intent ${intents + 1}/3)...`;
+      setTimeout(() => generarCapitol(idx, intents + 1), 5000);
+      return;
+    }
+
     hideLoader(11);
     toast('Error Sonnet: ' + err.message);
   }
@@ -2631,7 +2647,7 @@ function mostrarAccionsCapitolSimple(idx, isLast) {
   actualitzarEstatCapitol(idx, 'fet');
 }
 
-async function reescriureCapitol(idx) {
+async function reescriureCapitol(idx, intents = 0) {
   const instruccions = ESTAT._revisioInstruccions[idx] || '';
   document.getElementById('capitol-actual-wrap').classList.add('hidden');
   document.getElementById('revisio-panel').classList.add('hidden');
@@ -2647,8 +2663,22 @@ async function reescriureCapitol(idx) {
     mostrarAccionsCapitolSimple(idx, isLast);
     toast('Capítol reescrit.');
   } catch (err) {
+    if (USER_CONFIG && USER_CONFIG.fluxAutomatic && intents < 3) {
+      document.getElementById('loader-11-text').textContent = `⚠️ Error detectat. Reintentant capítol en 5 segons (Intent ${intents + 1}/3)...`;
+      setTimeout(() => reescriureCapitol(idx, intents + 1), 5000);
+      return;
+    }
+
     hideLoader(11);
     document.getElementById('capitol-actual-wrap').classList.remove('hidden');
+
+    if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
+      const isLast = idx >= ESTAT._estructuraCapitols.length - 1;
+      mostrarAccionsCapitolSimple(idx, isLast);
+      toast("Error Sonnet (reescriptura): s'han exhaurit els reintents. Continuant flux automàtic.");
+      return;
+    }
+
     toast('Error Sonnet: ' + err.message);
   }
 }
