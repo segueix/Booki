@@ -4750,6 +4750,12 @@ function buildSystemPromptCapitol() {
       if (m.vocabulari) linies.push(`• Vocabulari: ${m.vocabulari}`);
       if (linies.length > 0) parts.push('\nMANUAL D\'ESTIL DE REFERÈNCIA:\n' + linies.join('\n'));
     }
+    const tensioActiva = (ESTAT._corbaTensio || []).find(t => t.capitol === (Number(ESTAT._capitolActual || 0) + 1));
+    if (tensioActiva && Number(tensioActiva.nivell) > 7) {
+      parts.push("\nCONTROL DE CONTRAST SENSORIAL (NKG>7): Trenca qualsevol fredor comptable amb detalls viscerals o orgànics (olors, suor, brutícia, reaccions físiques involuntàries). Quan la tensió és alta, aquests detalls són OBLIGATORIS i han d'entrar dins l'acció.");
+    } else {
+      parts.push('\nCONTROL DE CONTRAST SENSORIAL: Evita la prosa asèptica. Integra textura física i sensorial (cos, entorn, fricció material) per humanitzar la tensió.');
+    }
     parts.push("\nREGLA D'ESTIL OBLIGATÒRIA (SHOW, DON'T TELL): Tens totalment prohibit utilitzar etiquetes emocionals explícites per descriure com se sent un personatge (ex: prohibit dir \"estava trist\", \"se sentia enfadat\", \"estava nerviós\"). En comptes d'això, has de MOSTRAR l'emoció a través d'accions físiques, interaccions amb objectes, vestimenta, llenguatge corporal o detalls de l'entorn.");
     parts.push("\nREGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que és el final del capítol, NO resolguis la situació ni facis que els personatges abandonin l'escenari al final del text. Deixa l'acció fluint, oberta o en suspens dramàtic, de manera que la següent generació pugui recollir el testimoni de forma natural.");
     return parts.join('\n');
@@ -6327,6 +6333,15 @@ function nkgQueryEscenaContext(escenaSpec) {
         if (p.objectes_inventari && p.objectes_inventari.length > 0) desc += ` | Inventari: ${p.objectes_inventari.join(', ')}`;
         if (p.ubicacio) desc += ` | A: ${p.ubicacio}`;
         if (p.objectius && p.objectius.length > 0) desc += ` | Vol: ${p.objectius[0]}`;
+        let passiuEmocional = p.passiu_emocional || '';
+        if (!passiuEmocional && Array.isArray(p.traumes) && p.traumes.length > 0) passiuEmocional = p.traumes[0];
+        if (!passiuEmocional && Array.isArray(p.pors) && p.pors.length > 0) passiuEmocional = p.pors[0];
+        if (!passiuEmocional && Array.isArray(p.deutes) && p.deutes.length > 0) passiuEmocional = p.deutes[0];
+        if (!passiuEmocional && ESTAT.bibliaNarrativa && Array.isArray(ESTAT.bibliaNarrativa.fitxes_personatges)) {
+          const fitxa = ESTAT.bibliaNarrativa.fitxes_personatges.find(f => nkgNormalitzarNom(f.nom || '') === nkgNormalitzarNom(nom));
+          if (fitxa) passiuEmocional = fitxa.secrets || fitxa.estat_actual || '';
+        }
+        if (passiuEmocional) desc += ` | Passiu emocional latent: ${passiuEmocional}`;
         if (p.secrets && p.secrets.length > 0) desc += ` | Amaga: ${p.secrets[0]}`;
         parts.push(desc);
 
@@ -6964,6 +6979,7 @@ INSTRUCCIONS D'EXPANSIÓ:
 - INTEGRACIÓ DE L'ENTORN: Utilitza les dades del context (clima, objectes de l'inventari, detalls de la localització) de manera activa. Els personatges han d'interactuar físicament amb l'entorn abans o durant les converses per alentir el ritme i donar volum i realisme al text.
 - Mostra les interaccions en temps real. Assegura't que almenys el 40% del text de l'escena sigui diàleg directe amb intercanvis ràpids i incisius.
 - Mostra, no expliquis: NO escriguis "estava trist" → mostra-ho amb gestos, paraules, mirada
+- FUNCIÓ D'INSINUACIÓ (ANTI-EXPOSICIÓ): PROHIBIT explicar directament mecanismes tècnics (cripto, fluxos, arquitectura interna). Mostra la conseqüència, no el mecanisme.
 - Respecta escrupolosament els salts de línia en els diàlegs: un paràgraf nou per a cada personatge que parla.
 - No repeteixis informació, accions ni frases de les escenes anteriors del mateix capítol; avança sempre
 - Comença directament amb la narració, sense titular${instruccionsVariancia ? '\n- VARIÀNCIA: ' + instruccionsVariancia : ''}
@@ -7449,6 +7465,9 @@ function generarInstruccionsVariancia(metriques) {
   }
   if (metriques.adverbisPerfrase > 0.5) {
     instruccions.push('substitueix adverbis en -ment per verbs més precisos');
+  }
+  if (metriques.cv < 0.2 && metriques.ratioConsecutives > 0.65 && metriques.ratioDialeg < 0.7) {
+    instruccions.push("to quirúrgic detectat: trenca la monotonia amb diàlegs fragmentats, interrupcions i un paràgraf d'introspecció emocional pura que mostri vulnerabilitat sense explicar-la");
   }
 
   return instruccions.join('; ');
