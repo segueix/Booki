@@ -4683,7 +4683,9 @@ ${world}
 ESTILS DE PARLA DELS PERSONATGES:
 ${veus}
 
-REGLA D'ESTIL OBLIGATÒRIA (SHOW, DON'T TELL): Tens totalment prohibit utilitzar etiquetes emocionals explícites per descriure com se sent un personatge (ex: prohibit dir \"estava trist\", \"se sentia enfadat\", \"estava nerviós\"). En comptes d'això, has de MOSTRAR l'emoció a través d'accions físiques, interaccions amb els objectes del seu inventari, la seva vestimenta, el llenguatge corporal o detalls de l'entorn (ex: \"jugava compulsivament amb el botó descosit de l'abric\", \"va prémer les claus fins que els artells se li van posar blancs\").`;
+REGLA D'ESTIL OBLIGATÒRIA (SHOW, DON'T TELL): Tens totalment prohibit utilitzar etiquetes emocionals explícites per descriure com se sent un personatge (ex: prohibit dir \"estava trist\", \"se sentia enfadat\", \"estava nerviós\"). En comptes d'això, has de MOSTRAR l'emoció a través d'accions físiques, interaccions amb els objectes del seu inventari, la seva vestimenta, el llenguatge corporal o detalls de l'entorn (ex: \"jugava compulsivament amb el botó descosit de l'abric\", \"va prémer les claus fins que els artells se li van posar blancs\").
+
+REGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que és el final del capítol, NO resolguis la situació ni facis que els personatges abandonin l'escenari al final del text. Deixa l'acció fluint, oberta o en suspens dramàtic, de manera que la següent generació pugui recollir el testimoni de forma natural.`;
 
   if (ESTAT._goldenPassage) {
     base += `\n\nREFERÈNCIA DE VEU:\nEl següent passatge exemplifica la veu i l'estil que ha de tenir la novel·la. Usa'l com a referència de qualitat:\n\n${ESTAT._goldenPassage}`;
@@ -4733,6 +4735,7 @@ function buildSystemPromptCapitol() {
       if (linies.length > 0) parts.push('\nMANUAL D\'ESTIL DE REFERÈNCIA:\n' + linies.join('\n'));
     }
     parts.push("\nREGLA D'ESTIL OBLIGATÒRIA (SHOW, DON'T TELL): Tens totalment prohibit utilitzar etiquetes emocionals explícites per descriure com se sent un personatge (ex: prohibit dir \"estava trist\", \"se sentia enfadat\", \"estava nerviós\"). En comptes d'això, has de MOSTRAR l'emoció a través d'accions físiques, interaccions amb objectes, vestimenta, llenguatge corporal o detalls de l'entorn.");
+    parts.push("\nREGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que és el final del capítol, NO resolguis la situació ni facis que els personatges abandonin l'escenari al final del text. Deixa l'acció fluint, oberta o en suspens dramàtic, de manera que la següent generació pugui recollir el testimoni de forma natural.");
     return parts.join('\n');
   }
   return buildSystemPromptCapitolLegacy();
@@ -4792,6 +4795,76 @@ function getInstruccionsRitme(nivell, tipus) {
   const base = obtenirInstruccionsDeTensio(nivell);
   return tipus ? `${base} Focus de corba: ${tipus}.` : base;
 }
+
+
+function obtenirTextEnllac(textEscenaAnterior) {
+  const raw = String(textEscenaAnterior || '').replace(/\r/g, '').trim();
+  if (!raw) return '';
+
+  // Neteja marcadors tècnics i línies de metadades que poden contaminar el punt d'enganx.
+  const net = raw
+    .replace(/\[\[ESCENA_\d+\]\]/g, '')
+    .split('\n')
+    .filter(l => !/^\s*(ESCENA\s+\d+|CAP[IÍ]TOL\s+\d+)\b/i.test(l.trim()))
+    .join('\n')
+    .trim();
+
+  if (!net) return '';
+
+  const paragrafs = net.split(/\n\s*\n+/).map(p => p.trim()).filter(Boolean);
+  if (paragrafs.length === 0) return '';
+
+  // Prioritza els darrers 2-3 paràgrafs; si són molt curts, completa fins ~1000 caràcters.
+  let text = paragrafs.slice(-3).join('\n\n').trim();
+  if (text.length < 600 && paragrafs.length > 3) {
+    text = paragrafs.slice(-4).join('\n\n').trim();
+  }
+
+  const maxChars = 1000;
+  if (text.length > maxChars) {
+    text = text.slice(-maxChars).trim();
+    const idx = text.indexOf('\n\n');
+    if (idx > 0 && idx < 250) text = text.slice(idx + 2).trim();
+  }
+
+  return text;
+}
+
+function determinarTipusTransicio(escenaAnterior, escenaActual) {
+  if (!escenaAnterior) return 'continuacio_directa';
+
+  const llocAnt = (escenaAnterior.lloc || escenaAnterior.localitzacio || '').trim().toLowerCase();
+  const llocAct = (escenaActual.lloc || escenaActual.localitzacio || '').trim().toLowerCase();
+  const canviLloc = llocAnt && llocAct && llocAnt !== llocAct;
+
+  const pistaSalt = `${escenaActual?.nom || ''} ${escenaActual?.funcio_narrativa || ''} ${escenaActual?.beat_narratiu || ''}`
+    .toLowerCase();
+  const teSaltTemporal = /(m[eé]s\s+tard|hores\s+despr[eé]s|l'?endem[aà]|dies\s+despr[eé]s|setmanes\s+despr[eé]s|mentrestant|temps\s+despr[eé]s|al\s+cap\s+de)/.test(pistaSalt);
+
+  if (canviLloc || teSaltTemporal) return 'salt_temporal';
+  return 'continuacio_directa';
+}
+
+
+function buildInstruccionsTransicio(textEnllac, tipusTransicio) {
+  if (!textEnllac) return '';
+
+  let instruccionsTransicio = `TEXT ANTERIOR (PUNT D'ENGANX): Així és com ha acabat l'escena just anterior:
+"${textEnllac}"
+
+`;
+
+  if (tipusTransicio === 'salt_temporal') {
+    instruccionsTransicio += `INSTRUCCIÓ DE TRANSICIÓ: Inicia aquesta escena fent una transició temporal o espacial elegant respecte al text anterior. Fes servir el primer paràgraf per situar el lector en el nou context sense fer un tall abrupte.
+`;
+  } else {
+    instruccionsTransicio += `INSTRUCCIÓ DE TRANSICIÓ: L'acció d'aquesta nova escena continua EXACTAMENT en el mateix lloc i segon on ho ha deixat el text anterior. El teu primer paràgraf ha de ser una continuació completament fluida i natural d'aquest punt d'enganx, mantenint la mateixa cadència literària. No facis introduccions, segueix l'acció.
+`;
+  }
+
+  return instruccionsTransicio;
+}
+
 
 // ═══════════════════════════════════════════════════════════
 //  FASE 5: Sistema de Prefiguració
@@ -6101,6 +6174,9 @@ async function escriureCapitolPerEscenes(idx, userConfig) {
     const esUltimaEscena = i === escenes.length - 1;
     const tensioEscena = (ESTAT._corbaTensio || []).find(t => t.capitol === idx + 1);
     const instruccioTensioEscena = obtenirInstruccionsDeTensio(tensioEscena ? tensioEscena.nivell : 5);
+    const textEnllac = i > 0 ? obtenirTextEnllac(textsEscenes[i - 1]) : '';
+    const tipusTransicio = i > 0 ? determinarTipusTransicio(escenes[i - 1], escena) : 'continuacio_directa';
+    const instruccionsTransicio = buildInstruccionsTransicio(textEnllac, tipusTransicio);
     const promptEscena = `${contextCapitol}
 
 ## ESCENA ACTUAL A ESCRIURE
@@ -6111,10 +6187,10 @@ Paraules objectiu: ${escena.paraules_objectiu || 400}
 ${escena.punt_inflexio ? '⚡ Aquesta escena conté un punt d\'inflexió important.' : ''}
 Ritme i tensió objectiu: ${instruccioTensioEscena}
 
-${i > 0 ? `TEXT DE L'ESCENA ANTERIOR:\n${textsEscenes[i-1].slice(-500)}\n\n` : ''}${esUltimaEscena ? `TANCAMENT DEL CAPÍTOL:
+${instruccionsTransicio}${esUltimaEscena ? `TANCAMENT DEL CAPÍTOL:
 ${instruccionsFinalCapitol}
 
-` : ''}Escriu ara aquesta escena en prosa literària completa, sense títols ni metadades. Aproximadament ${escena.paraules_objectiu || 400} paraules.`;
+` : ''}Escriu ara aquesta escena en prosa literària completa, sense títols ni metadades. Aproximadament ${escena.paraules_objectiu || 400} paraules.${!esUltimaEscena ? ' IMPORTANT: no tanquis la situació al final; deixa-la en continuïtat orgànica cap a la següent escena.' : ''}`;
     const res = await generarIValidarEscena(
       promptEscena,
       systemPrompt,
@@ -6693,6 +6769,16 @@ async function escriureEscenaDualPass(capitol, escenaIdx, escenaSpec, userConfig
     ? generarInstruccionsGanxoFinalCapitol(capitol - 1)
     : '';
 
+  const escenaAnterior = escenaIdx > 0 && escaletaCap && Array.isArray(escaletaCap.escenes)
+    ? escaletaCap.escenes[escenaIdx - 1]
+    : null;
+  const textEscenaAnterior = (ESTAT._escenes_generades && ESTAT._escenes_generades[idx])
+    ? ESTAT._escenes_generades[idx][escenaIdx - 1]
+    : '';
+  const textEnllac = obtenirTextEnllac(textEscenaAnterior);
+  const tipusTransicio = determinarTipusTransicio(escenaAnterior, escenaSpec);
+  const instruccionsTransicio = buildInstruccionsTransicio(textEnllac, tipusTransicio);
+
   // Instruccions de ritme
   const tensio = (ESTAT._corbaTensio || []).find(t => t.capitol === capitol);
   const nivellTensio = tensio ? Number(tensio.nivell) : 5;
@@ -6705,6 +6791,7 @@ async function escriureEscenaDualPass(capitol, escenaIdx, escenaSpec, userConfig
 
 ${contextNKG}${contextCapitolEnCurs}
 
+${instruccionsTransicio}
 INSTRUCCIONS DE DRAFT:
 - Continuïtat estricta amb les escenes anteriors del mateix capítol
 - PROHIBIT repetir literalment escenes, diàlegs o descripcions ja escrites
@@ -6829,6 +6916,7 @@ ${contextCapitolEnCurs}
 ${goldenRef}
 ${estilsPresents}${manualRef}
 
+${instruccionsTransicio}
 INSTRUCCIONS D'EXPANSIÓ:
 - Expandeix el draft a prosa literària completa: ${escenaSpec.paraules_objectiu || 500}-${(escenaSpec.paraules_objectiu || 500) + 150} paraules
 - El draft és l'esquelet; tu poses la carn, la pell i la sang
