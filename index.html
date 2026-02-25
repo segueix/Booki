@@ -2471,13 +2471,18 @@ async function generarCapitol(idx, intents = 0) {
     hideLoader(11);
     mostrarCapitol(idx, res.response);
 
-    // SISTEMA 1: actualitzar bíblia i registre (no bloquejants)
-    actualitzarBiblia(res.response, idx, USER_CONFIG).catch(err =>
-      console.warn('Bíblia async:', err.message)
-    );
-    actualitzarLlibreRegistreBackground(res.response, idx).catch(err =>
-      console.warn('Registre async:', err.message)
-    );
+    // SISTEMA 1: actualitzar bíblia i registre (en sèrie, amb tolerància a errors)
+    try {
+      await actualitzarBiblia(res.response, idx, USER_CONFIG);
+    } catch (err) {
+      console.warn('Bíblia async:', err.message);
+    }
+
+    try {
+      await actualitzarLlibreRegistreBackground(res.response, idx);
+    } catch (err) {
+      console.warn('Registre async:', err.message);
+    }
 
     // SISTEMA 4: checkpoint cada 3 capítols
     const esCheckpoint = (idx + 1) % 3 === 0 && idx + 1 < ESTAT._estructuraCapitols.length;
@@ -2640,11 +2645,11 @@ function mostrarRevisioCapitol(revisat, idx, isLast) {
   if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
     if (!ok && instruccions) {
       accions.innerHTML = `<span style="color:var(--text2);font-size:.85rem;">🔴 Opus demana correccions. Sonnet reescrivint automàticament...</span>`;
-      setTimeout(() => reescriureCapitol(idx), 1500); // Dona 1.5s per llegir el diagnòstic
+      setTimeout(() => reescriureCapitol(idx), 15000); // Dona 15s per recuperar quota abans de continuar
     } else {
       accions.innerHTML = `<span style="color:var(--success);font-size:.85rem;">✅ Capítol aprovat. Avançant automàticament...</span>`;
       if (!isLast) {
-        setTimeout(() => generarCapitol(idx + 1), 2000); // Dona 2s abans de saltar
+        setTimeout(() => generarCapitol(idx + 1), 15000); // Dona 15s abans de saltar
       } else {
         generarCapitol(ESTAT._estructuraCapitols.length);
       }
@@ -2719,7 +2724,7 @@ function mostrarAccionsCapitolSimple(idx, isLast) {
     // 🔴 CORRECCIÓ: Si és automàtic, no esperem el clic de l'usuari
     if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
       document.getElementById('capitol-accions').innerHTML = `<span style="color:var(--text2);font-size:.85rem;">Avançant automàticament al següent capítol...</span>`;
-      setTimeout(() => generarCapitol(idx + 1), 1500);
+      setTimeout(() => generarCapitol(idx + 1), 15000);
     } else {
       document.getElementById('capitol-accions').innerHTML =
         `<button class="btn btn-primary" onclick="generarCapitol(${idx + 1})">➡️ Capítol ${idx + 2}</button>`;
@@ -3421,13 +3426,13 @@ async function parseJsonResponse(rawResponse, providerName) {
 // ─── fetchSegur: fetch amb backoff exponencial ───────────────
 // Substitueix fetch() directe per a totes les crides LLM.
 // Reintenta automàticament si l'API retorna 429, 503 o 529.
-async function fetchSegur(url, options, maxIntents = 3) {
+async function fetchSegur(url, options, maxIntents = 4) {
   const RETRYABLE = new Set([429, 503, 529]);
   for (let intent = 0; intent < maxIntents; intent++) {
     const response = await fetch(url, options);
     if (!RETRYABLE.has(response.status)) return response;
     if (intent === maxIntents - 1) return response; // últim intent: retorna per deixar parseJsonResponse gestionar l'error
-    const delayMs = Math.pow(2, intent + 1) * 1000; // 2s → 4s → 8s
+    const delayMs = Math.pow(2, intent) * 10000; // 10s → 20s → 40s → 80s
     console.warn(`[fetchSegur] HTTP ${response.status} — reintent ${intent + 1}/${maxIntents - 1} en ${delayMs / 1000}s...`);
     await new Promise(resolve => setTimeout(resolve, delayMs));
   }
