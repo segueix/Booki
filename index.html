@@ -5328,8 +5328,7 @@ ${context}
 ${instruccionsVeu}
 
 INSTRUCCIONS D'ESCRIPTURA:
-- Longitud obligatòria del capítol: entre 2500 i 3000 caràcters (comptant espais).
-- L'últim caràcter del capítol ha de ser un punt final (.).
+- LONGITUD OBLIGATÒRIA: Aquest text ha de tenir entre 600 i 700 paraules. Presa't el teu temps per desenvolupar l'escena amb el ritme adequat. Utilitza descripcions sensorials riques, un diàleg ben construït i accions físiques per expandir el text. NO precipitis el final ni resumeixis els esdeveniments per acabar ràpid. Desenvolupa la prosa de manera literària fins a assolir aquesta extensió de paraules.
 - Desenvolupa les escenes a fons, utilitza diàleg ric i descripcions sensorials. NO resumeixis.
 - Comença directament amb la narració, sense titular el capítol
 - Si hi ha prefiguracions a plantar, integra-les de forma subtil i natural (el lector no ha de notar-les en primera lectura)
@@ -6091,7 +6090,7 @@ Retorna EXCLUSIVAMENT JSON vàlid:
 
 async function cridaAPI_GenerarText(promptEscena, systemPrompt, userConfig, maxTokensOverride) {
   const cfg = Object.assign({}, userConfig, {
-    maxTokens: maxTokensOverride || Math.max(1200, (promptEscena.length / 2) | 0)
+    maxTokens: maxTokensOverride || Math.max(1500, (promptEscena.length / 2) | 0)
   });
   return await callLLMMulti([{ role: 'user', content: promptEscena }], systemPrompt, cfg, 'generacio');
 }
@@ -6195,7 +6194,7 @@ ${instruccionsFinalCapitol}
       promptEscena,
       systemPrompt,
       userConfig,
-      { intentsMaxims: 2, maxTokens: Math.max(1200, (escena.paraules_objectiu || 400) * 2) }
+      { intentsMaxims: 2, maxTokens: Math.max(1500, (escena.paraules_objectiu || 400) * 2) }
     );
     textsEscenes.push(res || '');
   }
@@ -7004,8 +7003,7 @@ INSTRUCCIONS ESTRICTES:
 - Respecta personatges, continuïtat factual i estat del NKG
 - No repeteixis informació, accions ni frases
 - Mantén català natural i consistent
-- Longitud obligatòria del capítol complet: entre 2500 i 3000 caràcters (comptant espais)
-- L'últim caràcter del capítol ha de ser un punt final (.)
+- LONGITUD OBLIGATÒRIA: Aquest text ha de tenir entre 600 i 700 paraules. Presa't el teu temps per desenvolupar l'escena amb el ritme adequat. Utilitza descripcions sensorials riques, un diàleg ben construït i accions físiques per expandir el text. NO precipitis el final ni resumeixis els esdeveniments per acabar ràpid. Desenvolupa la prosa de manera literària fins a assolir aquesta extensió de paraules.
 - ${instruccionsFinalCapitol}`
     }];
 
@@ -7480,7 +7478,7 @@ Retorna EXCLUSIVAMENT JSON:
   try {
     const res = await callLLMMulti(promptDiagnosi,
       'Ets un editor literari professional. Sigues precís i exigent. Respon EXCLUSIVAMENT amb JSON vàlid.',
-      Object.assign({}, userConfig, { maxTokens: 1200, model: models.modelArquitecte }), 'arquitectura');
+      Object.assign({}, userConfig, { maxTokens: 1500, model: models.modelArquitecte }), 'arquitectura');
     diagnosi = parseJsonRobust(res);
   } catch (err) {
     console.warn('Micro-reescriptura: diagnosi fallida:', err.message);
@@ -7511,7 +7509,7 @@ Retorna NOMÉS el text reescrit, sense cap explicació ni metadades.`
     try {
       const reescrit = await callLLMMulti(promptReescriptura,
         'Ets un escriptor literari expert en revisió de prosa. Reescriu amb precisió quirúrgica.',
-        Object.assign({}, userConfig, { maxTokens: 600, model: models.modelGeneracio }), 'generacio');
+        Object.assign({}, userConfig, { maxTokens: 1500, model: models.modelGeneracio }), 'generacio');
 
       if (reescrit && reescrit.length > 50) {
         const capActual = ESTAT._capitols_generats[capIdx];
