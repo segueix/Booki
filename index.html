@@ -6098,19 +6098,24 @@ async function cridaAPI_GenerarText(promptEscena, systemPrompt, userConfig, maxT
 async function avaluarQualitatLiteraria(textEscena, userConfig) {
   const models = getModelConfig(userConfig);
   const textNet = String(textEscena || '').slice(0, 6000);
-  const promptAvaluador = `Ets un editor literari molt exigent. Llegeix aquest text:
+  const promptAvaluador = `Ets un editor literari exigent i un filòleg expert en llengua catalana. Llegeix aquest text:
 
 """${textNet}"""
 
-Avalua si conté clixés evidents, resolucions mandroses o diàlegs robòtics.
+La teva tasca té dues parts:
+1. AVALUACIÓ LITERÀRIA: Avalua si conté clixés evidents, resolucions mandroses o diàlegs robòtics.
+2. CORRECCIÓ LINGÜÍSTICA: Identifica qualsevol falta d'ortografia, castellanisme, expressió calcada d'altres idiomes o gramàtica incorrecta en català.
+
 Retorna ÚNICAMENT un objecte JSON amb aquest format exacte:
-{ "aprovat": true/false, "critiques": "Descripció breu del que falla i com fer-ho més original, o buit si està aprovat" }.
-Sigues exigent però just.`;
+{
+  "aprovat": true/false,
+  "critiques": "Descriu els errors narratius i/o llista les paraules/expressions incorrectes en català i la seva forma correcta. Si tot és perfecte, deixa-ho buit."
+}`;
 
   try {
     const raw = await callLLMMulti(
       [{ role: 'user', content: promptAvaluador }],
-      'Ets un jutge literari anti-clixés. Retorna únicament JSON vàlid.',
+      'Ets un jutge literari i corrector lingüístic expert en català. Retorna únicament JSON vàlid.',
       Object.assign({}, userConfig, { maxTokens: 500, model: models.modelArquitecte || models.modelGeneracio }),
       'arquitectura'
     );
