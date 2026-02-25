@@ -1251,6 +1251,15 @@ const MODEL_REGISTRY = {
     velocitat: 'rapida',
     notes: 'Bon raonament, context llarg. Prosa en català menys natural que Claude.'
   },
+  'gemini-3-flash-preview': {
+    nom: 'Gemini 3 Flash Preview', nomCurt: 'Gemini 3 Flash',
+    proveidor: 'google',
+    input_per_m: 0.10, output_per_m: 0.40,
+    context_max: 1000000, max_output: 8192,
+    qualitat: { draft: 80, prosa: 75, arquitectura: 75, extraccio: 85 },
+    velocitat: 'molt_rapida',
+    notes: 'Ràpid i econòmic. Ideal per escriure text brut i extreure dades al NKG.'
+  },
   'gpt-5.2': {
     nom: 'GPT-5.2', nomCurt: 'GPT-5.2',
     proveidor: 'openai',
@@ -1311,7 +1320,7 @@ function aplicarPreset(preset) {
     'premium':    { draft: 'claude-sonnet-4-6',         generacio: 'claude-sonnet-4-6', arquitecte: 'claude-opus-4-6'  },
     'maxim':      { draft: 'claude-sonnet-4-6',         generacio: 'claude-opus-4-6',   arquitecte: 'claude-opus-4-6'  },
     'barat_gpt':  { draft: 'gpt-5.2',                  generacio: 'gpt-5.2',           arquitecte: 'gpt-5.2'          },
-    'gemini':     { draft: 'gemini-3-pro-preview',      generacio: 'gemini-3-pro-preview', arquitecte: 'gemini-3-pro-preview' }
+    'gemini':     { draft: 'gemini-3-flash-preview',    generacio: 'gemini-3-flash-preview', arquitecte: 'gemini-3-pro-preview' }
   };
   const p = presets[preset];
   if (!p) return;
