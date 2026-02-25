@@ -615,13 +615,13 @@
   </div>
 
   <label class="field-label" for="anthropicApiKey">🔑 Anthropic API Key</label>
-  <input type="password" id="anthropicApiKey" placeholder="sk-ant-...">
+  <input type="password" id="anthropicApiKey" placeholder="sk-ant-..." oninput="guardarClausAPI()">
 
   <label class="field-label" for="geminiApiKey" style="margin-top:6px;">🔑 Google Gemini API Key <span style="color:var(--text2);font-size:.78rem;">(opcional — per a models Gemini)</span></label>
-  <input type="password" id="geminiApiKey" placeholder="AIza...">
+  <input type="password" id="geminiApiKey" placeholder="AIza..." oninput="guardarClausAPI()">
 
   <label class="field-label" for="openaiApiKey" style="margin-top:6px;">🔑 OpenAI API Key <span style="color:var(--text2);font-size:.78rem;">(opcional — per a models GPT)</span></label>
-  <input type="password" id="openaiApiKey" placeholder="sk-...">
+  <input type="password" id="openaiApiKey" placeholder="sk-..." oninput="guardarClausAPI()">
 
   <div class="btn-row">
     <button class="btn btn-primary" onclick="guardarIComencar()">Guardar i Començar</button>
@@ -1364,8 +1364,15 @@ function guardarIComencar() {
       fluxAutomatic
     };
 
-    poblarSelectorsModels();
-    actualitzarModelsDisponibles();
+    if (typeof poblarSelectorsModels === 'function') {
+      poblarSelectorsModels();
+    } else {
+      console.warn("poblarSelectorsModels no definit; s'omet la inicialització del panell de models.");
+    }
+
+    if (typeof actualitzarModelsDisponibles === 'function') {
+      actualitzarModelsDisponibles();
+    }
 
     hideCard('card-config');
     document.getElementById('progress-wrap').classList.remove('hidden');
@@ -3416,14 +3423,11 @@ INSTRUCCIONS ESTRICTES:
 
 
 function parseEscenesUnificades(text, totalEscenes) {
-  const net = String(text || '').replace(/
-/g, '').trim();
+  const net = String(text || '').replace(/\r/g, '').trim();
   const out = [];
   if (!net) return out;
 
-  const re = /(?:^|
-)\[\[ESCENA_(\d+)\]\]\s*
-?/g;
+  const re = /(?:^|\n)\[\[ESCENA_(\d+)\]\]\s*\n?/g;
   const marks = [];
   let m;
   while ((m = re.exec(net)) !== null) {
@@ -7289,7 +7293,9 @@ function actualitzarModelsDisponibles() {
 document.addEventListener('DOMContentLoaded', function() {
   // Aplicar preset econòmic per defecte i poblar selectors
   aplicarPreset('economic');
-  poblarSelectorsModels();
+  actualitzarConfigProvider();
+  if (typeof poblarSelectorsModels === 'function') poblarSelectorsModels();
+  if (typeof guardarClausAPI === 'function') guardarClausAPI();
 });
 
 </script>
