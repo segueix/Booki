@@ -3432,11 +3432,12 @@ async function callLLMOneShotPlusCompletion(messages, systemPrompt, config, tag)
   const missatgesTancament = [
     ...messages,
     { role: 'assistant', content: text },
-    { role: 'user', content: `Revisa NOMÉS el final del text anterior.
-Si el text ja està ben tancat, respon EXACTAMENT: OK
-Si ha quedat tallat o incomplet, respon EXACTAMENT en aquest format:
-APPEND: <text mínim necessari per tancar bé la frase o el paràgraf final>
-No repeteixis contingut ja escrit. No afegeixis res més.` }
+    { role: 'user', content: `VERIFICACIÓ DE TANCAMENT (PASSADA 2):
+Revisa l'últim paràgraf que acabes d'escriure.
+1. Si el text està perfectament tancat a nivell narratiu, no s'ha tallat a mitja frase i la longitud és l'adequada, respon EXACTAMENT amb la paraula: OK
+2. Si el text s'ha tallat, ha quedat incomplet o necessita una expansió final per tancar bé l'escena/capítol, respon EXACTAMENT en aquest format:
+APPEND: <escriu aquí la continuació directa des del punt exacte on t'has aturat, afegint el desenvolupament final necessari per tancar-ho amb excel·lència>.
+No repeteixis res del que ja has escrit.` }
   ];
   const configTancament = Object.assign({}, safeConfig, { maxTokens: 220 });
 
@@ -4055,7 +4056,8 @@ async function escriureContePart(partNum, totalParts, paraulesPerPart, finalTria
     userContent =
 `He triat el final: "${finalTriat}".
 
-Escriu el CONTE COMPLET (~${pp} paraules). Estil: ${estilDesc}.
+Escriu el CONTE COMPLET. Estil: ${estilDesc}.
+Extensió objectiu: ~${pp} PARAULES. Desenvolupa a fons cada detall, no resumeixis.
 Final obligatori: "${finalTriat}"
 
 OBERTURA: primera frase magnètica, tensió immediata. Primers 3 paràgrafs sense exposició directa.
@@ -4068,7 +4070,8 @@ Escriu directament el conte en català, sense títol ni nota de l'autor. Cap par
     userContent =
 `He triat el final: "${finalTriat}".
 
-Escriu la PRIMERA PART del conte (~${pp} paraules). Estil: ${estilDesc}.
+Escriu la PRIMERA PART del conte. Estil: ${estilDesc}.
+Extensió objectiu: ~${pp} PARAULES. Desenvolupa a fons cada detall, no resumeixis.
 
 Objectiu d'aquesta part:
 → Primera frase impossible de no llegir (pregunta o tensió immediata).
@@ -4080,7 +4083,8 @@ Escriu directament en català, sense títol ni cap indicació de "Part 1". Cap p
 
   } else if (partNum < totalParts) {
     userContent =
-`Continua el conte amb la PART ${partNum} (~${pp} paraules).
+`Continua el conte amb la PART ${partNum}.
+Extensió objectiu: ~${pp} PARAULES. Desenvolupa a fons cada detall, no resumeixis.
 
 Objectiu d'aquesta part:
 → Augmenta el conflicte i la pressió sobre el protagonista.
@@ -4091,7 +4095,8 @@ Continua directament la narració en català, des d'on s'ha aturat el text anter
 
   } else {
     userContent =
-`Finalitza el conte amb la PART FINAL (~${pp} paraules).
+`Finalitza el conte amb la PART FINAL.
+Extensió objectiu: ~${pp} PARAULES. Desenvolupa a fons cada detall, no resumeixis.
 
 El desenllaç OBLIGATORI és: "${finalTriat}"
 
@@ -4103,8 +4108,7 @@ Continua directament la narració en català, des d'on s'ha aturat el text anter
   }
 
   const msgs      = [...history, { role: 'user', content: userContent }];
-  const maxTokens = Math.min(Math.round(pp * 4) + 1000, 8192);
-  const response   = await callLLMMulti(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens }));
+  const response   = await callLLMOneShotPlusCompletion(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 8192 }), 'generacio');
   const newHistory = [...msgs, { role: 'assistant', content: response }];
   return { response, history: newHistory };
 }
@@ -5090,7 +5094,7 @@ ${context}
 ${instruccionsVeu}
 
 INSTRUCCIONS D'ESCRIPTURA:
-- Entre 4000 i 5000 caràcters
+- Extensió objectiu: MÍNIM 2000 - 2500 PARAULES. Desenvolupa les escenes a fons, utilitza diàleg ric i descripcions sensorials. NO resumeixis.
 - Comença directament amb la narració, sense titular el capítol
 - Si hi ha prefiguracions a plantar, integra-les de forma subtil i natural (el lector no ha de notar-les en primera lectura)
 - Si hi ha prefiguracions a recollir, dona'ls resolució satisfactòria
