@@ -4631,7 +4631,7 @@ Escrius EXCLUSIVAMENT en català. Mai inclous paraules ni comentaris en anglès 
 Mai afegeixes notes meta, indicacions de capítol ni cap text fora de la narració literària. Escriu directament el text.
 DIÀLEGS: Usa SEMPRE el guió llarg (—) per introduir el parlament i les acotacions. PROHIBIT usar cometes («», "", '') per al diàleg directe. Format correcte: —Hola —va dir ella. / —Bon dia. / —Vine aquí —li ordenà. SEPARACIÓ DE PARÀGRAFS: És OBLIGATORI fer un punt i a part (nova línia) cada vegada que canvia el personatge que parla o hi ha un canvi d'acció important. MAI barregis intervencions de dos personatges diferents en el mateix paràgraf.
 NOMS DE PERSONA: Aplica l'article personal (en, la, l', na) i les preposicions contractes quan la normativa catalana ho requereix. Exemples: la Maria, en Pere, l'Anna, en Marc, na Joana; amb la Júlia, amb en Tomàs; del senyor Puig, al doctor Ferrer.
-ESTIL DE PROSA: Evita el barroquisme. Prioritza paraules d'ús habitual i precises; evita adjectivació excessiva (màxim 1 adjectiu rellevant per substantiu, excepte si és imprescindible). En diàleg, fes parlar els personatges de manera natural i versemblant. Aplica la norma de 'Show, don't tell' especialment als conflictes: resol les tensions a través de diàlegs incisius i acció, no amb resums de la veu narradora.`;
+ESTIL DE PROSA: Evita el barroquisme. Prioritza paraules d'ús habitual i precises; evita adjectivació excessiva (màxim 1 adjectiu rellevant per substantiu, excepte si és imprescindible). En diàleg, fes parlar els personatges de manera natural i versemblant. Aplica la norma de 'Show, don't tell' especialment als conflictes: resol les tensions a través de diàlegs incisius i acció, no amb resums de la veu narradora. Recorda que estàs escrivint una novel·la completa, no un guió ni un conte breu. Pren-te el teu temps per descriure l'atmosfera, explorar el monòleg intern dels personatges i coreografiar els seus moviments per l'espai. Sigues exhaustiu i detallista.`;
   return base + getGenreStyle(tematica || ESTAT.tematica);
 }
 
@@ -6043,10 +6043,11 @@ CAPÍTOLS A ESCALETEJAR:
 ${capsText}
 
 ESCENES PER CAPÍTOL (adapta al ritme del capítol):
-- Capítols d'exposició/respiració (nivell tensió ≤4): 3 escenes (~450 paraules/escena)
-- Capítols de desenvolupament (nivell tensió 5-7): 3-4 escenes (~500 paraules/escena)
-- Capítols de clímax/acció (nivell tensió ≥8): 4 escenes curtes (~400 paraules/escena, ritme ràpid). REGLA CRÍTICA: En els clímaxs, crea SEMPRE una escena de beat "introspecció" per a la PRESA DE DECISIÓ (mostrant el cost físic/mental), separada i prèvia a l'escena d'"acció" posterior.
-- Capítol final/resolució: 3 escenes (~550 paraules/escena, ritme pausat)
+- Genera entre 4 i 6 escenes per a aquest capítol. (No menys de 4).
+- Capítols d'exposició/respiració (nivell tensió ≤4): 4 escenes (~450 paraules/escena)
+- Capítols de desenvolupament (nivell tensió 5-7): 4-5 escenes (~500 paraules/escena)
+- Capítols de clímax/acció (nivell tensió ≥8): 5-6 escenes (~400 paraules/escena, ritme ràpid). REGLA CRÍTICA: En els clímaxs, crea SEMPRE una escena de beat "introspecció" per a la PRESA DE DECISIÓ (mostrant el cost físic/mental), separada i prèvia a l'escena d'"acció" posterior.
+- Capítol final/resolució: 4 escenes (~550 paraules/escena, ritme pausat)
 
 TOTAL OBJECTIU: ~1800-2200 paraules per capítol. La novel·la completa ha de fer entre 24.000 i 31.000 paraules (12-14 capítols × ~2000 paraules).
 
@@ -6060,6 +6061,7 @@ Cada escena ha d'incloure (camps OBLIGATORIS, res més):
 - personatges: array de noms
 - beat_narratiu: "diàleg" | "acció" | "introspecció" | "descripció"
 - REGLA DE DIÀLEG: Com a mínim el 50% de les escenes d'un capítol han de tenir el "beat_narratiu" fixat a "diàleg". Prioritza sempre la interacció verbal.
+- Cada escena ha de tenir un objectiu físic (avançar en la trama) i un objectiu emocional o reflexiu (introspecció, record, subtrama).
 
 NO incloguis emocio_entrada, emocio_sortida ni punt_inflexio per estalviar espai.
 
@@ -6933,6 +6935,8 @@ INSTRUCCIONS D'EXPANSIÓ:
 - Evita mots infreqüents o artificiosos en la parla quotidiana; usa català natural i creïble
 - ${obtenirInstruccionsDeTensio(tensioNivell)}
 - ${instruccionsBeat || 'Equilibra narració, diàleg i descripció'}
+- PROHIBIT RESUMIR: No resumeixis l'acció, el pas del temps ni les converses. Mostra l'acció en temps real, segon a segon. Escriu els diàlegs complets amb interrupcions, silencis, llenguatge corporal i micro-expressions.
+- INTEGRACIÓ DE L'ENTORN: Utilitza les dades del context (clima, objectes de l'inventari, detalls de la localització) de manera activa. Els personatges han d'interactuar físicament amb l'entorn abans o durant les converses per alentir el ritme i donar volum i realisme al text.
 - Mostra les interaccions en temps real. Assegura't que almenys el 40% del text de l'escena sigui diàleg directe amb intercanvis ràpids i incisius.
 - Mostra, no expliquis: NO escriguis "estava trist" → mostra-ho amb gestos, paraules, mirada
 - Respecta escrupolosament els salts de línia en els diàlegs: un paràgraf nou per a cada personatge que parla.
