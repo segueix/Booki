@@ -4137,10 +4137,51 @@ El desenllaç OBLIGATORI és: "${finalTriat}"
 Continua directament la narració en català, des d'on s'ha aturat el text anterior. Sense cap indicació de número de part ni comentari fora de la ficció. Cap paraula en anglès ni cap altra llengua.`;
   }
 
-  const msgs      = [...history, { role: 'user', content: userContent }];
-  const response   = await callLLMOneShotPlusCompletion(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 8192 }), 'generacio');
-  const newHistory = [...msgs, { role: 'assistant', content: response }];
-  return { response, history: newHistory };
+  const msgs = [...history, { role: 'user', content: userContent }];
+  const models = getModelConfig(userConfig);
+
+  const responseGeneracio = await callLLMOneShotPlusCompletion(
+    msgs,
+    getSystemPrompt(tematica),
+    Object.assign({}, userConfig, { maxTokens: 8192, model: models.modelGeneracio }),
+    'generacio'
+  );
+
+  let responseFinal = responseGeneracio;
+  try {
+    const msgsRefina = [
+      ...msgs,
+      { role: 'assistant', content: responseGeneracio },
+      {
+        role: 'user',
+        content: `REFINAMENT ARQUITECTÒNIC DE PROSA:
+Reescriu íntegrament aquesta mateixa part mantenint els mateixos fets, ordre narratiu i continuïtat, però millorant coherència estructural, ritme i veu.
+Mantén una longitud equivalent (en paraules) i evita resumir.
+Retorna NOMÉS el text final en català.`
+      }
+    ];
+
+    const responseArquitectura = await callLLMOneShotPlusCompletion(
+      msgsRefina,
+      getSystemPrompt(tematica),
+      Object.assign({}, userConfig, {
+        maxTokens: 8192,
+        model: models.modelArquitecte,
+        modelArquitectura: models.modelArquitecte,
+        modelGeneracio: models.modelArquitecte
+      }),
+      'arquitectura'
+    );
+
+    if (responseArquitectura && responseArquitectura.trim()) {
+      responseFinal = responseArquitectura;
+    }
+  } catch (err) {
+    console.warn("Refinament amb model d'arquitectura no disponible, es manté la versió de generació:", err.message);
+  }
+
+  const newHistory = [...msgs, { role: 'assistant', content: responseFinal }];
+  return { response: responseFinal, history: newHistory };
 }
 
 // ─── MILLORA ─────────────────────────────────────────────────
@@ -4271,14 +4312,20 @@ Format ESTRICTE (res més, sense cap introducció):
 // Genera el perfil de veu per al protagonista + tots els personatges
 // secundaris seleccionats, per guiar l'escriptura dels diàlegs.
 async function fase9_estilParla(protagonistaTriat, personatgesSecundaris, conteActual, tematica, estilDesc, history, userConfig) {
-  const totsPersonatges = [protagonistaTriat, ...personatgesSecundaris];
-  const llista = totsPersonatges.map((p, i) => `${i + 1}. ${p}`).join('\n');
+  const totsPersonatges = Array.from(new Set([protagonistaTriat, ...personatgesSecundaris].filter(Boolean)));
+  const historyCurt = Array.isArray(history) ? history.slice(-6) : [];
+  const CHUNK = 6;
+  const partsResposta = [];
 
-  const msgs = [
-    ...history,
-    {
-      role: 'user',
-      content: `Defineix el perfil de veu i estil de parla de cada personatge de l'elenc per guiar l'escriptura dels diàlegs de la novel·la.
+  for (let i = 0; i < totsPersonatges.length; i += CHUNK) {
+    const blocPersonatges = totsPersonatges.slice(i, i + CHUNK);
+    const llista = blocPersonatges.map((p, j) => `${j + 1}. ${p}`).join('\n');
+
+    const msgs = [
+      ...historyCurt,
+      {
+        role: 'user',
+        content: `Defineix el perfil de veu i estil de parla de cada personatge de l'elenc per guiar l'escriptura dels diàlegs de la novel·la.
 
 Personatges:
 ${llista}
@@ -4303,13 +4350,42 @@ Tics: [...]
 Registre: [...]
 Exemple: «[frase representativa]»
 
+No tallis la resposta a mitges. Si no hi ha espai, prioritza completar TOTS els personatges d'aquest bloc abans d'afegir floritures.
 Separa cada personatge amb una línia en blanc. Escriu exclusivament en català.`
+      }
+    ];
+
+    const models = getModelConfig(userConfig);
+    const configBloc = Object.assign({}, userConfig, {
+      maxTokens: 8192,
+      model: models.modelArquitecte,
+      modelArquitectura: models.modelArquitecte,
+      modelGeneracio: models.modelArquitecte
+    });
+
+    let respostaBloc = await callLLMOneShotPlusCompletion(msgs, getSystemPrompt(tematica), configBloc, 'arquitectura');
+
+    const missing = blocPersonatges.filter(nom => !respostaBloc.includes(`**${nom}**`));
+    if (missing.length > 0) {
+      const msgsRetry = [
+        ...msgs,
+        { role: 'assistant', content: respostaBloc },
+        { role: 'user', content: `Has deixat personatges sense fitxa o la resposta s'ha tallat. Escriu NOMÉS les fitxes que falten, en el mateix format estricte, sense repetir les que ja has fet.\nFalten: ${missing.join(', ')}` }
+      ];
+      const retry = await callLLMOneShotPlusCompletion(msgsRetry, getSystemPrompt(tematica), configBloc, 'arquitectura');
+      if (retry && retry.trim()) respostaBloc += '\n\n' + retry.trim();
     }
-  ];
-  const maxTokens  = Math.min(700 * totsPersonatges.length + 800, 6000);
-  // Opus: definir veus és tasca d'arquitectura narrativa
-  const response   = await callLLMMulti(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens }), 'arquitectura');
-  const newHistory = [...msgs, { role: 'assistant', content: response }];
+
+    const missingFinal = blocPersonatges.filter(nom => !respostaBloc.includes(`**${nom}**`));
+    if (missingFinal.length > 0) {
+      respostaBloc += '\n\n' + missingFinal.map(nom => `**${nom}**\nVocabulari: pendent de generar\nFrases: pendent de generar\nTics: pendent de generar\nRegistre: pendent de generar\nExemple: «pend…»`).join('\n\n');
+    }
+
+    partsResposta.push(respostaBloc.trim());
+  }
+
+  const response = partsResposta.join('\n\n');
+  const newHistory = [...history, { role: 'assistant', content: response }];
   return { response, history: newHistory };
 }
 
