@@ -3912,6 +3912,7 @@ const SYSTEM_DEFAULT = `Ets un mestre del conte literari breu en català.
 Apliques el principi d'unitat d'efecte de Poe: cada paraula serveix un únic impacte emocional final.
 Escrius amb economia de paraules, primera frase magnètica, tensió creixent i finals memorables que ressonen.
 Mai desperdicies una frase. Prioritzes mostrar sobre explicar.
+DIÀLEGS — SEPARACIÓ DE PARÀGRAFS: És OBLIGATORI fer un punt i a part (nova línia) cada vegada que canvia el personatge que parla o hi ha un canvi d'acció important. MAI barregis intervencions de dos personatges diferents en el mateix paràgraf.
 Escrius EXCLUSIVAMENT en català. Mai inclous paraules, frases ni comentaris en anglès o cap altra llengua. Mai afegeixes notes meta, indicacions de número de part ni cap text fora de la narració literària. Escriu directament el text.`;
 
 // ─── Extensió d'estil per autor (reutilitzable per conte i novel·la) ───
@@ -4628,7 +4629,7 @@ function getSystemPromptNovella(tematica) {
 Apliques les tècniques de Donna Tartt, Elena Ferrante i Carlos Ruiz Zafón: atmòsferes denses, personatges amb contradiccions genuïnes i trames que s'informen mútuament.
 Escrius EXCLUSIVAMENT en català. Mai inclous paraules ni comentaris en anglès o qualsevol altra llengua.
 Mai afegeixes notes meta, indicacions de capítol ni cap text fora de la narració literària. Escriu directament el text.
-DIÀLEGS: Usa SEMPRE el guió llarg (—) per introduir el parlament i les acotacions. PROHIBIT usar cometes («», "", '') per al diàleg directe. Format correcte: —Hola —va dir ella. / —Bon dia. / —Vine aquí —li ordenà.
+DIÀLEGS: Usa SEMPRE el guió llarg (—) per introduir el parlament i les acotacions. PROHIBIT usar cometes («», "", '') per al diàleg directe. Format correcte: —Hola —va dir ella. / —Bon dia. / —Vine aquí —li ordenà. SEPARACIÓ DE PARÀGRAFS: És OBLIGATORI fer un punt i a part (nova línia) cada vegada que canvia el personatge que parla o hi ha un canvi d'acció important. MAI barregis intervencions de dos personatges diferents en el mateix paràgraf.
 NOMS DE PERSONA: Aplica l'article personal (en, la, l', na) i les preposicions contractes quan la normativa catalana ho requereix. Exemples: la Maria, en Pere, l'Anna, en Marc, na Joana; amb la Júlia, amb en Tomàs; del senyor Puig, al doctor Ferrer.
 ESTIL DE PROSA: Evita el barroquisme. Prioritza paraules d'ús habitual i precises; evita adjectivació excessiva (màxim 1 adjectiu rellevant per substantiu, excepte si és imprescindible). En diàleg, fes parlar els personatges de manera natural i versemblant.`;
   return base + getGenreStyle(tematica || ESTAT.tematica);
@@ -5416,6 +5417,7 @@ Verifica específicament:
 - Si el capítol havia de plantar una prefiguració, s'ha fet de forma subtil?
 - Si el capítol havia de recollir una prefiguració, s'ha resolt satisfactòriament?
 - Hi ha algun element que contradigui una prefiguració plantada anteriorment?
+- Format de diàlegs: Hi ha intervencions de diferents personatges solapades en un mateix paràgraf sense punt i a part? Si és així, marca-ho com a error greu de format.
 
 AVALUACIÓ DE GANXOS (Hook Review):
 Avalua els elements narratius de ganxo del capítol:
@@ -5428,9 +5430,10 @@ SELECCIÓ DE PASSATGE:
 A més de la revisió, selecciona el MILLOR passatge del capítol (entre 150 i 250 paraules) que millor exemplifiqui la veu narrativa. Copia'l literalment del text.
 
 Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense cap text addicional, sense markdown):
+IMPORTANT: Si detectes solapament de diàlegs entre personatges en un mateix paràgraf, "ok_per_continuar" HA DE ser false i has de donar "instruccions_correccio" explícites per reescriure separant els paràgrafs.
 {
   "puntuacio": 8,
-  "problemes": ["descripció concreta del problema 1"],
+  "problemes": ["descripció concreta del problema 1", "Solapament de diàlegs detectat: intervencions de diferents personatges en un mateix paràgraf. Cal reescriure separant-los."],
   "instruccions_correccio": "instruccions clares per a Sonnet per reescriure si cal (buit si no cal)",
   "ok_per_continuar": true,
   "prefiguracions_ok": true,
@@ -6930,6 +6933,7 @@ INSTRUCCIONS D'EXPANSIÓ:
 - ${obtenirInstruccionsDeTensio(tensioNivell)}
 - ${instruccionsBeat || 'Equilibra narració, diàleg i descripció'}
 - Mostra, no expliquis: NO escriguis "estava trist" → mostra-ho amb gestos, paraules, mirada
+- Respecta escrupolosament els salts de línia en els diàlegs: un paràgraf nou per a cada personatge que parla.
 - No repeteixis informació, accions ni frases de les escenes anteriors del mateix capítol; avança sempre
 - Comença directament amb la narració, sense titular${instruccionsVariancia ? '\n- VARIÀNCIA: ' + instruccionsVariancia : ''}
 - ${instruccionsFinalCapitol || "Mantén la progressió narrativa de l'escena."}
@@ -7462,7 +7466,7 @@ async function microReescripturaBlocOpus(blocIniciIdx, blocFinalIdx, userConfig)
 
   const promptDiagnosi = [{
     role: 'user',
-    content: `Analitza els capítols i identifica exactament 3-5 passatges febles (telling, clixés, prosa plana, diàleg genèric).
+    content: `Analitza els capítols i identifica exactament 3-5 passatges febles (telling, clixés, prosa plana, diàleg genèric) o ERRORS DE FORMAT (com ara solapament de diàlegs de diferents personatges en un mateix paràgraf).
 
 ${textsPerDiagnosi}
 
