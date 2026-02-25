@@ -4072,10 +4072,9 @@ async function fase3_personatges(premissaTriada, estilDesc, history, userConfig,
   const isNoir = tematica && /larsson|noir|negr[ae]|nòrdi/i.test(tematica);
 
   const protagonistePrompt = isNoir
-    ? `Genera 5 protagonistes possibles per a aquest conte NEGRE NÒRDIC. Han de ser arquetips propis del gènere.
-
-Usa exclusivament aquests tipus: detectiu/investigador traumatitzat, periodista d'investigació obstinada, hacker antisocial, advocat incorruptible en un sistema corrupte, o personatge marginal amb accés a informació perillosa.
-
+    ? `Genera 5 protagonistes possibles per a aquest conte NEGRE NÒRDIC.
+PROHIBICIÓ DE CLIXÉS: Evita absolutament els estereotips de Hollywood (prohibit "hackers antisocials en soterranis", policies alcohòlics amb la vida destruïda, assassins a sou amb filosofia existencial, periodistes coratjoses-però-solitàries). No copies arquetips del gènere: crea persones.
+Dona'ls feines reals, burocràtiques o integrades a la societat (ex: analista de dades d'una teleoperadora, auditor d'hisenda, periodista d'un mitjà local avorrit, funcionari de serveis socials, tècnic d'una empresa auditora). El terror ha de néixer de la quotidianitat, no de la marginalitat.
 Cada protagonista ha de tenir veu pròpia i la ferida personal que el fa avançar quan tot indica que ha de parar.`
     : `Genera 5 protagonistes possibles per a aquest conte. Cada un ha de tenir veu pròpia i tensió interna que el faci memorable.`;
 
@@ -4688,7 +4687,8 @@ Escrius EXCLUSIVAMENT en català. Mai inclous paraules ni comentaris en anglès 
 Mai afegeixes notes meta, indicacions de capítol ni cap text fora de la narració literària. Escriu directament el text.
 DIÀLEGS: Usa SEMPRE el guió llarg (—) per introduir el parlament i les acotacions. PROHIBIT usar cometes («», "", '') per al diàleg directe. Format correcte: —Hola —va dir ella. / —Bon dia. / —Vine aquí —li ordenà. SEPARACIÓ DE PARÀGRAFS: És OBLIGATORI fer un punt i a part (nova línia) cada vegada que canvia el personatge que parla o hi ha un canvi d'acció important. MAI barregis intervencions de dos personatges diferents en el mateix paràgraf.
 NOMS DE PERSONA: Aplica l'article personal (en, la, l', na) i les preposicions contractes quan la normativa catalana ho requereix. Exemples: la Maria, en Pere, l'Anna, en Marc, na Joana; amb la Júlia, amb en Tomàs; del senyor Puig, al doctor Ferrer.
-ESTIL DE PROSA: Evita el barroquisme. Prioritza paraules d'ús habitual i precises; evita adjectivació excessiva (màxim 1 adjectiu rellevant per substantiu, excepte si és imprescindible). En diàleg, fes parlar els personatges de manera natural i versemblant. Aplica la norma de 'Show, don't tell' especialment als conflictes: resol les tensions a través de diàlegs incisius i acció, no amb resums de la veu narradora. Recorda que estàs escrivint una novel·la completa, no un guió ni un conte breu. Pren-te el teu temps per descriure l'atmosfera, explorar el monòleg intern dels personatges i coreografiar els seus moviments per l'espai. Sigues exhaustiu i detallista.`;
+ESTIL DE PROSA: Evita el barroquisme. Prioritza paraules d'ús habitual i precises; evita adjectivació excessiva (màxim 1 adjectiu rellevant per substantiu, excepte si és imprescindible). En diàleg, fes parlar els personatges de manera natural i versemblant. Aplica la norma de 'Show, don't tell' especialment als conflictes: resol les tensions a través de diàlegs incisius i acció, no amb resums de la veu narradora. Recorda que estàs escrivint una novel·la completa, no un guió ni un conte breu. Pren-te el teu temps per descriure l'atmosfera, explorar el monòleg intern dels personatges i coreografiar els seus moviments per l'espai. Sigues exhaustiu i detallista.
+REGLA DE SUBTEXT ALS DIÀLEGS I ANTI-EXPOSICIÓ: És totalment prohibit que els antagonistes o figures de poder expliquin els seus plans, motivacions o el funcionament del sistema de forma directa (Zero monòlegs de "dolent de James Bond"). Les figures de poder han de parlar sempre en eufemismes corporatius, mitges veritats i to institucional. Mai un personatge explicarà res que l'altre personatge ja sàpiga (info-dumping per al lector). Obliga el lector i el protagonista a deduir l'horror amagat darrere d'un llenguatge aparentment amable o burocràtic.`;
   return base + getGenreStyle(tematica || ESTAT.tematica);
 }
 
@@ -5254,6 +5254,8 @@ PER A 19-22 CAPÍTOLS (estructura 5-12/14-4/5):
     · Subtrames han de tenir el seu propi clímax intern (nivell 8) abans de convergir amb la principal
   - Acte III (caps finals 4-5): convergència i resolució
     · Penúltim Acte II: nivell 9 | Clímax: nivell 10 | Resolució: nivell 7 | Epíleg: nivell 4
+
+INSTRUCCIÓ D'ARC DE PERSONATGE: Qualsevol caiguda moral, traïció als propis principis o canvi radical de paradigma del protagonista NO pot passar en un sol capítol. Ha d'haver-hi almenys un capítol sencer de "Dubte i Racionalització" on el personatge intenti auto-enganyar-se abans d'acceptar la seva nova naturalesa corrupta o el seu canvi d'alineació. Planifica explícitament aquest capítol de transició a l'estructura. Fes que les derrotes morals se sentin orgàniques i justificades, no precipitades.
 
 IMPORTANT: Has de completar TOTS els capítols. El JSON ha de contenir exactament tantes entrades a l'array "capitols" com el "nombre_capitols" que decideixis.
 IMPORTANT: L'array "capitols" ha de contenir EXACTAMENT el nombre de capítols indicat a "nombre_capitols". Prioritza completar tots els capítols encara que les descripcions dels últims siguin més breus. Un JSON truncat és INACCEPTABLE.
@@ -6036,6 +6038,8 @@ Crea un disseny de trames entrellaçades que:
 3. Un mapa de com les trames s'entrelaçen capítol a capítol (aproximat, 12-22 capítols)
 4. Cada subtrama ha de tenir una resolució pròpia (no necessàriament al capítol final)
 
+REGLA DE REALISME D'INVESTIGACIÓ: Prohibit utilitzar "MacGuffins" propis del cinema d'acció (com llapis USB encriptats amb autodestrucció, missatges pòstums pre-gravats, claus amagades en llocs secrets o pistes plantades de forma inversemblant). Tota investigació o descobriment de la veritat s'ha de fer a través de mètodes lents i realistes: creuament de dades financeres avorrides, sol·licituds de transparència governamental, contradiccions en documents notarials o factures, testimonis que diuen mitges veritats.
+
 IMPORTANT: El JSON ha de ser COMPLET. El mapa_entrellacat ha de cobrir TOTS els capítols (12-22 entrades). Les notes del mapa han de ser MOLT breus (3-5 paraules màxim per estalviar espai).
 
 Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense markdown, sense text addicional):
@@ -6284,7 +6288,12 @@ async function avaluarQualitatLiteraria(textEscena, userConfig) {
 """${textNet}"""
 
 La teva tasca té dues parts:
-1. AVALUACIÓ LITERÀRIA: Avalua si conté clixés evidents, resolucions mandroses o diàlegs robòtics.
+1. AVALUACIÓ LITERÀRIA: Rebutja l'escena immediatament si detectes qualsevol d'aquests errors:
+   - INFO-DUMPING: Personatges explicant coses que l'altre personatge ja sap, únicament perquè el lector se n'assabenti. És el pecat capital de la narrativa.
+   - MONÒLEG DE DOLENT: Antagonistes o figures de poder que expliquen els seus plans, motivacions o el funcionament del sistema de forma directa (monòlecs estil James Bond). Les figures de poder han de parlar en eufemismes, mitges veritats i to institucional.
+   - CLIXÉS TECNOLÒGICS O D'ACCIÓ: Teclejar frenèticament per aturar un hackeig, objectes d'espia hiper-tecnològics, USB encriptats, pistes amagades en llocs inversemblants.
+   - CANVIS EMOCIONALS NO GUANYATS: Personatges que canvien radicalment de postura (moral, emocional, ideològica) sense un procés de dubte i racionalització prèvi. Un sol capítol no és suficient per a una caiguda moral.
+   - CLIXÉS GENÈRICS: Resolucions mandroses, diàlegs robòtics, frases fetes del gènere.
 2. CORRECCIÓ LINGÜÍSTICA: Identifica qualsevol falta d'ortografia, castellanisme, expressió calcada d'altres idiomes o gramàtica incorrecta en català.
 
 Retorna ÚNICAMENT un objecte JSON amb aquest format exacte:
