@@ -7201,9 +7201,10 @@ Retorna EXCLUSIVAMENT JSON (sense cap altre text) amb el format:
 }`;
 
   const prompt = [{ role: 'user', content: promptBase }];
+  const models = getModelConfig(userConfig);
 
   const res = await callLLMMulti(prompt, 'Ets un crític literari expert en anàlisi estilística. Analitza amb precisió quirúrgica.',
-    Object.assign({}, userConfig, { maxTokens: 1500 }), 'arquitectura');
+    Object.assign({}, userConfig, { maxTokens: 2500, model: models.modelArquitecte }), 'arquitectura');
 
   let manual = parseJsonRobust(res) || parseManualEstilFallback(res);
   if (!manualEstilMassaCurt(manual)) return manual;
