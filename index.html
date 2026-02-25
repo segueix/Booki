@@ -2164,10 +2164,10 @@ function parseEstructura(text) {
     ESTAT._prefiguracions = data.prefiguracions || [];
     ESTAT._corbaTensio    = data.corba_tensio || [];
 
-    // Validació de límits 12-14 capítols
-    if (data.capitols.length > 14) {
-      console.warn(`Estructura amb ${data.capitols.length} capítols — retallant a 14`);
-      while (data.capitols.length > 14) {
+    // Validació de límits 12-22 capítols
+    if (data.capitols.length > 22) {
+      console.warn(`Estructura amb ${data.capitols.length} capítols — retallant a 22`);
+      while (data.capitols.length > 22) {
         const ultim = data.capitols.pop();
         const penultim = data.capitols[data.capitols.length - 1];
         penultim.resum = (penultim.resum || '') + ' ' + (ultim.resum || '');
@@ -5157,45 +5157,61 @@ ${personatgesCtx}
 ESTILS DE PARLA (resum):
 ${ESTAT.estilsParla ? ESTAT.estilsParla.substring(0, 1000) + (ESTAT.estilsParla.length > 1000 ? '\n[…]' : '') : '(No definits)'}${tramesCtx}
 
-NOMBRE DE CAPÍTOLS: Entre 12 i 14 capítols. La decisió depèn de la complexitat:
-- 12 capítols: Trama lineal, 1-2 personatges principals, 0-1 subtrames.
-  Estructura: 3 actes (4+4+4), ritme àgil, cada capítol aporta quelcom imprescindible.
-- 13 capítols: Trama principal + 1 subtrama significativa, o 3 personatges principals
-  que necessiten espai per desenvolupar els seus arcs.
-- 14 capítols: Trama principal + 2 subtrames, o trama complexa amb múltiples girs
-  que necessiten preparació i resolució adequada.
+NOMBRE DE CAPÍTOLS: Entre 12 i 22 capítols. La decisió depèn de la complexitat i profunditat de la trama:
+- 12-14 capítols: Trama principal + 0-2 subtrames. Arc narratiu concentrat. Novel·la de ritme àgil (50.000-65.000 paraules objectiu).
+- 15-18 capítols: Trama principal + 2-3 subtrames significatives, o elencs de 4+ personatges amb arcs propis.
+  Espai per a subplots emocionals, desviaments i caps de pont entre actes. (65.000-80.000 paraules objectiu).
+- 19-22 capítols: Trama principal + 3-4 subtrames complexes, múltiples girs, revelacions escalonades,
+  o una estructura coral amb 4+ protagonistes que requereix capítols de perspectiva alternada. (80.000-100.000 paraules objectiu).
 
-REGLA D'OR: Si dubtes entre 12 i 13, tria 12. Si dubtes entre 13 i 14, tria 13.
-Cada capítol ha de justificar la seva existència — si un capítol es pot fusionar
+REGLA D'OR: Cada capítol ha de justificar la seva existència — si un capítol es pot fusionar
 amb l'anterior o el posterior sense perdre res essencial, fusiona'l.
-NO superis MAI 14 capítols. Una novel·la curta i intensa és millor que una novel·la llarga i diluïda.
+Prioritza l'amplitud dramàtica: és millor una novel·la ben desplegada que un relat comprimit.
+NO superis MAI 22 capítols. La densitat narrativa és tan important com l'extensió.
 
 INSTRUCCIONS DE CORBA DE TENSIÓ:
-La "corba_tensio" ha de seguir una estructura dramàtica adaptada al nombre de capítols:
+La "corba_tensio" ha de seguir una estructura dramàtica adaptada al nombre de capítols.
+La corba NO és lineal ascendent — ha d'OSCIL·LAR: després de cada pic hi ha un moment de respir.
+Alterna capítols d'acció (frases curtes, diàleg ràpid) amb capítols de respiració (introspectiu, descriptiu).
 
-PER A 12 CAPÍTOLS (estructura 3-5-4):
-  - Capítols 1-3: Acte I (exposició → incident detonant)
+PER A 12-14 CAPÍTOLS (estructura 3-5/7-4):
+  - Acte I (caps 1-3): exposició → incident detonant
     · Cap 1: nivell 3 (establir món i protagonista)
     · Cap 2: nivell 4 (complicació, presentar conflicte)
     · Cap 3: nivell 6 (primer punt de gir — no hi ha marxa enrere)
-  - Capítols 4-8: Acte II (desenvolupament → crisi)
-    · Cap 4-5: nivell 5-6 (explorar el conflicte, subtrames)
-    · Cap 6: nivell 7 (punt mig — revelació o gir)
-    · Cap 7: nivell 8 (complicació greu)
-    · Cap 8: nivell 9 (tot sembla perdut)
-  - Capítols 9-12: Acte III (clímax → resolució)
-    · Cap 9: nivell 8 (reorganització, pla desesperat)
-    · Cap 10: nivell 10 (CLÍMAX)
-    · Cap 11: nivell 7 (resolució del conflicte)
-    · Cap 12: nivell 4-5 (tancament, epíleg narratiu)
+  - Acte II (caps 4-9/10): desenvolupament → crisi
+    · Caps 4-5: nivell 5-6 (explorar conflicte, subtrames)
+    · Cap mig: nivell 7 (punt mig — revelació o gir)
+    · Caps següents: nivell 7-8 (complicació greu)
+    · Penúltim de l'Acte II: nivell 9 (tot sembla perdut)
+  - Acte III (caps finals 4): clímax → resolució
+    · Penúltim: nivell 8 (reorganització, pla desesperat)
+    · Clímax: nivell 10
+    · Resolució: nivell 7
+    · Tancament: nivell 4-5 (epíleg narratiu)
 
-PER A 13-14 CAPÍTOLS: Mateixa estructura però l'Acte II s'expandeix
-amb 1-2 capítols addicionals de desenvolupament (nivell 5-7).
+PER A 15-18 CAPÍTOLS (estructura 4-9/10-4/5):
+  - Acte I (caps 1-4): exposició ampliada, presentació de subtrames
+    · Cap 1: nivell 3 | Cap 2: nivell 4 | Cap 3: nivell 5 | Cap 4: nivell 6 (primer gir)
+  - Acte II (caps 5-13/14): desenvolupament ric amb oscil·lació
+    · Caps 5-6: nivell 5-6 (respiració, explorar subtrames)
+    · Cap mig-1: nivell 7 (revelació parcial)
+    · Caps següents: nivell 6-7 (conseqüències, subtrames)
+    · Cap mig+2: nivell 8 (complicació greu, possible gir de subtrama)
+    · Cap penúltim Acte II: nivell 5 (calma abans de la tempesta)
+    · Cap últim Acte II: nivell 9 (crisi màxima)
+  - Acte III (caps 14/15-18): resolució i tancament
+    · Cap 1 Acte III: nivell 8 | Clímax: nivell 10 | Resolució: nivell 7 | Tancament: nivell 4-5
 
-IMPORTANT: La corba NO és lineal ascendent. Ha d'OSCIL·LAR:
-després de cada pic de tensió, ha d'haver-hi un moment de respir.
-Alterna capítols d'acció (frases curtes, diàleg ràpid) amb capítols
-de respiració (introspectiu, descriptiu, exploració de relacions).
+PER A 19-22 CAPÍTOLS (estructura 5-12/14-4/5):
+  - Acte I (caps 1-5): exposició coral, introducció de múltiples fils
+    · Caps 1-2: nivell 3-4 | Cap 3: nivell 5 | Cap 4: nivell 5-6 | Cap 5: nivell 7 (primer gir major)
+  - Acte II (caps 6-17/18): desplegament complex, múltiples subtrames
+    · Oscil·la entre nivells 4 i 9, amb respiració cada 2-3 capítols
+    · Inclou: un punt mig (nivell 7-8), un fals clímax (nivell 9), una calma estratègica (nivell 4-5)
+    · Subtrames han de tenir el seu propi clímax intern (nivell 8) abans de convergir amb la principal
+  - Acte III (caps finals 4-5): convergència i resolució
+    · Penúltim Acte II: nivell 9 | Clímax: nivell 10 | Resolució: nivell 7 | Epíleg: nivell 4
 
 IMPORTANT: Has de completar TOTS els capítols. El JSON ha de contenir exactament tantes entrades a l'array "capitols" com el "nombre_capitols" que decideixis.
 IMPORTANT: L'array "capitols" ha de contenir EXACTAMENT el nombre de capítols indicat a "nombre_capitols". Prioritza completar tots els capítols encara que les descripcions dels últims siguin més breus. Un JSON truncat és INACCEPTABLE.
@@ -5350,7 +5366,7 @@ ${context}
 ${instruccionsVeu}
 
 INSTRUCCIONS D'ESCRIPTURA:
-- LONGITUD OBLIGATÒRIA: Aquest text ha de tenir entre 600 i 700 paraules. Presa't el teu temps per desenvolupar l'escena amb el ritme adequat. Utilitza descripcions sensorials riques, un diàleg ben construït i accions físiques per expandir el text. NO precipitis el final ni resumeixis els esdeveniments per acabar ràpid. Desenvolupa la prosa de manera literària fins a assolir aquesta extensió de paraules.
+- LONGITUD OBLIGATÒRIA: Aquest capítol ha de tenir entre 3.500 i 5.000 paraules. Presa't el teu temps per desenvolupar totes les escenes amb el ritme adequat. Utilitza descripcions sensorials riques, diàlegs ben construïts i accions físiques per expandir el text. NO precipitis el final ni resumeixis els esdeveniments per acabar ràpid. Desenvolupa la prosa de manera literària fins a assolir aquesta extensió de paraules.
 - Desenvolupa les escenes a fons, utilitza diàleg ric i descripcions sensorials. NO resumeixis.
 - Comença directament amb la narració, sense titular el capítol
 - Si hi ha prefiguracions a plantar, integra-les de forma subtil i natural (el lector no ha de notar-les en primera lectura)
@@ -5361,7 +5377,7 @@ INSTRUCCIONS D'ESCRIPTURA:
 - Escriu en català`
   }];
 
-  const response = await callLLMOneShotPlusCompletion(msgs, systemPrompt, Object.assign({}, userConfig, { maxTokens: 1900 }), 'generacio');
+  const response = await callLLMOneShotPlusCompletion(msgs, systemPrompt, Object.assign({}, userConfig, { maxTokens: 14000 }), 'generacio');
   return { response };
 }
 
@@ -5889,10 +5905,10 @@ ${ESTAT.estilsParla || '(No definits)'}
 Crea un disseny de trames entrellaçades que:
 1. Tingui una trama principal clara que connecti amb el final planificat
 2. 2-4 subtrames que enriqueixin el món i els personatges secundaris
-3. Un mapa de com les trames s'entrelaçen capítol a capítol (aproximat, 12-14 capítols)
+3. Un mapa de com les trames s'entrelaçen capítol a capítol (aproximat, 12-22 capítols)
 4. Cada subtrama ha de tenir una resolució pròpia (no necessàriament al capítol final)
 
-IMPORTANT: El JSON ha de ser COMPLET. El mapa_entrellacat ha de cobrir TOTS els capítols (12-14 entrades). Les notes del mapa han de ser MOLT breus (3-5 paraules màxim per estalviar espai).
+IMPORTANT: El JSON ha de ser COMPLET. El mapa_entrellacat ha de cobrir TOTS els capítols (12-22 entrades). Les notes del mapa han de ser MOLT breus (3-5 paraules màxim per estalviar espai).
 
 Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense markdown, sense text addicional):
 {
@@ -6074,13 +6090,13 @@ CAPÍTOLS A ESCALETEJAR:
 ${capsText}
 
 ESCENES PER CAPÍTOL (adapta al ritme del capítol):
-- Genera entre 4 i 6 escenes per a aquest capítol. (No menys de 4).
-- Capítols d'exposició/respiració (nivell tensió ≤4): 4 escenes (~450 paraules/escena)
-- Capítols de desenvolupament (nivell tensió 5-7): 4-5 escenes (~500 paraules/escena)
-- Capítols de clímax/acció (nivell tensió ≥8): 5-6 escenes (~400 paraules/escena, ritme ràpid). REGLA CRÍTICA: En els clímaxs, crea SEMPRE una escena de beat "introspecció" per a la PRESA DE DECISIÓ (mostrant el cost físic/mental), separada i prèvia a l'escena d'"acció" posterior.
-- Capítol final/resolució: 4 escenes (~550 paraules/escena, ritme pausat)
+- Genera entre 5 i 8 escenes per a aquest capítol. (No menys de 5).
+- Capítols d'exposició/respiració (nivell tensió ≤4): 5-6 escenes (~650 paraules/escena). Aprofita per desplegar el món, explorar relacions i construir subtexte emocional.
+- Capítols de desenvolupament (nivell tensió 5-7): 6-7 escenes (~700 paraules/escena). Alterna acció i respiració; cada escena ha de capgirar o complicar la situació anterior.
+- Capítols de clímax/acció (nivell tensió ≥8): 7-8 escenes (~550 paraules/escena, ritme ràpid). REGLA CRÍTICA: En els clímaxs, crea SEMPRE una escena de beat "introspecció" per a la PRESA DE DECISIÓ (mostrant el cost físic/mental), separada i prèvia a l'escena d'"acció" posterior.
+- Capítol final/resolució: 5-6 escenes (~750 paraules/escena, ritme pausat). Dóna espai per tancar fils secundaris i deixar una ressonància emocional duradora.
 
-TOTAL OBJECTIU: ~1800-2200 paraules per capítol. La novel·la completa ha de fer entre 24.000 i 31.000 paraules (12-14 capítols × ~2000 paraules).
+TOTAL OBJECTIU: ~3.500-5.000 paraules per capítol. La novel·la completa ha de fer entre 60.000 i 100.000 paraules (12-22 capítols × ~4.000 paraules).
 
 CORBA DE TENSIÓ (per orientar el ritme de cada capítol):
 ${corbaTensio.length > 0 ? corbaTensio.map(t => `Cap.${t.capitol}: nivell ${t.nivell} (${t.tipus})`).join(', ') : '(no disponible)'}
@@ -6236,7 +6252,7 @@ ${instruccionsFinalCapitol}
       promptEscena,
       systemPrompt,
       userConfig,
-      { intentsMaxims: 2, maxTokens: Math.max(1500, (escena.paraules_objectiu || 400) * 2) }
+      { intentsMaxims: 2, maxTokens: Math.max(3000, (escena.paraules_objectiu || 700) * 2) }
     );
     textsEscenes.push(res || '');
   }
@@ -6788,12 +6804,12 @@ async function escriureEscenaDirecta(capitol, escenaIdx, escenaSpec, contextNKG,
 ${contextNKG}
 
 INSTRUCCIONS:
-- ${escenaSpec.paraules_objectiu || 500}-${(escenaSpec.paraules_objectiu || 500) + 150} paraules
+- ${escenaSpec.paraules_objectiu || 700}-${(escenaSpec.paraules_objectiu || 700) + 200} paraules
 - Escriu en català
 - Mostra, no expliquis`
   }];
 
-  const res = await callLLMWithContinuation(msgs, systemPrompt, Object.assign({}, userConfig, { maxTokens: 3000 }), 'generacio');
+  const res = await callLLMWithContinuation(msgs, systemPrompt, Object.assign({}, userConfig, { maxTokens: 6000 }), 'generacio');
   return res || '';
 }
 
@@ -6845,7 +6861,7 @@ ${instruccionsTransicio}
 INSTRUCCIONS DE DRAFT:
 - Continuïtat estricta amb les escenes anteriors del mateix capítol
 - PROHIBIT repetir literalment escenes, diàlegs o descripcions ja escrites
-- Escriu l'ESQUELET narratiu d'aquesta escena en ~300 paraules
+- Escriu l'ESQUELET narratiu d'aquesta escena en ~500 paraules
 - Prioritza: QUÈ PASSA, en quin ordre, quins diàlegs avancen la trama
 - NO et preocupis per la prosa, les descripcions ni els detalls sensorials
 - Indica els beats principals: [DIÀLEG], [ACCIÓ], [INTROSPECCIÓ], [DESCRIPCIÓ]
@@ -6858,7 +6874,7 @@ INSTRUCCIONS DE DRAFT:
   let draft;
   try {
     draft = await callLLMMulti(promptDraft, systemPrompt,
-      Object.assign({}, userConfig, { maxTokens: 1500, model: models.modelDraft, _esDraft: true }), 'generacio');
+      Object.assign({}, userConfig, { maxTokens: 2000, model: models.modelDraft, _esDraft: true }), 'generacio');
   } catch (err) {
     console.error('NKG: Error al draft:', err.message);
     return await escriureEscenaDirecta(capitol, escenaIdx, escenaSpec, contextNKG, userConfig);
@@ -6884,11 +6900,11 @@ ${contradiccions.map(c => `- ${c}`).join('\n')}
 DRAFT ORIGINAL:
 ${draft}
 
-Reescriu el draft corregint NOMÉS els errors indicats. Manté la mateixa estructura. ~300 paraules. Escriu en català.`
+Reescriu el draft corregint NOMÉS els errors indicats. Manté la mateixa estructura. ~500 paraules. Escriu en català.`
     }];
     try {
       const correccio = await callLLMMulti(promptCorreccio, systemPrompt,
-        Object.assign({}, userConfig, { maxTokens: 1500, model: models.modelDraft, _esDraft: true }), 'generacio');
+        Object.assign({}, userConfig, { maxTokens: 2000, model: models.modelDraft, _esDraft: true }), 'generacio');
       draft = correccio || draft;
     } catch (err) {
       console.warn('NKG: Error a la correcció del draft, usant original:', err.message);
@@ -6968,7 +6984,7 @@ ${estilsPresents}${manualRef}
 
 ${instruccionsTransicio}
 INSTRUCCIONS D'EXPANSIÓ:
-- Expandeix el draft a prosa literària completa: ${escenaSpec.paraules_objectiu || 500}-${(escenaSpec.paraules_objectiu || 500) + 150} paraules
+- Expandeix el draft a prosa literària completa: ${escenaSpec.paraules_objectiu || 700}-${(escenaSpec.paraules_objectiu || 700) + 200} paraules
 - El draft és l'esquelet; tu poses la carn, la pell i la sang
 - Afegeix: detalls sensorials (mínim 2 sentits per escena), subtexte als diàlegs, ritme de la prosa
 - Evita sobrecarregar d'adjectius: tria noms i verbs concrets abans que ornaments
@@ -6991,7 +7007,7 @@ INSTRUCCIONS D'EXPANSIÓ:
       promptExpansio,
       systemPrompt,
       Object.assign({}, userConfig, { model: models.modelGeneracio }),
-      { intentsMaxims: 2, maxTokens: 3000 }
+      { intentsMaxims: 2, maxTokens: 6000 }
     );
 
     if (!ESTAT._escenes_generades) ESTAT._escenes_generades = {};
@@ -7059,14 +7075,14 @@ INSTRUCCIONS ESTRICTES:
 - Respecta personatges, continuïtat factual i estat del NKG
 - No repeteixis informació, accions ni frases
 - Mantén català natural i consistent
-- LONGITUD OBLIGATÒRIA: Aquest text ha de tenir entre 600 i 700 paraules. Presa't el teu temps per desenvolupar l'escena amb el ritme adequat. Utilitza descripcions sensorials riques, un diàleg ben construït i accions físiques per expandir el text. NO precipitis el final ni resumeixis els esdeveniments per acabar ràpid. Desenvolupa la prosa de manera literària fins a assolir aquesta extensió de paraules.
+- LONGITUD OBLIGATÒRIA: Aquest capítol ha de tenir entre ${Math.round(paraulesTotal * 0.9)} i ${Math.round(paraulesTotal * 1.1)} paraules en total (suma de totes les escenes). Presa't el teu temps per desenvolupar cada escena amb el ritme adequat. Utilitza descripcions sensorials riques, diàlegs ben construïts i accions físiques per expandir el text. NO precipitis el final ni resumeixis els esdeveniments per acabar ràpid. Desenvolupa la prosa de manera literària fins a assolir aquesta extensió de paraules.
 - ${instruccionsFinalCapitol}`
     }];
 
     const textRaw = await callLLMOneShotConditionalCompletion(
       msgs,
       systemPrompt,
-      Object.assign({}, userConfig, { maxTokens: 5200 }),
+      Object.assign({}, userConfig, { maxTokens: Math.max(12000, paraulesTotal * 2) }),
       'generacio'
     );
 
@@ -7094,7 +7110,7 @@ INSTRUCCIONS ESTRICTES:
       objectiu_dramatic: cap ? (cap.resum || '') : '',
       funcio_narrativa: cap ? (cap.fil_principal || '') : '',
       beat_narratiu: cap ? (cap.to_ritme || 'equilibrat') : 'equilibrat',
-      paraules_objectiu: 1800
+      paraules_objectiu: 3500
     };
     const loaderEl = document.getElementById('loader-11-text');
     if (loaderEl) loaderEl.textContent = `✍️ Capítol ${capitol}: draft → expansió…`;
@@ -7603,7 +7619,7 @@ Retorna NOMÉS el text reescrit, sense cap explicació ni metadades.`
 function calcularEstimacioNovella() {
   const models = getModelConfig();
   const numCaps = ESTAT._nombreCapitols || 12;
-  const escenesMitjana = 3.5;
+  const escenesMitjana = 6.5;
   const totalEscenes = Math.round(numCaps * escenesMitjana);
 
   const regDraft = MODEL_REGISTRY[models.modelDraft];
