@@ -623,6 +623,19 @@
   <label class="field-label" for="openaiApiKey" style="margin-top:6px;">🔑 OpenAI API Key <span style="color:var(--text2);font-size:.78rem;">(opcional — per a models GPT)</span></label>
   <input type="password" id="openaiApiKey" placeholder="sk-..." oninput="guardarClausAPI()">
 
+  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+    <h3 style="margin:0 0 10px;font-size:1em;">🎭 Estil i To Global del Projecte</h3>
+
+    <label class="field-label" for="config-genere">Gènere Literari</label>
+    <input type="text" id="config-genere" value="Thriller / Nordic Noir" placeholder="ex: Ciència-Ficció, Nordic Noir...">
+
+    <label class="field-label" for="config-autor">Autor de Referència</label>
+    <input type="text" id="config-autor" value="Stieg Larsson" placeholder="ex: Stieg Larsson, Tolkien...">
+
+    <label class="field-label" for="config-focus-climax">Focus del Clímax (Cost acumulat)</label>
+    <input type="text" id="config-focus-climax" value="Cost físic extrem, esgotament mental, entorns freds i hostils, cinisme" placeholder="ex: Esgotament físic, xoc moral...">
+  </div>
+
   <div class="btn-row">
     <button class="btn btn-primary" onclick="guardarIComencar()">Guardar i Començar</button>
   </div>
@@ -1353,6 +1366,11 @@ function guardarIComencar() {
     ESTAT._modelGeneracio  = modelGeneracio;
     ESTAT._modelArquitecte = modelArquitectura;
     ESTAT._modelDraft      = modelGeneracio;
+
+    const genere = document.getElementById('config-genere') ? document.getElementById('config-genere').value : '';
+    const autor = document.getElementById('config-autor') ? document.getElementById('config-autor').value : '';
+    const focusClimax = document.getElementById('config-focus-climax') ? document.getElementById('config-focus-climax').value : '';
+    ESTAT.configProjecte = { genere, autor_referencia: autor, focus_climax: focusClimax };
 
     USER_CONFIG = {
       provider,
@@ -3200,7 +3218,7 @@ async function parseJsonResponse(rawResponse, providerName) {
 // config.model: override explícit del model (màxima prioritat)
 async function callLLMMulti(messages, systemPrompt, config, tag) {
   const safeConfig = config || {};
-  
+
   // Assignem el model segons si la tasca és d'arquitectura o de generació
   let modelId;
   if (tag === 'arquitecte' || tag === 'arquitectura') {
@@ -3211,7 +3229,7 @@ async function callLLMMulti(messages, systemPrompt, config, tag) {
   }
 
   const proveidor = safeConfig.provider || 'anthropic';
-  
+
   // Obtenim la clau API corresponent
   let apiKey;
   if (proveidor === 'anthropic') apiKey = ESTAT._anthropicApiKey || safeConfig.apiKey;
@@ -3620,7 +3638,7 @@ async function callGemini(messages, systemPrompt, apiKey, model, maxTokens) {
       { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
     ]
   };
-  
+
   if (systemPrompt || SYSTEM_DEFAULT) {
     payload.systemInstruction = { parts: [{ text: systemPrompt || SYSTEM_DEFAULT }] };
   }
@@ -5701,7 +5719,7 @@ ${capsText}
 ESCENES PER CAPÍTOL (adapta al ritme del capítol):
 - Capítols d'exposició/respiració (nivell tensió ≤4): 3 escenes (~450 paraules/escena)
 - Capítols de desenvolupament (nivell tensió 5-7): 3-4 escenes (~500 paraules/escena)
-- Capítols de clímax/acció (nivell tensió ≥8): 4 escenes curtes (~400 paraules/escena, ritme ràpid)
+- Capítols de clímax/acció (nivell tensió ≥8): 4 escenes curtes (~400 paraules/escena, ritme ràpid). REGLA CRÍTICA: En els clímaxs, crea SEMPRE una escena de beat "introspecció" per a la PRESA DE DECISIÓ (mostrant el cost físic/mental), separada i prèvia a l'escena d'"acció" posterior.
 - Capítol final/resolució: 3 escenes (~550 paraules/escena, ritme pausat)
 
 TOTAL OBJECTIU: ~1800-2200 paraules per capítol. La novel·la completa ha de fer entre 24.000 i 31.000 paraules (12-14 capítols × ~2000 paraules).
@@ -5876,6 +5894,7 @@ function nkgQueryEscenaContext(escenaSpec) {
       const p = nkgQueryPersonatge(nom);
       if (p) {
         let desc = `• ${p.nom}: ${p.estat_emocional || 'neutre'}`;
+        if (p.estat_fisic) desc += ` | Físic: ${p.estat_fisic}`;
         if (p.ubicacio) desc += ` | A: ${p.ubicacio}`;
         if (p.objectius && p.objectius.length > 0) desc += ` | Vol: ${p.objectius[0]}`;
         if (p.secrets && p.secrets.length > 0) desc += ` | Amaga: ${p.secrets[0]}`;
@@ -6107,6 +6126,7 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
       } else {
         const ex = nkg.personatges[clau];
         if (p.estat_emocional) ex.estat_emocional = p.estat_emocional;
+        if (p.estat_fisic) ex.estat_fisic = p.estat_fisic;
         if (p.ubicacio) ex.ubicacio = p.ubicacio;
         if (p.viu !== undefined) ex.viu = p.viu;
         if (p.nous_objectius) {
@@ -6206,6 +6226,7 @@ Retorna EXCLUSIVAMENT un JSON vàlid:
   "personatges_actualitzats": [
     {
       "nom": "Nom Exacte",
+      "estat_fisic": "grau de fatiga, ferides, esgotament o dolor al final",
       "estat_emocional": "descripció breu del seu estat emocional al FINAL del fragment",
       "ubicacio": "on és al final",
       "nous_objectius": ["objectiu nou si n'hi ha"],
@@ -6433,12 +6454,26 @@ Reescriu el draft corregint NOMÉS els errors indicats. Manté la mateixa estruc
 
   let instruccionsBeat = '';
   const beat = (escenaSpec.beat_narratiu || escenaSpec.funcio_narrativa || '').toLowerCase();
+
+  // Recuperem el nivell de tensió de l'obra per a l'escena actual
+  const tensioObj = (ESTAT._corbaTensio || []).find(t => t.capitol === capitol);
+  const tensioNivell = tensioObj ? tensioObj.nivell : 5;
+  const conf = ESTAT.configProjecte || { genere: '', autor_referencia: '', focus_climax: '' };
+
   if (beat.includes('diàleg') || beat.includes('dialog')) {
     instruccionsBeat = 'Mínim 60% diàleg directe. Cada personatge ha de sonar diferent. Acotacions mínimes.';
+  } else if (beat.includes('introspecció') || beat.includes('introspeccio') || beat.includes('decisió')) {
+    // LLÒGICA DINÀMICA DE PACING DEL CLÍMAX
+    if (tensioNivell >= 8) {
+      instruccionsBeat = `MOMENT DE DECISIÓ CLIMÀTICA. Atura el temps narratiu i NO acceleris el tempo emocional.
+      Respecta l'estil de l'obra (Gènere: ${conf.genere} / Autor: ${conf.autor_referencia}).
+      El personatge lluita amb la seva resistència interna. Mostra el pes del seu COST ACUMULAT (físic o emocional) abans de prendre la decisió.
+      Enfoca't en detalls minúsculs coherents amb: ${conf.focus_climax}.`;
+    } else {
+      instruccionsBeat = 'Ritme pausat. Pensaments del personatge. Reflexions internes.';
+    }
   } else if (beat.includes('acció') || beat.includes('accio')) {
     instruccionsBeat = 'Frases curtes i directes. Ritme trepidant. Verbs d\'acció. Poc diàleg.';
-  } else if (beat.includes('introspecció') || beat.includes('introspeccio')) {
-    instruccionsBeat = 'Ritme pausat. Pensaments del personatge. Reflexions internes.';
   } else if (beat.includes('descripció') || beat.includes('descripcio')) {
     instruccionsBeat = 'Detalls sensorials: olors, sons, textures, llum. El lloc cobra vida.';
   }
