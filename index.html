@@ -4681,7 +4681,9 @@ BÍBLIA DE MÓN:
 ${world}
 
 ESTILS DE PARLA DELS PERSONATGES:
-${veus}`;
+${veus}
+
+REGLA D'ESTIL OBLIGATÒRIA (SHOW, DON'T TELL): Tens totalment prohibit utilitzar etiquetes emocionals explícites per descriure com se sent un personatge (ex: prohibit dir \"estava trist\", \"se sentia enfadat\", \"estava nerviós\"). En comptes d'això, has de MOSTRAR l'emoció a través d'accions físiques, interaccions amb els objectes del seu inventari, la seva vestimenta, el llenguatge corporal o detalls de l'entorn (ex: \"jugava compulsivament amb el botó descosit de l'abric\", \"va prémer les claus fins que els artells se li van posar blancs\").`;
 
   if (ESTAT._goldenPassage) {
     base += `\n\nREFERÈNCIA DE VEU:\nEl següent passatge exemplifica la veu i l'estil que ha de tenir la novel·la. Usa'l com a referència de qualitat:\n\n${ESTAT._goldenPassage}`;
@@ -4730,6 +4732,7 @@ function buildSystemPromptCapitol() {
       if (m.vocabulari) linies.push(`• Vocabulari: ${m.vocabulari}`);
       if (linies.length > 0) parts.push('\nMANUAL D\'ESTIL DE REFERÈNCIA:\n' + linies.join('\n'));
     }
+    parts.push("\nREGLA D'ESTIL OBLIGATÒRIA (SHOW, DON'T TELL): Tens totalment prohibit utilitzar etiquetes emocionals explícites per descriure com se sent un personatge (ex: prohibit dir \"estava trist\", \"se sentia enfadat\", \"estava nerviós\"). En comptes d'això, has de MOSTRAR l'emoció a través d'accions físiques, interaccions amb objectes, vestimenta, llenguatge corporal o detalls de l'entorn.");
     return parts.join('\n');
   }
   return buildSystemPromptCapitolLegacy();
@@ -4774,12 +4777,20 @@ function buildRegistreContext(idx) {
 // ═══════════════════════════════════════════════════════════
 //  FASE 4: Control de Ritme i Tensió
 // ═══════════════════════════════════════════════════════════
+function obtenirInstruccionsDeTensio(nivellTensio) {
+  const nivell = Math.max(1, Math.min(10, Number(nivellTensio) || 5));
+  if (nivell <= 3) {
+    return `ESTIL I RITME: Tensió baixa (${nivell}/10). Escriu amb un ritme pausat. Crea una atmosfera introspectiva, centra't en descripcions sensorials riques de l'entorn i allarga els paràgrafs. Deixa que els personatges reflexionin.`;
+  }
+  if (nivell <= 7) {
+    return `ESTIL I RITME: Tensió mitjana (${nivell}/10). Ritme equilibrat. Combina diàleg fluid amb accions concretes. L'escena ha d'avançar de manera constant cap al seu objectiu.`;
+  }
+  return `ESTIL I RITME: Tensió alta (${nivell}/10). Ritme frenètic. Utilitza frases més curtes i contundents. Elimina descripcions innecessàries. L'acció i la urgència són primordials.`;
+}
+
 function getInstruccionsRitme(nivell, tipus) {
-  if (nivell <= 3) return 'Ritme pausat. Frases llargues i descriptives. Permet digressions. Estableix atmosfera. Pocs diàlegs, i si n\'hi ha, són reflexius.';
-  if (nivell <= 5) return 'Ritme moderat. Alterna descripció amb diàleg. Introdueix tensió subtilment a través de detalls, no d\'acció.';
-  if (nivell <= 7) return 'Ritme creixent. Frases més curtes a mesura que avança el capítol. Diàlegs amb subtexte. Les escenes s\'acceleren cap al final.';
-  if (nivell <= 9) return 'Ritme alt. Frases curtes i directes. Diàlegs tensos, tallants. Poc espai per respirar. Cada paràgraf augmenta la pressió.';
-  return 'CLÍMAX. Ritme frenètic. Frases mínimes. Acció directa. El moment de màxima tensió. Tot s\'accelera cap a la resolució.';
+  const base = obtenirInstruccionsDeTensio(nivell);
+  return tipus ? `${base} Focus de corba: ${tipus}.` : base;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -6005,6 +6016,70 @@ Retorna EXCLUSIVAMENT JSON vàlid:
   return { response };
 }
 
+async function cridaAPI_GenerarText(promptEscena, systemPrompt, userConfig, maxTokensOverride) {
+  const cfg = Object.assign({}, userConfig, {
+    maxTokens: maxTokensOverride || Math.max(1200, (promptEscena.length / 2) | 0)
+  });
+  return await callLLMMulti([{ role: 'user', content: promptEscena }], systemPrompt, cfg, 'generacio');
+}
+
+async function avaluarQualitatLiteraria(textEscena, userConfig) {
+  const models = getModelConfig(userConfig);
+  const textNet = String(textEscena || '').slice(0, 6000);
+  const promptAvaluador = `Ets un editor literari molt exigent. Llegeix aquest text:
+
+"""${textNet}"""
+
+Avalua si conté clixés evidents, resolucions mandroses o diàlegs robòtics.
+Retorna ÚNICAMENT un objecte JSON amb aquest format exacte:
+{ "aprovat": true/false, "critiques": "Descripció breu del que falla i com fer-ho més original, o buit si està aprovat" }.
+Sigues exigent però just.`;
+
+  try {
+    const raw = await callLLMMulti(
+      [{ role: 'user', content: promptAvaluador }],
+      'Ets un jutge literari anti-clixés. Retorna únicament JSON vàlid.',
+      Object.assign({}, userConfig, { maxTokens: 500, model: models.modelArquitecte || models.modelGeneracio }),
+      'arquitectura'
+    );
+    const parsed = parseJsonRobust(raw);
+    if (parsed && typeof parsed.aprovat === 'boolean') {
+      return {
+        aprovat: parsed.aprovat,
+        critiques: typeof parsed.critiques === 'string' ? parsed.critiques : ''
+      };
+    }
+  } catch (err) {
+    console.warn('Jutge Literari: error de validació, s\'aprova per no bloquejar:', err.message);
+  }
+
+  return { aprovat: true, critiques: '' };
+}
+
+async function generarIValidarEscena(promptEscena, systemPrompt, userConfig, opts = {}) {
+  const intentsMaxims = Math.max(1, Number(opts.intentsMaxims) || 2);
+  const maxTokens = opts.maxTokens || 3000;
+  let escenaAprovada = false;
+  let textEscenaGenerada = '';
+  let intents = 0;
+  let promptTreball = String(promptEscena || '');
+
+  while (!escenaAprovada && intents < intentsMaxims) {
+    intents++;
+    textEscenaGenerada = await cridaAPI_GenerarText(promptTreball, systemPrompt, userConfig, maxTokens);
+
+    const veredicte = await avaluarQualitatLiteraria(textEscenaGenerada, userConfig);
+    if (veredicte.aprovat) {
+      escenaAprovada = true;
+    } else {
+      console.log('El Jutge Literari ha rebutjat l\'escena. Reescrivint... Motius:', veredicte.critiques);
+      promptTreball += `\n\nCRÍTICA DE L'EDITOR: La versió anterior tenia els següents problemes: ${veredicte.critiques || 'massa clixés o prosa plana'}. Reescriu l'escena solucionant AQUESTS problemes específics i evitant llocs comuns.`;
+    }
+  }
+
+  return textEscenaGenerada || '';
+}
+
 // ═══════════════════════════════════════════════════════════
 //  FASE 11: Escriure capítol per escenes (usa escaleta)
 // ═══════════════════════════════════════════════════════════
@@ -6024,6 +6099,8 @@ async function escriureCapitolPerEscenes(idx, userConfig) {
       document.getElementById('loader-11-text').textContent = `Escrivint capítol ${idx + 1} — Escena ${i + 1}/${escenes.length}: ${escena.nom || ''}…`;
     }
     const esUltimaEscena = i === escenes.length - 1;
+    const tensioEscena = (ESTAT._corbaTensio || []).find(t => t.capitol === idx + 1);
+    const instruccioTensioEscena = obtenirInstruccionsDeTensio(tensioEscena ? tensioEscena.nivell : 5);
     const promptEscena = `${contextCapitol}
 
 ## ESCENA ACTUAL A ESCRIURE
@@ -6032,17 +6109,17 @@ Funció narrativa: ${escena.funcio_narrativa || ''}
 Personatges: ${(escena.personatges || []).join(', ')}
 Paraules objectiu: ${escena.paraules_objectiu || 400}
 ${escena.punt_inflexio ? '⚡ Aquesta escena conté un punt d\'inflexió important.' : ''}
+Ritme i tensió objectiu: ${instruccioTensioEscena}
 
 ${i > 0 ? `TEXT DE L'ESCENA ANTERIOR:\n${textsEscenes[i-1].slice(-500)}\n\n` : ''}${esUltimaEscena ? `TANCAMENT DEL CAPÍTOL:
 ${instruccionsFinalCapitol}
 
 ` : ''}Escriu ara aquesta escena en prosa literària completa, sense títols ni metadades. Aproximadament ${escena.paraules_objectiu || 400} paraules.`;
-    const msgs = [{ role: 'user', content: promptEscena }];
-    const res = await callLLMMulti(
-      msgs,
+    const res = await generarIValidarEscena(
+      promptEscena,
       systemPrompt,
-      Object.assign({}, userConfig, { maxTokens: Math.max(1200, (escena.paraules_objectiu || 400) * 2) }),
-      'generacio'
+      userConfig,
+      { intentsMaxims: 2, maxTokens: Math.max(1200, (escena.paraules_objectiu || 400) * 2) }
     );
     textsEscenes.push(res || '');
   }
@@ -6618,7 +6695,8 @@ async function escriureEscenaDualPass(capitol, escenaIdx, escenaSpec, userConfig
 
   // Instruccions de ritme
   const tensio = (ESTAT._corbaTensio || []).find(t => t.capitol === capitol);
-  const instruccionsRitme = tensio ? getInstruccionsRitme(tensio.nivell, tensio.tipus) : 'moderat';
+  const nivellTensio = tensio ? Number(tensio.nivell) : 5;
+  const instruccionsRitme = obtenirInstruccionsDeTensio(nivellTensio);
 
   // ── PAS 1: DRAFT NARRATIU ──
   const promptDraft = [{
@@ -6743,9 +6821,7 @@ Reescriu el draft corregint NOMÉS els errors indicats. Manté la mateixa estruc
     if (linies.length > 0) manualRef = '\nMANUAL D\'ESTIL:\n' + linies.join('\n');
   }
 
-  const promptExpansio = [{
-    role: 'user',
-    content: `EXPANSIÓ LITERÀRIA — Capítol ${capitol}, Escena ${escenaIdx + 1}
+  const promptExpansio = `EXPANSIÓ LITERÀRIA — Capítol ${capitol}, Escena ${escenaIdx + 1}
 
 DRAFT (esquelet narratiu — manté l'estructura i els beats):
 ${draft}
@@ -6759,17 +6835,21 @@ INSTRUCCIONS D'EXPANSIÓ:
 - Afegeix: detalls sensorials (mínim 2 sentits per escena), subtexte als diàlegs, ritme de la prosa
 - Evita sobrecarregar d'adjectius: tria noms i verbs concrets abans que ornaments
 - Evita mots infreqüents o artificiosos en la parla quotidiana; usa català natural i creïble
+- ${obtenirInstruccionsDeTensio(tensioNivell)}
 - ${instruccionsBeat || 'Equilibra narració, diàleg i descripció'}
 - Mostra, no expliquis: NO escriguis "estava trist" → mostra-ho amb gestos, paraules, mirada
 - No repeteixis informació, accions ni frases de les escenes anteriors del mateix capítol; avança sempre
 - Comença directament amb la narració, sense titular${instruccionsVariancia ? '\n- VARIÀNCIA: ' + instruccionsVariancia : ''}
-- ${instruccionsFinalCapitol || 'Mantén la progressió narrativa de l\'escena.'}
-- Escriu en català`
-  }];
+- ${instruccionsFinalCapitol || "Mantén la progressió narrativa de l'escena."}
+- Escriu en català`;
 
   try {
-    const textFinal = await callLLMWithContinuation(promptExpansio, systemPrompt,
-      Object.assign({}, userConfig, { maxTokens: 3000, model: models.modelGeneracio }), 'generacio');
+    const textFinal = await generarIValidarEscena(
+      promptExpansio,
+      systemPrompt,
+      Object.assign({}, userConfig, { model: models.modelGeneracio }),
+      { intentsMaxims: 2, maxTokens: 3000 }
+    );
 
     if (!ESTAT._escenes_generades) ESTAT._escenes_generades = {};
     if (!ESTAT._escenes_generades[idx]) ESTAT._escenes_generades[idx] = {};
