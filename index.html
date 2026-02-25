@@ -978,6 +978,7 @@
     <div class="conte-reader" id="capitol-actual-cos"></div>
     <div class="conte-wordcount" id="capitol-actual-wordcount"></div>
     <div id="revisio-panel" class="hidden review-panel"></div>
+    <div id="checkpoint-intermedi-panel" class="hidden" style="margin-top:16px;padding:16px;background:var(--surface2);border-radius:10px;border-left:3px solid #f59e0b;"></div>
     <div class="btn-row" id="capitol-accions" style="margin-top:16px;"></div>
   </div>
 
@@ -1146,6 +1147,7 @@ const ESTAT = {
   _capitols_generats:       [],
   _revisioInstruccions:     {},
   _controlArcs:             null,
+  _checkpointIntermedi:     null,
   epileg:                   null,
   // Novel·la: dades de l'estructura JSON
   _arcGlobal:               '',
@@ -2457,6 +2459,7 @@ async function generarCapitol(idx, intents = 0) {
 
   document.getElementById('capitol-actual-wrap').classList.add('hidden');
   document.getElementById('revisio-panel').classList.add('hidden');
+  document.getElementById('checkpoint-intermedi-panel').classList.add('hidden');
   document.getElementById('btn-control-arcs-wrap').classList.add('hidden');
   showLoader(11);
   document.getElementById('loader-11-text').textContent =
@@ -2667,6 +2670,45 @@ function mostrarRevisioCapitol(revisat, idx, isLast) {
   }
 
   actualitzarEstatCapitol(idx, 'fet');
+}
+
+function mostrarCheckpointIntermedi(checkpoint, capitolActual, totalCapitols) {
+  const panel = document.getElementById('checkpoint-intermedi-panel');
+  if (!panel) return;
+
+  const subtramesHtml = (checkpoint.estat_subtrames || []).map(st => {
+    const color = st.estat === 'activa' ? 'var(--success)' : st.urgent ? '#f87171' : 'var(--warning)';
+    return `<li style="color:${color};margin-bottom:4px;"><strong>${escHtml(st.nom)}</strong> (${escHtml(st.estat)}) — ${escHtml(st.nota || '')}</li>`;
+  }).join('');
+
+  const absentsHtml = (checkpoint.personatges_absents || []).length > 0
+    ? `<p style="margin:8px 0 4px;font-size:.82rem;color:var(--text2);"><strong>Personatges a recuperar:</strong> ${escHtml((checkpoint.personatges_absents || []).join(', '))}</p>`
+    : '';
+
+  const prefUrgentsHtml = (checkpoint.prefiguracions_urgents || []).map(p =>
+    `<li style="font-size:.82rem;color:var(--text2);">Cap.${p.capitol_resolucio}: <strong>${escHtml(p.element || '')}</strong> — ${escHtml(p.nota || '')}</li>`
+  ).join('');
+
+  const derivaHtml = checkpoint.deriva_detectada
+    ? `<p style="margin:8px 0 4px;font-size:.82rem;color:#f87171;"><strong>Deriva detectada:</strong> ${escHtml(checkpoint.deriva_detectada)}</p>`
+    : '';
+
+  panel.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <span style="font-size:1.3rem;">🟡</span>
+      <div>
+        <div style="font-weight:700;color:#f59e0b;font-size:.95rem;">Checkpoint de coherència — meitat de novel·la</div>
+        <div style="font-size:.78rem;color:var(--text2);">Capítol ${capitolActual} de ${totalCapitols} — els ajustos de rumb s'aplicaran als capítols restants</div>
+      </div>
+    </div>
+    ${subtramesHtml ? `<ul style="margin:0 0 8px 16px;padding:0;">${subtramesHtml}</ul>` : ''}
+    ${absentsHtml}
+    ${prefUrgentsHtml ? `<p style="margin:8px 0 4px;font-size:.82rem;color:var(--text2);"><strong>Prefiguracions urgents:</strong></p><ul style="margin:0 0 8px 16px;padding:0;">${prefUrgentsHtml}</ul>` : ''}
+    ${derivaHtml}
+    ${checkpoint.ajustos_rumb ? `<div style="margin-top:10px;padding:10px 14px;background:var(--surface);border-radius:6px;border-left:2px solid #f59e0b;font-size:.81rem;color:var(--text2);"><strong>Ajustos de rumb injectats als capítols restants:</strong><br>${escHtml(checkpoint.ajustos_rumb)}</div>` : ''}`;
+
+  panel.classList.remove('hidden');
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function mostrarAccionsCapitolSimple(idx, isLast) {
@@ -5668,6 +5710,92 @@ Retorna un diagnòstic detallat en català. Si hi ha fils oberts greus, prefigur
 }
 
 // ═══════════════════════════════════════════════════════════
+//  Checkpoint de coherència a meitat de novel·la
+//  S'executa automàticament al capítol N/2 (novel·les ≥16 caps)
+//  Genera ajustos de rumb que s'injecten a tots els capítols restants
+// ═══════════════════════════════════════════════════════════
+async function controlArcsIntermedi(capitolActual, userConfig) {
+  const reg = ESTAT.llibreRegistre;
+  const totalCapitols = ESTAT._estructuraCapitols ? ESTAT._estructuraCapitols.length : 0;
+  const capsRestants = totalCapitols - capitolActual;
+
+  const resums = (reg.capitols || [])
+    .slice(0, capitolActual)
+    .map((c, i) => c ? `Capítol ${i + 1}: ${c.resum_capitol || '(sense resum)'}` : '')
+    .filter(Boolean)
+    .join('\n');
+
+  const filsOberts = (reg.fils_oberts || []).map(f => `- ${f}`).join('\n') || '(Cap registrat)';
+
+  const prefCtx = llistarPrefiguracions();
+
+  // Capítols pendents (de N/2 fins al final)
+  const capsRestantsText = (ESTAT._estructuraCapitols || [])
+    .slice(capitolActual)
+    .map((c, i) => `Cap. ${capitolActual + i + 1}: "${c.titol || ''}" — ${(c.resum || '').substring(0, 80)}`)
+    .join('\n');
+
+  const msgs = [{
+    role: 'user',
+    content: `Ets un editor sènior fent una revisió de coherència a MEITAT d'una novel·la en curs.
+
+${buildBriefNarratiu()}
+
+PREFIGURACIONS PLANIFICADES (plantades i per plantar):
+${prefCtx}
+
+RESUMS DELS CAPÍTOLS ESCRITS FINS ARA (${capitolActual} de ${totalCapitols}):
+${resums || '(Cap resum disponible)'}
+
+FILS NARRATIUS OBERTS: ${filsOberts}
+
+CAPÍTOLS QUE QUEDEN PER ESCRIURE (${capsRestants} capítols restants):
+${capsRestantsText}
+
+La novel·la va per la meitat. Diagnostica l'estat actual i genera instruccions de rumb per als capítols restants.
+
+Analitza:
+1. SUBTRAMES: Quines subtrames s'estan desenvolupant correctament? Quines s'han descuidat o han desaparegut?
+2. PERSONATGES: Algun personatge important porta massa capítols sense aparèixer o amb arc estancat?
+3. PREFIGURACIONS: Quines prefiguracions plantades han de recollir-se en els capítols restants? Urgència?
+4. DERIVA DE TRAMA: Hi ha alguna desviació respecte a l'arc planificat originalment que calgui corregir?
+5. RITME: El ritme actual (tensió acumulada fins ara) és adequat per arribar al clímax planificat?
+
+Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense markdown, sense text addicional):
+{
+  "estat_subtrames": [
+    {"nom": "nom subtrama", "estat": "activa/descuidada/resolta", "urgent": true, "nota": "breu diagnòstic"}
+  ],
+  "personatges_absents": ["nom1", "nom2"],
+  "prefiguracions_urgents": [
+    {"element": "descripció", "capitol_resolucio": 15, "nota": "breu indicació de com resoldre-la"}
+  ],
+  "deriva_detectada": "descripció breu si n'hi ha, buit si tot va bé",
+  "ajustos_rumb": "instruccions concretes en 3-5 línies per als capítols restants: quins fils recuperar, quins personatges fer aparèixer, quines tensions apujar o baixar. Escrit com a nota interna de l'arquitecte per al model que escriurà els capítols."
+}`
+  }];
+
+  try {
+    const response = await callLLMMulti(
+      msgs,
+      'Ets un editor sènior de novel·la. Retornes EXCLUSIVAMENT JSON vàlid, sense text addicional.',
+      Object.assign({}, userConfig, { maxTokens: 2000 }),
+      'arquitectura'
+    );
+    const data = parseJsonRobust(response);
+    if (data && data.ajustos_rumb) {
+      ESTAT._ajustosRumb = data.ajustos_rumb;
+      ESTAT._checkpointIntermedi = data;
+      console.log(`Checkpoint meitat novel·la (cap.${capitolActual}/${totalCapitols}):`, data.ajustos_rumb);
+    }
+    return data;
+  } catch (err) {
+    console.warn('Checkpoint intermedi: error no bloquejant:', err.message);
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
 //  Epíleg Resolutiu (Sonnet) — FASE 7: context real
 // ═══════════════════════════════════════════════════════════
 async function generarEpileg(instruccionsOpus, userConfig) {
@@ -7132,8 +7260,23 @@ INSTRUCCIONS ESTRICTES:
     await generarResumCompacte(capitol, userConfig);
   }
 
-  // Millora 7: Micro-reescriptura cada 3 capítols (Sonnet diagnostica i reescriu)
+  // Checkpoint de coherència a meitat de novel·la (novel·les ≥16 capítols)
   const totalCapitols = ESTAT._estructuraCapitols ? ESTAT._estructuraCapitols.length : 12;
+  const capitolMig = Math.floor(totalCapitols / 2);
+  if (totalCapitols >= 16 && capitol === capitolMig) {
+    try {
+      const loaderEl = document.getElementById('loader-11-text');
+      if (loaderEl) loaderEl.textContent = `🟡 Checkpoint de coherència a meitat de novel·la (cap.${capitol}/${totalCapitols})…`;
+      const checkpoint = await controlArcsIntermedi(capitol, userConfig);
+      if (checkpoint) {
+        mostrarCheckpointIntermedi(checkpoint, capitol, totalCapitols);
+      }
+    } catch (err) {
+      console.warn('Checkpoint intermedi: error no bloquejant:', err.message);
+    }
+  }
+
+  // Millora 7: Micro-reescriptura cada 3 capítols (Sonnet diagnostica i reescriu)
   if (capitol % 3 === 0 || capitol === totalCapitols) {
     try {
       const loaderEl = document.getElementById('loader-11-text');
