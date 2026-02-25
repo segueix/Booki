@@ -1258,7 +1258,7 @@ const MODEL_REGISTRY = {
     context_max: 1000000, max_output: 8192,
     qualitat: { draft: 80, prosa: 75, arquitectura: 75, extraccio: 85 },
     velocitat: 'molt_rapida',
-    notes: 'Ràpid i econòmic. Ideal per escriure text brut i extreure dades al NKG.'
+    notes: 'Model de nova generació extremadament barat i ràpid.'
   },
   'gpt-5.2': {
     nom: 'GPT-5.2', nomCurt: 'GPT-5.2',
@@ -1359,8 +1359,8 @@ function actualitzarConfigProvider() {
     genInput.value = 'claude-sonnet-4-6';
     arqInput.value = 'claude-opus-4-6';
   } else if (provider === 'gemini') {
-    genInput.value = 'gemini-1.5-flash';
-    arqInput.value = 'gemini-1.5-pro';
+    genInput.value = 'gemini-3-flash-preview';
+    arqInput.value = 'gemini-3-flash-preview';
   } else if (provider === 'openai') {
     genInput.value = 'gpt-4o-mini';
     arqInput.value = 'gpt-4o';
