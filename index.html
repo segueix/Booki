@@ -558,6 +558,25 @@
     </label>
     <input type="text" id="config-model-arquitectura" value="claude-opus-4-6" placeholder="claude-opus-4-6">
 
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
+      <div>
+        <label class="field-label" for="config-provider-generacio" style="margin-bottom:4px;">Proveïdor Generació</label>
+        <select id="config-provider-generacio">
+          <option value="anthropic">Anthropic (Claude)</option>
+          <option value="gemini">Google (Gemini)</option>
+          <option value="openai">OpenAI (GPT)</option>
+        </select>
+      </div>
+      <div>
+        <label class="field-label" for="config-provider-arquitectura" style="margin-bottom:4px;">Proveïdor Arquitectura</label>
+        <select id="config-provider-arquitectura">
+          <option value="anthropic">Anthropic (Claude)</option>
+          <option value="gemini">Google (Gemini)</option>
+          <option value="openai">OpenAI (GPT)</option>
+        </select>
+      </div>
+    </div>
+
     <div class="checkbox-row" onclick="document.getElementById('config-flux-automatic').click()">
       <input type="checkbox" id="config-flux-automatic" onclick="event.stopPropagation()">
       <label for="config-flux-automatic">
@@ -1318,6 +1337,11 @@ function actualitzarConfigProvider() {
 
   const genInput = document.getElementById('config-model-generacio');
   const arqInput = document.getElementById('config-model-arquitectura');
+  const provGenSel = document.getElementById('config-provider-generacio');
+  const provArqSel = document.getElementById('config-provider-arquitectura');
+
+  if (provGenSel) provGenSel.value = provider;
+  if (provArqSel) provArqSel.value = provider;
 
   // Actualitzem els valors per defecte recomanats segons el proveïdor
   if (provider === 'anthropic') {
@@ -1340,16 +1364,25 @@ function guardarIComencar() {
     const provider = document.getElementById('config-provider').value;
     if (!provider) { toast('Selecciona un proveïdor.'); return; }
 
+    const providerGeneracio = (document.getElementById('config-provider-generacio')?.value || provider).trim();
+    const providerArquitectura = (document.getElementById('config-provider-arquitectura')?.value || provider).trim();
+
     const anthropicKey = document.getElementById('anthropicApiKey')?.value?.trim() || '';
     const geminiKey    = document.getElementById('geminiApiKey')?.value?.trim() || '';
     const openaiKey    = document.getElementById('openaiApiKey')?.value?.trim() || '';
 
-    let apiKey = '';
-    if (provider === 'anthropic') apiKey = anthropicKey;
-    if (provider === 'gemini')    apiKey = geminiKey;
-    if (provider === 'openai')    apiKey = openaiKey;
+    const getKeyForProvider = (prov) => {
+      if (prov === 'anthropic') return anthropicKey;
+      if (prov === 'gemini' || prov === 'google') return geminiKey;
+      if (prov === 'openai') return openaiKey;
+      return '';
+    };
 
-    if (!apiKey) { toast("Introdueix una API key per al proveïdor seleccionat."); return; }
+    const providersNecessaris = Array.from(new Set([providerGeneracio, providerArquitectura]));
+    const senseKey = providersNecessaris.find(p => !getKeyForProvider(p));
+    if (senseKey) { toast(`Introdueix una API key per al proveïdor seleccionat (${senseKey}).`); return; }
+
+    const apiKey = getKeyForProvider(providerGeneracio);
 
     if (anthropicKey) ESTAT._anthropicApiKey = anthropicKey;
     if (geminiKey)    ESTAT._geminiApiKey    = geminiKey;
@@ -1374,6 +1407,8 @@ function guardarIComencar() {
 
     USER_CONFIG = {
       provider,
+      providerGeneracio,
+      providerArquitectura,
       apiKey,
       modelGeneracio,
       modelArquitectura,
@@ -3330,6 +3365,15 @@ async function parseJsonResponse(rawResponse, providerName) {
 // tag: 'generacio' | 'arquitecte' | 'arquitectura'
 // config._esDraft: true → usa model Draft (Haiku o equivalent)
 // config.model: override explícit del model (màxima prioritat)
+function getProviderPerRol(config, tag) {
+  const cfg = config || {};
+  const isArq = (tag === 'arquitecte' || tag === 'arquitectura');
+  const roleProvider = isArq
+    ? (cfg.providerArquitectura || cfg.provider_arq)
+    : (cfg.providerGeneracio || cfg.provider_gen || cfg.providerDraft);
+  return (roleProvider || cfg.provider || 'anthropic');
+}
+
 async function callLLMMulti(messages, systemPrompt, config, tag) {
   const safeConfig = config || {};
 
@@ -3342,7 +3386,7 @@ async function callLLMMulti(messages, systemPrompt, config, tag) {
     modelId = safeConfig.modelGeneracio || safeConfig.model;
   }
 
-  const proveidor = safeConfig.provider || 'anthropic';
+  const proveidor = getProviderPerRol(safeConfig, tag);
 
   // Obtenim la clau API corresponent
   let apiKey;
@@ -3372,7 +3416,7 @@ async function callLLMWithContinuation(messages, systemPrompt, config, tag, maxC
     modelId = safeConfig.modelGeneracio || safeConfig.model;
   }
 
-  const proveidor = safeConfig.provider || 'anthropic';
+  const proveidor = getProviderPerRol(safeConfig, tag);
 
   let apiKey;
   if (proveidor === 'anthropic') apiKey = ESTAT._anthropicApiKey || safeConfig.apiKey;
@@ -3435,7 +3479,7 @@ async function callLLMOneShotPlusCompletion(messages, systemPrompt, config, tag)
     modelId = safeConfig.modelGeneracio || safeConfig.model;
   }
 
-  const proveidor = safeConfig.provider || 'anthropic';
+  const proveidor = getProviderPerRol(safeConfig, tag);
   let apiKey;
   if (proveidor === 'anthropic') apiKey = ESTAT._anthropicApiKey || safeConfig.apiKey;
   if (proveidor === 'google' || proveidor === 'gemini') apiKey = ESTAT._geminiApiKey || safeConfig.apiKey;
@@ -3507,7 +3551,7 @@ async function callLLMOneShotConditionalCompletion(messages, systemPrompt, confi
     modelId = safeConfig.modelGeneracio || safeConfig.model;
   }
 
-  const proveidor = safeConfig.provider || 'anthropic';
+  const proveidor = getProviderPerRol(safeConfig, tag);
   let apiKey;
   if (proveidor === 'anthropic') apiKey = ESTAT._anthropicApiKey || safeConfig.apiKey;
   if (proveidor === 'google' || proveidor === 'gemini') apiKey = ESTAT._geminiApiKey || safeConfig.apiKey;
