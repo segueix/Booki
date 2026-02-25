@@ -1219,7 +1219,7 @@ const MODEL_REGISTRY = {
     nom: 'Claude Haiku 4.5', nomCurt: 'Haiku 4.5',
     proveidor: 'anthropic',
     input_per_m: 1.00, output_per_m: 5.00,
-    context_max: 200000,
+    context_max: 200000, max_output: 4096,
     qualitat: { draft: 72, prosa: 62, arquitectura: 65, extraccio: 78 },
     velocitat: 'molt_rapida',
     notes: 'Ràpid i barat. Bo per tasques mecàniques. Prosa plana.'
@@ -1228,7 +1228,7 @@ const MODEL_REGISTRY = {
     nom: 'Claude Sonnet 4.6', nomCurt: 'Sonnet 4.6',
     proveidor: 'anthropic',
     input_per_m: 3.00, output_per_m: 15.00,
-    context_max: 1000000,
+    context_max: 1000000, max_output: 8192,
     qualitat: { draft: 82, prosa: 84, arquitectura: 86, extraccio: 88 },
     velocitat: 'rapida',
     notes: 'Millor ràtio qualitat/preu. Quasi Opus a 1/5 del preu. Prosa molt bona.'
@@ -1237,7 +1237,7 @@ const MODEL_REGISTRY = {
     nom: 'Claude Opus 4.6', nomCurt: 'Opus 4.6',
     proveidor: 'anthropic',
     input_per_m: 5.00, output_per_m: 25.00,
-    context_max: 1000000,
+    context_max: 1000000, max_output: 8192,
     qualitat: { draft: 85, prosa: 88, arquitectura: 93, extraccio: 90 },
     velocitat: 'moderada',
     notes: 'Màxima intel·ligència. Millor per judicis literaris subtils i arquitectura complexa.'
@@ -1246,7 +1246,7 @@ const MODEL_REGISTRY = {
     nom: 'Gemini 3 Pro Preview', nomCurt: 'Gemini 3 Pro',
     proveidor: 'google',
     input_per_m: 2.00, output_per_m: 12.00,
-    context_max: 1000000,
+    context_max: 1000000, max_output: 8192,
     qualitat: { draft: 78, prosa: 75, arquitectura: 80, extraccio: 82 },
     velocitat: 'rapida',
     notes: 'Bon raonament, context llarg. Prosa en català menys natural que Claude.'
@@ -1255,7 +1255,7 @@ const MODEL_REGISTRY = {
     nom: 'GPT-5.2', nomCurt: 'GPT-5.2',
     proveidor: 'openai',
     input_per_m: 1.75, output_per_m: 14.00,
-    context_max: 400000,
+    context_max: 400000, max_output: 4096,
     qualitat: { draft: 80, prosa: 78, arquitectura: 82, extraccio: 85 },
     velocitat: 'rapida',
     notes: 'Fort en raonament i codi. Català acceptable però no natiu. Preu competitiu.'
@@ -3418,6 +3418,63 @@ async function parseJsonResponse(rawResponse, providerName) {
   return parsed;
 }
 
+// ─── fetchSegur: fetch amb backoff exponencial ───────────────
+// Substitueix fetch() directe per a totes les crides LLM.
+// Reintenta automàticament si l'API retorna 429, 503 o 529.
+async function fetchSegur(url, options, maxIntents = 3) {
+  const RETRYABLE = new Set([429, 503, 529]);
+  for (let intent = 0; intent < maxIntents; intent++) {
+    const response = await fetch(url, options);
+    if (!RETRYABLE.has(response.status)) return response;
+    if (intent === maxIntents - 1) return response; // últim intent: retorna per deixar parseJsonResponse gestionar l'error
+    const delayMs = Math.pow(2, intent + 1) * 1000; // 2s → 4s → 8s
+    console.warn(`[fetchSegur] HTTP ${response.status} — reintent ${intent + 1}/${maxIntents - 1} en ${delayMs / 1000}s...`);
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+  }
+}
+
+// ─── analitzarRespostaGenerica: parser estandarditzat ────────
+// Extreu text i detecta tall per límit de tokens de forma
+// agnòstica al proveïdor. Retorna { text, textIncomplet }.
+function analitzarRespostaGenerica(respostaJSON, proveidor) {
+  let text = '';
+  let textIncomplet = false;
+
+  if (proveidor === 'anthropic') {
+    text = Array.isArray(respostaJSON.content)
+      ? respostaJSON.content.filter(p => p && p.type === 'text').map(p => p.text || '').join('\n')
+      : '';
+    textIncomplet = respostaJSON.stop_reason === 'max_tokens';
+
+  } else if (proveidor === 'openai') {
+    const firstChoice = respostaJSON.choices && respostaJSON.choices[0];
+    const content = firstChoice && firstChoice.message ? firstChoice.message.content : '';
+    text = extractContentText(content);
+    textIncomplet = !!(firstChoice && firstChoice.finish_reason === 'length');
+
+  } else if (proveidor === 'google' || proveidor === 'gemini') {
+    const firstCandidate = respostaJSON.candidates && respostaJSON.candidates[0];
+    if (firstCandidate && firstCandidate.finishReason === 'SAFETY') {
+      throw new Error('Gemini ha bloquejat la resposta per filtres de seguretat extrems. Prova amb un fragment menys sensible.');
+    }
+    const parts = firstCandidate && firstCandidate.content ? firstCandidate.content.parts : [];
+    text = Array.isArray(parts) ? parts.map(p => (p && p.text) ? p.text : '').join('\n') : '';
+    textIncomplet = !!(firstCandidate && firstCandidate.finishReason === 'MAX_TOKENS');
+
+  } else {
+    throw new Error(`analitzarRespostaGenerica: proveidor desconegut "${proveidor}"`);
+  }
+
+  return { text: normalizeLLMText(text), textIncomplet };
+}
+
+// ─── Helpers per llegir max_output del registre ──────────────
+function getMaxTokens(safeConfig, modelId) {
+  if (safeConfig.maxTokens) return safeConfig.maxTokens;
+  const entry = MODEL_REGISTRY[modelId];
+  return (entry && entry.max_output) || 4096;
+}
+
 // ─── Router multi-proveïdor i multi-rol — v5.1 ──────────────
 // tag: 'generacio' | 'arquitecte' | 'arquitectura'
 // config._esDraft: true → usa model Draft (Haiku o equivalent)
@@ -3453,7 +3510,7 @@ async function callLLMMulti(messages, systemPrompt, config, tag) {
 
   if (!apiKey) throw new Error(`Cal una clau API per al proveïdor: ${proveidor}`);
 
-  const maxTokens = safeConfig.maxTokens || 2048;
+  const maxTokens = getMaxTokens(safeConfig, modelId);
 
   // Enrutem directament al proveïdor triat amb el text lliure del model
   if (proveidor === 'anthropic') return await callAnthropic(messages, systemPrompt, apiKey, modelId, maxTokens);
@@ -3482,7 +3539,7 @@ async function callLLMWithContinuation(messages, systemPrompt, config, tag, maxC
 
   if (!apiKey) throw new Error(`Cal una clau API per al proveïdor: ${proveidor}`);
 
-  const maxTokens = safeConfig.maxTokens || 2048;
+  const maxTokens = getMaxTokens(safeConfig, modelId);
 
   let fullText = '';
   let currentMessages = [...messages];
@@ -3501,13 +3558,13 @@ async function callLLMWithContinuation(messages, systemPrompt, config, tag, maxC
 
     fullText += result.text;
 
-    if (result.finishReason !== 'length') break;
+    if (!result.textIncomplet) break;
 
     console.log(`[callLLMWithContinuation] Text tallat (iteració ${i + 1}/${maxCont}), sol·licitant continuació...`);
     currentMessages = [
       ...currentMessages,
       { role: 'assistant', content: result.text },
-      { role: 'user', content: "Continua el text exactament des d'on t'has aturat, sense repetir ni resumir res." }
+      { role: 'user', content: "El teu últim missatge s'ha tallat per límits de longitud. Continua escrivint EXACTAMENT des de la teva última lletra, sense introduccions ni disculpes." }
     ];
   }
 
@@ -3543,7 +3600,7 @@ async function callLLMOneShotPlusCompletion(messages, systemPrompt, config, tag)
   if (proveidor === 'openai') apiKey = ESTAT._openaiApiKey || safeConfig.apiKey;
   if (!apiKey) throw new Error(`Cal una clau API per al proveïdor: ${proveidor}`);
 
-  const maxTokens = safeConfig.maxTokens || 2048;
+  const maxTokens = getMaxTokens(safeConfig, modelId);
 
   let primera;
   if (proveidor === 'anthropic') {
@@ -3583,7 +3640,7 @@ No repeteixis res del que ja has escrit.` }
     }
 
     // Fallback robust: només si el detector local veu final incomplet.
-    if ((primera.finishReason === 'length') || textSemblaIncomplet(text)) {
+    if (primera.textIncomplet || textSemblaIncomplet(text)) {
       const rescat = await callLLMMulti([
         ...messages,
         { role: 'assistant', content: text },
@@ -3615,7 +3672,7 @@ async function callLLMOneShotConditionalCompletion(messages, systemPrompt, confi
   if (proveidor === 'openai') apiKey = ESTAT._openaiApiKey || safeConfig.apiKey;
   if (!apiKey) throw new Error(`Cal una clau API per al proveïdor: ${proveidor}`);
 
-  const maxTokens = safeConfig.maxTokens || 2048;
+  const maxTokens = getMaxTokens(safeConfig, modelId);
 
   let primera;
   if (proveidor === 'anthropic') {
@@ -3629,7 +3686,7 @@ async function callLLMOneShotConditionalCompletion(messages, systemPrompt, confi
   }
 
   let text = primera.text || '';
-  const necessitaTancament = (primera.finishReason === 'length') || textSemblaIncomplet(text);
+  const necessitaTancament = primera.textIncomplet || textSemblaIncomplet(text);
   if (!necessitaTancament) return text;
 
   const missatgesTancament = [
@@ -3697,7 +3754,6 @@ async function callLLM(messages, systemPrompt, config, rol) {
   const safeConfig = config || {};
   const provider   = String(safeConfig.provider || '').toLowerCase().trim();
   const apiKey     = safeConfig.apiKey;
-  const maxTokens  = safeConfig.maxTokens || 2048;
 
   if (!provider) throw new Error('Falta el provider al config.');
   if (!apiKey)   throw new Error("Falta l'apiKey al config.");
@@ -3712,6 +3768,8 @@ async function callLLM(messages, systemPrompt, config, rol) {
     model = safeConfig.modelGeneracio ||
             (PROVIDER_DEFAULTS[provider] && PROVIDER_DEFAULTS[provider].model);
   }
+
+  const maxTokens = getMaxTokens(safeConfig, model);
 
   if (provider === 'anthropic') return await callAnthropic(messages, systemPrompt, apiKey, model, maxTokens);
   if (provider === 'openai')    return await callOpenAI(messages, systemPrompt, apiKey, model, maxTokens);
@@ -3734,12 +3792,12 @@ async function callAnthropic(messages, systemPrompt, apiKey, model, maxTokens) {
     messages:   messages
   };
 
-  const raw = await fetch(PROVIDER_DEFAULTS.anthropic.apiUrl, {
+  const raw = await fetchSegur(PROVIDER_DEFAULTS.anthropic.apiUrl, {
     method: 'POST',
     headers: {
-      'Content-Type':                            'application/json',
-      'x-api-key':                               apiKey,
-      'anthropic-version':                       '2023-06-01',
+      'Content-Type':                              'application/json',
+      'x-api-key':                                 apiKey,
+      'anthropic-version':                         '2023-06-01',
       'anthropic-dangerous-direct-browser-access': 'true'
     },
     body: JSON.stringify(payload)
@@ -3747,11 +3805,7 @@ async function callAnthropic(messages, systemPrompt, apiKey, model, maxTokens) {
 
   const result = await parseJsonResponse(raw, 'Anthropic');
   if (result.error) throw new Error(result.error.message || "Error desconegut d'Anthropic.");
-
-  const text = Array.isArray(result.content)
-    ? result.content.filter(p => p && p.type === 'text').map(p => p.text || '').join('\n')
-    : '';
-  return normalizeLLMText(text);
+  return analitzarRespostaGenerica(result, 'anthropic').text;
 }
 
 async function callAnthropicWithFinishReason(messages, systemPrompt, apiKey, model, maxTokens) {
@@ -3762,12 +3816,12 @@ async function callAnthropicWithFinishReason(messages, systemPrompt, apiKey, mod
     messages:   messages
   };
 
-  const raw = await fetch(PROVIDER_DEFAULTS.anthropic.apiUrl, {
+  const raw = await fetchSegur(PROVIDER_DEFAULTS.anthropic.apiUrl, {
     method: 'POST',
     headers: {
-      'Content-Type':                            'application/json',
-      'x-api-key':                               apiKey,
-      'anthropic-version':                       '2023-06-01',
+      'Content-Type':                              'application/json',
+      'x-api-key':                                 apiKey,
+      'anthropic-version':                         '2023-06-01',
       'anthropic-dangerous-direct-browser-access': 'true'
     },
     body: JSON.stringify(payload)
@@ -3775,12 +3829,7 @@ async function callAnthropicWithFinishReason(messages, systemPrompt, apiKey, mod
 
   const result = await parseJsonResponse(raw, 'Anthropic');
   if (result.error) throw new Error(result.error.message || "Error desconegut d'Anthropic.");
-
-  const text = Array.isArray(result.content)
-    ? result.content.filter(p => p && p.type === 'text').map(p => p.text || '').join('\n')
-    : '';
-  const finishReason = result.stop_reason === 'max_tokens' ? 'length' : 'stop';
-  return { text: normalizeLLMText(text), finishReason };
+  return analitzarRespostaGenerica(result, 'anthropic');
 }
 
 // ─── OpenAI (GPT) ───────────────────────────────────────────
@@ -3793,7 +3842,7 @@ async function callOpenAI(messages, systemPrompt, apiKey, model, maxTokens) {
     max_tokens: maxTokens
   };
 
-  const raw = await fetch(PROVIDER_DEFAULTS.openai.apiUrl, {
+  const raw = await fetchSegur(PROVIDER_DEFAULTS.openai.apiUrl, {
     method: 'POST',
     headers: {
       'Content-Type':  'application/json',
@@ -3804,10 +3853,7 @@ async function callOpenAI(messages, systemPrompt, apiKey, model, maxTokens) {
 
   const result = await parseJsonResponse(raw, 'OpenAI');
   if (result.error) throw new Error(result.error.message || "Error desconegut d'OpenAI.");
-
-  const firstChoice    = result.choices && result.choices[0];
-  const messageContent = firstChoice && firstChoice.message ? firstChoice.message.content : '';
-  return normalizeLLMText(extractContentText(messageContent));
+  return analitzarRespostaGenerica(result, 'openai').text;
 }
 
 async function callOpenAIWithFinishReason(messages, systemPrompt, apiKey, model, maxTokens) {
@@ -3817,7 +3863,7 @@ async function callOpenAIWithFinishReason(messages, systemPrompt, apiKey, model,
     max_tokens: maxTokens
   };
 
-  const raw = await fetch(PROVIDER_DEFAULTS.openai.apiUrl, {
+  const raw = await fetchSegur(PROVIDER_DEFAULTS.openai.apiUrl, {
     method: 'POST',
     headers: {
       'Content-Type':  'application/json',
@@ -3828,11 +3874,7 @@ async function callOpenAIWithFinishReason(messages, systemPrompt, apiKey, model,
 
   const result = await parseJsonResponse(raw, 'OpenAI');
   if (result.error) throw new Error(result.error.message || "Error desconegut d'OpenAI.");
-
-  const firstChoice    = result.choices && result.choices[0];
-  const messageContent = firstChoice && firstChoice.message ? firstChoice.message.content : '';
-  const finishReason   = firstChoice && firstChoice.finish_reason === 'length' ? 'length' : 'stop';
-  return { text: normalizeLLMText(extractContentText(messageContent)), finishReason };
+  return analitzarRespostaGenerica(result, 'openai');
 }
 
 // ─── Google Gemini ──────────────────────────────────────────
@@ -3848,10 +3890,10 @@ async function callGemini(messages, systemPrompt, apiKey, model, maxTokens) {
     generationConfig: { maxOutputTokens: maxTokens },
     // CORRECCIÓ: Desactivem els filtres per permetre textos literaris
     safetySettings: [
-      { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-      { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-      { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-      { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+      { category: "HARM_CATEGORY_HARASSMENT",        threshold: "BLOCK_NONE" },
+      { category: "HARM_CATEGORY_HATE_SPEECH",        threshold: "BLOCK_NONE" },
+      { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",  threshold: "BLOCK_NONE" },
+      { category: "HARM_CATEGORY_DANGEROUS_CONTENT",  threshold: "BLOCK_NONE" }
     ]
   };
 
@@ -3859,7 +3901,7 @@ async function callGemini(messages, systemPrompt, apiKey, model, maxTokens) {
     payload.systemInstruction = { parts: [{ text: systemPrompt || SYSTEM_DEFAULT }] };
   }
 
-  const raw = await fetch(endpoint, {
+  const raw = await fetchSegur(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -3872,18 +3914,7 @@ async function callGemini(messages, systemPrompt, apiKey, model, maxTokens) {
       (result.error.status ? ' (' + result.error.status + ')' : '')
     );
   }
-
-  const firstCandidate = result.candidates && result.candidates[0];
-
-  // Avís clar si bloqueja per seguretat
-  if (firstCandidate && firstCandidate.finishReason === 'SAFETY') {
-     throw new Error("Gemini ha bloquejat la resposta per filtres de seguretat extrems. Prova amb un fragment menys sensible.");
-  }
-
-  const parts = firstCandidate && firstCandidate.content ? firstCandidate.content.parts : [];
-  const text  = Array.isArray(parts) ? parts.map(p => (p && p.text) ? p.text : '').join('\n') : '';
-
-  return normalizeLLMText(text);
+  return analitzarRespostaGenerica(result, 'google').text;
 }
 
 async function callGeminiWithFinishReason(messages, systemPrompt, apiKey, model, maxTokens) {
@@ -3895,10 +3926,10 @@ async function callGeminiWithFinishReason(messages, systemPrompt, apiKey, model,
     contents:         buildGeminiContents(messages),
     generationConfig: { maxOutputTokens: maxTokens },
     safetySettings: [
-      { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-      { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-      { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-      { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+      { category: "HARM_CATEGORY_HARASSMENT",        threshold: "BLOCK_NONE" },
+      { category: "HARM_CATEGORY_HATE_SPEECH",        threshold: "BLOCK_NONE" },
+      { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",  threshold: "BLOCK_NONE" },
+      { category: "HARM_CATEGORY_DANGEROUS_CONTENT",  threshold: "BLOCK_NONE" }
     ]
   };
 
@@ -3906,7 +3937,7 @@ async function callGeminiWithFinishReason(messages, systemPrompt, apiKey, model,
     payload.systemInstruction = { parts: [{ text: systemPrompt || SYSTEM_DEFAULT }] };
   }
 
-  const raw = await fetch(endpoint, {
+  const raw = await fetchSegur(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -3919,17 +3950,7 @@ async function callGeminiWithFinishReason(messages, systemPrompt, apiKey, model,
       (result.error.status ? ' (' + result.error.status + ')' : '')
     );
   }
-
-  const firstCandidate = result.candidates && result.candidates[0];
-
-  if (firstCandidate && firstCandidate.finishReason === 'SAFETY') {
-    throw new Error("Gemini ha bloquejat la resposta per filtres de seguretat extrems. Prova amb un fragment menys sensible.");
-  }
-
-  const parts = firstCandidate && firstCandidate.content ? firstCandidate.content.parts : [];
-  const text  = Array.isArray(parts) ? parts.map(p => (p && p.text) ? p.text : '').join('\n') : '';
-  const finishReason = firstCandidate && firstCandidate.finishReason === 'MAX_TOKENS' ? 'length' : 'stop';
-  return { text: normalizeLLMText(text), finishReason };
+  return analitzarRespostaGenerica(result, 'google');
 }
 
 // ─── Helpers de construcció de missatges ────────────────────
