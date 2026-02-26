@@ -964,8 +964,11 @@
 
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
     <div id="capitol-progress-text" style="color:var(--text2);font-size:.88rem;"></div>
-    <button class="btn btn-ghost" style="padding:7px 14px;font-size:.82rem;" onclick="obrirLlibreRegistre()">📓 Llibre de Registre</button>
-    <button class="btn btn-ghost" style="padding:7px 14px;font-size:.82rem;" onclick="obrirBiblia()">📚 Bíblia Narrativa</button>
+    <div style="display:flex; gap:8px;">
+      <button id="btn-pausa-flux" class="btn btn-ghost hidden" style="padding:7px 14px;font-size:.82rem;color:var(--warning);border-color:var(--warning);" onclick="togglePausaFlux()">⏸ Pausar Automàtic</button>
+      <button class="btn btn-ghost" style="padding:7px 14px;font-size:.82rem;" onclick="obrirLlibreRegistre()">📓 Llibre de Registre</button>
+      <button class="btn btn-ghost" style="padding:7px 14px;font-size:.82rem;" onclick="obrirBiblia()">📚 Bíblia Narrativa</button>
+    </div>
   </div>
 
   <div id="capitol-llista" style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px;max-height:260px;overflow-y:auto;"></div>
@@ -1085,6 +1088,53 @@ function hideLoader(n) {
   guardarProjecteLocal();
 }
 function showBtn(id)   { document.getElementById(id).classList.remove('hidden'); }
+
+// --- GESTOR DE FLUX AUTOMÀTIC (CUA RESILIENT) ---
+const GestorFlux = {
+  pausat: false,
+  cua: [],
+  enExecucio: false,
+  afegirTasca(nom, funcio, delayMs = 0) {
+    this.cua.push({ nom, funcio, delayMs });
+    this.processarCua();
+  },
+  async processarCua() {
+    if (this.enExecucio || this.pausat || this.cua.length === 0) return;
+    this.enExecucio = true;
+    const tasca = this.cua.shift();
+    console.log(`[GestorFlux] Preparant: ${tasca.nom} (espera de ${tasca.delayMs / 1000}s)`);
+    if (tasca.delayMs > 0) {
+      await new Promise(r => setTimeout(r, tasca.delayMs));
+    }
+    if (!this.pausat) {
+      try { await tasca.funcio(); }
+      catch (e) { console.error(`[GestorFlux] Error a ${tasca.nom}:`, e); }
+    } else {
+      // Si s'ha pausat durant l'espera, tornem a posar la tasca al principi de la cua
+      this.cua.unshift(tasca);
+    }
+    this.enExecucio = false;
+    this.processarCua();
+  },
+  pausar() {
+    this.pausat = true;
+    const btn = document.getElementById('btn-pausa-flux');
+    if (btn) btn.innerHTML = '▶ Reprendre Automàtic';
+    toast("Flux automàtic pausat. S'aturarà en acabar l'acció en curs.");
+  },
+  reprendre() {
+    this.pausat = false;
+    const btn = document.getElementById('btn-pausa-flux');
+    if (btn) btn.innerHTML = '⏸ Pausar Automàtic';
+    toast('Flux automàtic reprès.');
+    this.processarCua();
+  }
+};
+
+function togglePausaFlux() {
+  if (GestorFlux.pausat) GestorFlux.reprendre();
+  else GestorFlux.pausar();
+}
 
 // --- SISTEMA DE PERSISTÈNCIA ---
 function guardarProjecteLocal() {
@@ -2494,6 +2544,13 @@ function iniciarFase11() {
 
   updateProgress(11);
   showCard('fase-11');
+
+  if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
+    document.getElementById('btn-pausa-flux').classList.remove('hidden');
+  } else {
+    document.getElementById('btn-pausa-flux').classList.add('hidden');
+  }
+
   renderLlistaCapitols();
   generarCapitol(0);
 }
@@ -2740,14 +2797,14 @@ function mostrarRevisioCapitol(revisat, idx, isLast) {
   // 🔴 CORRECCIÓ: Gestió automatitzada real del flux
   if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
     if (!ok && instruccions) {
-      accions.innerHTML = `<span style="color:var(--text2);font-size:.85rem;">🔴 Opus demana correccions. Sonnet reescrivint automàticament...</span>`;
-      setTimeout(() => reescriureCapitol(idx), 15000); // Dona 15s per recuperar quota abans de continuar
+      accions.innerHTML = `<span style="color:var(--text2);font-size:.85rem;">🔴 Opus demana correccions. Entrant a la cua per reescriure...</span>`;
+      GestorFlux.afegirTasca(`Reescriure Cap. ${idx + 1}`, () => reescriureCapitol(idx), 15000);
     } else {
-      accions.innerHTML = `<span style="color:var(--success);font-size:.85rem;">✅ Capítol aprovat. Avançant automàticament...</span>`;
+      accions.innerHTML = `<span style="color:var(--success);font-size:.85rem;">✅ Capítol aprovat. Entrant a la cua pel següent...</span>`;
       if (!isLast) {
-        setTimeout(() => generarCapitol(idx + 1), 15000); // Dona 15s abans de saltar
+        GestorFlux.afegirTasca(`Generar Cap. ${idx + 2}`, () => generarCapitol(idx + 1), 15000);
       } else {
-        generarCapitol(ESTAT._estructuraCapitols.length);
+        GestorFlux.afegirTasca('Revisió/Epíleg Final', () => generarCapitol(ESTAT._estructuraCapitols.length), 2000);
       }
     }
   } else {
@@ -2815,12 +2872,16 @@ function mostrarCheckpointIntermedi(checkpoint, capitolActual, totalCapitols) {
 function mostrarAccionsCapitolSimple(idx, isLast) {
   if (isLast) {
     document.getElementById('capitol-accions').innerHTML = '';
-    generarCapitol(ESTAT._estructuraCapitols.length);
+    if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
+      GestorFlux.afegirTasca('Revisió/Epíleg Final', () => generarCapitol(ESTAT._estructuraCapitols.length), 2000);
+    } else {
+      generarCapitol(ESTAT._estructuraCapitols.length);
+    }
   } else {
-    // 🔴 CORRECCIÓ: Si és automàtic, no esperem el clic de l'usuari
+    // Si és automàtic, usem la cua de tasques
     if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
       document.getElementById('capitol-accions').innerHTML = `<span style="color:var(--text2);font-size:.85rem;">Avançant automàticament al següent capítol...</span>`;
-      setTimeout(() => generarCapitol(idx + 1), 15000);
+      GestorFlux.afegirTasca(`Generar Cap. ${idx + 2}`, () => generarCapitol(idx + 1), 15000);
     } else {
       document.getElementById('capitol-accions').innerHTML =
         `<button class="btn btn-primary" onclick="generarCapitol(${idx + 1})">➡️ Capítol ${idx + 2}</button>`;
