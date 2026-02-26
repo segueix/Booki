@@ -656,7 +656,8 @@
   </div>
 
   <div class="btn-row">
-    <button class="btn btn-primary" onclick="guardarIComencar()">Guardar i Començar</button>
+    <button class="btn btn-primary" onclick="guardarIComencar()">Guardar i Començar Nou</button>
+    <button id="btn-reprendre" class="btn btn-secondary hidden" onclick="reprendreProjecteLocal()">📂 Reprendre projecte anterior</button>
   </div>
 </div>
 
@@ -1077,8 +1078,90 @@ function escHtml(str) {
 function showCard(id)  { document.getElementById(id).classList.remove('hidden'); }
 function hideCard(id)  { document.getElementById(id).classList.add('hidden'); }
 function showLoader(n) { document.getElementById('loader-' + n).classList.add('visible'); }
-function hideLoader(n) { document.getElementById('loader-' + n).classList.remove('visible'); }
+function hideLoader(n) {
+  document.getElementById('loader-' + n).classList.remove('visible');
+  // Autoguardat cada cop que un procés de la IA acaba
+  guardarProjecteLocal();
+}
 function showBtn(id)   { document.getElementById(id).classList.remove('hidden'); }
+
+// --- SISTEMA DE PERSISTÈNCIA ---
+function guardarProjecteLocal() {
+  if (ESTAT.fase === 0) return; // No guardem si no ha començat
+  try {
+    const dades = { estat: ESTAT, config: USER_CONFIG };
+    localStorage.setItem('booki_projecte_actual', JSON.stringify(dades));
+  } catch (e) {
+    console.warn("No s'ha pogut guardar a localStorage:", e);
+  }
+}
+
+function comprovarProjecteGuardat() {
+  const guardat = localStorage.getItem('booki_projecte_actual');
+  if (guardat) {
+    document.getElementById('btn-reprendre').classList.remove('hidden');
+  }
+}
+
+function reprendreProjecteLocal() {
+  const guardat = localStorage.getItem('booki_projecte_actual');
+  if (!guardat) return;
+  try {
+    const dades = JSON.parse(guardat);
+    Object.assign(ESTAT, dades.estat);
+    USER_CONFIG = dades.config;
+
+    // Restaurar Claus API a la UI (opcional però útil)
+    if (ESTAT._anthropicApiKey) document.getElementById('anthropicApiKey').value = ESTAT._anthropicApiKey;
+    if (ESTAT._openaiApiKey) document.getElementById('openaiApiKey').value = ESTAT._openaiApiKey;
+    if (ESTAT._geminiApiKey) document.getElementById('geminiApiKey').value = ESTAT._geminiApiKey;
+
+    restaurarInterficieDesDeEstat();
+    toast('Projecte recuperat amb èxit.');
+  } catch (e) {
+    toast('Error en recuperar el projecte: ' + e.message);
+  }
+}
+
+function restaurarInterficieDesDeEstat() {
+  hideCard('card-config');
+  document.getElementById('progress-wrap').classList.remove('hidden');
+
+  const fase = ESTAT.fase;
+  updateProgress(fase);
+
+  // Amagar totes les fases i mostrar només l'actual
+  document.querySelectorAll('.card').forEach(c => {
+    if (c.id !== 'card-config') c.classList.add('hidden');
+  });
+  showCard('fase-' + Math.floor(fase));
+
+  // Reconstruir l'estat visual depenent de la fase
+  if (fase >= 1 && ESTAT._premissaLista.length > 0) renderPremisses(ESTAT._premissaLista.map((p, i) => `${i+1}. ${p}`).join('\\n'));
+  if (fase >= 3 && ESTAT._llistaProtagonistes.length > 0) renderProtagonistes(ESTAT._llistaProtagonistes.map((p, i) => `${i+1}. ${p}`).join('\\n'));
+  if (fase >= 4 && ESTAT._llistaLocalitzacions.length > 0) renderLlistaAmbRecomanat(ESTAT._llistaLocalitzacions.map((p, i) => `${i+1}. ${p}`).join('\\n'), 'llista-localitzacions', '_llistaLocalitzacions', '_idxLocalitzacio', 'btn-fase4');
+  if (fase >= 5 && ESTAT._llistaFinals.length > 0) renderLlistaAmbRecomanat(ESTAT._llistaFinals.map((p, i) => `${i+1}. ${p}`).join('\\n'), 'llista-finals', '_llistaFinals', '_idxFinal', 'btn-fase5');
+  if (fase >= 6 && ESTAT.conteText) mostrarConte(ESTAT.conteText);
+  if (fase >= 7 && ESTAT.worldbuilding) mostrarResultatWorldbuilding(ESTAT.worldbuilding);
+  if (fase >= 9 && ESTAT.estilsParla) mostrarEstilsParla(ESTAT.estilsParla);
+  if (fase >= 10 && ESTAT._estructuraCapitols.length > 0) mostrarEstructura('Reconstruït des de memòria (dades en JSON actiu)');
+  if (fase >= 10.5 && ESTAT._escaletes.length > 0) {
+    mostrarEscaleta(ESTAT._escaletes);
+    document.getElementById('btn-fase11').classList.remove('hidden');
+  }
+  if (fase >= 11) {
+    renderLlistaCapitols();
+    if (ESTAT._nkg) nkgInicialitzar(); // Re-assigna objectes de memòria
+    ESTAT._nkg = ESTAT._nkg; // Manté el reference si ja hi era
+
+    // Si estem a meitat d'escriure
+    const capActual = ESTAT._capitolActual || 0;
+    if (ESTAT._capitols_generats[capActual]) {
+      mostrarCapitol(capActual, ESTAT._capitols_generats[capActual]);
+      mostrarAccionsCapitolSimple(capActual, capActual >= ESTAT._estructuraCapitols.length - 1);
+    }
+  }
+}
 
 function toast(msg) {
   const t = document.getElementById('toast');
@@ -8176,6 +8259,9 @@ document.addEventListener('DOMContentLoaded', function() {
   actualitzarConfigProvider();
   if (typeof poblarSelectorsModels === 'function') poblarSelectorsModels();
   if (typeof guardarClausAPI === 'function') guardarClausAPI();
+
+  // Comprovar si hi ha algun projecte guardat a localStorage
+  comprovarProjecteGuardat();
 });
 
 </script>
