@@ -1356,6 +1356,7 @@ const ESTAT = {
   // Estils de parla (fase 9)
   _personatgesSeleccionats: [],
   estilsParla:              null,
+  _perfilsPersonatges:      {},
   // Novel·la (fases 10-12)
   estructuraNovella:        null,
   _estructuraCapitols:      [],
@@ -2200,6 +2201,16 @@ async function generarEstilsParla() {
   }).filter(t => t.length > 0);
 
   ESTAT._personatgesSeleccionats = seleccionats;
+  ESTAT._perfilsPersonatges = ESTAT._perfilsPersonatges || {};
+  seleccionats.forEach(nom => {
+    const prev = ESTAT._perfilsPersonatges[nom] || {};
+    ESTAT._perfilsPersonatges[nom] = Object.assign({}, prev, {
+      nom,
+      estil_veu: prev.estil_veu || '',
+      perfil_psicologic: prev.perfil_psicologic || '',
+      estat_animic_actual: prev.estat_animic_actual || 'Tranquil'
+    });
+  });
   ESTAT.fase = 9;
   updateProgress(9);
   showCard('fase-9');
@@ -2213,11 +2224,145 @@ async function generarEstilsParla() {
     );
     ESTAT.history    = res.history;
     ESTAT.estilsParla = res.response;
+    await generarPerfilsPsicologics(USER_CONFIG);
     hideLoader(9);
     mostrarEstilsParla(res.response);
   } catch (err) {
     hideLoader(9);
     toast('Error: ' + err.message);
+  }
+}
+
+
+function extreureEstilsPerPersonatge(text) {
+  const mapa = {};
+  const src = String(text || '');
+  const blocs = src.split(/\n\n+/).map(b => b.trim()).filter(Boolean);
+  blocs.forEach(bloc => {
+    const m = bloc.match(/^\*\*(.+?)\*\*/m);
+    if (!m) return;
+    const nom = m[1].trim();
+    mapa[nom] = bloc;
+  });
+  return mapa;
+}
+
+function construirContextPsicologicPersonatges(limit = 8) {
+  const perfils = ESTAT._perfilsPersonatges || {};
+  const noms = ESTAT._personatgesSeleccionats || [];
+  const seleccionats = noms.slice(0, limit).map(nom => {
+    const p = perfils[nom] || {};
+    return `- Nom: ${nom}
+  Estil_veu: ${(p.estil_veu || '').substring(0, 220) || '(pendent)'}
+  Perfil_psicologic: ${(p.perfil_psicologic || '').substring(0, 260) || '(pendent)'}
+  Estat_animic_actual: ${p.estat_animic_actual || 'Tranquil'}`;
+  });
+  return seleccionats.length > 0 ? seleccionats.join('\n') : '';
+}
+
+async function generarPerfilsPsicologics(userConfig) {
+  const noms = (ESTAT._personatgesSeleccionats || []).filter(Boolean);
+  if (noms.length === 0 || !ESTAT.estilsParla) return;
+
+  const estils = extreureEstilsPerPersonatge(ESTAT.estilsParla);
+  const llista = noms.map((nom, i) => `${i + 1}. ${nom}
+Estil de veu:
+${(estils[nom] || '(no trobat)').substring(0, 900)}`).join('\n\n');
+
+  const msgs = [{
+    role: 'user',
+    content: `Analitza aquests personatges i genera un perfil psicològic breu (trets de personalitat, pors, motivacions) per a cadascun. Retorna un JSON on cada personatge tingui el seu "perfil_psicologic".
+
+PERSONATGES:
+${llista}
+
+Retorna EXCLUSIVAMENT JSON vàlid:
+{
+  "personatges": [
+    {"nom": "Nom", "perfil_psicologic": "..."}
+  ]
+}`
+  }];
+
+  try {
+    const models = getModelConfig(userConfig || USER_CONFIG || {});
+    const raw = await callLLMMulti(
+      msgs,
+      'Ets un psicòleg narratiu. Retorna només JSON vàlid en català.',
+      Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 1800, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+    const data = parseJsonRobust(raw);
+    if (!data || !Array.isArray(data.personatges)) return;
+
+    ESTAT._perfilsPersonatges = ESTAT._perfilsPersonatges || {};
+    data.personatges.forEach(p => {
+      if (!p || !p.nom) return;
+      const nom = String(p.nom).trim();
+      const prev = ESTAT._perfilsPersonatges[nom] || {};
+      ESTAT._perfilsPersonatges[nom] = Object.assign({}, prev, {
+        nom,
+        estil_veu: prev.estil_veu || (estils[nom] || ''),
+        perfil_psicologic: String(p.perfil_psicologic || '').trim(),
+        estat_animic_actual: prev.estat_animic_actual || 'Tranquil'
+      });
+    });
+  } catch (err) {
+    console.warn('Perfils psicològics: no bloquejant:', err.message);
+  }
+}
+
+async function actualitzarEstatsAnimics(textCapitol, idx, userConfig) {
+  const cap = ESTAT._estructuraCapitols && ESTAT._estructuraCapitols[idx] ? ESTAT._estructuraCapitols[idx] : null;
+  const presents = cap && Array.isArray(cap.personatges) ? cap.personatges.filter(Boolean) : [];
+  if (presents.length === 0) return;
+
+  ESTAT._perfilsPersonatges = ESTAT._perfilsPersonatges || {};
+  const estatAnterior = presents.map(nom => {
+    const p = ESTAT._perfilsPersonatges[nom] || {};
+    return `- ${nom}: ${p.estat_animic_actual || 'Tranquil'}`;
+  }).join('\n');
+
+  const resum = resumAutomaticCapitol(textCapitol || '').substring(0, 900);
+  const msgs = [{
+    role: 'user',
+    content: `Llegeix el resum d'aquest capítol i l'estat anímic anterior dels personatges. Com han afectat els esdeveniments d'aquest capítol a la psicologia de cadascun? Retorna un JSON amb l'"estat_animic_actual" actualitzat (ex: "Enfurismat", "Deprimit", "Ple d'esperança") per a cada personatge que hagi aparegut.
+
+RESUM CAPÍTOL ${idx + 1}:
+${resum}
+
+ESTAT ANÍMIC ANTERIOR:
+${estatAnterior}
+
+Retorna EXCLUSIVAMENT JSON vàlid:
+{
+  "personatges": [
+    {"nom": "Nom", "estat_animic_actual": "..."}
+  ]
+}`
+  }];
+
+  try {
+    const models = getModelConfig(userConfig || USER_CONFIG || {});
+    const raw = await callLLMMulti(
+      msgs,
+      'Ets un analista de continuïtat emocional narrativa. Retorna només JSON vàlid en català.',
+      Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 900, model: models.modelDraft, _esDraft: true }),
+      'generacio'
+    );
+    const data = parseJsonRobust(raw);
+    if (!data || !Array.isArray(data.personatges)) return;
+
+    data.personatges.forEach(p => {
+      if (!p || !p.nom) return;
+      const nom = String(p.nom).trim();
+      const prev = ESTAT._perfilsPersonatges[nom] || { nom, estil_veu: '', perfil_psicologic: '', estat_animic_actual: 'Tranquil' };
+      ESTAT._perfilsPersonatges[nom] = Object.assign({}, prev, {
+        estat_animic_actual: String(p.estat_animic_actual || '').trim() || prev.estat_animic_actual || 'Tranquil'
+      });
+    });
+  } catch (err) {
+    console.warn('Estats anímics: no bloquejant:', err.message);
   }
 }
 
@@ -2628,6 +2773,7 @@ function iniciarFase11() {
   ESTAT._capitols_generats  = [];
   ESTAT._revisioInstruccions= {};
   ESTAT.llibreRegistre      = { capitols: [], estat_personatges: [], fils_oberts: [], fils_tancats: [] };
+  ESTAT._perfilsPersonatges = {};
 
   updateProgress(11);
   showCard('fase-11');
@@ -3033,9 +3179,16 @@ function resumAutomaticCapitol(textCapitol) {
 function normalitzarEntradaRegistre(dades, textCapitol, idx) {
   const base = (dades && typeof dades === 'object') ? dades : {};
   const resum = String(base.resum_capitol || '').trim() || resumAutomaticCapitol(textCapitol);
+  const estatPersonatges = Array.isArray(base.estat_personatges) ? base.estat_personatges.map(p => ({
+    nom: p && p.nom ? p.nom : '',
+    ubicacio: p && p.ubicacio ? p.ubicacio : '',
+    estat_actual: p && p.estat_actual ? p.estat_actual : '',
+    perfil_psicologic: p && p.perfil_psicologic ? p.perfil_psicologic : '',
+    estat_animic_actual: p && p.estat_animic_actual ? p.estat_animic_actual : 'Tranquil'
+  })) : [];
   return {
     resum_capitol: resum,
-    estat_personatges: Array.isArray(base.estat_personatges) ? base.estat_personatges : [],
+    estat_personatges: estatPersonatges,
     fils_oberts: Array.isArray(base.fils_oberts) ? base.fils_oberts : [],
     fils_tancats: Array.isArray(base.fils_tancats) ? base.fils_tancats : [],
     prefiguracions_detectades: Array.isArray(base.prefiguracions_detectades) ? base.prefiguracions_detectades : [],
@@ -3069,6 +3222,8 @@ async function actualitzarLlibreRegistreBackgroundLegacy(textCapitol, idx) {
           dades.fils_oberts.forEach(f => existents.add(f));
           ESTAT.llibreRegistre.fils_oberts = [...existents];
         }
+
+        await actualitzarEstatsAnimics(textCapitol, idx, USER_CONFIG);
         return;  // èxit
       }
       intents++;
@@ -3080,6 +3235,7 @@ async function actualitzarLlibreRegistreBackgroundLegacy(textCapitol, idx) {
 
   if (!ESTAT.llibreRegistre.capitols) ESTAT.llibreRegistre.capitols = [];
   ESTAT.llibreRegistre.capitols[idx] = normalitzarEntradaRegistre(null, textCapitol, idx);
+  await actualitzarEstatsAnimics(textCapitol, idx, USER_CONFIG);
   console.warn('Registre: fallback local aplicat (entrada mínima) per al capítol', idx + 1);
 }
 
@@ -5141,6 +5297,10 @@ function buildSystemPromptCapitol() {
 
     if (ESTAT.estilsParla) {
       parts.push('\nESTILS DE PARLA DELS PERSONATGES:\n' + ESTAT.estilsParla.substring(0, 2000));
+      const ctxPsico = construirContextPsicologicPersonatges(10);
+      if (ctxPsico) {
+        parts.push(`\nESTAT ANIMIC ACTUAL: Adapta l'estil de veu base de cada personatge al seu estat d'ànim actual. Per exemple, si el seu estil és 'frases curtes i analítiques' però el seu estat anímic actual és 'pànic absolut', la seva veu ha de reflectir el pànic perdent l'estructura analítica.\n\nPERSONATGES (nom, estil_veu, perfil_psicologic, estat_animic_actual):\n${ctxPsico}`);
+      }
     }
     if (ESTAT._goldenPassage) {
       parts.push('\nREFERÈNCIA DE VEU (escriu amb aquest to):\n' + ESTAT._goldenPassage.substring(0, 800));
@@ -5834,10 +5994,11 @@ async function escriureCapitol(idx, userConfig) {
   const persPresents = cap && cap.personatges ? cap.personatges : [];
   let instruccionsVeu = '';
   if (persPresents.length > 0 && ESTAT.estilsParla) {
+    const ctxPsico = construirContextPsicologicPersonatges(12);
     instruccionsVeu = `\n\nPERSONATGES EN AQUEST CAPÍTOL I ELS SEUS ESTILS DE PARLA:
 Aplica estrictament l'estil de veu definit per a cada personatge en els seus diàlegs.
 Cada personatge ha de sonar inconfusiblement diferent dels altres.
-Personatges presents: ${persPresents.join(', ')}`;
+Personatges presents: ${persPresents.join(', ')}\n\nESTAT ANIMIC ACTUAL: Adapta l'estil de veu base de cada personatge al seu estat d'ànim actual. Per exemple, si el seu estil és 'frases curtes i analítiques' però el seu estat anímic actual és 'pànic absolut', la seva veu ha de reflectir el pànic perdent l'estructura analítica.${ctxPsico ? '\n\nPERFIL DINÀMIC (nom, estil_veu, perfil_psicologic, estat_animic_actual):\n' + ctxPsico : ''}`;
   }
 
   const msgs = [{
@@ -8650,7 +8811,7 @@ async function generarInformePostMortem() {
   }
 
   wrap.classList.remove('hidden');
-  content.innerHTML = '<span style="color:var(--text2);">⏳ Opus està analitzant l'estructura i la qualitat de l'obra per generar l'informe tècnic. Això pot trigar un minut...</span>';
+  content.innerHTML = `<span style="color:var(--text2);">⏳ Opus està analitzant l'estructura i la qualitat de l'obra per generar l'informe tècnic. Això pot trigar un minut...</span>`;
   btn.disabled = true;
 
   // Recopilem una mostra representativa per no saturar el context:
