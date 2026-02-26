@@ -5087,68 +5087,71 @@ function llistarPrefiguracions() {
 // ═══════════════════════════════════════════════════════════
 
 function buildContextCapitolsComplets(idx, opts = {}) {
-  // Recollim les entrades amb índex original (per accedir al llibreRegistre)
   const entrades = [];
   (ESTAT._capitols_generats || []).slice(0, idx).forEach((t, i) => {
     if (t && t.trim()) entrades.push({ idx: i, text: t });
   });
   if (entrades.length === 0) return '';
 
-  const N = entrades.length;
-  const FULL_COUNT    = 2; // tier 1: text complet
-  const SUMMARY_COUNT = 4; // tier 2: resums
-
-  // Dividim en tiers (de més antic a més recent)
-  const tier3 = entrades.slice(0, Math.max(0, N - FULL_COUNT - SUMMARY_COUNT));
-  const tier2 = entrades.slice(Math.max(0, N - FULL_COUNT - SUMMARY_COUNT), Math.max(0, N - FULL_COUNT));
-  const tier1 = entrades.slice(-FULL_COUNT);
-
+  // Pressupost aproximat: 4500 paraules representen uns 6000 tokens.
+  // Això deixa prou espai lliure al prompt per la Bíblia de món i l'escaleta.
+  const MAX_PARAULES_CONTEXT = opts.maxParaules || 4500;
+  let paraulesAcumulades = 0;
   const parts = [];
 
-  // ── TIER 3: memòria comprimida ───────────────────────────────
-  if (tier3.length > 0) {
-    const cobertaFinsCap = tier3[tier3.length - 1].idx + 1;
-    let memoriaText = '';
+  // Recorrem els capítols de més recent a més antic
+  for (let i = entrades.length - 1; i >= 0; i--) {
+    const e = entrades[i];
+    const textComplet = e.text.trim();
+    const paraulesText = textComplet.split(/\s+/).length;
 
-    if (ESTAT._memoriasComprimides && ESTAT._memoriasComprimides.length > 0) {
-      const mem = [...ESTAT._memoriasComprimides]
-        .filter(m => m.finsCap <= cobertaFinsCap + 5)
-        .sort((a, b) => b.finsCap - a.finsCap)[0];
-      if (mem && mem.text) memoriaText = mem.text;
-    }
-    if (!memoriaText && ESTAT._resumCompacte) {
-      memoriaText = ESTAT._resumCompacte;
-    }
-
-    if (memoriaText) {
-      parts.push(`### SINOPSI CAPÍTOLS 1–${cobertaFinsCap} (comprimida)\n${memoriaText.trim()}`);
+    // TIER 1: Si hi ha pressupost, posem el capítol sencer
+    if (paraulesAcumulades + paraulesText <= MAX_PARAULES_CONTEXT) {
+      parts.unshift(`### CAPÍTOL ${e.idx + 1}
+${textComplet}`);
+      paraulesAcumulades += paraulesText;
     } else {
-      // Fallback: 300 chars per capítol antic
-      tier3.forEach(e => {
-        const reg = ESTAT.llibreRegistre?.capitols?.[e.idx];
-        const resum = (reg?.resum_capitol || e.text).slice(0, 300);
-        parts.push(`### CAPÍTOL ${e.idx + 1} (resum breu)\n${resum}…`);
-      });
+      // TIER 2: Si ja no hi cap el text sencer, usem el resum del llibre de registre
+      const reg = ESTAT.llibreRegistre?.capitols?.[e.idx];
+      let resum = reg?.resum_capitol || textComplet.slice(0, 1000) + '...';
+      const paraulesResum = resum.split(/\s+/).length;
+
+      if (paraulesAcumulades + paraulesResum <= MAX_PARAULES_CONTEXT) {
+        parts.unshift(`### CAPÍTOL ${e.idx + 1} (Resum)
+${resum}`);
+        paraulesAcumulades += paraulesResum;
+      } else {
+        // TIER 3: Estem al límit del pressupost. Afegim la memòria global comprimida per cobrir la resta i parem el bucle.
+        const cobertaFinsCap = e.idx + 1;
+        let memoriaText = '';
+
+        if (ESTAT._memoriasComprimides && ESTAT._memoriasComprimides.length > 0) {
+          const mem = [...ESTAT._memoriasComprimides]
+            .filter(m => m.finsCap <= cobertaFinsCap)
+            .sort((a, b) => b.finsCap - a.finsCap)[0];
+          if (mem && mem.text) memoriaText = mem.text;
+        }
+        if (!memoriaText && ESTAT._resumCompacte) {
+          memoriaText = ESTAT._resumCompacte;
+        }
+
+        if (memoriaText) {
+          parts.unshift(`### SINOPSI CAPÍTOLS 1–${cobertaFinsCap} (comprimida)
+${memoriaText.trim()}`);
+        } else {
+          // Mini-fallback per evitar quedar-nos sense context inicial si no hi ha memòria
+          parts.unshift(`### CAPÍTOLS 1–${cobertaFinsCap}
+(Contingut omès per mantenir el focus narratiu).`);
+        }
+        break; // Tallem l'addició de context antic per protegir el context window
+      }
     }
   }
 
-  // ── TIER 2: resums per capítol ───────────────────────────────
-  tier2.forEach(e => {
-    const reg = ESTAT.llibreRegistre?.capitols?.[e.idx];
-    const resum = reg?.resum_capitol || e.text.slice(0, 1500);
-    parts.push(`### CAPÍTOL ${e.idx + 1} (resum)\n${resum.trim()}`);
-  });
+  return `
 
-  // ── TIER 1: text complet ─────────────────────────────────────
-  tier1.forEach(e => {
-    parts.push(`### CAPÍTOL ${e.idx + 1}\n${e.text.trim()}`);
-  });
-
-  const header = tier3.length > 0
-    ? 'CAPÍTOLS ANTERIORS (compressió progressiva — recents complets, antics comprimits):'
-    : 'CAPÍTOLS ANTERIORS (recents complets, intermedis en resum):';
-
-  return `\n\n${header}\n${parts.join('\n\n')}`;
+CAPÍTOLS ANTERIORS (Context dinàmic per pressupost de tokens):
+${parts.join('\n\n')}`;
 }
 
 function buildContextCapitolLegacy(idx) {
