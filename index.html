@@ -685,6 +685,8 @@
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="9">Veus</div>
     <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="9.2">Psicologia</div>
+    <div class="step-arrow">›</div>
     <div class="step-pill" data-step="9.5">Trames</div>
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="10">Estructura</div>
@@ -911,7 +913,25 @@
     <div class="veu-result" id="estils-cos"></div>
     <div class="btn-row" style="margin-top:24px;">
       <button class="btn btn-secondary" onclick="tornarAElenc()">← Tornar a l'elenc</button>
-      <button class="btn btn-primary" onclick="iniciarFaseTrames()">🕸️ Dissenyar Trames <span class="badge-model badge-opus">Opus</span></button>
+      <button class="btn btn-primary" onclick="iniciarFasePsicologia()">🧠 Analitzar Psicologia</button>
+    </div>
+  </div>
+</div>
+
+<!-- FASE 9.2: Perfils Psicològics -->
+<div class="card hidden" id="fase-9-2">
+  <h2><span class="icon">🧠</span> Perfils Psicològics</h2>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Anàlisi de personalitat i estat d'ànim base per a tots els personatges seleccionats.</p>
+  <div class="loader-wrap" id="loader-9-2">
+    <div class="spinner"></div>
+    <span>Analitzant la psicologia dels personatges...</span>
+  </div>
+
+  <div id="psicologia-result" class="hidden">
+    <div id="psicologia-cos" class="veu-result"></div>
+    <div class="btn-row" style="margin-top:24px;">
+      <button class="btn btn-secondary" onclick="hideCard('fase-9-2');showCard('fase-9');">← Tornar a Veus</button>
+      <button class="btn btn-primary" onclick="iniciarFaseTrames()">🕸️ Dissenyar Trames Opus</button>
     </div>
   </div>
 </div>
@@ -1215,7 +1235,8 @@ function restaurarInterficieDesDeEstat() {
   document.querySelectorAll('.card').forEach(c => {
     if (c.id !== 'card-config') c.classList.add('hidden');
   });
-  showCard('fase-' + Math.floor(fase));
+  if (Math.abs(fase - 9.2) < 0.001) showCard('fase-9-2');
+  else showCard('fase-' + Math.floor(fase));
 
   // Reconstruir l'estat visual depenent de la fase
   if (fase >= 1 && ESTAT._premissaLista.length > 0) renderPremisses(ESTAT._premissaLista.map((p, i) => `${i+1}. ${p}`).join('\\n'));
@@ -1225,6 +1246,7 @@ function restaurarInterficieDesDeEstat() {
   if (fase >= 6 && ESTAT.conteText) mostrarConte(ESTAT.conteText);
   if (fase >= 7 && ESTAT.worldbuilding) mostrarResultatWorldbuilding(ESTAT.worldbuilding);
   if (fase >= 9 && ESTAT.estilsParla) mostrarEstilsParla(ESTAT.estilsParla);
+  if (fase >= 9.2 && ESTAT._perfilsPersonatges && Object.keys(ESTAT._perfilsPersonatges).length > 0) mostrarPerfilsPsicologics({ personatges: Object.values(ESTAT._perfilsPersonatges) });
   if (fase >= 10 && ESTAT._estructuraCapitols.length > 0) mostrarEstructura('Reconstruït des de memòria (dades en JSON actiu)');
   if (fase >= 10.5 && ESTAT._escaletes.length > 0) {
     mostrarEscaleta(ESTAT._escaletes);
@@ -2224,7 +2246,6 @@ async function generarEstilsParla() {
     );
     ESTAT.history    = res.history;
     ESTAT.estilsParla = res.response;
-    await generarPerfilsPsicologics(USER_CONFIG);
     hideLoader(9);
     mostrarEstilsParla(res.response);
   } catch (err) {
@@ -2262,16 +2283,19 @@ function construirContextPsicologicPersonatges(limit = 8) {
 
 async function generarPerfilsPsicologics(userConfig) {
   const noms = (ESTAT._personatgesSeleccionats || []).filter(Boolean);
-  if (noms.length === 0 || !ESTAT.estilsParla) return;
+  if (noms.length === 0 || !ESTAT.estilsParla) return { personatges: [] };
 
   const estils = extreureEstilsPerPersonatge(ESTAT.estilsParla);
   const llista = noms.map((nom, i) => `${i + 1}. ${nom}
 Estil de veu:
-${(estils[nom] || '(no trobat)').substring(0, 900)}`).join('\n\n');
+${(estils[nom] || '(no trobat)').substring(0, 900)}`).join('
+
+');
 
   const msgs = [{
     role: 'user',
     content: `Analitza aquests personatges i genera un perfil psicològic breu (trets de personalitat, pors, motivacions) per a cadascun. Retorna un JSON on cada personatge tingui el seu "perfil_psicologic".
+Es requereix l'anàlisi de EXACTAMENT ${noms.length} personatges.
 
 PERSONATGES:
 ${llista}
@@ -2284,8 +2308,11 @@ Retorna EXCLUSIVAMENT JSON vàlid:
 }`
   }];
 
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  const perfilMap = {};
+  noms.forEach(n => { perfilMap[n] = { nom: n, perfil_psicologic: '', estat_animic_actual: 'Tranquil' }; });
+
   try {
-    const models = getModelConfig(userConfig || USER_CONFIG || {});
     const raw = await callLLMMulti(
       msgs,
       'Ets un psicòleg narratiu. Retorna només JSON vàlid en català.',
@@ -2293,23 +2320,67 @@ Retorna EXCLUSIVAMENT JSON vàlid:
       'arquitectura'
     );
     const data = parseJsonRobust(raw);
-    if (!data || !Array.isArray(data.personatges)) return;
-
-    ESTAT._perfilsPersonatges = ESTAT._perfilsPersonatges || {};
-    data.personatges.forEach(p => {
-      if (!p || !p.nom) return;
-      const nom = String(p.nom).trim();
-      const prev = ESTAT._perfilsPersonatges[nom] || {};
-      ESTAT._perfilsPersonatges[nom] = Object.assign({}, prev, {
-        nom,
-        estil_veu: prev.estil_veu || (estils[nom] || ''),
-        perfil_psicologic: String(p.perfil_psicologic || '').trim(),
-        estat_animic_actual: prev.estat_animic_actual || 'Tranquil'
+    if (data && Array.isArray(data.personatges)) {
+      data.personatges.forEach(p => {
+        const nom = p && p.nom ? String(p.nom).trim() : '';
+        if (!nom || !noms.includes(nom)) return;
+        perfilMap[nom] = {
+          nom,
+          perfil_psicologic: String(p.perfil_psicologic || '').trim(),
+          estat_animic_actual: (ESTAT._perfilsPersonatges && ESTAT._perfilsPersonatges[nom] && ESTAT._perfilsPersonatges[nom].estat_animic_actual) || 'Tranquil'
+        };
       });
-    });
+    }
+
+    const faltants = noms.filter(nom => !(perfilMap[nom] && perfilMap[nom].perfil_psicologic));
+    if (faltants.length > 0) {
+      const retryMsgs = [{
+        role: 'user',
+        content: `T'has deixat els següents personatges: ${faltants.join(', ')}. Genera només el JSON per aquests.
+
+Retorna EXCLUSIVAMENT JSON:
+{
+  "personatges": [
+    {"nom": "Nom", "perfil_psicologic": "..."}
+  ]
+}`
+      }];
+      const rawRetry = await callLLMMulti(
+        retryMsgs,
+        'Ets un psicòleg narratiu. Retorna només JSON vàlid en català.',
+        Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 1000, model: models.modelArquitecte }),
+        'arquitectura'
+      );
+      const retryData = parseJsonRobust(rawRetry);
+      if (retryData && Array.isArray(retryData.personatges)) {
+        retryData.personatges.forEach(p => {
+          const nom = p && p.nom ? String(p.nom).trim() : '';
+          if (!nom || !faltants.includes(nom)) return;
+          perfilMap[nom] = {
+            nom,
+            perfil_psicologic: String(p.perfil_psicologic || '').trim(),
+            estat_animic_actual: (ESTAT._perfilsPersonatges && ESTAT._perfilsPersonatges[nom] && ESTAT._perfilsPersonatges[nom].estat_animic_actual) || 'Tranquil'
+          };
+        });
+      }
+    }
   } catch (err) {
     console.warn('Perfils psicològics: no bloquejant:', err.message);
   }
+
+  ESTAT._perfilsPersonatges = ESTAT._perfilsPersonatges || {};
+  noms.forEach(nom => {
+    const prev = ESTAT._perfilsPersonatges[nom] || {};
+    const nou = perfilMap[nom] || { nom, perfil_psicologic: '', estat_animic_actual: 'Tranquil' };
+    ESTAT._perfilsPersonatges[nom] = Object.assign({}, prev, {
+      nom,
+      estil_veu: prev.estil_veu || (estils[nom] || ''),
+      perfil_psicologic: nou.perfil_psicologic || prev.perfil_psicologic || '',
+      estat_animic_actual: nou.estat_animic_actual || prev.estat_animic_actual || 'Tranquil'
+    });
+  });
+
+  return { personatges: noms.map(n => ESTAT._perfilsPersonatges[n]) };
 }
 
 async function actualitzarEstatsAnimics(textCapitol, idx, userConfig) {
@@ -2364,6 +2435,48 @@ Retorna EXCLUSIVAMENT JSON vàlid:
   } catch (err) {
     console.warn('Estats anímics: no bloquejant:', err.message);
   }
+}
+
+async function iniciarFasePsicologia() {
+  ESTAT.fase = 9.2;
+  updateProgress(9.2);
+  hideCard('fase-9');
+  showCard('fase-9-2');
+  document.getElementById('psicologia-result').classList.add('hidden');
+  showLoader('9-2');
+
+  try {
+    const dades = await generarPerfilsPsicologics(USER_CONFIG);
+    hideLoader('9-2');
+    mostrarPerfilsPsicologics(dades);
+  } catch (err) {
+    hideLoader('9-2');
+    toast('Error en l'anàlisi psicològica: ' + err.message);
+  }
+}
+
+function mostrarPerfilsPsicologics(dades) {
+  const cos = document.getElementById('psicologia-cos');
+  const perfils = dades && Array.isArray(dades.personatges)
+    ? dades.personatges
+    : Object.values(ESTAT._perfilsPersonatges || {});
+
+  cos.innerHTML = perfils.map(p => {
+    const nom = escHtml(String(p.nom || 'Personatge').trim());
+    const perfil = escHtml(String(p.perfil_psicologic || '(pendent)').trim());
+    const anim = escHtml(String(p.estat_animic_actual || 'Tranquil').trim());
+    return `<div class="veu-card">
+      <div class="veu-card-nom">👤 ${nom}</div>
+      <div class="veu-card-camps">
+        <div><div class="veu-camp-label">Perfil psicològic</div><div class="veu-camp-val">${perfil}</div></div>
+        <div><div class="veu-camp-label">Estat anímic actual</div><div class="veu-camp-val">${anim}</div></div>
+      </div>
+    </div>`;
+  }).join('
+');
+
+  document.getElementById('psicologia-result').classList.remove('hidden');
+  setTimeout(() => document.getElementById('fase-9-2').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
 }
 
 function mostrarEstilsParla(text) {
@@ -4895,6 +5008,7 @@ Exemple: «[frase representativa]»
 
 No tallis la resposta a mitges. Si no hi ha espai, prioritza completar TOTS els personatges d'aquest bloc abans d'afegir floritures.
 Separa cada personatge amb una línia en blanc. Escriu exclusivament en català.
+CRÍTIC: Hi ha EXACTAMENT ${blocPersonatges.length} personatges en aquesta llista. És OBLIGATORI que generis la fitxa de TOTS I CADASCUN d'ells. Si et deixes un sol personatge, el sistema fallarà.
 
 CRÍTIC: Has de generar un estil de parla per a TOTS I CADASCUN dels personatges de la llista. NO pots deixar-ne cap com a "pendent", "etcètera" o ometre'l.
 Per assegurar que hi caben tots en la teva resposta, sigues molt concís: dedica MÀXIM 3-4 línies per personatge indicant només els tics verbals, to habitual, llargada de les frases i vocabulari característic. L'objectiu és que TOTS els personatges de la llista tinguin el seu bloc completat.`
