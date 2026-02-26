@@ -6471,37 +6471,62 @@ async function avaluarQualitatLiteraria(textEscena, userConfig) {
   const models = getModelConfig(userConfig);
   const textNet = String(textEscena || '').slice(0, 6000);
 
-  // Detecció programàtica de telling emocional (sense cost LLM)
+  // --- NIVELL 1: JUTGE PROGRAMÀTIC (0 tokens, estalvi de costos) ---
   const instanciesTelling = detectarTellingEmocional(textNet);
-  const tellingCtx = instanciesTelling.length > 3
-    ? `\n   - TELLING EMOCIONAL DETECTAT: El text conté ${instanciesTelling.length} instàncies d'emocions explicades directament (${instanciesTelling.slice(0, 3).map(m => `"${m}"`).join(', ')}…). Marca com a NO APROVAT si n'hi ha més de 2 per escena.`
-    : '';
+  const metriquesVeu = analitzarVarianciaVeu(textNet);
+  const problemesProgramatics = [];
 
+  // Rebuig per Telling (Més de 3 és inacceptable)
+  if (instanciesTelling.length > 3) {
+    problemesProgramatics.push(`S'ha detectat massa 'telling' emocional directe: ${instanciesTelling.slice(0, 3).join(', ')}... Cal MOSTRAR l'emoció amb accions o diàleg, no etiquetar-la.`);
+  }
+
+  // Rebuig per mecàniques de veu pobres
+  if (metriquesVeu) {
+    if (metriquesVeu.ratioConsecutives > 0.65) {
+      problemesProgramatics.push("La prosa és massa monòtona i robòtica: hi ha massa frases consecutives de la mateixa longitud. Alterna frases curtes, mitjanes i llargues.");
+    }
+    if (metriquesVeu.ratioStarts > 0.4) {
+      problemesProgramatics.push("Falta varietat en els inicis de frase. Massa frases comencen de la mateixa manera. Utilitza diferents connectors o estructures.");
+    }
+    if (metriquesVeu.densitat_adjectival > 0.6) {
+      problemesProgramatics.push("Sobrecàrrega d'adjectius detectada. Poda'ls i substitueix-los per noms més precisos o verbs d'acció.");
+    }
+  }
+
+  // Si no supera el Nivell 1, tallem l'execució aquí sense cridar a l'API
+  if (problemesProgramatics.length > 0) {
+    console.log("⛔ Rebutjat pel Jutge Programàtic (estalviant tokens):", problemesProgramatics);
+    return {
+      aprovat: false,
+      critiques: "Filtre de qualitat automàtic no superat: " + problemesProgramatics.join(" ")
+    };
+  }
+
+  // --- NIVELL 2: JUTGE LLM (Només si passa el Nivell 1 o no detectem errors greus programàtics) ---
   const promptAvaluador = `Ets un editor literari exigent i un filòleg expert en llengua catalana. Llegeix aquest text:
 
 """${textNet}"""
 
 La teva tasca té dues parts:
-1. AVALUACIÓ LITERÀRIA: Rebutja l'escena immediatament si detectes qualsevol d'aquests errors:
-   - INFO-DUMPING: Personatges explicant coses que l'altre personatge ja sap, únicament perquè el lector se n'assabenti. És el pecat capital de la narrativa.
-   - MONÒLEG DE DOLENT: Antagonistes o figures de poder que expliquen els seus plans, motivacions o el funcionament del sistema de forma directa (monòlecs estil James Bond). Les figures de poder han de parlar en eufemismes, mitges veritats i to institucional.
-   - CLIXÉS TECNOLÒGICS O D'ACCIÓ: Teclejar frenèticament per aturar un hackeig, objectes d'espia hiper-tecnològics, USB encriptats, pistes amagades en llocs inversemblants.
-   - CANVIS EMOCIONALS NO GUANYATS: Personatges que canvien radicalment de postura (moral, emocional, ideològica) sense un procés de dubte i racionalització prèvi. Un sol capítol no és suficient per a una caiguda moral.
-   - CLIXÉS GENÈRICS: Resolucions mandroses, diàlegs robòtics, frases fetes del gènere.
-   - SOBRECÀRREGA SENSORIAL: Rebutja si hi ha més de 2 adjectius per frase de mitjana o si cada paràgraf conté descripcions sensorials. La prosa ha de respirar: alterna paràgrafs sensorials amb paràgrafs d'acció pura o diàleg sec.${tellingCtx}
-2. CORRECCIÓ LINGÜÍSTICA: Identifica qualsevol falta d'ortografia, castellanisme, expressió calcada d'altres idiomes o gramàtica incorrecta en català.
+1. AVALUACIÓ LITERÀRIA: Rebutja l'escena immediatament si detectes qualsevol d'aquests errors de principiant:
+   - INFO-DUMPING: Personatges explicant coses que l'altre personatge ja sap, només perquè el lector se n'assabenti.
+   - MONÒLEG DE DOLENT / EXPOSICIÓ DIRECTA: Figures de poder explicant els seus plans clarament. Han de parlar en eufemismes.
+   - CLIXÉS DE GÈNERE: Resolucions mandroses, diàlegs forçats per moure la trama, situacions de perill inversemblants.
+   - CANVIS EMOCIONALS PRECIPITATS: Personatges que canvien d'opinió o principis molt ràpid sense racionalitzar-ho.
+2. CORRECCIÓ LINGÜÍSTICA: Detecta faltes d'ortografia, castellanismes flagrants o mala gramàtica.
 
 Retorna ÚNICAMENT un objecte JSON amb aquest format exacte:
 {
   "aprovat": true/false,
-  "critiques": "Descriu els errors narratius i/o llista les paraules/expressions incorrectes en català i la seva forma correcta. Si tot és perfecte, deixa-ho buit."
+  "critiques": "Descriu els errors narratius i/o llista les paraules incorrectes i la seva correcció. Si tot és literàriament correcte, deixa-ho buit."
 }`;
 
   try {
     const raw = await callLLMMulti(
       [{ role: 'user', content: promptAvaluador }],
-      'Ets un jutge literari i corrector lingüístic expert en català. Retorna únicament JSON vàlid.',
-      Object.assign({}, userConfig, { maxTokens: 500, model: models.modelArquitecte }),
+      'Ets un jutge literari i corrector expert en català. Retorna únicament JSON vàlid.',
+      Object.assign({}, userConfig, { maxTokens: 400, model: models.modelArquitecte }),
       'arquitectura'
     );
     const parsed = parseJsonRobust(raw);
@@ -6512,7 +6537,7 @@ Retorna ÚNICAMENT un objecte JSON amb aquest format exacte:
       };
     }
   } catch (err) {
-    console.warn('Jutge Literari: error de validació, s\'aprova per no bloquejar:', err.message);
+    console.warn("Jutge LLM: error a l'avaluació, s'aprova temporalment per evitar bloquejos:", err.message);
   }
 
   return { aprovat: true, critiques: '' };
