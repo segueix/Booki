@@ -1357,6 +1357,7 @@ const ESTAT = {
   _temesCentrals:           [],
   _prefiguracions:          [],
   _corbaTensio:             [],
+  titol_novella:            '',
   _revisioGlobal:           null,
   _ajustosRumb:             null,
   // Bíblia Narrativa Persistent (sistema 1)
@@ -4820,12 +4821,26 @@ function exportarADoc(titol, contingut) {
 
 
 function descarregarNovella() {
-  const caps      = ESTAT._capitols_generats || [];
-  const estructura = ESTAT._estructuraCapitols || [];
-  if (!caps.some(c => c)) { toast('No hi ha cap capítol generat per descarregar.'); return; }
-  const titol = (ESTAT.premissaTriada || 'Novel·la')
-    .replace(/\*\*/g, '').replace(/[<>:"/\\|?*]/g, '').trim().substring(0, 80);
-  exportarNovella(titol, caps, estructura, ESTAT.epileg || '');
+  // Agafem el títol que ha generat l'IA. Si per algun motiu falla, deixem que l'usuari l'introdueixi.
+  let titolDefinitiu = ESTAT.titol_novella;
+  if (!titolDefinitiu || titolDefinitiu === "Novel·la Sense Títol") {
+    titolDefinitiu = prompt("Introdueix un títol per a la teva novel·la:", titolDefinitiu || "La meva novel·la");
+  }
+  if (!titolDefinitiu) return; // Si l'usuari cancel·la el prompt
+
+  // Recuperem l'epíleg si existeix
+  let textEpileg = '';
+  if (ESTAT._epileg_generat) {
+    textEpileg = ESTAT._epileg_generat;
+  } else {
+    const epEl = document.getElementById('epileg-text');
+    if (epEl && epEl.innerText.trim().length > 10) {
+      // Netegem el text visible per passar-lo a l'exportador
+      textEpileg = Array.from(epEl.querySelectorAll('p')).map(p => p.textContent).join('\n\n') || epEl.innerText;
+    }
+  }
+
+  exportarNovella(titolDefinitiu, ESTAT._capitols_generats || [], ESTAT._estructuraCapitols || [], textEpileg);
 }
 
 function exportarNovella(titol, caps, estructura, epileg) {
@@ -5601,6 +5616,7 @@ CRÍTIC: L'array "corba_tensio" HA DE CONTENIR EXACTAMENT una entrada per a CADA
 
 Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense markdown, sense text addicional):
 {
+  "titol_novella": "Escriu aquí un títol atractiu, evocador i comercial per a l'obra",
   "nombre_capitols": 12,
   "justificacio_capitols": "Explica en 2-3 línies per què has triat N capítols i no N-1 o N+1",
   "arc_global": "descripció de l'arc narratiu complet en 5-8 línies",
@@ -5651,6 +5667,9 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense markdown, sense text addicio
   if (!validacio) {
     throw new Error("L'API no ha retornat una estructura vàlida amb la clau 'capitols'. Cal reintentar.");
   }
+  
+  // Guardem el títol generat a l'estat global perquè estigui disponible a l'exportació
+  ESTAT.titol_novella = validacio.titol_novella || "Novel·la Sense Títol";
 
   return { response };
 }
