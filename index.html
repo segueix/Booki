@@ -1007,7 +1007,14 @@
       <button class="btn btn-primary hidden" id="btn-control-arcs" onclick="iniciarFase12()">📋 Control d'Arcs Narratius <span class="badge-model badge-opus">Opus</span></button>
       <button class="btn btn-secondary" onclick="obrirManuscrit()">🖋️ Mode Manuscrit</button>
       <button class="btn btn-secondary" onclick="descarregarNovella()">📖 Descarregar Novel·la</button>
+      <button class="btn btn-ghost" onclick="generarInformePostMortem()" style="color:var(--accent); border-color:var(--accent);">🧠 Informe Post-Mortem (Opus)</button>
     </div>
+    
+    <div id="post-mortem-wrap" class="hidden" style="margin-top:30px; padding:20px; background:var(--surface2); border:1px solid var(--accent); border-radius:8px;">
+      <h3 style="color:var(--accent); margin-top:0;">🧠 Informe Editorial i Tècnic (Post-Mortem)</h3>
+      <div id="post-mortem-content" class="conte-reader" style="font-size:0.95rem;"></div>
+    </div>
+    
   </div>
 </div>
 
@@ -8551,6 +8558,78 @@ Retorna NOMÉS el text reescrit, en prosa fluïda, sense cometes afegides ni exp
     toast("Error de l'IA: " + err.message);
   } finally {
     btn.textContent = txtOriginalBtn;
+    btn.disabled = false;
+  }
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  INFORME POST-MORTEM (AVALUACIÓ META)
+// ══════════════════════════════════════════════════════════════
+async function generarInformePostMortem() {
+  const wrap = document.getElementById('post-mortem-wrap');
+  const content = document.getElementById('post-mortem-content');
+  const btn = document.querySelector('button[onclick="generarInformePostMortem()"]');
+  
+  if (!ESTAT._capitols_generats || ESTAT._capitols_generats.length === 0) {
+    toast("No hi ha cap novel·la generada per avaluar.");
+    return;
+  }
+
+  wrap.classList.remove('hidden');
+  content.innerHTML = '<span style="color:var(--text2);">⏳ Opus està analitzant l'estructura i la qualitat de l'obra per generar l'informe tècnic. Això pot trigar un minut...</span>';
+  btn.disabled = true;
+
+  // Recopilem una mostra representativa per no saturar el context:
+  // L'estructura, els personatges, el capítol 1 i l'últim capítol.
+  const numCaps = ESTAT._capitols_generats.length;
+  const cap1 = ESTAT._capitols_generats[0] || '';
+  const capFinal = ESTAT._capitols_generats[numCaps - 1] || '';
+  
+  const dadesAnalisi = `
+TÍTOL: ${ESTAT.titol_novella || 'Sense títol'}
+ESTRUCTURA: ${JSON.stringify(ESTAT._estructuraCapitols)}
+LLISTA PERSONATGES: ${ESTAT._llistaProtagonistes ? ESTAT._llistaProtagonistes.join(', ') : 'N/A'}
+-- MOSTRA CAPÍTOL 1 --
+${cap1.substring(0, 1500)}...
+-- MOSTRA CAPÍTOL FINAL --
+${capFinal.substring(0, 1500)}...
+`;
+
+  const prompt = `Ets el Model Arquitecte (Claude Opus), el cervell darrere d'aquesta aplicació generadora de novel·les.
+Acabes de finalitzar la generació d'una novel·la. Aquí tens les dades estructurals i mostres del primer i últim capítol:
+
+${dadesAnalisi}
+
+La teva tasca és fer un INFORME POST-MORTEM META adreçat al desenvolupador de l'aplicació. No vull que reescriguis la novel·la. Vull que avaluïs el *sistema*.
+Format de la teva resposta (en català i amb format Markdown net):
+
+1. **Diagnòstic Literari:** Què ha funcionat bé en la història i quins defectes típics de l'IA has notat (ex: personatges plans, pèrdua de ritme, clixés al final)?
+2. **Diagnòstic Tècnic:** Basat en el resultat, on creus que els algorismes de l'aplicació (el "Narrative Knowledge Graph", la corba de tensió, els prompts d'estil de veu) han fallat o s'han quedat curts?
+3. **Propostes de Codi:** Dóna 2 o 3 consells concrets de com el desenvolupador podria canviar el codi de l'aplicació o els *prompts* de sistema per solucionar aquests defectes i millorar les futures generacions.
+
+Sigues crític, directe i molt tècnic.`;
+
+  try {
+    const models = getModelConfig(USER_CONFIG);
+    const msgs = [{ role: 'user', content: prompt }];
+    const res = await callLLMMulti(
+      msgs,
+      'Ets un Arquitecte de Software i Editor Literari Sènior.',
+      Object.assign({}, USER_CONFIG, { maxTokens: 1500, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+    
+    if (typeof efecteEscripturaHTML === 'function') {
+      const htmlConvertit = res.replace(/\n\n/g, '<br><br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      efecteEscripturaHTML('post-mortem-content', htmlConvertit, 5);
+    } else {
+      content.innerText = res;
+    }
+    toast('✅ Informe Post-Mortem generat!');
+  } catch (err) {
+    content.innerHTML = `<span style="color:var(--error);">Error en generar l'informe: ${err.message}</span>`;
+  } finally {
     btn.disabled = false;
   }
 }
