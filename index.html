@@ -1309,6 +1309,13 @@ function compteParaules(text) {
   return text.trim().split(/\s+/).filter(w => w.length > 0).length;
 }
 
+function netejarTabulacionsInicials(text = '') {
+  if (!text) return '';
+  return String(text)
+    .replace(/^[ \u00A0]*\t+/gm, '')
+    .replace(/\r\n/g, '\n');
+}
+
 // ═══════════════════════════════════════════════════════════
 //  ESTAT GLOBAL
 // ═══════════════════════════════════════════════════════════
@@ -1358,6 +1365,7 @@ const ESTAT = {
   _controlArcs:             null,
   _checkpointIntermedi:     null,
   epileg:                   null,
+  _epileg_generat:          '',
   // Novel·la: dades de l'estructura JSON
   _arcGlobal:               '',
   _arcMoral:                null,
@@ -2658,10 +2666,10 @@ function copiarCapitol(idx) {
   const text = ESTAT._capitols_generats && ESTAT._capitols_generats[idx];
   if (!text) return;
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(() => toast(`Capítol ${idx + 1} copiat.`)).catch(() => {});
+    navigator.clipboard.writeText(netejarTabulacionsInicials(text)).then(() => toast(`Capítol ${idx + 1} copiat.`)).catch(() => {});
   } else {
     const ta = document.createElement('textarea');
-    ta.value = text; document.body.appendChild(ta); ta.select();
+    ta.value = netejarTabulacionsInicials(text); document.body.appendChild(ta); ta.select();
     document.execCommand('copy'); document.body.removeChild(ta);
     toast(`Capítol ${idx + 1} copiat.`);
   }
@@ -2699,9 +2707,11 @@ async function generarCapitol(idx, intents = 0) {
 
   try {
     const res = await generarCapitolNKG(idx, USER_CONFIG);
-    ESTAT._capitols_generats[idx] = res.response;
+    const textNet = netejarTabulacionsInicials(res.response);
+    ESTAT._capitols_generats[idx] = textNet;
+    renderLlistaCapitols();
     hideLoader(11);
-    mostrarCapitol(idx, res.response);
+    mostrarCapitol(idx, textNet);
 
     // SISTEMA 1: actualitzar bíblia i registre (en sèrie, amb tolerància a errors)
     try {
@@ -2743,6 +2753,7 @@ async function generarCapitol(idx, intents = 0) {
 }
 
 function mostrarCapitol(idx, text) {
+  text = netejarTabulacionsInicials(text);
   const cap   = ESTAT._estructuraCapitols[idx];
   const titol = cap ? cap.titol || 'Capítol ' + (idx + 1) : 'Capítol ' + (idx + 1);
 
@@ -2981,9 +2992,11 @@ async function reescriureCapitol(idx, intents = 0) {
 
   try {
     const res = await reescriureCapitolAmbInstruccions(idx, instruccions, USER_CONFIG);
-    ESTAT._capitols_generats[idx] = res.response;
+    const textNet = netejarTabulacionsInicials(res.response);
+    ESTAT._capitols_generats[idx] = textNet;
+    renderLlistaCapitols();
     hideLoader(11);
-    mostrarCapitol(idx, res.response);
+    mostrarCapitol(idx, textNet);
     const isLast = idx >= ESTAT._estructuraCapitols.length - 1;
     mostrarAccionsCapitolSimple(idx, isLast);
     toast('Capítol reescrit.');
@@ -3126,11 +3139,13 @@ async function escriureEpileg() {
 
   try {
     const res = await generarEpileg(ESTAT._controlArcs, USER_CONFIG);
-    ESTAT.epileg = res.response;
+    const epilegNet = netejarTabulacionsInicials(res.response);
+    ESTAT.epileg = epilegNet;
+    ESTAT._epileg_generat = epilegNet;
     document.getElementById('epileg-loader-wrap').classList.add('hidden');
 
     const epilegText = document.getElementById('epileg-text');
-    const pars = res.response.split(/\n\n+/).filter(p => p.trim().length > 0);
+    const pars = epilegNet.split(/\n\n+/).filter(p => p.trim().length > 0);
     const html = pars.map(p => `<p>${escHtml(p.trim())}</p>`).join('');
     document.getElementById('epileg-cos').classList.remove('hidden');
     toast('Epíleg escrit per Sonnet.');
@@ -4828,6 +4843,12 @@ function exportarADoc(titol, contingut) {
 
 
 function descarregarNovella() {
+  const capsGenerats = ESTAT._capitols_generats || [];
+  if (!capsGenerats.some(Boolean)) {
+    toast('No hi ha cap capítol generat per descarregar.');
+    return;
+  }
+
   // Agafem el títol que ha generat l'IA. Si per algun motiu falla, deixem que l'usuari l'introdueixi.
   let titolDefinitiu = ESTAT.titol_novella;
   if (!titolDefinitiu || titolDefinitiu === "Novel·la Sense Títol") {
@@ -4839,6 +4860,8 @@ function descarregarNovella() {
   let textEpileg = '';
   if (ESTAT._epileg_generat) {
     textEpileg = ESTAT._epileg_generat;
+  } else if (ESTAT.epileg) {
+    textEpileg = ESTAT.epileg;
   } else {
     const epEl = document.getElementById('epileg-text');
     if (epEl && epEl.innerText.trim().length > 10) {
@@ -4847,7 +4870,7 @@ function descarregarNovella() {
     }
   }
 
-  exportarNovella(titolDefinitiu, ESTAT._capitols_generats || [], ESTAT._estructuraCapitols || [], textEpileg);
+  exportarNovella(titolDefinitiu, capsGenerats, ESTAT._estructuraCapitols || [], netejarTabulacionsInicials(textEpileg));
 }
 
 function exportarNovella(titol, caps, estructura, epileg) {
@@ -4896,11 +4919,10 @@ function exportarNovella(titol, caps, estructura, epileg) {
       fills.push(new Paragraph({ spacing: { after: 600 } }));
     }
 
-    const paragrafsText = text.split(/\n\n+/).filter(p => p.trim().length > 0);
+    const paragrafsText = netejarTabulacionsInicials(text).split(/\n\n+/).filter(p => p.trim().length > 0);
     paragrafsText.forEach((p, index) => {
       fills.push(new Paragraph({
         text: p.trim(),
-        indent: index > 0 ? { firstLine: 720 } : undefined, // Primera línia sagnada (720 twips = 0.5 inches)
         spacing: { after: 200 }
       }));
     });
@@ -4921,11 +4943,10 @@ function exportarNovella(titol, caps, estructura, epileg) {
       spacing: { after: 600 }
     }));
 
-    const paragrafsEpileg = epileg.split(/\n\n+/).filter(p => p.trim().length > 0);
+    const paragrafsEpileg = netejarTabulacionsInicials(epileg).split(/\n\n+/).filter(p => p.trim().length > 0);
     paragrafsEpileg.forEach((p, index) => {
       fills.push(new Paragraph({
         text: p.trim(),
-        indent: index > 0 ? { firstLine: 720 } : undefined,
         spacing: { after: 200 }
       }));
     });
@@ -6221,13 +6242,14 @@ L'epíleg ha de:
 - Tancar els fils narratius indicats per l'editor
 - Connectar directament amb l'escena final de l'últim capítol (continuïtat de to)
 - Fer eco del primer paràgraf de la novel·la (tancament circular)
-- Tenir entre 600 i 1200 paraules
+- Tenir entre 450 i 900 paraules (si cal, una mica més curt per assegurar completitud)
 - Resoldre les prefiguracions pendents si n'hi ha
+- PRIORITAT ABSOLUTA: retorna un epíleg complet i tancat; no deixis el text a mitges
 
 Escriu directament el text de l'epíleg en català, sense títol ni notes de l'autor.`
   }];
 
-  const response = await callLLMMulti(msgs, systemPrompt, Object.assign({}, userConfig, { maxTokens: 3500 }), 'generacio');
+  const response = await callLLMOneShotPlusCompletion(msgs, systemPrompt, Object.assign({}, userConfig, { maxTokens: 2600, model: getModelConfig(userConfig).modelGeneracio }), 'generacio');
   return { response };
 }
 
@@ -7637,7 +7659,7 @@ INSTRUCCIONS ESTRICTES:
 
   // Guardar capítol complet
   if (!ESTAT._capitols_generats) ESTAT._capitols_generats = [];
-  ESTAT._capitols_generats[idx] = textComplet;
+  ESTAT._capitols_generats[idx] = netejarTabulacionsInicials(textComplet);
 
   // Generar resum compacte cada 3 capítols o al primer
   if (capitol === 1 || capitol % 3 === 0) {
@@ -8501,7 +8523,7 @@ function guardarManuscritActual() {
     nouText = editor.innerText.trim();
   }
 
-  if (nouText) ESTAT._capitols_generats[manuscritCapitolActiu] = nouText;
+  if (nouText) ESTAT._capitols_generats[manuscritCapitolActiu] = netejarTabulacionsInicials(nouText);
 }
 
 async function reescriureSeleccioManuscrit(event) {
