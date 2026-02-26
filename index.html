@@ -5876,28 +5876,23 @@ ${prefCtx}
 CAPÍTOL ${idx + 1} GENERAT:
 ${textCapitol.substring(0, 5000)}${textCapitol.length > 5000 ? '\n[…text truncat…]' : ''}
 
-Verifica específicament:
-- Si el capítol havia de plantar una prefiguració, s'ha fet de forma subtil?
-- Si el capítol havia de recollir una prefiguració, s'ha resolt satisfactòriament?
-- Hi ha algun element que contradigui una prefiguració plantada anteriorment?
-- Format de diàlegs: Hi ha intervencions de diferents personatges solapades en un mateix paràgraf sense punt i a part? Si és així, marca-ho com a error greu de format.
+La teva tasca és avaluar si el text és publicable i si compleix amb els objectius de l'escaleta.
+Fixa't especialment en:
+1. Coherència amb l'escaleta i personatges.
+2. Format (errors de diàlegs al mateix paràgraf = rebuig automàtic).
+3. Qualitat (ritme, telling vs showing, info-dumping).
 
-AVALUACIÓ DE GANXOS (Hook Review):
-Avalua els elements narratius de ganxo del capítol:
-1. OBERTURA: El primer paràgraf captura l'atenció? (escena in medias res, tensió immediata, imatge potent — no necessàriament una pregunta)
-2. CLIFFHANGER: El final fa que el lector NECESSITI llegir el següent capítol? Avalua si usa la tècnica més efectiva per a aquest moment narratiu: revelació que ho canvia tot, amenaça imminent tallada just abans, ruptura emocional (traïció/pèrdua/descobriment), decisió congelada, inversió de situació, imatge final que ressona, o escalada d'apostes. Penalitza els finals que es limiten a una pregunta retòrica quan el moment narratiu permetia alguna cosa més visceral.
-3. RITME INTERN: El capítol manté un ritme adequat al seu tipus (acció/respiració)? Hi ha un equilibri entre diàleg, acció i descripció?
-4. PROMESA NARRATIVA: El capítol avança alguna trama o obre una tensió que el lector vol veure resolta?
+CRÍTIC PER ESTALVIAR TOKENS: Si aproves el capítol, les valoracions han de ser buides o d'1 sola paraula. Si el rebutges, les "instruccions_correccio" han de ser EXTREMADAMENT BREUS, en estil telegràfic (3 o 4 bullet points directes al gra). Prohibit justificar-te o enrotllar-te.
 
 SELECCIÓ DE PASSATGE:
 A més de la revisió, selecciona el MILLOR passatge del capítol (entre 150 i 250 paraules) que millor exemplifiqui la veu narrativa. Copia'l literalment del text.
 
-Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense cap text addicional, sense markdown):
+Retorna ÚNICAMENT un objecte JSON amb la següent estructura:
 IMPORTANT: Si detectes solapament de diàlegs entre personatges en un mateix paràgraf, "ok_per_continuar" HA DE ser false i has de donar "instruccions_correccio" explícites per reescriure separant els paràgrafs.
 {
   "puntuacio": 8,
   "problemes": ["descripció concreta del problema 1", "Solapament de diàlegs detectat: intervencions de diferents personatges en un mateix paràgraf. Cal reescriure separant-los."],
-  "instruccions_correccio": "instruccions clares per a Sonnet per reescriure si cal (buit si no cal)",
+  "instruccions_correccio": "MÀXIM 30-40 PARAULES. Estil telegràfic. Ex: '- Ritme massa lent. - Elimina l'info-dumping sobre la màgia. - Fes que el diàleg final sigui més tens.' Si és true, deixa-ho completament buit.",
   "ok_per_continuar": true,
   "prefiguracions_ok": true,
   "prefiguracions_problemes": ["descripció del problema de prefiguració si n'hi ha"],
@@ -5920,7 +5915,7 @@ IMPORTANT: Si detectes solapament de diàlegs entre personatges en un mateix par
   const response = await callLLMMulti(
     msgs,
     'Ets un editor literari sènior especialitzat en narrativa de pàgina. Retornes EXCLUSIVAMENT un objecte JSON vàlid, sense cap altre text.',
-    Object.assign({}, userConfig, { maxTokens: 2000 }),
+    Object.assign({}, userConfig, { maxTokens: 1200 }),
     'arquitectura'
   );
 
