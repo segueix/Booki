@@ -527,6 +527,7 @@
   /* ── Camps de config per proveïdor ── */
   .config-section { margin-top: 4px; }
 </style>
+<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
 </head>
 <body>
 
@@ -4621,73 +4622,61 @@ Separa cada personatge amb una línia en blanc. Escriu exclusivament en català.
 // Genera un document HTML semàntic amb <h1> i <p> i el descarrega
 // directament al navegador mitjançant Blob + URL.createObjectURL.
 function exportarADoc(titol, contingut) {
-  // ── 1. Generar HTML semàntic ──────────────────────────────
-  const paragraphs   = contingut.split(/\n\n+/).filter(p => p.trim().length > 0);
-  const paragrafsHtml = paragraphs.map((p, i) => {
-    const text  = escHtml(p.trim());
-    const style = i > 0 ? ' style="text-indent:1.8em;"' : '';
-    return `  <p${style}>${text}</p>`;
-  }).join('\n');
+  if (typeof docx === 'undefined') {
+    toast("Error: La llibreria DOCX no s'ha carregat. Comprova la connexió.");
+    return;
+  }
 
-  const ara        = new Date();
-  const dataStr    = ara.toLocaleDateString('ca', { year: 'numeric', month: 'long', day: 'numeric' });
-  const htmlDoc    = `<!DOCTYPE html>
-<html lang="ca">
-<head>
-  <meta charset="UTF-8">
-  <title>${escHtml(titol)}</title>
-  <style>
-    body {
-      font-family: Georgia, 'Times New Roman', serif;
-      max-width: 680px;
-      margin: 60px auto;
-      line-height: 1.9;
-      color: #222;
-      padding: 0 24px 80px;
-    }
-    h1 {
-      font-size: 1.8rem;
-      text-align: center;
-      margin-bottom: 0.25em;
-    }
-    .meta {
-      text-align: center;
-      color: #888;
-      font-size: 0.85rem;
-      margin-bottom: 3em;
-      font-family: system-ui, sans-serif;
-    }
-    p { margin-bottom: 1.1em; }
-  </style>
-</head>
-<body>
-  <h1>${escHtml(titol)}</h1>
-  <div class="meta">Generat amb Conte IA · ${dataStr}</div>
-${paragrafsHtml}
-</body>
-</html>`;
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = docx;
 
-  // ── 2. Crear Blob i forçar descàrrega ─────────────────────
-  const blob = new Blob([htmlDoc], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document;charset=utf-8' });
-  const url  = URL.createObjectURL(blob);
+  const paragrafsText = contingut.split(/\n\n+/).filter(p => p.trim().length > 0);
+  const fills = [
+    new Paragraph({
+      text: titol || 'Conte IA',
+      heading: HeadingLevel.HEADING_1,
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 400 }
+    }),
+    new Paragraph({
+      children: [new TextRun({ text: "Generat amb Conte IA", color: "888888" })],
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 800 }
+    })
+  ];
 
-  // Netejar el títol per convertir-lo en nom de fitxer vàlid
-  const nomFitxer = titol
-    .replace(/[<>:"/\\|?*]/g, '')   // caràcters no vàlids a fitxers
-    .trim()
-    .replace(/\s+/g, '_')
-    .substring(0, 80) + '.docx';
+  paragrafsText.forEach((p, i) => {
+    fills.push(new Paragraph({
+      text: p.trim(),
+      indent: i > 0 ? { firstLine: 720 } : undefined, // Sangria a partir del segon paràgraf
+      spacing: { after: 200 }
+    }));
+  });
 
-  const a = document.createElement('a');
-  a.href     = url;
-  a.download = nomFitxer;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);          // alliberar memòria
+  const doc = new Document({
+    sections: [{
+      properties: {},
+      children: fills
+    }]
+  });
 
-  toast('📄 Descarregat: ' + nomFitxer);
+  Packer.toBlob(doc).then(blob => {
+    const url = URL.createObjectURL(blob);
+    const nomFitxer = (titol || 'conte')
+      .replace(/[<>:"/\\|?*]/g, '').trim().replace(/\s+/g, '_').substring(0, 80) + '.docx';
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nomFitxer;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('📄 Descarregat: ' + nomFitxer);
+  }).catch(err => {
+    toast("Error a l'exportar DOCX: " + err.message);
+  });
 }
+
 
 function descarregarNovella() {
   const caps      = ESTAT._capitols_generats || [];
@@ -4699,61 +4688,106 @@ function descarregarNovella() {
 }
 
 function exportarNovella(titol, caps, estructura, epileg) {
-  const ara     = new Date();
-  const dataStr = ara.toLocaleDateString('ca', { year: 'numeric', month: 'long', day: 'numeric' });
-
-  function capsHtml(text, primeraNoSangria) {
-    return text.split(/\n\n+/).filter(p => p.trim().length > 0).map((p, i) => {
-      const t     = escHtml(p.trim());
-      const style = (primeraNoSangria && i === 0) ? '' : ' style="text-indent:1.8em;"';
-      return `  <p${style}>${t}</p>`;
-    }).join('\n');
+  if (typeof docx === 'undefined') {
+    toast("Error: La llibreria DOCX no s'ha carregat.");
+    return;
   }
 
-  let cosHtml = '';
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, PageBreak } = docx;
+  const fills = [];
+
+  // Portada
+  fills.push(new Paragraph({
+    text: titol || 'Novel·la IA',
+    heading: HeadingLevel.TITLE,
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 2400, after: 400 }
+  }));
+  fills.push(new Paragraph({
+    children: [new TextRun({ text: "Generat amb Booki", color: "888888" })],
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 800 }
+  }));
+  fills.push(new Paragraph({ children: [new PageBreak()] })); // Salt de pàgina després de la portada
+
+  // Capítols
   caps.forEach((text, i) => {
     if (!text) return;
-    const cap      = estructura[i];
-    const numCap   = escHtml(`Capítol ${i + 1}`);
-    const titolCap = escHtml(cap ? (cap.titol || '') : '');
-    cosHtml += `\n<div class="capitol">\n  <p class="num-capitol">${numCap}</p>\n  <h2>${titolCap}</h2>\n${capsHtml(text, true)}\n</div>\n`;
+    const cap = estructura[i];
+    const titolCap = cap ? (cap.titol || '') : '';
+
+    fills.push(new Paragraph({
+      children: [new TextRun({ text: `Capítol ${i + 1}`, color: "888888", size: 24 })],
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 800, after: 200 }
+    }));
+
+    if (titolCap) {
+      fills.push(new Paragraph({
+        text: titolCap,
+        heading: HeadingLevel.HEADING_2,
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 600 }
+      }));
+    } else {
+      fills.push(new Paragraph({ spacing: { after: 600 } }));
+    }
+
+    const paragrafsText = text.split(/\n\n+/).filter(p => p.trim().length > 0);
+    paragrafsText.forEach((p, index) => {
+      fills.push(new Paragraph({
+        text: p.trim(),
+        indent: index > 0 ? { firstLine: 720 } : undefined, // Primera línia sagnada (720 twips = 0.5 inches)
+        spacing: { after: 200 }
+      }));
+    });
+    fills.push(new Paragraph({ children: [new PageBreak()] })); // Salt de pàgina al final de cada capítol
   });
 
+  // Epíleg
   if (epileg && epileg.trim()) {
-    cosHtml += `\n<div class="capitol">\n  <p class="num-capitol">—</p>\n  <h2>Epíleg</h2>\n${capsHtml(epileg, true)}\n</div>\n`;
+    fills.push(new Paragraph({
+      children: [new TextRun({ text: "—", color: "888888", size: 24 })],
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 800, after: 200 }
+    }));
+    fills.push(new Paragraph({
+      text: "Epíleg",
+      heading: HeadingLevel.HEADING_2,
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 600 }
+    }));
+
+    const paragrafsEpileg = epileg.split(/\n\n+/).filter(p => p.trim().length > 0);
+    paragrafsEpileg.forEach((p, index) => {
+      fills.push(new Paragraph({
+        text: p.trim(),
+        indent: index > 0 ? { firstLine: 720 } : undefined,
+        spacing: { after: 200 }
+      }));
+    });
   }
 
-  const htmlDoc = `<!DOCTYPE html>
-<html lang="ca">
-<head>
-  <meta charset="UTF-8">
-  <title>${escHtml(titol)}</title>
-  <style>
-    body { font-family: Georgia, 'Times New Roman', serif; max-width: 660px; margin: 60px auto; line-height: 1.95; color: #1a1a1a; padding: 0 24px 80px; }
-    h1 { font-size: 2rem; text-align: center; margin-bottom: 0.3em; font-weight: 700; }
-    .meta { text-align: center; color: #999; font-size: 0.82rem; margin-bottom: 4.5em; font-family: system-ui, sans-serif; }
-    .capitol { margin-top: 4em; }
-    .num-capitol { text-align: center; font-size: 0.78rem; letter-spacing: 0.2em; text-transform: uppercase; color: #aaa; margin: 0 0 0.3em; font-family: system-ui, sans-serif; }
-    h2 { font-size: 1.15rem; text-align: center; margin: 0 0 2em; font-weight: 600; }
-    p { margin: 0 0 0.15em; }
-  </style>
-</head>
-<body>
-  <h1>${escHtml(titol)}</h1>
-  <p class="meta">Generat amb Booki · ${dataStr}</p>
-${cosHtml}
-</body>
-</html>`;
+  const doc = new Document({
+    sections: [{ properties: {}, children: fills }]
+  });
 
-  const blob      = new Blob([htmlDoc], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document;charset=utf-8' });
-  const url       = URL.createObjectURL(blob);
-  const nomFitxer = titol.replace(/\s+/g, '_').substring(0, 80) + '.docx';
-  const a         = document.createElement('a');
-  a.href = url; a.download = nomFitxer;
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
-  toast('📖 Descarregat: ' + nomFitxer);
+  Packer.toBlob(doc).then(blob => {
+    const url = URL.createObjectURL(blob);
+    const nomFitxer = (titol || 'novella').replace(/[<>:"/\\|?*]/g, '').trim().replace(/\s+/g, '_').substring(0, 80) + '.docx';
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nomFitxer;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('📖 Descarregat: ' + nomFitxer);
+  }).catch(err => {
+    toast("Error a l'exportar la novel·la DOCX: " + err.message);
+  });
 }
+
 
 // ═══════════════════════════════════════════════════════════
 //  UTILITAT: Parse robust de JSON (evita errors LLM)
