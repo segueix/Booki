@@ -7774,18 +7774,12 @@ ${instruccionsVariancia ? '- VARIÀNCIA: ' + instruccionsVariancia + '\n' : ''}$
   }
 }
 
-async function generarCapitolNKG(idx, userConfig) {
+async function generarEsborranyCapitol(idx, userConfig) {
   const capitol = idx + 1;
   const escaletaCap = ESTAT._escaletes ? ESTAT._escaletes.find(e => e.capitol === capitol) : null;
   const escenes = escaletaCap ? (escaletaCap.escenes || null) : null;
 
-  let textComplet = '';
-
   if (ESTAT._nkg && escenes && Array.isArray(escenes) && escenes.length > 0) {
-    // Escriptura d'un sol missatge per capítol (NKG + totes les escenes)
-    const loaderEl = document.getElementById('loader-11-text');
-    if (loaderEl) loaderEl.textContent = `✍️ Capítol ${capitol}: generació unificada (1 missatge + tancament opcional)…`;
-
     const contextNKG = nkgGenerarContextMinim({
       capitol,
       escena: 1,
@@ -7796,20 +7790,22 @@ async function generarCapitolNKG(idx, userConfig) {
     const contextCapitol = buildContextCapitol(idx);
     const instruccionsFinalCapitol = generarInstruccionsGanxoFinalCapitol(idx);
 
-    const escenesText = escenes.map((sc, i) => {
-      return `ESCENA ${i + 1}/${escenes.length}
+    const escenesText = escenes
+      .map((sc, i) => `ESCENA ${i + 1}/${escenes.length}
 - Nom: ${sc.nom || ''}
 - Funció narrativa: ${sc.funcio_narrativa || ''}
 - Personatges: ${(sc.personatges || []).join(', ')}
 - Paraules objectiu: ${sc.paraules_objectiu || 500}
-- Beat narratiu: ${sc.beat_narratiu || 'equilibrat'}`;
-    }).join('\n\n');
+- Beat narratiu: ${sc.beat_narratiu || 'equilibrat'}`)
+      .join('\n\n');
 
     const paraulesTotal = escenes.reduce((acc, sc) => acc + (sc.paraules_objectiu || 500), 0);
     const systemPrompt = buildSystemPromptCapitol();
     const msgs = [{
       role: 'user',
-      content: `Escriu el CAPÍTOL ${capitol} complet en una sola resposta, integrant TOTES les escenes de l'escaleta en ordre.
+      content: `Escriu un primer esborrany complet d'aquest capítol. Centra't en avançar l'acció i els diàlegs, no et preocupis per la prosa perfecta encara.
+
+CAPÍTOL ${capitol}
 
 ${contextNKG}
 
@@ -7821,38 +7817,25 @@ ${escenesText}
 INSTRUCCIONS ESTRICTES:
 - Escriu totes les escenes en ordre i posa aquest marcador al començament de cada escena: [[ESCENA_1]], [[ESCENA_2]], etc.
 - NO afegeixis cap altre encapçalament ni metadades
-- Dins de cada escena escriu prosa literària completa i transicions naturals
-- Respecta personatges, continuïtat factual i estat del NKG
-- No repeteixis informació, accions ni frases
-- Mantén català natural i consistent
-- LONGITUD OBLIGATÒRIA: Aquest capítol ha de tenir entre ${Math.round(paraulesTotal * 0.9)} i ${Math.round(paraulesTotal * 1.1)} paraules en total (suma de totes les escenes). Presa't el teu temps per desenvolupar cada escena amb el ritme adequat. Utilitza descripcions sensorials riques, diàlegs ben construïts i accions físiques per expandir el text. NO precipitis el final ni resumeixis els esdeveniments per acabar ràpid. Desenvolupa la prosa de manera literària fins a assolir aquesta extensió de paraules.
+- Dins de cada escena escriu prosa literària funcional i transicions naturals
+- Respecta personatges i continuïtat factual
+- LONGITUD OBJECTIU: entre ${Math.round(paraulesTotal * 0.85)} i ${Math.round(paraulesTotal * 1.05)} paraules
 - ${instruccionsFinalCapitol}`
     }];
 
     const textRaw = await callLLMOneShotConditionalCompletion(
       msgs,
       systemPrompt,
-      Object.assign({}, userConfig, { maxTokens: Math.max(12000, paraulesTotal * 2), model: getModelConfig(userConfig).modelGeneracio }),
+      Object.assign({}, userConfig, { maxTokens: Math.max(10000, paraulesTotal * 2), model: getModelConfig(userConfig).modelGeneracio }),
       'generacio'
     );
 
     const escenesParsejades = parseEscenesUnificades(textRaw, escenes.length);
-    if (escenesParsejades.length > 0) {
-      textComplet = escenesParsejades.map(e => e.text).join('\n\n');
-      if (!ESTAT._escenes_generades) ESTAT._escenes_generades = {};
-      ESTAT._escenes_generades[idx] = {};
-      escenesParsejades.forEach((e, i) => {
-        ESTAT._escenes_generades[idx][i] = e.text;
-      });
-    } else {
-      textComplet = textRaw;
-      if (!ESTAT._escenes_generades) ESTAT._escenes_generades = {};
-      ESTAT._escenes_generades[idx] = { 0: textComplet };
-    }
+    if (escenesParsejades.length > 0) return escenesParsejades.map(e => e.text).join('\n\n');
+    return textRaw;
+  }
 
-    await nkgActualitzarPostEscena(textComplet, capitol, escenes.length, userConfig);
-  } else if (ESTAT._nkg) {
-    // NKG actiu però sense escaleta: escriptura directa (Write & Edit) del capítol com una sola escena
+  if (ESTAT._nkg) {
     const cap = ESTAT._estructuraCapitols ? ESTAT._estructuraCapitols[idx] : null;
     const escenaSpec = {
       personatges: cap ? (cap.personatges || []) : [],
@@ -7860,59 +7843,102 @@ INSTRUCCIONS ESTRICTES:
       objectiu_dramatic: cap ? (cap.resum || '') : '',
       funcio_narrativa: cap ? (cap.fil_principal || '') : '',
       beat_narratiu: cap ? (cap.to_ritme || 'equilibrat') : 'equilibrat',
-      paraules_objectiu: 3500
+      paraules_objectiu: 3000
     };
-    const loaderEl = document.getElementById('loader-11-text');
-    if (loaderEl) loaderEl.textContent = `✍️ Capítol ${capitol}: escriptura directa (Write & Edit)…`;
-    textComplet = await escriureEscenaDirectaAmbJutge(capitol, 0, escenaSpec, userConfig);
-  } else {
-    // Fallback: sistema antic sense NKG
-    const res = await escriureCapitolPerEscenes(idx, userConfig);
-    return res;
+    return await escriureEscenaDirectaAmbJutge(capitol, 0, escenaSpec, userConfig);
   }
 
-  // Guardar capítol complet
-  if (!ESTAT._capitols_generats) ESTAT._capitols_generats = [];
-  ESTAT._capitols_generats[idx] = netejarTabulacionsInicials(textComplet);
+  const res = await escriureCapitolPerEscenes(idx, userConfig);
+  return res.response || '';
+}
 
-  // Generar resum compacte cada 3 capítols o al primer
-  if (capitol === 1 || capitol % 3 === 0) {
-    const loaderEl = document.getElementById('loader-11-text');
-    if (loaderEl) loaderEl.textContent = '🔵 Actualitzant resum narratiu…';
-    await generarResumCompacte(capitol, userConfig);
-  }
+async function avaluarEsborranyAmbHistoric(idx, esborrany, userConfig) {
+  const capitol = idx + 1;
+  const historic = (ESTAT._capitols_generats || [])
+    .slice(0, idx)
+    .filter(Boolean)
+    .map((t, i) => `--- CAPÍTOL ${i + 1} ---
+${String(t).slice(-1800)}`)
+    .join('\n\n');
 
-  // Checkpoint de coherència a meitat de novel·la (novel·les ≥16 capítols)
-  const totalCapitols = ESTAT._estructuraCapitols ? ESTAT._estructuraCapitols.length : 12;
-  const capitolMig = Math.floor(totalCapitols / 2);
-  if (totalCapitols >= 16 && capitol === capitolMig) {
+  const msgs = [{
+    role: 'user',
+    content: `Compara aquest esborrany amb la novel·la. Busca: 1) Objectes que canvien de mà o desapareixen. 2) Personatges secundaris que sonen genèrics. 3) Diàlegs on s'explica informació ja sabuda (As you know, Bob). 4) Repeticions innecessàries respecte al capítol anterior. Retorna una llista de correccions a aplicar.
+
+NOVEL·LA FINS ARA:
+${historic || '(encara no hi ha capítols previs)'}
+
+ESBORRANY CAPÍTOL ${capitol}:
+${String(esborrany || '').slice(0, 7000)}
+
+Respon en bullets curts i accionables.`
+  }];
+
+  const models = getModelConfig(userConfig);
+  return await callLLMMulti(
+    msgs,
+    'Ets una arquitecta narrativa obsessiva amb la micro-continuïtat. Respon de forma tècnica i accionable.',
+    Object.assign({}, userConfig, { maxTokens: 1200, model: models.modelArquitecte }),
+    'arquitectura'
+  );
+}
+
+async function generarProsaDefinitiva(idx, esborrany, correccions, userConfig) {
+  const capitol = idx + 1;
+  const cap = ESTAT._estructuraCapitols[idx] || {};
+  const contextCapitol = buildContextCapitol(idx);
+  const systemPrompt = buildSystemPromptCapitol();
+
+  const msgs = [{
+    role: 'user',
+    content: `Aquest és el teu esborrany. Aquestes són les correccions obligatòries de l'Arquitecta. Reescriu el capítol sencer solucionant TOTS els errors. Aquesta és la versió final: aplica una qualitat literària superba, elimina adverbis en '-ment', i usa 'show, don't tell'.
+
+CAPÍTOL ${capitol}: ${cap.titol || ''}
+
+CONTEXT:
+${contextCapitol}
+
+ESBORRANY:
+${String(esborrany || '').slice(0, 12000)}
+
+CORRECCIONS OBLIGATÒRIES:
+${String(correccions || '').slice(0, 3500)}
+
+Retorna només la versió final del capítol, sense metadades ni notes.`
+  }];
+
+  const models = getModelConfig(userConfig);
+  return await callLLMOneShotPlusCompletion(
+    msgs,
+    systemPrompt,
+    Object.assign({}, userConfig, { maxTokens: 14000, model: models.modelGeneracio }),
+    'generacio'
+  );
+}
+
+async function generarCapitolNKG(idx, userConfig) {
+  const capitol = idx + 1;
+  const loaderEl = document.getElementById('loader-11-text');
+
+  if (loaderEl) loaderEl.textContent = '📝 Escrivint primer esborrany ràpid...';
+  const esborrany = await generarEsborranyCapitol(idx, userConfig);
+
+  if (loaderEl) loaderEl.textContent = "🔍 Arquitecta revisant continuïtat d'objectes i veus...";
+  const correccionsArquitecta = await avaluarEsborranyAmbHistoric(idx, esborrany, userConfig);
+
+  if (loaderEl) loaderEl.textContent = '✨ Polint i escrivint la prosa definitiva...';
+  let textComplet = await generarProsaDefinitiva(idx, esborrany, correccionsArquitecta, userConfig);
+  textComplet = netejarTabulacionsInicials(textComplet || '');
+
+  if (ESTAT._nkg) {
     try {
-      const loaderEl = document.getElementById('loader-11-text');
-      if (loaderEl) loaderEl.textContent = `🟡 Checkpoint de coherència a meitat de novel·la (cap.${capitol}/${totalCapitols})…`;
-      const checkpoint = await controlArcsIntermedi(capitol, userConfig);
-      if (checkpoint) {
-        mostrarCheckpointIntermedi(checkpoint, capitol, totalCapitols);
-      }
+      await nkgActualitzarPostEscena(textComplet, capitol, 1, userConfig);
     } catch (err) {
-      console.warn('Checkpoint intermedi: error no bloquejant:', err.message);
+      console.warn('NKG post-capítol: error no bloquejant:', err.message);
     }
   }
 
-  // Millora 7: Micro-reescriptura cada 3 capítols (Sonnet diagnostica i reescriu)
-  if (capitol % 3 === 0 || capitol === totalCapitols) {
-    try {
-      const loaderEl = document.getElementById('loader-11-text');
-      if (loaderEl) loaderEl.textContent = '🔴 Revisant passatges febles…';
-      await microReescripturaBlocOpus(Math.max(0, idx - 2), idx, userConfig);
-      if (capitol === totalCapitols && totalCapitols >= 12) {
-        console.log('Micro-reescriptura final: verificant tancament narratiu');
-      }
-    } catch (err) {
-      console.warn('Micro-reescriptura: error no bloquejant:', err.message);
-    }
-  }
-
-  return { response: textComplet };
+  return { response: textComplet, esborrany, correccionsArquitecta };
 }
 
 function renderitzarNKG() {
