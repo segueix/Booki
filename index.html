@@ -1251,6 +1251,15 @@ const MODEL_REGISTRY = {
     velocitat: 'rapida',
     notes: 'Bon raonament, context llarg. Prosa en català menys natural que Claude.'
   },
+  'gemini-3-flash-preview': {
+    nom: 'Gemini 3 Flash Preview', nomCurt: 'Gemini 3 Flash',
+    proveidor: 'google',
+    input_per_m: 0.10, output_per_m: 0.40,
+    context_max: 1000000, max_output: 8192,
+    qualitat: { draft: 80, prosa: 75, arquitectura: 75, extraccio: 85 },
+    velocitat: 'molt_rapida',
+    notes: 'Model de nova generació extremadament barat i ràpid.'
+  },
   'gpt-5.2': {
     nom: 'GPT-5.2', nomCurt: 'GPT-5.2',
     proveidor: 'openai',
@@ -1285,12 +1294,13 @@ const ROLS_MODEL = {
 
 // Model híbrid v5.1: llegeix de ESTAT._model* (selector flexible per rol)
 function getModelConfig(userConfig) {
-  // Prioritat: ESTAT._model* > userConfig.model* > defaults
+  // Prioritat: ESTAT._model* > userConfig.models.* > userConfig.model* > defaults
   const cfg = userConfig || {};
+  const cfgModels = cfg.models || {};
   return {
-    modelDraft:      ESTAT._modelDraft      || cfg.modelDraft      || cfg.modelHaiku      || 'claude-haiku-4-5-20251001',
-    modelGeneracio:  ESTAT._modelGeneracio  || cfg.modelGeneracio  || cfg.model           || 'claude-sonnet-4-6',
-    modelArquitecte: ESTAT._modelArquitecte || cfg.modelArquitecte || cfg.modelArquitectura || cfg.model || 'claude-sonnet-4-6'
+    modelDraft:      ESTAT._modelDraft      || cfgModels.draft      || cfg.modelDraft      || cfg.modelHaiku      || 'claude-haiku-4-5-20251001',
+    modelGeneracio:  ESTAT._modelGeneracio  || cfgModels.generacio  || cfg.modelGeneracio  || cfg.model           || 'claude-sonnet-4-6',
+    modelArquitecte: ESTAT._modelArquitecte || cfgModels.arquitecte || cfg.modelArquitecte || cfg.modelArquitectura || cfg.model || 'claude-sonnet-4-6'
   };
 }
 
@@ -1311,7 +1321,7 @@ function aplicarPreset(preset) {
     'premium':    { draft: 'claude-sonnet-4-6',         generacio: 'claude-sonnet-4-6', arquitecte: 'claude-opus-4-6'  },
     'maxim':      { draft: 'claude-sonnet-4-6',         generacio: 'claude-opus-4-6',   arquitecte: 'claude-opus-4-6'  },
     'barat_gpt':  { draft: 'gpt-5.2',                  generacio: 'gpt-5.2',           arquitecte: 'gpt-5.2'          },
-    'gemini':     { draft: 'gemini-3-pro-preview',      generacio: 'gemini-3-pro-preview', arquitecte: 'gemini-3-pro-preview' }
+    'gemini':     { draft: 'gemini-3-flash-preview',    generacio: 'gemini-3-flash-preview', arquitecte: 'gemini-3-pro-preview' }
   };
   const p = presets[preset];
   if (!p) return;
@@ -1350,8 +1360,8 @@ function actualitzarConfigProvider() {
     genInput.value = 'claude-sonnet-4-6';
     arqInput.value = 'claude-opus-4-6';
   } else if (provider === 'gemini') {
-    genInput.value = 'gemini-1.5-flash';
-    arqInput.value = 'gemini-1.5-pro';
+    genInput.value = 'gemini-3-flash-preview';
+    arqInput.value = 'gemini-3-flash-preview';
   } else if (provider === 'openai') {
     genInput.value = 'gpt-4o-mini';
     arqInput.value = 'gpt-4o';
@@ -2471,13 +2481,18 @@ async function generarCapitol(idx, intents = 0) {
     hideLoader(11);
     mostrarCapitol(idx, res.response);
 
-    // SISTEMA 1: actualitzar bíblia i registre (no bloquejants)
-    actualitzarBiblia(res.response, idx, USER_CONFIG).catch(err =>
-      console.warn('Bíblia async:', err.message)
-    );
-    actualitzarLlibreRegistreBackground(res.response, idx).catch(err =>
-      console.warn('Registre async:', err.message)
-    );
+    // SISTEMA 1: actualitzar bíblia i registre (en sèrie, amb tolerància a errors)
+    try {
+      await actualitzarBiblia(res.response, idx, USER_CONFIG);
+    } catch (err) {
+      console.warn('Bíblia async:', err.message);
+    }
+
+    try {
+      await actualitzarLlibreRegistreBackground(res.response, idx);
+    } catch (err) {
+      console.warn('Registre async:', err.message);
+    }
 
     // SISTEMA 4: checkpoint cada 3 capítols
     const esCheckpoint = (idx + 1) % 3 === 0 && idx + 1 < ESTAT._estructuraCapitols.length;
@@ -2640,11 +2655,11 @@ function mostrarRevisioCapitol(revisat, idx, isLast) {
   if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
     if (!ok && instruccions) {
       accions.innerHTML = `<span style="color:var(--text2);font-size:.85rem;">🔴 Opus demana correccions. Sonnet reescrivint automàticament...</span>`;
-      setTimeout(() => reescriureCapitol(idx), 1500); // Dona 1.5s per llegir el diagnòstic
+      setTimeout(() => reescriureCapitol(idx), 15000); // Dona 15s per recuperar quota abans de continuar
     } else {
       accions.innerHTML = `<span style="color:var(--success);font-size:.85rem;">✅ Capítol aprovat. Avançant automàticament...</span>`;
       if (!isLast) {
-        setTimeout(() => generarCapitol(idx + 1), 2000); // Dona 2s abans de saltar
+        setTimeout(() => generarCapitol(idx + 1), 15000); // Dona 15s abans de saltar
       } else {
         generarCapitol(ESTAT._estructuraCapitols.length);
       }
@@ -2719,7 +2734,7 @@ function mostrarAccionsCapitolSimple(idx, isLast) {
     // 🔴 CORRECCIÓ: Si és automàtic, no esperem el clic de l'usuari
     if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
       document.getElementById('capitol-accions').innerHTML = `<span style="color:var(--text2);font-size:.85rem;">Avançant automàticament al següent capítol...</span>`;
-      setTimeout(() => generarCapitol(idx + 1), 1500);
+      setTimeout(() => generarCapitol(idx + 1), 15000);
     } else {
       document.getElementById('capitol-accions').innerHTML =
         `<button class="btn btn-primary" onclick="generarCapitol(${idx + 1})">➡️ Capítol ${idx + 2}</button>`;
@@ -3421,13 +3436,13 @@ async function parseJsonResponse(rawResponse, providerName) {
 // ─── fetchSegur: fetch amb backoff exponencial ───────────────
 // Substitueix fetch() directe per a totes les crides LLM.
 // Reintenta automàticament si l'API retorna 429, 503 o 529.
-async function fetchSegur(url, options, maxIntents = 3) {
+async function fetchSegur(url, options, maxIntents = 4) {
   const RETRYABLE = new Set([429, 503, 529]);
   for (let intent = 0; intent < maxIntents; intent++) {
     const response = await fetch(url, options);
     if (!RETRYABLE.has(response.status)) return response;
     if (intent === maxIntents - 1) return response; // últim intent: retorna per deixar parseJsonResponse gestionar l'error
-    const delayMs = Math.pow(2, intent + 1) * 1000; // 2s → 4s → 8s
+    const delayMs = Math.pow(2, intent) * 10000; // 10s → 20s → 40s → 80s
     console.warn(`[fetchSegur] HTTP ${response.status} — reintent ${intent + 1}/${maxIntents - 1} en ${delayMs / 1000}s...`);
     await new Promise(resolve => setTimeout(resolve, delayMs));
   }
@@ -4083,7 +4098,8 @@ Format ESTRICTE (res més, sense cap introducció):
 10. [premissa]`
   };
   const msgs       = [...history, userMsg];
-  const response   = await callLLMMulti(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 4096 }));
+  const models = getModelConfig(userConfig);
+  const response   = await callLLMMulti(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 4096, model: models.modelArquitecte }), 'arquitectura');
   const newHistory = [...msgs, { role: 'assistant', content: response }];
   return { response, history: newHistory };
 }
@@ -4123,7 +4139,8 @@ Format ESTRICTE (5 opcions, res més):
 5. **[Nom, edat]** | Desig: [...] | Temor: [...] | Contradicció: [...] | Veu: [...]`
     }
   ];
-  const response   = await callLLMMulti(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 4096 }));
+  const models = getModelConfig(userConfig);
+  const response   = await callLLMMulti(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 4096, model: models.modelDraft, _esDraft: true }), 'generacio');
   const newHistory = [...msgs, { role: 'assistant', content: response }];
   return { response, history: newHistory };
 }
@@ -4153,7 +4170,8 @@ Format ESTRICTE (5 opcions, res més):
 5. **[Nom/tipus de lloc]** | Atmosfera: [...] | Detall clau: [...] | Potencial: [...]`
     }
   ];
-  const response   = await callLLMMulti(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 4096 }));
+  const models = getModelConfig(userConfig);
+  const response   = await callLLMMulti(msgs, getSystemPrompt(tematica), Object.assign({}, userConfig, { maxTokens: 4096, model: models.modelDraft, _esDraft: true }), 'generacio');
   const newHistory = [...msgs, { role: 'assistant', content: response }];
   return { response, history: newHistory };
 }
@@ -4265,7 +4283,7 @@ Continua directament la narració en català, des d'on s'ha aturat el text anter
   const responseGeneracio = await callLLMOneShotPlusCompletion(
     msgs,
     getSystemPrompt(tematica),
-    Object.assign({}, userConfig, { maxTokens: 8192, model: models.modelGeneracio }),
+    Object.assign({}, userConfig, { maxTokens: 8192, model: models.modelArquitecte, modelArquitectura: models.modelArquitecte, modelGeneracio: models.modelArquitecte }),
     'generacio'
   );
 
@@ -5315,7 +5333,7 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense markdown, sense text addicio
   const response = await callLLMMulti(
     msgs,
     'Ets un arquitecte narratiu expert en estructures de novel·la. Retornes EXCLUSIVAMENT un objecte JSON vàlid, sense cap text addicional ni markdown. Escrius els valors de text en català.',
-    Object.assign({}, userConfig, { maxTokens: 16384 }),
+    Object.assign({}, userConfig, { maxTokens: 16384, model: getModelConfig(userConfig).modelArquitecte }),
     'arquitectura'
   );
   return { response };
@@ -5442,7 +5460,8 @@ INSTRUCCIONS D'ESCRIPTURA:
 - Escriu en català`
   }];
 
-  const response = await callLLMOneShotPlusCompletion(msgs, systemPrompt, Object.assign({}, userConfig, { maxTokens: 14000 }), 'generacio');
+  const models = getModelConfig(userConfig);
+  const response = await callLLMOneShotPlusCompletion(msgs, systemPrompt, Object.assign({}, userConfig, { maxTokens: 14000, model: models.modelGeneracio }), 'generacio');
   return { response };
 }
 
@@ -5478,7 +5497,7 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense cap text addicional, sense m
   const response = await callLLMMulti(
     msgs,
     'Ets un supervisor narratiu. Retornes EXCLUSIVAMENT un objecte JSON vàlid, sense cap altre text.',
-    Object.assign({}, userConfig, { maxTokens: 1500 }),
+    Object.assign({}, userConfig, { maxTokens: 1500, model: getModelConfig(userConfig).modelDraft, _esDraft: true }),
     'generacio'
   );
   return { response };
@@ -6013,8 +6032,8 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid:
   const response = await callLLMMulti(
     msgs,
     'Ets un editor literari actualitzant una bíblia narrativa. Retornes EXCLUSIVAMENT JSON vàlid.',
-    Object.assign({}, userConfig, { maxTokens: 1500 }),
-    'arquitectura'
+    Object.assign({}, userConfig, { maxTokens: 1500, model: getModelConfig(userConfig).modelDraft, _esDraft: true }),
+    'generacio'
   );
 
   const canvis = parseJsonRobust(response) || {};
@@ -6295,8 +6314,10 @@ Retorna EXCLUSIVAMENT JSON vàlid:
 }
 
 async function cridaAPI_GenerarText(promptEscena, systemPrompt, userConfig, maxTokensOverride) {
+  const models = getModelConfig(userConfig);
   const cfg = Object.assign({}, userConfig, {
-    maxTokens: maxTokensOverride || Math.max(1500, (promptEscena.length / 2) | 0)
+    maxTokens: maxTokensOverride || Math.max(1500, (promptEscena.length / 2) | 0),
+    model: models.modelGeneracio
   });
   return await callLLMMulti([{ role: 'user', content: promptEscena }], systemPrompt, cfg, 'generacio');
 }
@@ -6327,7 +6348,7 @@ Retorna ÚNICAMENT un objecte JSON amb aquest format exacte:
     const raw = await callLLMMulti(
       [{ role: 'user', content: promptAvaluador }],
       'Ets un jutge literari i corrector lingüístic expert en català. Retorna únicament JSON vàlid.',
-      Object.assign({}, userConfig, { maxTokens: 500, model: models.modelArquitecte || models.modelGeneracio }),
+      Object.assign({}, userConfig, { maxTokens: 500, model: models.modelArquitecte }),
       'arquitectura'
     );
     const parsed = parseJsonRobust(raw);
@@ -7240,7 +7261,7 @@ INSTRUCCIONS ESTRICTES:
     const textRaw = await callLLMOneShotConditionalCompletion(
       msgs,
       systemPrompt,
-      Object.assign({}, userConfig, { maxTokens: Math.max(12000, paraulesTotal * 2) }),
+      Object.assign({}, userConfig, { maxTokens: Math.max(12000, paraulesTotal * 2), model: getModelConfig(userConfig).modelGeneracio }),
       'generacio'
     );
 
