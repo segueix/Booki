@@ -1237,6 +1237,51 @@ function restaurarInterficieDesDeEstat() {
   }
 }
 
+// --- EFECTE D'ESCRIPTURA EN VIU ---
+async function efecteEscripturaHTML(elementId, htmlContent, msPerChar = 3) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  el.innerHTML = '';
+
+  // Creem un element temporal per parsejar les etiquetes (com <p>, <strong>...)
+  const temp = document.createElement('div');
+  temp.innerHTML = htmlContent;
+
+  async function typeNode(node, parent) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent;
+      for (let i = 0; i < text.length; i++) {
+        parent.appendChild(document.createTextNode(text[i]));
+        // Scroll automàtic suau cap avall mentre escriu
+        const scrollContainer = el.closest('.conte-reader') || el;
+        if (scrollContainer.scrollHeight - scrollContainer.scrollTop > scrollContainer.clientHeight) {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        }
+        await new Promise(r => setTimeout(r, msPerChar));
+      }
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const clone = node.cloneNode(false); // Copia l'etiqueta buida
+      parent.appendChild(clone);
+      for (let i = 0; i < node.childNodes.length; i++) {
+        await typeNode(node.childNodes[i], clone);
+      }
+    }
+  }
+
+  // Si l'usuari clica l'element, accelera l'escriptura (salta l'efecte)
+  let saltarEfecte = false;
+  el.onclick = () => { saltarEfecte = true; };
+
+  for (let i = 0; i < temp.childNodes.length; i++) {
+    if (saltarEfecte) {
+      el.innerHTML = htmlContent;
+      break;
+    }
+    await typeNode(temp.childNodes[i], el);
+  }
+  el.onclick = null; // Netegem l'esdeveniment
+}
+
 function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -1855,7 +1900,7 @@ async function escriureSeguentPart() {
 function mostrarConte(text) {
   const cos  = document.getElementById('conte-cos');
   const pars = text.split(/\n\n+/).filter(p => p.trim().length > 0);
-  cos.innerHTML = pars.map(p => `<p>${escHtml(p.trim())}</p>`).join('');
+  const html = pars.map(p => `<p>${escHtml(p.trim())}</p>`).join('');
 
   const wc = compteParaules(text);
   document.getElementById('conte-wordcount').textContent = `${wc.toLocaleString('ca')} paraules`;
@@ -1864,6 +1909,9 @@ function mostrarConte(text) {
   setTimeout(() => {
     document.getElementById('fase-6').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, 100);
+
+  // Executar efecte d'escriptura
+  efecteEscripturaHTML('conte-cos', html, 5);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2693,13 +2741,16 @@ function mostrarCapitol(idx, text) {
   document.getElementById('capitol-actual-titol').textContent = `Capítol ${idx + 1}: ${titol}`;
   const cos  = document.getElementById('capitol-actual-cos');
   const pars = text.split(/\n\n+/).filter(p => p.trim().length > 0);
-  cos.innerHTML = pars.map(p => `<p>${escHtml(p.trim())}</p>`).join('');
+  const html = pars.map(p => `<p>${escHtml(p.trim())}</p>`).join('');
 
   const wc = compteParaules(text);
   document.getElementById('capitol-actual-wordcount').textContent = `${wc.toLocaleString('ca')} paraules`;
   document.getElementById('capitol-actual-wrap').classList.remove('hidden');
 
   setTimeout(() => document.getElementById('fase-11').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+
+  // Executar efecte d'escriptura
+  efecteEscripturaHTML('capitol-actual-cos', html, 3);
 }
 
 function mostrarAccionsCapitol(idx, text) {
@@ -3072,9 +3123,12 @@ async function escriureEpileg() {
 
     const epilegText = document.getElementById('epileg-text');
     const pars = res.response.split(/\n\n+/).filter(p => p.trim().length > 0);
-    epilegText.innerHTML = pars.map(p => `<p>${escHtml(p.trim())}</p>`).join('');
+    const html = pars.map(p => `<p>${escHtml(p.trim())}</p>`).join('');
     document.getElementById('epileg-cos').classList.remove('hidden');
     toast('Epíleg escrit per Sonnet.');
+
+    // Executar efecte d'escriptura
+    efecteEscripturaHTML('epileg-text', html, 5);
   } catch (err) {
     document.getElementById('epileg-loader-wrap').classList.add('hidden');
     document.getElementById('btn-epileg').disabled = false;
