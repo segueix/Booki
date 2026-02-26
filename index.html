@@ -5596,8 +5596,8 @@ A més de la corba de tensió, defineix una "corba moral" independent amb exacta
 5. COST FINAL (últims 2-3 caps): El preu emocional/moral concret de la transformació
 Inclou-ho com a camp "arc_moral" al JSON de retorn.
 
-IMPORTANT: Has de completar TOTS els capítols. El JSON ha de contenir exactament tantes entrades a l'array "capitols" com el "nombre_capitols" que decideixis.
 IMPORTANT: L'array "capitols" ha de contenir EXACTAMENT el nombre de capítols indicat a "nombre_capitols". Prioritza completar tots els capítols encara que les descripcions dels últims siguin més breus. Un JSON truncat és INACCEPTABLE.
+CRÍTIC: L'array "corba_tensio" HA DE CONTENIR EXACTAMENT una entrada per a CADA capítol de la novel·la. Si tries 18 capítols, hi ha d'haver 18 entrades a la corba de tensió. NO T'ATURIS A LA MEITAT.
 
 Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense markdown, sense text addicional):
 {
@@ -5611,7 +5611,9 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense markdown, sense text addicio
   ],
   "corba_tensio": [
     {"capitol": 1, "nivell": 3, "tipus": "exposició"},
-    {"capitol": 2, "nivell": 5, "tipus": "complicació"}
+    {"capitol": 2, "nivell": 5, "tipus": "complicació"},
+    {"capitol": 3, "nivell": 6, "tipus": "gir"},
+    {"capitol": "...", "nivell": 0, "tipus": "continua així fins a arribar al darrer capítol, sense saltar-ne cap"}
   ],
   "arc_moral": {
     "estat_inicial": "descripció dels valors inicials del protagonista",
