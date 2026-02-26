@@ -1151,6 +1151,7 @@ const ESTAT = {
   epileg:                   null,
   // Novel·la: dades de l'estructura JSON
   _arcGlobal:               '',
+  _arcMoral:                null,
   _temesCentrals:           [],
   _prefiguracions:          [],
   _corbaTensio:             [],
@@ -2175,6 +2176,7 @@ function parseEstructura(text) {
     ESTAT._temesCentrals  = data.temes_centrals || [];
     ESTAT._prefiguracions = data.prefiguracions || [];
     ESTAT._corbaTensio    = data.corba_tensio || [];
+    ESTAT._arcMoral       = data.arc_moral || null;
 
     // Validació de límits 12-22 capítols
     if (data.capitols.length > 22) {
@@ -4820,6 +4822,12 @@ function buildSystemPromptCapitol() {
         const evitar = [...trigrames.slice(0,5), ...bigrames.slice(0,5)].map(([ng]) => `"${ng}"`);
         if (evitar.length > 0) parts.push(`\nEXPRESSIONS A EVITAR (massa repetides): ${evitar.join(', ')}`);
       }
+      const repsTematiques = detectarRepeticionsTematiques();
+      if (repsTematiques) {
+        parts.push('\nREGLA ANTI-REDUNDÀNCIA EMOCIONAL: Els personatges ja han tingut les revelacions emocionals següents i NO poden "redescobrir-les": ' +
+          repsTematiques.map(r => `"${r.tema}" (caps. ${r.capitols.join(', ')})`).join('; ') +
+          '. Si un personatge ja ha tingut una revelació emocional en un capítol anterior, NO pot "redescobrir" el mateix. Ha de: (a) actuar en conseqüència, (b) descobrir una capa NOVA del problema, o (c) intentar negar-ho i fracassar. La repetició de la mateixa epifania és la mort del ritme narratiu.');
+      }
     }
     if (ESTAT._manualEstil) {
       const m = ESTAT._manualEstil;
@@ -5296,6 +5304,15 @@ PER A 19-22 CAPÍTOLS (estructura 5-12/14-4/5):
 
 INSTRUCCIÓ D'ARC DE PERSONATGE: Qualsevol caiguda moral, traïció als propis principis o canvi radical de paradigma del protagonista NO pot passar en un sol capítol. Ha d'haver-hi almenys un capítol sencer de "Dubte i Racionalització" on el personatge intenti auto-enganyar-se abans d'acceptar la seva nova naturalesa corrupta o el seu canvi d'alineació. Planifica explícitament aquest capítol de transició a l'estructura. Fes que les derrotes morals se sentin orgàniques i justificades, no precipitades.
 
+ARC MORAL DEL PROTAGONISTA (OBLIGATORI):
+A més de la corba de tensió, defineix una "corba moral" independent amb exactament 5 punts:
+1. ESTAT INICIAL: Valors i creences del protagonista al començar
+2. PRIMERA FISSURA (cap. 3-5): Un moment on els seus principis fallen per primera vegada
+3. BACKSLIDING (cap. 6-9): Un intent genuí de tornar als seus valors originals que FRACASSA — no per debilitat, sinó perquè el món ja no li ho permet
+4. PUNT DE NO RETORN (cap. 9-12): La decisió irreversible que el transforma
+5. COST FINAL (últims 2-3 caps): El preu emocional/moral concret de la transformació
+Inclou-ho com a camp "arc_moral" al JSON de retorn.
+
 IMPORTANT: Has de completar TOTS els capítols. El JSON ha de contenir exactament tantes entrades a l'array "capitols" com el "nombre_capitols" que decideixis.
 IMPORTANT: L'array "capitols" ha de contenir EXACTAMENT el nombre de capítols indicat a "nombre_capitols". Prioritza completar tots els capítols encara que les descripcions dels últims siguin més breus. Un JSON truncat és INACCEPTABLE.
 
@@ -5313,6 +5330,13 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense markdown, sense text addicio
     {"capitol": 1, "nivell": 3, "tipus": "exposició"},
     {"capitol": 2, "nivell": 5, "tipus": "complicació"}
   ],
+  "arc_moral": {
+    "estat_inicial": "descripció dels valors inicials del protagonista",
+    "primera_fissura": {"capitol": 4, "descripcio": "moment on els principis fallen per primera vegada"},
+    "backsliding": {"capitol": 7, "descripcio": "intent genuí de tornar als valors originals que fracassa"},
+    "punt_no_retorn": {"capitol": 10, "descripcio": "decisió irreversible que el transforma"},
+    "cost_final": {"capitol": 13, "descripcio": "preu emocional/moral concret de la transformació"}
+  },
   "capitols": [
     {
       "numero": 1,
@@ -5802,6 +5826,7 @@ Analitza:
 3. PREFIGURACIONS: Quines prefiguracions plantades han de recollir-se en els capítols restants? Urgència?
 4. DERIVA DE TRAMA: Hi ha alguna desviació respecte a l'arc planificat originalment que calgui corregir?
 5. RITME: El ritme actual (tensió acumulada fins ara) és adequat per arribar al clímax planificat?
+6. ARC MORAL DEL PROTAGONISTA: El protagonista ha mostrat RESISTÈNCIA genuïna a la seva transformació? (no compten dubtes retòrics o monòlegs interns). Hi ha hagut almenys un moment de "backsliding" on intenta tornar als seus valors originals? Si la resposta és NO a qualsevol dels dos, marca "arc_lineal" com a problema greu i recomana un capítol de reversió.
 
 Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense markdown, sense text addicional):
 {
@@ -5813,6 +5838,7 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense markdown, sense text addicio
     {"element": "descripció", "capitol_resolucio": 15, "nota": "breu indicació de com resoldre-la"}
   ],
   "deriva_detectada": "descripció breu si n'hi ha, buit si tot va bé",
+  "arc_lineal": false,
   "ajustos_rumb": "instruccions concretes en 3-5 línies per als capítols restants: quins fils recuperar, quins personatges fer aparèixer, quines tensions apujar o baixar. Escrit com a nota interna de l'arquitecte per al model que escriurà els capítols."
 }`
   }];
@@ -6164,6 +6190,15 @@ async function executarCheckpoint(idx, userConfig) {
     ? '\nAJUSTOS DE RUMB ANTERIORS:\n' + (typeof ESTAT._ajustosRumb === 'string' ? ESTAT._ajustosRumb : JSON.stringify(ESTAT._ajustosRumb))
     : '';
 
+  // Detecció programàtica de repeticions temàtiques (NKG)
+  const repetidesTematiques = detectarRepeticionsTematiques();
+  const repetidesTematiquesCtx = repetidesTematiques
+    ? '\nREVELACIONS REPETIDES DETECTADES:\n' + repetidesTematiques.map(r =>
+        `- "${r.tema}" repetida ${r.cops} vegades (caps. ${r.capitols.join(', ')})`
+      ).join('\n') +
+      '\nINSTRUCCIÓ: Si una revelació emocional ja s\'ha produït, el següent capítol ha de COMPLICAR-LA (afegir una capa nova, una contradicció, un cost emocional diferent) o SUPERAR-LA (el personatge ja ho sap i actua en conseqüència, no ho "redescobeix").'
+    : '';
+
   const tramesCtx = ESTAT.trames.trama_principal
     ? `\nTRAMA PRINCIPAL: ${typeof ESTAT.trames.trama_principal === 'string' ? ESTAT.trames.trama_principal : (ESTAT.trames.trama_principal.descripcio || '')}
 SUBTRAMES: ${ESTAT.trames.subtrames.length > 0 ? ESTAT.trames.subtrames.map(st => st.nom + ': ' + (st.descripcio || '')).join(' | ') : '(cap)'}`
@@ -6176,13 +6211,14 @@ SUBTRAMES: ${ESTAT.trames.subtrames.length > 0 ? ESTAT.trames.subtrames.map(st =
 ${brief}${tramesCtx}
 
 CAPÍTOLS ESCRITS FINS ARA:
-${capitolsEscrits}${ajustosAnteriors}
+${capitolsEscrits}${ajustosAnteriors}${repetidesTematiquesCtx}
 
 Verifica:
 1. Coherència entre capítols (no contradiccions, no lapsus de memòria dels personatges)
 2. Les subtrames s'estan desenvolupant com estava planificat
 3. El ritme narratiu és adequat (ni massa accelerat ni estancat)
 4. Les prefiguracions plantades es mantenen sense resoldre prematurament
+5. VITALITAT DELS SECUNDARIS: Per a cada personatge secundari, indica si ha tingut almenys una escena d'autonomia en els últims 4 capítols. Si algun secundari porta 4+ capítols sent només reactiu al protagonista, marca'l com a "estancat" i recomana una escena d'autonomia.
 
 Retorna EXCLUSIVAMENT un objecte JSON vàlid:
 {
@@ -6190,6 +6226,7 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid:
   "valoracio_general": "descripció breu de l'estat de la novel·la en una frase",
   "problemes_detectats": ["problema concret 1 si n'hi ha"],
   "recomanacions": ["recomanació específica per als pròxims capítols"],
+  "secundaris_estancats": ["nom del personatge estancat si n'hi ha"],
   "ajustos_rumb": "instruccions específiques per als capítols ${idx + 2}-${idx + 4} si cal ajustar el rumb (buit si tot va bé)"
 }`
   }];
@@ -6253,6 +6290,23 @@ async function generarEscaletaBloc(capitols, offset, userConfig) {
   const brief = buildBriefNarratiu();
   const capsText = capitols.map((c, i) => `Cap. ${offset + i + 1}: ${c.titol || ''} — ${c.resum || ''}`).join('\n');
   const corbaTensio = ESTAT._corbaTensio || [];
+
+  // Arc moral del protagonista (si existeix)
+  const arcMoral = ESTAT._arcMoral;
+  const arcMoralCtx = arcMoral ? (() => {
+    const capsBloc = capitols.map((_, i) => offset + i + 1);
+    const punts = [];
+    if (arcMoral.backsliding && capsBloc.includes(arcMoral.backsliding.capitol)) {
+      punts.push(`BACKSLIDING (cap. ${arcMoral.backsliding.capitol}): Almenys 2 escenes on el protagonista intenta genuïnament tornar al seu antic jo. Ha de ser un intent CREÏBLE, no un gest simbòlic. Descripció: ${arcMoral.backsliding.descripcio}`);
+    }
+    if (arcMoral.punt_no_retorn && capsBloc.includes(arcMoral.punt_no_retorn.capitol)) {
+      punts.push(`PUNT DE NO RETORN (cap. ${arcMoral.punt_no_retorn.capitol}): L'escena de decisió ha de ser AMBIGUA moralment — el lector ha de poder defensar tant la decisió com la seva alternativa. Descripció: ${arcMoral.punt_no_retorn.descripcio}`);
+    }
+    if (arcMoral.primera_fissura && capsBloc.includes(arcMoral.primera_fissura.capitol)) {
+      punts.push(`PRIMERA FISSURA (cap. ${arcMoral.primera_fissura.capitol}): El moment on els principis del protagonista fallen per primera vegada. Descripció: ${arcMoral.primera_fissura.descripcio}`);
+    }
+    return punts.length > 0 ? '\n\nVERIFICACIÓ D\'ARC MORAL DEL PROTAGONISTA:\n' + punts.join('\n') : '';
+  })() : '';
   const prompt = `Ets un dramaturg expert. Genera una escaleta detallada per escenes per als capítols següents de la novel·la.
 
 BRIEF:
@@ -6271,7 +6325,7 @@ ESCENES PER CAPÍTOL (adapta al ritme del capítol):
 TOTAL OBJECTIU: ~3.500-5.000 paraules per capítol. La novel·la completa ha de fer entre 60.000 i 100.000 paraules (12-22 capítols × ~4.000 paraules).
 
 CORBA DE TENSIÓ (per orientar el ritme de cada capítol):
-${corbaTensio.length > 0 ? corbaTensio.map(t => `Cap.${t.capitol}: nivell ${t.nivell} (${t.tipus})`).join(', ') : '(no disponible)'}
+${corbaTensio.length > 0 ? corbaTensio.map(t => `Cap.${t.capitol}: nivell ${t.nivell} (${t.tipus})`).join(', ') : '(no disponible)'}${arcMoralCtx}
 
 Cada escena ha d'incloure (camps OBLIGATORIS, res més):
 - nom: títol breu (3-5 paraules)
@@ -6283,6 +6337,11 @@ Cada escena ha d'incloure (camps OBLIGATORIS, res més):
 - Cada escena ha de tenir un objectiu físic (avançar en la trama) i un objectiu emocional o reflexiu (introspecció, record, subtrama).
 
 NO incloguis emocio_entrada, emocio_sortida ni punt_inflexio per estalviar espai.
+
+REGLA DE PROFUNDITAT DELS SECUNDARIS:
+- Cada personatge secundari ha de tenir almenys 1 escena cada 4 capítols on actuï per iniciativa pròpia (no com a reacció al protagonista).
+- En aquestes escenes, el secundari ha de mostrar un desig, por o contradicció que NO estigui directament relacionada amb la trama principal.
+- Indica al camp "funcio_narrativa" quan una escena és d'"autonomia del secundari" amb el tag [AUTONOMIA: Nom].
 
 Retorna EXCLUSIVAMENT JSON vàlid:
 {
@@ -6325,6 +6384,13 @@ async function cridaAPI_GenerarText(promptEscena, systemPrompt, userConfig, maxT
 async function avaluarQualitatLiteraria(textEscena, userConfig) {
   const models = getModelConfig(userConfig);
   const textNet = String(textEscena || '').slice(0, 6000);
+
+  // Detecció programàtica de telling emocional (sense cost LLM)
+  const instanciesTelling = detectarTellingEmocional(textNet);
+  const tellingCtx = instanciesTelling.length > 3
+    ? `\n   - TELLING EMOCIONAL DETECTAT: El text conté ${instanciesTelling.length} instàncies d'emocions explicades directament (${instanciesTelling.slice(0, 3).map(m => `"${m}"`).join(', ')}…). Marca com a NO APROVAT si n'hi ha més de 2 per escena.`
+    : '';
+
   const promptAvaluador = `Ets un editor literari exigent i un filòleg expert en llengua catalana. Llegeix aquest text:
 
 """${textNet}"""
@@ -6336,6 +6402,7 @@ La teva tasca té dues parts:
    - CLIXÉS TECNOLÒGICS O D'ACCIÓ: Teclejar frenèticament per aturar un hackeig, objectes d'espia hiper-tecnològics, USB encriptats, pistes amagades en llocs inversemblants.
    - CANVIS EMOCIONALS NO GUANYATS: Personatges que canvien radicalment de postura (moral, emocional, ideològica) sense un procés de dubte i racionalització prèvi. Un sol capítol no és suficient per a una caiguda moral.
    - CLIXÉS GENÈRICS: Resolucions mandroses, diàlegs robòtics, frases fetes del gènere.
+   - SOBRECÀRREGA SENSORIAL: Rebutja si hi ha més de 2 adjectius per frase de mitjana o si cada paràgraf conté descripcions sensorials. La prosa ha de respirar: alterna paràgrafs sensorials amb paràgrafs d'acció pura o diàleg sec.${tellingCtx}
 2. CORRECCIÓ LINGÜÍSTICA: Identifica qualsevol falta d'ortografia, castellanisme, expressió calcada d'altres idiomes o gramàtica incorrecta en català.
 
 Retorna ÚNICAMENT un objecte JSON amb aquest format exacte:
@@ -6791,6 +6858,10 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
         if (p.nous_secrets) {
           p.nous_secrets.forEach(s => { if (!ex.secrets.includes(s)) ex.secrets.push(s); });
         }
+        if (p.te_escena_autonoma) {
+          if (!ex.autonomia_escenes) ex.autonomia_escenes = [];
+          ex.autonomia_escenes.push(capitol);
+        }
       }
     });
   }
@@ -7109,6 +7180,13 @@ Reescriu el draft corregint NOMÉS els errors indicats. Manté la mateixa estruc
     if (estils.length > 0) estilsPresents = '\n\nESTILS DE PARLA:\n' + estils.join('\n');
   }
 
+  // Escena d'autonomia de secundari (tag [AUTONOMIA: Nom] a funcio_narrativa)
+  const funcioNarrativa = escenaSpec.funcio_narrativa || '';
+  const autonomiaMatch = funcioNarrativa.match(/\[AUTONOMIA:\s*([^\]]+)\]/i);
+  const instruccionsAutonomia = autonomiaMatch
+    ? `\nESCENA D'AUTONOMIA DEL SECUNDARI: En aquesta escena, ${autonomiaMatch[1].trim()} actua per iniciativa pròpia. Mostra un desig o una por que sigui INDEPENDENT de la trama principal. El protagonista pot estar present però ha de ser OBSERVADOR o fins i tot incòmode davant les accions del secundari. El secundari ha de sorprendre el lector amb una decisió o revelació que no es pugui predir.`
+    : '';
+
   let instruccionsBeat = '';
   const beat = (escenaSpec.beat_narratiu || escenaSpec.funcio_narrativa || '').toLowerCase();
 
@@ -7174,10 +7252,11 @@ INSTRUCCIONS D'EXPANSIÓ:
 - INTEGRACIÓ DE L'ENTORN: Utilitza les dades del context (clima, objectes de l'inventari, detalls de la localització) de manera activa. Els personatges han d'interactuar físicament amb l'entorn abans o durant les converses per alentir el ritme i donar volum i realisme al text.
 - Mostra les interaccions en temps real. Assegura't que almenys el 40% del text de l'escena sigui diàleg directe amb intercanvis ràpids i incisius.
 - Mostra, no expliquis: NO escriguis "estava trist" → mostra-ho amb gestos, paraules, mirada
+- PROHIBIT TELLING EMOCIONAL: Mai escriguis 'sentia por/ràbia/tristesa'. Mostra-ho amb: tensió muscular, objectes manipulats compulsivament, canvis en la respiració, microexpressions, accions involuntàries (tremolor, suor, veu trencada). Cada emoció s'ha de deduir, mai etiquetar.
 - FUNCIÓ D'INSINUACIÓ (ANTI-EXPOSICIÓ): PROHIBIT explicar directament mecanismes tècnics (cripto, fluxos, arquitectura interna). Mostra la conseqüència, no el mecanisme.
 - Respecta escrupolosament els salts de línia en els diàlegs: un paràgraf nou per a cada personatge que parla.
 - No repeteixis informació, accions ni frases de les escenes anteriors del mateix capítol; avança sempre
-- Comença directament amb la narració, sense titular${instruccionsVariancia ? '\n- VARIÀNCIA: ' + instruccionsVariancia : ''}
+- Comença directament amb la narració, sense titular${instruccionsVariancia ? '\n- VARIÀNCIA: ' + instruccionsVariancia : ''}${instruccionsAutonomia}
 - ${instruccionsFinalCapitol || "Mantén la progressió narrativa de l'escena."}
 - Escriu en català`;
 
@@ -7427,6 +7506,38 @@ function detectarRepeticions() {
   return { bigrames: bigramesRepetits, trigrames: trigramesRepetits };
 }
 
+function detectarRepeticionsTematiques() {
+  const nkg = ESTAT._nkg;
+  if (!nkg || !nkg.esdeveniments || nkg.esdeveniments.length < 5) return null;
+
+  // Agrupar esdeveniments per tipus de revelació
+  const revelacions = nkg.esdeveniments.filter(e =>
+    /descobr|revel|adona[r']?.*compte|s'assabent|comprèn|entén/i.test(e.descripcio)
+  );
+
+  // Detectar revelacions repetides (mateix personatge + mateixa temàtica)
+  const grups = {};
+  revelacions.forEach(r => {
+    const personatgesClau = (r.personatges_involucrats || []).sort().join('+');
+    const tema = r.descripcio.toLowerCase()
+      .replace(/[^a-zA-ZàèéíòóúüçÀÈÉÍÒÓÚÜÇ\s]/g, '')
+      .split(/\s+/).filter(p => p.length > 3).slice(0, 5).join(' ');
+    const clau = `${personatgesClau}::${tema}`;
+    if (!grups[clau]) grups[clau] = [];
+    grups[clau].push(r);
+  });
+
+  const repetides = Object.entries(grups)
+    .filter(([, rs]) => rs.length >= 2)
+    .map(([clau, rs]) => ({
+      tema: clau,
+      cops: rs.length,
+      capitols: rs.map(r => r.capitol)
+    }));
+
+  return repetides.length > 0 ? repetides : null;
+}
+
 // ══════════════════════════════════════════════════════════════
 // MILLORA 6: VEU SEMILLA — Analitzar estil de referència (Opus)
 // ══════════════════════════════════════════════════════════════
@@ -7622,6 +7733,24 @@ async function processarVeuSemilla() {
 // MILLORA 8: DETECTOR DE VEU PLANA — anàlisi programàtica (0 LLM)
 // ══════════════════════════════════════════════════════════════
 
+function detectarTellingEmocional(text) {
+  if (!text) return [];
+  const patrons = [
+    /\b(sentia|se sentia|estava|es trobava|es va sentir|va sentir-se)\s+(trist[ae]?|content[ae]?|enfadat|enfadada|nerviós|nerviosa|espantat|espantada|feliç|angoixat|angoixada|frustrat|frustrada|confós|confosa|avergonyit|avergonyida|culpable|satisfe[ct]|alleujat|alleujada|eufòric|eufòrica|deprimit|deprimida|sol[ae]?|abandonat|abandonada)/gi,
+    /\b(una (ona|onada|rampa|punxada|fiblada) de? (por|ràbia|tristesa|angoixa|pànic|alegria|culpa|vergonya))/gi,
+    /\b(el cor li|el cor se li|li va fer|li feia)\s+(un salt|un nus|mal|por|pena)/gi,
+    /\b(amb (por|ràbia|tristesa|alegria|vergonya|culpa))\b/gi
+  ];
+  const matches = [];
+  patrons.forEach(p => {
+    let m;
+    while ((m = p.exec(text)) !== null) {
+      matches.push(m[0]);
+    }
+  });
+  return matches;
+}
+
 function analitzarVarianciaVeu(text) {
   if (!text || text.length < 50) return null;
 
@@ -7656,7 +7785,33 @@ function analitzarVarianciaVeu(text) {
   const dialogLines = (text.match(/[«»"—]/g) || []).length;
   const ratioDialeg = text.length > 0 ? dialogLines / (text.length / 100) : 0;
 
-  return { cv, mitja, ratioConsecutives, ratioStarts, adverbisPerfrase, ratioDialeg, nFrases: frases.length };
+  // Densitat adjectival: adjectius / substantius estimats
+  const sufixosAdjectiu = /\b\w+(?:osa|ós|ant|ent|ble|iva|iu|al|ar|ic|ica|oses|osos|als|ars|ics|iques|ants|ents|bles|ives|ius)\b/gi;
+  const sufixosVerb = /\b\w+(?:ar|er|ir|re|ava|aven|ava|ia|ies|à|aran|eran|iran|at|ada|ats|ades|ant)\b/gi;
+  const paraules = text.split(/\s+/).filter(p => p.length > 3);
+  const nombreAdjectius = (text.match(sufixosAdjectiu) || []).length;
+  const nombreVerbs = (text.match(sufixosVerb) || []).length;
+  const nombreSubstantius = Math.max(1, paraules.length - nombreAdjectius - nombreVerbs);
+  const densitat_adjectival = nombreAdjectius / nombreSubstantius;
+
+  // Densitat sensorial: paraules sensorials per cada 100 paraules
+  const PARAULES_SENSORIALS = new Set([
+    'olor','pudor','fragància','aroma','efluvi','pestilència','flaire','perfum','tufor',
+    'llum','foscor','claror','penombra','resplendor','enlluernament','fosca','lluminositat',
+    'fred','calor','humitat','sequedat','escalfor','glaçor','tibiesa','ardor',
+    'soroll','silenci','xiulet','murmuri','cruixit','estrèpit','renou','brunzit','retruny',
+    'textura','aspre','suau','rugós','llis','viscós','tou','dur','sedós','escabrós',
+    'dolç','amarg','àcid','salat','acre','salitre','gasoil','metàl·lic','picant',
+    'vibració','pols','boira','vapor','brisa','teranyina','freda','càlida','pesada',
+    'tènue','brillant','opac','mat','translúcid','fosc','clar'
+  ]);
+  const totalParaules = Math.max(1, text.split(/\s+/).filter(p => p.length > 1).length);
+  const nombreSensorials = text.toLowerCase().split(/\s+/).filter(p =>
+    PARAULES_SENSORIALS.has(p.replace(/[.,;:!?«»""''()\[\]]/g, ''))
+  ).length;
+  const densitat_sensorial = (nombreSensorials / totalParaules) * 100;
+
+  return { cv, mitja, ratioConsecutives, ratioStarts, adverbisPerfrase, ratioDialeg, nFrases: frases.length, densitat_adjectival, densitat_sensorial };
 }
 
 function generarInstruccionsVariancia(metriques) {
@@ -7678,6 +7833,12 @@ function generarInstruccionsVariancia(metriques) {
   }
   if (metriques.cv < 0.2 && metriques.ratioConsecutives > 0.65 && metriques.ratioDialeg < 0.7) {
     instruccions.push("to quirúrgic detectat: trenca la monotonia amb diàlegs fragmentats, interrupcions i un paràgraf d'introspecció emocional pura que mostri vulnerabilitat sense explicar-la");
+  }
+  if (metriques.densitat_adjectival !== undefined && metriques.densitat_adjectival > 0.6) {
+    instruccions.push("PODA D'ADJECTIUS: Màxim 1 adjectiu per substantiu. Substitueix adjectius per verbs precisos o accions. Exemple: en lloc de 'la porta pesada i rovellada' → 'la porta va grinyolar'");
+  }
+  if (metriques.densitat_sensorial !== undefined && metriques.densitat_sensorial > 3) {
+    instruccions.push("SATURACIÓ SENSORIAL: Aquesta escena ja té prou detalls sensorials. Prioritza acció i diàleg. Reserva les descripcions sensorials per a 1-2 moments clau de l'escena, no per a cada frase");
   }
 
   return instruccions.join('; ');
