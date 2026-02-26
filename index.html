@@ -1005,6 +1005,7 @@
     <!-- Botons de flux -->
     <div style="text-align:center;display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
       <button class="btn btn-primary hidden" id="btn-control-arcs" onclick="iniciarFase12()">📋 Control d'Arcs Narratius <span class="badge-model badge-opus">Opus</span></button>
+      <button class="btn btn-secondary" onclick="obrirManuscrit()">🖋️ Mode Manuscrit</button>
       <button class="btn btn-secondary" onclick="descarregarNovella()">📖 Descarregar Novel·la</button>
     </div>
   </div>
@@ -1034,7 +1035,29 @@
     <h3 style="font-size:1rem;font-weight:600;color:var(--accent2);margin-bottom:14px;">Epíleg</h3>
     <div class="conte-reader" id="epileg-text"></div>
     <div class="btn-row" style="margin-top:20px;">
+      <button class="btn btn-secondary" onclick="obrirManuscrit()">🖋️ Mode Manuscrit</button>
       <button class="btn btn-primary" onclick="descarregarNovella()">📖 Descarregar Novel·la Completa</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="modal-manuscrit">
+  <div class="modal-box" style="max-width:960px; height:85vh; display:flex; flex-direction:column;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <h3 style="font-size:1.2rem;font-weight:600;color:var(--accent2);">🖋️ Mode Manuscrit</h3>
+      <button class="btn btn-ghost" style="padding:6px 14px;" onclick="tancarManuscrit()">✕ Tancar</button>
+    </div>
+    <div style="display:flex; gap:16px; flex:1; overflow:hidden;">
+      <div id="manuscrit-sidebar" style="width:160px; overflow-y:auto; border-right:1px solid var(--border); padding-right:10px; display:flex; flex-direction:column; gap:6px;">
+      </div>
+      <div style="flex:1; display:flex; flex-direction:column; overflow-y:hidden; padding-right:4px;">
+        <div id="manuscrit-editor" class="conte-reader" contenteditable="true" style="flex:1; outline:none; margin-bottom:14px; min-height:300px; padding:20px; overflow-y:auto;" onblur="guardarManuscritActual()"></div>
+        <div style="display:flex; gap:10px; align-items:center; background:var(--surface2); padding:10px; border-radius:8px; border:1px solid var(--border);">
+          <span style="font-size:1.2rem;">✨</span>
+          <input type="text" id="manuscrit-instruccio" placeholder="Subratlla un text i escriu què vols millorar (ex: fes-ho més fosc)" style="flex:1; padding:8px 12px; border-radius:6px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-family:var(--font);">
+          <button class="btn btn-primary" style="padding:8px 16px; font-size:.85rem;" onclick="reescriureSeleccioManuscrit(event)">Reescriure IA</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -8320,6 +8343,138 @@ function actualitzarModelsDisponibles() {
       option.textContent = option.textContent.replace(' (sense clau)', '');
     }
   });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MODE MANUSCRIT INTEGRAT
+// ══════════════════════════════════════════════════════════════
+let manuscritCapitolActiu = 0;
+let manuscritRangSeleccionat = null;
+
+// Capturar la selecció de text abans que es perdi en fer clic a l'input
+document.addEventListener('selectionchange', () => {
+  const sel = window.getSelection();
+  const editor = document.getElementById('manuscrit-editor');
+  if (sel.rangeCount > 0 && editor && editor.contains(sel.anchorNode)) {
+    manuscritRangSeleccionat = sel.getRangeAt(0);
+  }
+});
+
+function obrirManuscrit() {
+  const sidebar = document.getElementById('manuscrit-sidebar');
+  if (!ESTAT._capitols_generats || ESTAT._capitols_generats.filter(Boolean).length === 0) {
+    toast("No hi ha capítols generats encara.");
+    return;
+  }
+
+  let htmlSidebar = '';
+  ESTAT._capitols_generats.forEach((cap, i) => {
+    if (!cap) return;
+    htmlSidebar += `<button class="btn btn-ghost" style="text-align:left; padding:8px; font-size:.85rem; border:1px solid transparent; ${i === manuscritCapitolActiu ? 'background:var(--surface2); color:var(--accent2); font-weight:600;' : ''}" id="btn-manu-cap-${i}" onclick="carregarCapitolManuscrit(${i})">Capítol ${i + 1}</button>`;
+  });
+  sidebar.innerHTML = htmlSidebar;
+
+  carregarCapitolManuscrit(manuscritCapitolActiu || 0);
+  document.getElementById('modal-manuscrit').classList.remove('hidden');
+}
+
+function tancarManuscrit() {
+  guardarManuscritActual();
+  document.getElementById('modal-manuscrit').classList.add('hidden');
+  renderLlistaCapitols(); // Refresca la UI per si hi ha hagut canvis
+}
+
+function carregarCapitolManuscrit(idx) {
+  if (manuscritCapitolActiu !== idx) guardarManuscritActual();
+  manuscritCapitolActiu = idx;
+  const editor = document.getElementById('manuscrit-editor');
+  const text = ESTAT._capitols_generats[idx] || '';
+
+  // Converteix els salts de línia a paràgrafs per a edició correcta
+  editor.innerHTML = text.split(/\n\n+/).filter(p => p.trim().length > 0).map(p => `<p>${escHtml(p.trim())}</p>`).join('');
+
+  // Actualitza sidebar UI
+  const sidebar = document.getElementById('manuscrit-sidebar');
+  Array.from(sidebar.children).forEach((btn, i) => {
+    if (i === idx) {
+      btn.style.background = 'var(--surface2)';
+      btn.style.color = 'var(--accent2)';
+      btn.style.fontWeight = '600';
+    } else {
+      btn.style.background = 'transparent';
+      btn.style.color = 'var(--text2)';
+      btn.style.fontWeight = 'normal';
+    }
+  });
+}
+
+function guardarManuscritActual() {
+  const editor = document.getElementById('manuscrit-editor');
+  if (!editor || ESTAT._capitols_generats.length === 0) return;
+
+  // Recupera el text (respectant paràgrafs HTML)
+  let nouText = '';
+  const pars = editor.querySelectorAll('p, div');
+  if (pars.length > 0) {
+    nouText = Array.from(pars).map(p => p.textContent.trim()).filter(t => t).join('\n\n');
+  } else {
+    nouText = editor.innerText.trim();
+  }
+
+  if (nouText) ESTAT._capitols_generats[manuscritCapitolActiu] = nouText;
+}
+
+async function reescriureSeleccioManuscrit(event) {
+  const instruccio = document.getElementById('manuscrit-instruccio').value.trim();
+
+  if (!manuscritRangSeleccionat || manuscritRangSeleccionat.toString().trim() === '') {
+    toast("Primer subratlla el text que vols reescriure dins l'editor.");
+    return;
+  }
+  if (!instruccio) {
+    toast("Escriu com vols que l'IA millori el text.");
+    return;
+  }
+
+  const textSeleccionat = manuscritRangSeleccionat.toString().trim();
+  const btn = event.target;
+  const txtOriginalBtn = btn.textContent;
+  btn.textContent = '⏳ ...';
+  btn.disabled = true;
+
+  try {
+    const prompt = `Reescriu únicament aquest fragment literari seguint ESTRICTAMENT aquesta instrucció: "${instruccio}".
+
+FRAGMENT ORIGINAL:
+"${textSeleccionat}"
+
+Retorna NOMÉS el text reescrit, en prosa fluïda, sense cometes afegides ni explicacions.`;
+    const msgs = [{ role: 'user', content: prompt }];
+    const models = getModelConfig(USER_CONFIG);
+
+    const reescrit = await callLLMMulti(
+      msgs,
+      'Ets un editor literari ajudant a millorar un manuscrit. Retorna només el text net en català.',
+      Object.assign({}, USER_CONFIG, { maxTokens: 1000, model: models.modelGeneracio }),
+      'generacio'
+    );
+
+    if (reescrit && reescrit.trim()) {
+      // Substituïm el text al rang guardat
+      manuscritRangSeleccionat.deleteContents();
+      manuscritRangSeleccionat.insertNode(document.createTextNode(reescrit.trim()));
+
+      guardarManuscritActual();
+      toast("✨ Fragment reescrit!");
+      document.getElementById('manuscrit-instruccio').value = '';
+      manuscritRangSeleccionat = null; // Reset
+    }
+  } catch (err) {
+    toast("Error de l'IA: " + err.message);
+  } finally {
+    btn.textContent = txtOriginalBtn;
+    btn.disabled = false;
+  }
 }
 
 // ── Inicialització del selector de models en carregar la pàgina ──
