@@ -5125,6 +5125,14 @@ REGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que é
 }
 
 function buildSystemPromptCapitol() {
+  const idxActual = Number(ESTAT._capitolActual || 0);
+  const capitolsRegistre = (ESTAT.llibreRegistre && Array.isArray(ESTAT.llibreRegistre.capitols))
+    ? ESTAT.llibreRegistre.capitols
+    : [];
+  const r1 = idxActual - 1 >= 0 ? capitolsRegistre[idxActual - 1] : null;
+  const r2 = idxActual - 2 >= 0 ? capitolsRegistre[idxActual - 2] : null;
+  const prohibirIniciMeteorologic = !!(r1 && r2 && r1.inici_meteorologic === true && r2.inici_meteorologic === true);
+
   // PONT NKG: quan el NKG és actiu, system prompt reduït (el context va al prompt d'escena)
   if (ESTAT._nkg) {
     const parts = [];
@@ -5170,9 +5178,15 @@ function buildSystemPromptCapitol() {
     }
     parts.push("\nREGLA D'ESTIL OBLIGATÒRIA (SHOW, DON'T TELL): Tens totalment prohibit utilitzar etiquetes emocionals explícites per descriure com se sent un personatge (ex: prohibit dir \"estava trist\", \"se sentia enfadat\", \"estava nerviós\"). En comptes d'això, has de MOSTRAR l'emoció a través d'accions físiques, interaccions amb objectes, vestimenta, llenguatge corporal o detalls de l'entorn.");
     parts.push("\nREGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que és el final del capítol, NO resolguis la situació ni facis que els personatges abandonin l'escenari al final del text. Deixa l'acció fluint, oberta o en suspens dramàtic, de manera que la següent generació pugui recollir el testimoni de forma natural.");
+    if (prohibirIniciMeteorologic) {
+      parts.push("PROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg.");
+    }
     return parts.join('\n');
   }
-  return buildSystemPromptCapitolLegacy();
+  const legacy = buildSystemPromptCapitolLegacy();
+  return prohibirIniciMeteorologic
+    ? legacy + "\n\nPROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg."
+    : legacy;
 }
 
 function buildRegistreContextLegacy(idx) {
@@ -5513,6 +5527,13 @@ function buildContextCapitolLegacy(idx) {
 }
 
 function buildContextCapitol(idx) {
+  const capitolsRegistre = (ESTAT.llibreRegistre && Array.isArray(ESTAT.llibreRegistre.capitols))
+    ? ESTAT.llibreRegistre.capitols
+    : [];
+  const r1 = idx - 1 >= 0 ? capitolsRegistre[idx - 1] : null;
+  const r2 = idx - 2 >= 0 ? capitolsRegistre[idx - 2] : null;
+  const prohibirIniciMeteorologic = !!(r1 && r2 && r1.inici_meteorologic === true && r2.inici_meteorologic === true);
+
   // PONT NKG: quan el NKG és actiu, delega a nkgGenerarContextMinim
   if (ESTAT._nkg) {
     const cap = ESTAT._estructuraCapitols ? ESTAT._estructuraCapitols[idx] : null;
@@ -5523,9 +5544,17 @@ function buildContextCapitol(idx) {
       lloc: cap ? (cap.localitzacio || '') : '',
       escaleta: null
     };
-    return nkgGenerarContextMinim(escenaSpec);
+    const ctxNkg = nkgGenerarContextMinim(escenaSpec);
+    if (prohibirIniciMeteorologic) {
+      return ctxNkg + "\n\nPROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg.";
+    }
+    return ctxNkg;
   }
-  return buildContextCapitolLegacy(idx);
+  const ctxLegacy = buildContextCapitolLegacy(idx);
+  if (prohibirIniciMeteorologic) {
+    return ctxLegacy + "\n\nPROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg.";
+  }
+  return ctxLegacy;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -5761,6 +5790,16 @@ function generarInstruccionsGanxoFinalCapitol(idx) {
   const oberts = (ESTAT.llibreRegistre && Array.isArray(ESTAT.llibreRegistre.fils_oberts))
     ? ESTAT.llibreRegistre.fils_oberts.filter(Boolean)
     : [];
+  const capitolsRegistre = (ESTAT.llibreRegistre && Array.isArray(ESTAT.llibreRegistre.capitols))
+    ? ESTAT.llibreRegistre.capitols
+    : [];
+  const c1 = idx - 1 >= 0 ? capitolsRegistre[idx - 1] : null;
+  const c2 = idx - 2 >= 0 ? capitolsRegistre[idx - 2] : null;
+  const dosCliffhangersConsecutius = !!(c1 && c2 && c1.es_cliffhanger === true && c2.es_cliffhanger === true);
+
+  if (dosCliffhangersConsecutius) {
+    return "PROHIBIT acabar amb cliffhanger. Ja n'hi ha hagut dos consecutius. Aquest capítol HA d'acabar amb una resolució parcial o una reflexió interna.";
+  }
 
   if (esUltimCapitol) {
     return `Com que és l'últim capítol, tanca els fils prioritaris i deixa una reverberació emocional final potent: una última imatge, una realització del personatge o una resolució que ressoni. Sense cliffhanger fort, però que la darrera frase es quedi gravada.`;
@@ -5853,7 +5892,9 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense cap text addicional, sense m
   "estat_personatges": [{"nom": "nom", "ubicacio": "on és ara", "estat_actual": "situació emocional/física actual"}],
   "fils_oberts": ["fil narratiu que queda obert o s'ha introduït"],
   "fils_tancats": ["fil narratiu que s'ha resolt en aquest capítol"],
-  "prefiguracions_detectades": ["element que apareix en aquest capítol i podria ser una prefiguració o referència a una"]
+  "prefiguracions_detectades": ["element que apareix en aquest capítol i podria ser una prefiguració o referència a una"],
+  "inici_meteorologic": true,
+  "es_cliffhanger": false
 }`
   }];
 
@@ -5902,6 +5943,9 @@ Fixa't especialment en:
 1. Coherència amb l'escaleta i personatges.
 2. Format (errors de diàlegs al mateix paràgraf = rebuig automàtic).
 3. Qualitat (ritme, telling vs showing, info-dumping).
+4. Escenes equivalents: Avisa si hi ha alguna escena que serveixi per al mateix propòsit narratiu que una del capítol anterior i demana'n la transformació.
+5. Continuïtat física: Verifica que cap objecte canviï de lloc o desaparegui màgicament de les mans d'un personatge.
+6. Metàfores repetides: Assegura't que no s'utilitza una imatge poètica o metàfora ja gastada.
 
 CRÍTIC PER ESTALVIAR TOKENS: Si aproves el capítol, les valoracions han de ser buides o d'1 sola paraula. Si el rebutges, les "instruccions_correccio" han de ser EXTREMADAMENT BREUS, en estil telegràfic (3 o 4 bullet points directes al gra). Prohibit justificar-te o enrotllar-te.
 
@@ -6741,6 +6785,12 @@ async function avaluarQualitatLiteraria(textEscena, userConfig) {
     if (metriquesVeu.densitat_adjectival > 0.6) {
       problemesProgramatics.push("Sobrecàrrega d'adjectius detectada. Poda'ls i substitueix-los per noms més precisos o verbs d'acció.");
     }
+    if (metriquesVeu.comparacions_com > 3) {
+      problemesProgramatics.push("Excés de comparacions ('com un/a'). Redueix-les a un màxim de 3 i substitueix la resta per metàfores directes.");
+    }
+    if (metriquesVeu.adverbisTotal > 6) {
+      problemesProgramatics.push("Massa adverbis acabats en '-ment'. Redueix-los i utilitza verbs més forts.");
+    }
   }
 
   // Si no supera el Nivell 1, tallem l'execució aquí sense cridar a l'API
@@ -6763,6 +6813,9 @@ La teva tasca té dues parts:
    - MONÒLEG DE DOLENT / EXPOSICIÓ DIRECTA: Figures de poder explicant els seus plans clarament. Han de parlar en eufemismes.
    - CLIXÉS DE GÈNERE: Resolucions mandroses, diàlegs forçats per moure la trama, situacions de perill inversemblants.
    - CANVIS EMOCIONALS PRECIPITATS: Personatges que canvien d'opinió o principis molt ràpid sense racionalitzar-ho.
+   - SÍNDROME 'AS YOU KNOW, BOB': Rebutja si hi ha un diàleg on un personatge explica fets que l'altre ja sap. Tota informació s'ha de revelar a través de conflicte o subtext.
+   - VEUS IDÈNTIQUES: Rebutja si tots els personatges parlen amb la mateixa cadència literària. Les veus s'han de diferenciar.
+   - ARQUETIPS PLANS: Rebutja si un personatge secundari actua sense matís, contradicció moral o complexitat.
 2. CORRECCIÓ LINGÜÍSTICA: Detecta faltes d'ortografia, castellanismes flagrants o mala gramàtica.
 
 Retorna ÚNICAMENT un objecte JSON amb aquest format exacte:
@@ -8059,6 +8112,9 @@ function analitzarVarianciaVeu(text) {
   const adverbis = (text.match(/\b\w+ment\b/gi) || []).length;
   const adverbisPerfrase = frases.length > 0 ? adverbis / frases.length : 0;
 
+  // Comparacions explícites "com un/a"
+  const comparacions_com = (text.match(/\bcom un[a]?\b/gi) || []).length;
+
   // Proporció de diàleg (per senyals tipogràfics)
   const dialogLines = (text.match(/[«»"—]/g) || []).length;
   const ratioDialeg = text.length > 0 ? dialogLines / (text.length / 100) : 0;
@@ -8089,7 +8145,7 @@ function analitzarVarianciaVeu(text) {
   ).length;
   const densitat_sensorial = (nombreSensorials / totalParaules) * 100;
 
-  return { cv, mitja, ratioConsecutives, ratioStarts, adverbisPerfrase, ratioDialeg, nFrases: frases.length, densitat_adjectival, densitat_sensorial };
+  return { cv, mitja, ratioConsecutives, ratioStarts, adverbisPerfrase, adverbisTotal: adverbis, comparacions_com, ratioDialeg, nFrases: frases.length, densitat_adjectival, densitat_sensorial };
 }
 
 function generarInstruccionsVariancia(metriques) {
