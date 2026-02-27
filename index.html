@@ -618,6 +618,10 @@
       </label>
     </div>
 
+    <label class="field-label" for="config-target-qualitat" style="margin-top:10px;">Qualitat objectiu del jutge (0-100)</label>
+    <input type="number" id="config-target-qualitat" min="60" max="98" step="1" value="85" placeholder="85">
+    <small style="display:block;color:var(--text2);font-size:.78rem;margin-top:4px;">El generador iterarà fins assolir aquest llindar (amb límit de seguretat d'intents).</small>
+
     <!-- Panell de selecció de models flexible v5.1 -->
     <div id="panellModels" style="margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:8px;">
       <h3 style="margin:0 0 10px;font-size:1em;">⚙️ Configuració de Models</h3>
@@ -1314,6 +1318,11 @@ function aplicarSnapshotProjecte(dades) {
   if (typeof sincronitzarCampsConfigModels === 'function') sincronitzarCampsConfigModels();
   if (typeof guardarClausAPI === 'function') guardarClausAPI();
 
+  const targetQualitatInput = document.getElementById('config-target-qualitat');
+  if (targetQualitatInput && USER_CONFIG && USER_CONFIG.targetQualitat != null) {
+    targetQualitatInput.value = USER_CONFIG.targetQualitat;
+  }
+
   restaurarInterficieDesDeEstat();
 }
 
@@ -1825,6 +1834,9 @@ function guardarIComencar() {
     const modelGeneracioInput    = document.getElementById('config-model-generacio').value.trim();
     const modelArquitecturaInput = document.getElementById('config-model-arquitectura').value.trim();
     const fluxAutomatic     = document.getElementById('config-flux-automatic').checked;
+    const targetQualitatEl  = document.getElementById('config-target-qualitat');
+    const targetQualitatRaw = targetQualitatEl ? Number(targetQualitatEl.value) : 85;
+    const targetQualitat    = Math.max(60, Math.min(98, Number.isFinite(targetQualitatRaw) ? targetQualitatRaw : 85));
 
     // Prioritzem el que l'usuari veu al panell en aquest moment (inputs/selectors),
     // per evitar arrossegar valors antics d'ESTAT d'un proveïdor diferent.
@@ -1864,7 +1876,8 @@ function guardarIComencar() {
         generacio: modelGeneracio,
         arquitecte: modelArquitectura
       },
-      fluxAutomatic
+      fluxAutomatic,
+      targetQualitat
     };
 
     if (typeof poblarSelectorsModels === 'function') {
@@ -8082,9 +8095,19 @@ async function avaluarQualitatLiteraria(textEscena, userConfig) {
   // Si no supera el Nivell 1, tallem l'execució aquí sense cridar a l'API
   if (problemesProgramatics.length > 0) {
     console.log("⛔ Rebutjat pel Jutge Programàtic (estalviant tokens):", problemesProgramatics);
+    const scoreProgramatic = Math.max(30, 72 - (problemesProgramatics.length * 9));
     return {
       aprovat: false,
-      critiques: "Filtre de qualitat automàtic no superat: " + problemesProgramatics.join(" ")
+      critiques: "Filtre de qualitat automàtic no superat: " + problemesProgramatics.join(" "),
+      score_global: scoreProgramatic,
+      blocking_issues: problemesProgramatics,
+      sub_scores: {
+        coherencia: Math.max(35, scoreProgramatic - 8),
+        veu: Math.max(35, scoreProgramatic - 5),
+        dialeg: Math.max(35, scoreProgramatic - 5),
+        prosa: Math.max(35, scoreProgramatic - 7),
+        catala: Math.max(40, scoreProgramatic)
+      }
     };
   }
 
@@ -8107,6 +8130,15 @@ La teva tasca té dues parts:
 Retorna ÚNICAMENT un objecte JSON amb aquest format exacte:
 {
   "aprovat": true/false,
+  "score_global": 0-100,
+  "sub_scores": {
+    "coherencia": 0-100,
+    "veu": 0-100,
+    "dialeg": 0-100,
+    "prosa": 0-100,
+    "catala": 0-100
+  },
+  "blocking_issues": ["error crític 1", "error crític 2"],
   "critiques": "Descriu els errors narratius i/o llista les paraules incorrectes i la seva correcció. Si tot és literàriament correcte, deixa-ho buit."
 }`;
 
@@ -8119,40 +8151,74 @@ Retorna ÚNICAMENT un objecte JSON amb aquest format exacte:
     );
     const parsed = parseJsonRobust(raw);
     if (parsed && typeof parsed.aprovat === 'boolean') {
+      const scoreGlobalRaw = Number(parsed.score_global);
+      const scoreGlobal = Number.isFinite(scoreGlobalRaw) ? Math.max(0, Math.min(100, scoreGlobalRaw)) : (parsed.aprovat ? 86 : 65);
+      const sub = parsed.sub_scores && typeof parsed.sub_scores === 'object' ? parsed.sub_scores : {};
+      const sanitizeScore = (v, fb) => {
+        const n = Number(v);
+        return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : fb;
+      };
       return {
         aprovat: parsed.aprovat,
-        critiques: typeof parsed.critiques === 'string' ? parsed.critiques : ''
+        critiques: typeof parsed.critiques === 'string' ? parsed.critiques : '',
+        score_global: scoreGlobal,
+        blocking_issues: Array.isArray(parsed.blocking_issues) ? parsed.blocking_issues.map(s => String(s || '').trim()).filter(Boolean) : [],
+        sub_scores: {
+          coherencia: sanitizeScore(sub.coherencia, scoreGlobal),
+          veu: sanitizeScore(sub.veu, scoreGlobal),
+          dialeg: sanitizeScore(sub.dialeg, scoreGlobal),
+          prosa: sanitizeScore(sub.prosa, scoreGlobal),
+          catala: sanitizeScore(sub.catala, scoreGlobal)
+        }
       };
     }
   } catch (err) {
     console.warn("Jutge LLM: error a l'avaluació, s'aprova temporalment per evitar bloquejos:", err.message);
   }
 
-  return { aprovat: true, critiques: '' };
+  return {
+    aprovat: true,
+    critiques: '',
+    score_global: 82,
+    blocking_issues: [],
+    sub_scores: { coherencia: 82, veu: 82, dialeg: 82, prosa: 82, catala: 82 }
+  };
 }
 
 async function generarIValidarEscena(promptEscena, systemPrompt, userConfig, opts = {}) {
   const intentsMaxims = Math.max(1, Number(opts.intentsMaxims) || 2);
   const maxTokens = opts.maxTokens || 3000;
+  const targetQualitatRaw = Number(opts.targetQualitat ?? userConfig?.targetQualitat ?? USER_CONFIG?.targetQualitat ?? 85);
+  const targetQualitat = Math.max(60, Math.min(98, Number.isFinite(targetQualitatRaw) ? targetQualitatRaw : 85));
   let escenaAprovada = false;
   let textEscenaGenerada = '';
   let intents = 0;
   let promptTreball = String(promptEscena || '');
+  let millorText = '';
+  let millorScore = -1;
 
   while (!escenaAprovada && intents < intentsMaxims) {
     intents++;
     textEscenaGenerada = await cridaAPI_GenerarText(promptTreball, systemPrompt, userConfig, maxTokens);
 
     const veredicte = await avaluarQualitatLiteraria(textEscenaGenerada, userConfig);
-    if (veredicte.aprovat) {
+    const scoreGlobal = Math.max(0, Math.min(100, Number(veredicte.score_global) || (veredicte.aprovat ? 84 : 64)));
+    const teBloquejos = Array.isArray(veredicte.blocking_issues) && veredicte.blocking_issues.length > 0;
+    if (scoreGlobal > millorScore) {
+      millorScore = scoreGlobal;
+      millorText = textEscenaGenerada || millorText;
+    }
+
+    if (veredicte.aprovat && scoreGlobal >= targetQualitat && !teBloquejos) {
       escenaAprovada = true;
     } else {
-      console.log('El Jutge Literari ha rebutjat l\'escena. Reescrivint... Motius:', veredicte.critiques);
-      promptTreball += `\n\nCRÍTICA DE L'EDITOR: La versió anterior tenia els següents problemes: ${veredicte.critiques || 'massa clixés o prosa plana'}. Reescriu l'escena solucionant AQUESTS problemes específics i evitant llocs comuns.`;
+      console.log(`El Jutge Literari demana millora (${scoreGlobal}/${targetQualitat}). Reescrivint...`, veredicte.critiques);
+      const bloquejosTxt = teBloquejos ? ` Errors crítics detectats: ${veredicte.blocking_issues.join(' | ')}.` : '';
+      promptTreball += `\n\nCRÍTICA DE L'EDITOR: La versió anterior ha obtingut ${scoreGlobal}/100 i l'objectiu és ${targetQualitat}/100.${bloquejosTxt} Problemes detectats: ${veredicte.critiques || 'massa clixés o prosa plana'}. Reescriu l'escena solucionant AQUESTS problemes específics i elevant la qualitat literària per sobre de ${targetQualitat}/100.`;
     }
   }
 
-  return textEscenaGenerada || '';
+  return escenaAprovada ? (textEscenaGenerada || '') : (millorText || textEscenaGenerada || '');
 }
 
 // ═══════════════════════════════════════════════════════════
