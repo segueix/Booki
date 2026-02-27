@@ -1378,16 +1378,16 @@ function restaurarInterficieDesDeEstat() {
   const fase = ESTAT.fase;
   updateProgress(fase);
 
-  // Amagar totes les fases i mostrar només l'actual
+  // Mostrar totes les fases fins a la fase actual per poder reprendre
+  // i re-treballar des de qualsevol punt del pipeline.
   document.querySelectorAll('.card').forEach(c => {
-    if (c.id !== 'card-config') c.classList.add('hidden');
+    if (c.id === 'card-config') return;
+    const idMatch = c.id.match(/^fase-(\d+)(?:-(\d+))?$/);
+    if (!idMatch) return;
+    const faseCard = parseFloat(idMatch[1] + (idMatch[2] ? '.' + idMatch[2] : ''));
+    if (faseCard <= fase) c.classList.remove('hidden');
+    else c.classList.add('hidden');
   });
-  if (Math.abs(fase - 9.2) < 0.001) showCard('fase-9-2');
-  else if (Math.abs(fase - 9.3) < 0.001) showCard('fase-9-3');
-  else if (Math.abs(fase - 9.4) < 0.001) showCard('fase-9-4');
-  else if (Math.abs(fase - 9.5) < 0.001) showCard('fase-9-5');
-  else if (Math.abs(fase - 10.5) < 0.001) showCard('fase-10-5');
-  else showCard('fase-' + Math.floor(fase));
 
   // Reconstruir l'estat visual depenent de la fase
   if (fase >= 1 && ESTAT._premissaLista.length > 0) renderPremisses(ESTAT._premissaLista.map((p, i) => `${i+1}. ${p}`).join('\\n'));
