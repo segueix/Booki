@@ -8177,6 +8177,7 @@ function crearNKG() {
     fets_canonics: [],
     esdeveniments: [],
     relacions: [],
+    timeline_accions: [], // Registre d'Accions Consumades (NKG CHRONOS): "C3E2: Maja entra al laboratori"
     ultima_actualitzacio: { capitol: 0, escena: 0 },
     versio: 1
   };
@@ -8268,6 +8269,12 @@ function nkgQueryEscenaContext(escenaSpec) {
     objectesRellevants.forEach(o => {
       parts.push(`• ${o.nom}${o.significat_simbolic ? ' — ' + o.significat_simbolic : ''}`);
     });
+  }
+
+  // NKG CHRONOS: àncora temporal — última acció registrada al timeline
+  if (Array.isArray(nkg.timeline_accions) && nkg.timeline_accions.length > 0) {
+    const ultimaAccio = nkg.timeline_accions[nkg.timeline_accions.length - 1];
+    parts.push(`\nÚLTIMA ACCIÓ REGISTRADA: ${ultimaAccio}`);
   }
 
   return parts.join('\n');
@@ -8561,6 +8568,19 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
     if (nkg.esdeveniments.length > 30) nkg.esdeveniments = nkg.esdeveniments.slice(-30);
   }
 
+  // NKG CHRONOS: registrar accions consumades per al protocol anti-regressió
+  if (Array.isArray(dades.accions_consumades) && dades.accions_consumades.length > 0) {
+    if (!Array.isArray(nkg.timeline_accions)) nkg.timeline_accions = [];
+    const novesAccions = dades.accions_consumades
+      .filter(a => typeof a === 'string' && a.trim().length > 0)
+      .map(a => `C${capitol}E${escena}: ${a.trim()}`);
+    nkg.timeline_accions.push(...novesAccions);
+    // Mantenim les últimes 20 accions per no saturar el context
+    if (nkg.timeline_accions.length > 20) {
+      nkg.timeline_accions = nkg.timeline_accions.slice(-20);
+    }
+  }
+
   nkg.ultima_actualitzacio = { capitol, escena };
 }
 
@@ -8592,7 +8612,7 @@ IMPORTANT: Per omplir aquest JSON, has de llegir el text de la nova escena i ten
 TEXT:
 ${textEscena.substring(0, 3000)}${textEscena.length > 3000 ? '\n[…text truncat…]' : ''}
 
-Retorna EXCLUSIVAMENT un JSON vàlid:
+Retorna EXCLUSIVAMENT un JSON vàlid amb EXACTAMENT aquests camps:
 {
   "personatges": [
     {
@@ -8607,8 +8627,15 @@ Retorna EXCLUSIVAMENT un JSON vàlid:
         }
       ]
     }
+  ],
+  "accions_consumades": [
+    "ha obert la porta del laboratori",
+    "ha disparat la pistola cap al sostre",
+    "ha llegit el fitxer secret"
   ]
-}`
+}
+
+El camp "accions_consumades" ha de contenir 3-5 accions físiques IRREVERSIBLES que han succeït en aquesta escena concreta. Cada acció ha d'estar en tercera persona passada i ser prou específica per poder-se usar com a restricció ("ha creuat el portal", "ha firmat el document", "ha matat el guarda"). Si no n'hi ha prou, posa les que hi hagi. NO inventes accions que no surten al text.`
   }];
 
   const models = getModelConfig(userConfig);
@@ -8790,10 +8817,24 @@ async function escriureEscenaDirectaAmbJutge(capitol, escenaIdx, escenaSpec, use
 
   const blocPlaPsico = construirBlocPlaPsicologicPerPrompt(capitol, escenaIdx);
 
+  // NKG CHRONOS: restricció negativa anti-regressió
+  const accionsRecents = (ESTAT._nkg && Array.isArray(ESTAT._nkg.timeline_accions) && ESTAT._nkg.timeline_accions.length > 0)
+    ? ESTAT._nkg.timeline_accions.slice(-8).join('\n- ')
+    : '';
+  const blocAntiRegressio = accionsRecents
+    ? `[CONTROL DE CONTINUÏTAT — ACCIONS JA CONSUMADES]
+Les següents accions JA han succeït en els capítols/escenes anteriors immediats.
+ESTÀ TERMINANTMENT PROHIBIT TORNAR A NARRAR-LES o presentar-les com a noves.
+La teva escena ha de començar TEMPORALMENT DESPRÉS d'aquests fets:
+- ${accionsRecents}
+
+Si l'escaleta et demana una acció que ja està a la llista superior, assumeix que ja s'ha realitzat i narra la CONSEQÜÈNCIA directa, no l'acció en si.`
+    : '';
+
   const promptUnificat = `ESCRIPTURA D'ESCENA — Capítol ${capitol}, Escena ${escenaIdx + 1}
 
 ${contextNKG}
-${contextCapitolEnCurs}
+${blocAntiRegressio ? blocAntiRegressio + '\n' : ''}${contextCapitolEnCurs}
 ${goldenRef}
 ${estilsPresents}${manualRef}
 ${blocPlaPsico}
