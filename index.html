@@ -658,6 +658,9 @@
   <div class="btn-row">
     <button class="btn btn-primary" onclick="guardarIComencar()">Guardar i Començar Nou</button>
     <button id="btn-reprendre" class="btn btn-secondary hidden" onclick="reprendreProjecteLocal()">📂 Reprendre projecte anterior</button>
+    <button class="btn btn-ghost" onclick="exportarCopiaSeguretat()">💾 Exportar còpia (.json)</button>
+    <button class="btn btn-ghost" onclick="obrirImportarCopiaSeguretat()">📥 Importar còpia</button>
+    <input type="file" id="input-copia-seguretat" accept="application/json,.json" class="hidden" onchange="importarCopiaSeguretat(event)">
   </div>
 </div>
 
@@ -1229,45 +1232,110 @@ function togglePausaFlux() {
 }
 
 // --- SISTEMA DE PERSISTÈNCIA ---
+const CLAU_PROJECTE_ACTUAL = 'booki_projecte_actual';
+const CLAU_HISTORIAL = 'booki_projecte_historial';
+const MAX_SNAPSHOTS = 6;
+
+function construirSnapshotProjecte() {
+  return {
+    versio: 1,
+    guardat_el: new Date().toISOString(),
+    estat: ESTAT,
+    config: USER_CONFIG
+  };
+}
+
 function guardarProjecteLocal() {
   if (ESTAT.fase === 0) return; // No guardem si no ha començat
   try {
-    const dades = { estat: ESTAT, config: USER_CONFIG };
-    localStorage.setItem('booki_projecte_actual', JSON.stringify(dades));
+    const snapshot = construirSnapshotProjecte();
+    localStorage.setItem(CLAU_PROJECTE_ACTUAL, JSON.stringify(snapshot));
+
+    const hist = JSON.parse(localStorage.getItem(CLAU_HISTORIAL) || '[]');
+    hist.push(snapshot);
+    const histCurt = hist.slice(-MAX_SNAPSHOTS);
+    localStorage.setItem(CLAU_HISTORIAL, JSON.stringify(histCurt));
   } catch (e) {
     console.warn("No s'ha pogut guardar a localStorage:", e);
   }
 }
 
 function comprovarProjecteGuardat() {
-  const guardat = localStorage.getItem('booki_projecte_actual');
+  const guardat = localStorage.getItem(CLAU_PROJECTE_ACTUAL);
   if (guardat) {
     document.getElementById('btn-reprendre').classList.remove('hidden');
   }
 }
 
+function aplicarSnapshotProjecte(dades) {
+  if (!dades || !dades.estat) throw new Error('Format de còpia no vàlid');
+
+  Object.assign(ESTAT, dades.estat);
+  USER_CONFIG = dades.config || USER_CONFIG;
+
+  if (ESTAT._anthropicApiKey) document.getElementById('anthropicApiKey').value = ESTAT._anthropicApiKey;
+  if (ESTAT._openaiApiKey) document.getElementById('openaiApiKey').value = ESTAT._openaiApiKey;
+  if (ESTAT._geminiApiKey) document.getElementById('geminiApiKey').value = ESTAT._geminiApiKey;
+
+  if (typeof poblarSelectorsModels === 'function') poblarSelectorsModels();
+  if (typeof sincronitzarCampsConfigModels === 'function') sincronitzarCampsConfigModels();
+  if (typeof guardarClausAPI === 'function') guardarClausAPI();
+
+  restaurarInterficieDesDeEstat();
+}
+
 function reprendreProjecteLocal() {
-  const guardat = localStorage.getItem('booki_projecte_actual');
+  const guardat = localStorage.getItem(CLAU_PROJECTE_ACTUAL);
   if (!guardat) return;
   try {
     const dades = JSON.parse(guardat);
-    Object.assign(ESTAT, dades.estat);
-    USER_CONFIG = dades.config;
-
-    // Restaurar Claus API a la UI (opcional però útil)
-    if (ESTAT._anthropicApiKey) document.getElementById('anthropicApiKey').value = ESTAT._anthropicApiKey;
-    if (ESTAT._openaiApiKey) document.getElementById('openaiApiKey').value = ESTAT._openaiApiKey;
-    if (ESTAT._geminiApiKey) document.getElementById('geminiApiKey').value = ESTAT._geminiApiKey;
-
-    if (typeof poblarSelectorsModels === 'function') poblarSelectorsModels();
-    if (typeof sincronitzarCampsConfigModels === 'function') sincronitzarCampsConfigModels();
-    if (typeof guardarClausAPI === 'function') guardarClausAPI();
-
-    restaurarInterficieDesDeEstat();
+    aplicarSnapshotProjecte(dades);
     toast('Projecte recuperat amb èxit.');
   } catch (e) {
     toast('Error en recuperar el projecte: ' + e.message);
   }
+}
+
+function exportarCopiaSeguretat() {
+  if (ESTAT.fase === 0) {
+    toast('Encara no hi ha cap projecte per exportar.');
+    return;
+  }
+  try {
+    const snapshot = construirSnapshotProjecte();
+    const nom = `booki_backup_fase_${String(ESTAT.fase).replace('.', '_')}_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json;charset=utf-8' });
+    descarregarBlobDocx(blob, nom);
+    toast('Còpia exportada: ' + nom);
+  } catch (err) {
+    toast("No s'ha pogut exportar la còpia: " + err.message);
+  }
+}
+
+function obrirImportarCopiaSeguretat() {
+  const input = document.getElementById('input-copia-seguretat');
+  if (!input) return;
+  input.value = '';
+  input.click();
+}
+
+function importarCopiaSeguretat(event) {
+  const file = event && event.target && event.target.files ? event.target.files[0] : null;
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const dades = JSON.parse(String(reader.result || '{}'));
+      aplicarSnapshotProjecte(dades);
+      localStorage.setItem(CLAU_PROJECTE_ACTUAL, JSON.stringify(dades));
+      toast('Còpia importada correctament.');
+    } catch (err) {
+      toast('Fitxer de còpia invàlid: ' + err.message);
+    }
+  };
+  reader.onerror = () => toast("No s'ha pogut llegir el fitxer de còpia.");
+  reader.readAsText(file, 'utf-8');
 }
 
 function restaurarInterficieDesDeEstat() {
