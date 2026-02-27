@@ -925,7 +925,7 @@
 <!-- FASE 9.2: Perfils Psicològics -->
 <div class="card hidden" id="fase-9-2">
   <h2><span class="icon">🧠</span> Perfils Psicològics</h2>
-  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Anàlisi de personalitat i estat d'ànim base per a tots els personatges seleccionats.</p>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Anàlisi de personalitat i estat d'ànim base del protagonista i de l'elenc que has seleccionat a la fase 8.</p>
   <div class="loader-wrap" id="loader-9-2">
     <div class="spinner"></div>
     <span>Analitzant la psicologia dels personatges...</span>
@@ -2305,6 +2305,28 @@ function syncElencItem(idx) {
   el.classList.toggle('chosen', cb.checked);
 }
 
+function extreureNomPersonatge(raw = '') {
+  let txt = String(raw || '').trim();
+  if (!txt) return '';
+  txt = txt.replace(/^\d+[.)]\s*/, '').trim();
+  txt = txt.replace(/\*\*/g, '').trim();
+  const abansPipe = txt.split('|')[0] || txt;
+  txt = abansPipe.trim();
+  txt = txt.replace(/^[\[(]\s*/, '').replace(/[\])]\s*$/, '').trim();
+  if (!txt) return '';
+  return txt.split(',')[0].trim();
+}
+
+function normalitzarNomPersonatge(raw = '') {
+  return String(raw || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // ═══════════════════════════════════════════════════════════
 //  FASE 8 → FASE 9: Estils de parla
 // ═══════════════════════════════════════════════════════════
@@ -2314,7 +2336,7 @@ async function generarEstilsParla() {
 
   const seleccionats = Array.from(checkboxes).map(cb => {
     const item = document.getElementById(cb.id.replace('elenc-cb-', 'elenc-item-'));
-    return item ? item.dataset.text : '';
+    return item ? extreureNomPersonatge(item.dataset.text) : '';
   }).filter(t => t.length > 0);
 
   ESTAT._personatgesSeleccionats = seleccionats;
@@ -2384,9 +2406,24 @@ async function generarPerfilsPsicologics(userConfig) {
   if (noms.length === 0 || !ESTAT.estilsParla) return { personatges: [] };
 
   const estils = extreureEstilsPerPersonatge(ESTAT.estilsParla);
+  const mapaEstilsNormalitzat = {};
+  Object.keys(estils).forEach(nom => {
+    const key = normalitzarNomPersonatge(extreureNomPersonatge(nom) || nom);
+    if (!key || mapaEstilsNormalitzat[key]) return;
+    mapaEstilsNormalitzat[key] = estils[nom];
+  });
+
+  const obtenirEstilPerNom = (nom) => {
+    if (estils[nom]) return estils[nom];
+    const nomNet = extreureNomPersonatge(nom);
+    if (nomNet && estils[nomNet]) return estils[nomNet];
+    const key = normalitzarNomPersonatge(nomNet || nom);
+    return key ? (mapaEstilsNormalitzat[key] || '') : '';
+  };
+
   const llista = noms.map((nom, i) => `${i + 1}. ${nom}
 Estil de veu:
-${(estils[nom] || '(no trobat)').substring(0, 900)}`).join('\n');
+${(obtenirEstilPerNom(nom) || '(no trobat)').substring(0, 900)}`).join('\n');
 
   const msgs = [{
     role: 'user',
@@ -2421,14 +2458,16 @@ Retorna EXCLUSIVAMENT JSON vàlid:
     if (data && Array.isArray(data.personatges)) {
       data.personatges.forEach(p => {
         const nom = p && p.nom ? String(p.nom).trim() : '';
-        if (!nom || !noms.includes(nom)) return;
-        perfilMap[nom] = {
-          nom,
+        const key = normalitzarNomPersonatge(extreureNomPersonatge(nom) || nom);
+        const nomOriginal = noms.find(n => normalitzarNomPersonatge(extreureNomPersonatge(n) || n) === key);
+        if (!nomOriginal) return;
+        perfilMap[nomOriginal] = {
+          nom: nomOriginal,
           perfil_psicologic: String(p.perfil_psicologic || '').trim(),
           ferida_nuclear: String(p.ferida_nuclear || '').trim(),
           mascara_social: String(p.mascara_social || '').trim(),
           etapa_arc_intern: normalitzarEtapaArcIntern(p.etapa_arc_intern),
-          estat_animic_actual: (ESTAT._perfilsPersonatges && ESTAT._perfilsPersonatges[nom] && ESTAT._perfilsPersonatges[nom].estat_animic_actual) || 'Tranquil'
+          estat_animic_actual: (ESTAT._perfilsPersonatges && ESTAT._perfilsPersonatges[nomOriginal] && ESTAT._perfilsPersonatges[nomOriginal].estat_animic_actual) || 'Tranquil'
         };
       });
     }
@@ -2456,14 +2495,16 @@ Retorna EXCLUSIVAMENT JSON:
       if (retryData && Array.isArray(retryData.personatges)) {
         retryData.personatges.forEach(p => {
           const nom = p && p.nom ? String(p.nom).trim() : '';
-          if (!nom || !faltants.includes(nom)) return;
-          perfilMap[nom] = {
-            nom,
+          const key = normalitzarNomPersonatge(extreureNomPersonatge(nom) || nom);
+          const nomOriginal = faltants.find(n => normalitzarNomPersonatge(extreureNomPersonatge(n) || n) === key);
+          if (!nomOriginal) return;
+          perfilMap[nomOriginal] = {
+            nom: nomOriginal,
             perfil_psicologic: String(p.perfil_psicologic || '').trim(),
             ferida_nuclear: String(p.ferida_nuclear || '').trim(),
             mascara_social: String(p.mascara_social || '').trim(),
             etapa_arc_intern: normalitzarEtapaArcIntern(p.etapa_arc_intern),
-            estat_animic_actual: (ESTAT._perfilsPersonatges && ESTAT._perfilsPersonatges[nom] && ESTAT._perfilsPersonatges[nom].estat_animic_actual) || 'Tranquil'
+            estat_animic_actual: (ESTAT._perfilsPersonatges && ESTAT._perfilsPersonatges[nomOriginal] && ESTAT._perfilsPersonatges[nomOriginal].estat_animic_actual) || 'Tranquil'
           };
         });
       }
@@ -5422,11 +5463,15 @@ Format ESTRICTE (res més, sense cap introducció):
 async function fase9_estilParla(protagonistaTriat, personatgesSecundaris, conteActual, tematica, estilDesc, history, userConfig) {
   const totsPersonatges = Array.from(new Set([protagonistaTriat, ...personatgesSecundaris].filter(Boolean)));
   const historyCurt = Array.isArray(history) ? history.slice(-6) : [];
-  const CHUNK = 6;
+  const PRIMERA_TONGADA = 7;
   const partsResposta = [];
 
-  for (let i = 0; i < totsPersonatges.length; i += CHUNK) {
-    const blocPersonatges = totsPersonatges.slice(i, i + CHUNK);
+  const tongades = [
+    totsPersonatges.slice(0, PRIMERA_TONGADA),
+    totsPersonatges.slice(PRIMERA_TONGADA)
+  ].filter(bloc => bloc.length > 0);
+
+  for (const blocPersonatges of tongades) {
     const llista = blocPersonatges.map((p, j) => `${j + 1}. ${p}`).join('\n');
 
     const msgs = [
