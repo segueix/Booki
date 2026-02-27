@@ -4447,17 +4447,26 @@ function getProviderPerRol(config, tag) {
   return (roleProvider || cfg.provider || 'anthropic');
 }
 
+function getModelIdPerRol(config, tag) {
+  const cfg = config || {};
+  const isArq = (tag === 'arquitecte' || tag === 'arquitectura');
+
+  if (isArq) {
+    return cfg.modelArquitectura || cfg.modelArquitecte || cfg.model;
+  }
+
+  if (cfg._esDraft) {
+    return cfg.modelDraft || cfg.modelHaiku || cfg.model;
+  }
+
+  return cfg.modelGeneracio || cfg.model;
+}
+
 async function callLLMMulti(messages, systemPrompt, config, tag) {
   const safeConfig = config || {};
 
   // Assignem el model segons si la tasca és d'arquitectura o de generació
-  let modelId;
-  if (tag === 'arquitecte' || tag === 'arquitectura') {
-    modelId = safeConfig.modelArquitectura || safeConfig.model;
-  } else {
-    // Si no és arquitectura, o és draft/generació, usem el de generació
-    modelId = safeConfig.modelGeneracio || safeConfig.model;
-  }
+  const modelId = getModelIdPerRol(safeConfig, tag);
 
   const proveidor = getProviderPerRol(safeConfig, tag);
 
@@ -4482,12 +4491,7 @@ async function callLLMMulti(messages, systemPrompt, config, tag) {
 async function callLLMWithContinuation(messages, systemPrompt, config, tag, maxCont = 3) {
   const safeConfig = config || {};
 
-  let modelId;
-  if (tag === 'arquitecte' || tag === 'arquitectura') {
-    modelId = safeConfig.modelArquitectura || safeConfig.model;
-  } else {
-    modelId = safeConfig.modelGeneracio || safeConfig.model;
-  }
+  const modelId = getModelIdPerRol(safeConfig, tag);
 
   const proveidor = getProviderPerRol(safeConfig, tag);
 
@@ -4545,12 +4549,7 @@ function textSemblaIncomplet(text) {
 async function callLLMOneShotPlusCompletion(messages, systemPrompt, config, tag) {
   const safeConfig = config || {};
 
-  let modelId;
-  if (tag === 'arquitecte' || tag === 'arquitectura') {
-    modelId = safeConfig.modelArquitectura || safeConfig.model;
-  } else {
-    modelId = safeConfig.modelGeneracio || safeConfig.model;
-  }
+  const modelId = getModelIdPerRol(safeConfig, tag);
 
   const proveidor = getProviderPerRol(safeConfig, tag);
   let apiKey;
@@ -4617,12 +4616,7 @@ No repeteixis res del que ja has escrit.` }
 async function callLLMOneShotConditionalCompletion(messages, systemPrompt, config, tag) {
   const safeConfig = config || {};
 
-  let modelId;
-  if (tag === 'arquitecte' || tag === 'arquitectura') {
-    modelId = safeConfig.modelArquitectura || safeConfig.model;
-  } else {
-    modelId = safeConfig.modelGeneracio || safeConfig.model;
-  }
+  const modelId = getModelIdPerRol(safeConfig, tag);
 
   const proveidor = getProviderPerRol(safeConfig, tag);
   let apiKey;
