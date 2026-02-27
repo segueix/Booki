@@ -2194,10 +2194,15 @@ async function exportarDoc() {
     ? ESTAT.premissaTriada.substring(0, 55) + (ESTAT.premissaTriada.length > 55 ? '…' : '')
     : 'Conte IA';
 
+  const btn = document.querySelector('[onclick="exportarDoc()"]');
+  const origText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Generant DOCX…'; }
   try {
     await exportarADoc(titol, ESTAT.conteText);
   } catch (error) {
     toast("Error general exportant: " + error.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = origText; }
   }
 }
 
@@ -4269,14 +4274,15 @@ function mostrarResultatRevisioGlobal(dades) {
   resultEl.classList.remove('hidden');
 
   // Botons de reescriptura per als capítols problemàtics
-  if (capitolsReescriure.length > 0 && dades.instruccions_reescriptura) {
+  if (capitolsReescriure.length > 0) {
+    // Guardem les instruccions a ESTAT per evitar passar JSON complex via onclick
+    ESTAT._instruccionsReescripturaGlobal = dades.instruccions_reescriptura || {};
     reescrEl.innerHTML = `
       <div style="width:100%;font-size:.82rem;color:var(--text2);margin-bottom:6px;">Opus suggereix reescriure els capítols:</div>
       ${capitolsReescriure.map(numCap => {
         const idx = numCap - 1;
-        const instruccions = dades.instruccions_reescriptura[String(numCap)] || '';
-        return `<button class="btn btn-secondary" onclick="reescriureCapitolGlobal(${idx}, ${escHtml(JSON.stringify(instruccions))})">
-          ✏️ Reescriure Cap. ${numCap}
+        return `<button class="btn btn-secondary" data-cap-idx="${idx}" onclick="reescriureCapitolGlobal(${idx})">
+          ✏️ Reeditar Cap. ${numCap}
         </button>`;
       }).join('\n')}`;
   }
@@ -4368,12 +4374,61 @@ Retorna EXCLUSIVAMENT el text del prompt llest per copiar i enganxar, escrit en 
   }
 }
 
-async function reescriureCapitolGlobal(idx, instruccions) {
-  if (!instruccions || !ESTAT._capitols_generats[idx]) return;
-  // Reutilitzem la funció existent
-  ESTAT._revisioInstruccions = ESTAT._revisioInstruccions || {};
-  ESTAT._revisioInstruccions[idx] = instruccions;
-  await reescriureCapitol(idx);
+async function reescriureCapitolGlobal(idx) {
+  if (!ESTAT._capitols_generats[idx]) { toast('Capítol no disponible.'); return; }
+
+  // Llegim les instruccions del mapa guardat per Opus (pot ser buit si Opus no les va donar)
+  const instruccions = (ESTAT._instruccionsReescripturaGlobal && ESTAT._instruccionsReescripturaGlobal[String(idx + 1)]) || '';
+
+  // Deshabilitem el botó que s'ha premut
+  const reescrEl = document.getElementById('revisio-global-reescriptures');
+  const btn = reescrEl && reescrEl.querySelector(`[data-cap-idx="${idx}"]`);
+  if (btn) { btn.disabled = true; btn.textContent = `⏳ Reescrivint Cap. ${idx + 1}…`; }
+
+  // Amagatem el panell de revisió global i mostrem el loader
+  document.getElementById('btn-control-arcs-wrap').classList.add('hidden');
+  document.getElementById('capitol-actual-wrap').classList.add('hidden');
+  document.getElementById('revisio-panel').classList.add('hidden');
+  showLoader(11);
+  document.getElementById('loader-11-text').textContent = `🟣 Sonnet reescrivint el Capítol ${idx + 1}…`;
+
+  try {
+    const res = await reescriureCapitolAmbInstruccions(idx, instruccions, USER_CONFIG);
+    const textNet = netejarTabulacionsInicials(res.response);
+    ESTAT._capitols_generats[idx] = textNet;
+    renderLlistaCapitols();
+    hideLoader(11);
+    mostrarCapitol(idx, textNet);
+
+    // Tornem a mostrar el panell de revisió global amb el capítol reescrit marcat i botó per re-avaluar
+    document.getElementById('btn-control-arcs-wrap').classList.remove('hidden');
+    if (reescrEl) {
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = `✓ Cap. ${idx + 1} reescrit`;
+        btn.classList.remove('btn-secondary');
+        btn.classList.add('btn-ghost');
+      }
+      // Afegim/actualitzem el botó de nova revisió global
+      let reavBtn = document.getElementById('btn-nova-revisio-global');
+      if (!reavBtn) {
+        reavBtn = document.createElement('button');
+        reavBtn.id = 'btn-nova-revisio-global';
+        reavBtn.className = 'btn btn-primary';
+        reavBtn.style.cssText = 'width:100%;margin-top:12px;';
+        reavBtn.onclick = iniciarRevisioGlobal;
+        reescrEl.appendChild(reavBtn);
+      }
+      reavBtn.textContent = '🔄 Nova Revisió Global del Llibre';
+    }
+    toast(`✓ Capítol ${idx + 1} reescrit amb millores literàries.`);
+  } catch (err) {
+    hideLoader(11);
+    document.getElementById('btn-control-arcs-wrap').classList.remove('hidden');
+    document.getElementById('capitol-actual-wrap').classList.remove('hidden');
+    if (btn) { btn.disabled = false; btn.textContent = `✏️ Reeditar Cap. ${idx + 1}`; }
+    toast('Error en reeditar: ' + err.message);
+  }
 }
 
 // ─── SISTEMA 1: Bíblia Narrativa ─────────────────────────────────────────────
@@ -5936,7 +5991,17 @@ async function descarregarNovella() {
     }
   }
 
-  await exportarNovella(titolDefinitiu, capsGenerats, ESTAT._estructuraCapitols || [], netejarTabulacionsInicials(textEpileg));
+  const btns = document.querySelectorAll('[onclick="descarregarNovella()"]');
+  const origTexts = Array.from(btns).map(b => b.textContent);
+  btns.forEach(b => { b.disabled = true; b.textContent = '⏳ Generant DOCX…'; });
+  try {
+    await exportarNovella(titolDefinitiu, capsGenerats, ESTAT._estructuraCapitols || [], netejarTabulacionsInicials(textEpileg));
+  } catch (err) {
+    toast('Error al descarregar la novel·la: ' + err.message);
+    console.error('[descarregarNovella]', err);
+  } finally {
+    btns.forEach((b, i) => { b.disabled = false; b.textContent = origTexts[i]; });
+  }
 }
 
 async function exportarNovella(titol, caps, estructura, epileg) {
@@ -7213,6 +7278,15 @@ async function reescriureCapitolAmbInstruccions(idx, instruccions, userConfig) {
   const capText     = cap ? cap.text : '';
   const systemPrompt= buildSystemPromptCapitol();
 
+  const promptMilIora = `
+CRITERIS DE QUALITAT LITERÀRIA (aplica sempre en la reescriptura):
+- MOSTRA, no expliquis: substitueix el "telling" emocional ("va sentir por", "estava nerviós", "es va posar content") per accions, diàleg o pensament intern que mostrin l'emoció.
+- Alterna frases curtes, mitjanes i llargues per crear ritme i evitar la monotonia robòtica.
+- Varia els inicis de frase; no comencis massa seguides amb el nom del personatge o el mateix connector.
+- Elimina adjectius febles i substitueix-los per verbs d'acció forts.
+- Mantén veus diferenciades per a cada personatge; no parlin tots amb la mateixa cadència.
+- Evita clixés, resolucions mandroses i diàlegs que exposen informació que els personatges ja saben.`;
+
   const msgs = [{
     role: 'user',
     content: `Reescriu el Capítol ${idx + 1} incorporant les correccions de l'editor.
@@ -7224,7 +7298,8 @@ CAPÍTOL ACTUAL:
 ${textActual.substring(0, 4000)}${textActual.length > 4000 ? '\n[…]' : ''}
 
 INSTRUCCIONS DE CORRECCIÓ DE L'EDITOR (Opus):
-${instruccions}
+${instruccions || 'Millora la qualitat literària general del capítol.'}
+${promptMilIora}
 
 Reescriu el capítol complet incorporant les correccions. Mantén la mateixa veu i extensió (~2000 paraules). Escriu directament la narració en català, sense títol ni notes.`
   }];
