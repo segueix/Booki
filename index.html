@@ -1663,17 +1663,30 @@ function actualitzarConfigProvider() {
   if (provGenSel) provGenSel.value = provider;
   if (provArqSel) provArqSel.value = provider;
 
-  // Actualitzem els valors per defecte recomanats segons el proveïdor
-  if (provider === 'anthropic') {
-    genInput.value = 'claude-sonnet-4-6';
-    arqInput.value = 'claude-opus-4-6';
-  } else if (provider === 'gemini') {
-    genInput.value = 'gemini-3-flash-preview';
-    arqInput.value = 'gemini-3-flash-preview';
-  } else if (provider === 'openai') {
-    genInput.value = 'gpt-4o-mini';
-    arqInput.value = 'gpt-4o';
-  }
+  const defaults = {
+    anthropic: { draft: 'claude-haiku-4-5-20251001', generacio: 'claude-sonnet-4-6', arquitectura: 'claude-opus-4-6' },
+    gemini:    { draft: 'gemini-3-flash-preview',    generacio: 'gemini-3-flash-preview', arquitectura: 'gemini-3-flash-preview' },
+    openai:    { draft: 'gpt-5.2',                   generacio: 'gpt-4o-mini',            arquitectura: 'gpt-4o' }
+  };
+  const p = defaults[provider] || defaults.anthropic;
+
+  // Quan canvia el proveïdor principal, apliquem models coherents amb aquest proveïdor.
+  if (genInput) genInput.value = p.generacio;
+  if (arqInput) arqInput.value = p.arquitectura;
+
+  ESTAT._modelDraft = p.draft;
+  ESTAT._modelGeneracio = p.generacio;
+  ESTAT._modelArquitecte = p.arquitectura;
+
+  const selDraft = document.getElementById('selectModelDraft');
+  const selGen = document.getElementById('selectModelGen');
+  const selArq = document.getElementById('selectModelArq');
+  if (selDraft) selDraft.value = p.draft;
+  if (selGen) selGen.value = p.generacio;
+  if (selArq) selArq.value = p.arquitectura;
+
+  sincronitzarCampsConfigModels();
+  actualitzarEstimacio();
 }
 
 // Manté compatibilitat si algú cridava l'antiga funció
@@ -1712,11 +1725,15 @@ function guardarIComencar() {
     const modelArquitecturaInput = document.getElementById('config-model-arquitectura').value.trim();
     const fluxAutomatic     = document.getElementById('config-flux-automatic').checked;
 
-    // Prioritzem la configuració real del selector per rol si existeix.
-    const modelsSeleccionats = getModelConfig();
-    const modelDraft = modelsSeleccionats.modelDraft || modelGeneracioInput;
-    const modelGeneracio = modelsSeleccionats.modelGeneracio || modelGeneracioInput;
-    const modelArquitectura = modelsSeleccionats.modelArquitecte || modelArquitecturaInput;
+    // Prioritzem el que l'usuari veu al panell en aquest moment (inputs/selectors),
+    // per evitar arrossegar valors antics d'ESTAT d'un proveïdor diferent.
+    const selectDraft = document.getElementById('selectModelDraft');
+    const selectGen = document.getElementById('selectModelGen');
+    const selectArq = document.getElementById('selectModelArq');
+
+    const modelDraft = (selectDraft && selectDraft.value.trim()) || ESTAT._modelDraft || modelGeneracioInput;
+    const modelGeneracio = modelGeneracioInput || (selectGen && selectGen.value.trim()) || ESTAT._modelGeneracio;
+    const modelArquitectura = modelArquitecturaInput || (selectArq && selectArq.value.trim()) || ESTAT._modelArquitecte;
 
     if (!modelGeneracio)    { toast('Introdueix el model de generació.'); return; }
     if (!modelArquitectura) { toast("Introdueix el model d'arquitectura."); return; }
