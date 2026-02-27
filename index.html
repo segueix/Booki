@@ -5846,13 +5846,15 @@ async function descarregarNovella() {
 async function exportarNovella(titol, caps, estructura, epileg) {
   const docxDisponible = await assegurarLlibreriaDocx();
   if (!docxDisponible) {
+    const capitolsFallback = caps
+      .map((c, i) => ({ text: c, titolCap: (estructura[i] && estructura[i].titol ? String(estructura[i].titol).trim() : '') || `Capítol ${i + 1}` }))
+      .filter(c => c.text);
+    const indexFallback = capitolsFallback.map((c, i) => `${i + 1}. ${c.titolCap}`).join('\n');
     const contingutFallback = [
-      ...caps.filter(Boolean).map((c, i) => `Capítol ${i + 1}
-
-${netejarTabulacionsInicials(c)}`),
-      (epileg && String(epileg).trim()) ? `Epíleg
-
-${netejarTabulacionsInicials(epileg)}` : ''
+      titol || 'Novel·la IA',
+      indexFallback ? `Índex de capítols\n${indexFallback}` : '',
+      ...capitolsFallback.map((c, i) => `Capítol ${i + 1} — ${c.titolCap}\n\n${netejarTabulacionsInicials(c.text)}`),
+      (epileg && String(epileg).trim()) ? `Epíleg\n\n${netejarTabulacionsInicials(epileg)}` : ''
     ].filter(Boolean).join('\n\n');
     const nomTxt = descarregarTextFallback(titol, contingutFallback, 'novella');
     obrirGoogleDocsPerImportar(nomTxt);
@@ -5862,9 +5864,19 @@ ${netejarTabulacionsInicials(epileg)}` : ''
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, PageBreak } = docx;
   const fills = [];
 
-  // Portada
+  const titolObra = titol || 'Novel·la IA';
+  const capitolsAmbText = caps
+    .map((text, i) => ({
+      text,
+      idx: i,
+      cap: estructura[i] || null,
+      titolCap: (estructura[i] && estructura[i].titol ? String(estructura[i].titol).trim() : '') || `Capítol ${i + 1}`
+    }))
+    .filter(item => item.text);
+
+  // Portada + índex
   fills.push(new Paragraph({
-    text: titol || 'Novel·la IA',
+    text: titolObra,
     heading: HeadingLevel.TITLE,
     alignment: AlignmentType.CENTER,
     spacing: { before: 2400, after: 400 }
@@ -5874,30 +5886,41 @@ ${netejarTabulacionsInicials(epileg)}` : ''
     alignment: AlignmentType.CENTER,
     spacing: { after: 800 }
   }));
-  fills.push(new Paragraph({ children: [new PageBreak()] })); // Salt de pàgina després de la portada
+
+  fills.push(new Paragraph({
+    text: 'Índex de capítols',
+    heading: HeadingLevel.HEADING_2,
+    alignment: AlignmentType.LEFT,
+    spacing: { before: 600, after: 260 }
+  }));
+
+  capitolsAmbText.forEach((item, pos) => {
+    fills.push(new Paragraph({
+      text: `${pos + 1}. ${item.titolCap}`,
+      spacing: { after: 120 }
+    }));
+  });
+
+  fills.push(new Paragraph({ children: [new PageBreak()] })); // Salt de pàgina després de la portada + índex
 
   // Capítols
-  caps.forEach((text, i) => {
-    if (!text) return;
-    const cap = estructura[i];
-    const titolCap = cap ? (cap.titol || '') : '';
+  capitolsAmbText.forEach((item, pos) => {
+    const text = item.text;
+    const i = item.idx;
+    const titolCap = item.titolCap;
 
     fills.push(new Paragraph({
-      children: [new TextRun({ text: `Capítol ${i + 1}`, color: "888888", size: 24 })],
+      children: [new TextRun({ text: titolObra, color: "888888", size: 22 })],
       alignment: AlignmentType.CENTER,
-      spacing: { before: 800, after: 200 }
+      spacing: { before: 600, after: 120 }
     }));
 
-    if (titolCap) {
-      fills.push(new Paragraph({
-        text: titolCap,
-        heading: HeadingLevel.HEADING_2,
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 600 }
-      }));
-    } else {
-      fills.push(new Paragraph({ spacing: { after: 600 } }));
-    }
+    fills.push(new Paragraph({
+      text: `Capítol ${pos + 1} — ${titolCap}`,
+      heading: HeadingLevel.HEADING_2,
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 600 }
+    }));
 
     const paragrafsText = netejarTabulacionsInicials(text).split(/\n\n+/).filter(p => p.trim().length > 0);
     paragrafsText.forEach((p, index) => {
