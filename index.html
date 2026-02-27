@@ -7135,17 +7135,28 @@ async function revisarCapitol(textCapitol, idx, userConfig) {
       aRecollirAra.map(p => `- ${p.element}`).join('\n');
   }
 
+  // Text complet de tots els capítols anteriors per detectar incongruències creuades
+  const capitolsAnteriors = (ESTAT._capitols_generats || [])
+    .slice(0, idx)
+    .map((text, i) => text ? `═══ CAPÍTOL ${i + 1} ═══\n${text}` : null)
+    .filter(Boolean)
+    .join('\n\n');
+
   const msgs = [{
     role: 'user',
-    content: `Revisa aquest capítol i comprova la coherència amb la planificació i el Registre narratiu.
+    content: `Revisa aquest capítol i comprova la coherència amb tots els capítols anteriors i amb la planificació narrativa.
+${capitolsAnteriors ? `
+CAPÍTOLS ANTERIORS (text complet — usa'ls per detectar incongruències, repeticions, contradiccions de fets, objectes, roba o emocions):
+${capitolsAnteriors}
 
+` : ''}
 PLANIFICACIÓ D'AQUEST CAPÍTOL:
 ${capText}
 ${registreCtx}
 ${prefCtx}
 
 CAPÍTOL ${idx + 1} GENERAT:
-${textCapitol.substring(0, 5000)}${textCapitol.length > 5000 ? '\n[…text truncat…]' : ''}
+${textCapitol}
 
 La teva tasca és avaluar si el text és publicable i si compleix amb els objectius de l'escaleta.
 Fixa't especialment en:
