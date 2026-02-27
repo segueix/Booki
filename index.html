@@ -2433,6 +2433,18 @@ function normalitzarNomPersonatge(raw = '') {
     .trim();
 }
 
+function inferirEstatAnimicDesDeVeu(estilVeu = '', perfilText = '') {
+  const txt = `${estilVeu || ''} ${perfilText || ''}`.toLowerCase();
+  if (!txt.trim()) return 'Tranquil';
+  if (/fur[ií]|rabia|ira|hostil|agress|violent/.test(txt)) return 'Irritat';
+  if (/por|ansi|anx|panic|p[àa]nic|nerv|inquiet/.test(txt)) return 'Neguitós';
+  if (/trist|dol|abat|depr|melancol/.test(txt)) return 'Melancòlic';
+  if (/ironi|sarcas|fred|calculador|anal[ií]tic/.test(txt)) return 'Reservat';
+  if (/esperan[çc]|optim|euf[oò]r|entusias/.test(txt)) return 'Esperançat';
+  if (/poetic|emocional|sensible|vulnerable/.test(txt)) return 'Sensibilitzat';
+  return 'Tranquil';
+}
+
 // ═══════════════════════════════════════════════════════════
 //  FASE 8 → FASE 9: Estils de parla
 // ═══════════════════════════════════════════════════════════
@@ -2453,7 +2465,7 @@ async function generarEstilsParla() {
       nom,
       estil_veu: prev.estil_veu || '',
       perfil_psicologic: prev.perfil_psicologic || '',
-      estat_animic_actual: prev.estat_animic_actual || 'Tranquil'
+      estat_animic_actual: prev.estat_animic_actual || inferirEstatAnimicDesDeVeu(prev.estil_veu, prev.perfil_psicologic)
     });
   });
   ESTAT.fase = 9;
@@ -2531,7 +2543,10 @@ async function generarPerfilsPsicologics(userConfig) {
     const net = String(txt || '').replace(/\s+/g, ' ').trim();
     if (!net) return '';
     const parts = net.split(' ');
-    return parts.length <= maxParaules ? net : parts.slice(0, maxParaules).join(' ');
+    let out = parts.length <= maxParaules ? net : parts.slice(0, maxParaules).join(' ');
+    out = out.replace(/[,:;\-–—]+$/g, '').trim();
+    if (out && !/[.!?…]$/.test(out)) out += '.';
+    return out;
   };
 
   const llista = noms.map((nom, i) => `${i + 1}. ${nom}
@@ -2559,7 +2574,7 @@ Retorna EXCLUSIVAMENT JSON vàlid:
 
   const models = getModelConfig(userConfig || USER_CONFIG || {});
   const perfilMap = {};
-  noms.forEach(n => { perfilMap[n] = { nom: n, perfil_psicologic: '', ferida_nuclear: '', mascara_social: '', etapa_arc_intern: 'negacio', estat_animic_actual: 'Tranquil' }; });
+  noms.forEach(n => { perfilMap[n] = { nom: n, perfil_psicologic: '', ferida_nuclear: '', mascara_social: '', etapa_arc_intern: 'negacio', estat_animic_actual: inferirEstatAnimicDesDeVeu(obtenirEstilPerNom(n), '') }; });
 
   try {
     const systemPsico = 'Ets un psicòleg narratiu. Retorna només JSON vàlid en català.';
@@ -2577,7 +2592,7 @@ Retorna EXCLUSIVAMENT JSON vàlid:
           ferida_nuclear: String(p.ferida_nuclear || '').trim(),
           mascara_social: String(p.mascara_social || '').trim(),
           etapa_arc_intern: normalitzarEtapaArcIntern(p.etapa_arc_intern),
-          estat_animic_actual: (ESTAT._perfilsPersonatges && ESTAT._perfilsPersonatges[nomOriginal] && ESTAT._perfilsPersonatges[nomOriginal].estat_animic_actual) || 'Tranquil'
+          estat_animic_actual: (ESTAT._perfilsPersonatges && ESTAT._perfilsPersonatges[nomOriginal] && ESTAT._perfilsPersonatges[nomOriginal].estat_animic_actual) || inferirEstatAnimicDesDeVeu(obtenirEstilPerNom(nomOriginal), String(p.perfil_psicologic || ''))
         };
       });
     };
@@ -2663,7 +2678,7 @@ Retorna EXCLUSIVAMENT JSON:
   ESTAT._perfilsPersonatges = ESTAT._perfilsPersonatges || {};
   noms.forEach(nom => {
     const prev = ESTAT._perfilsPersonatges[nom] || {};
-    const nou = perfilMap[nom] || { nom, perfil_psicologic: '', ferida_nuclear: '', mascara_social: '', etapa_arc_intern: 'negacio', estat_animic_actual: 'Tranquil' };
+    const nou = perfilMap[nom] || { nom, perfil_psicologic: '', ferida_nuclear: '', mascara_social: '', etapa_arc_intern: 'negacio', estat_animic_actual: '' };
     ESTAT._perfilsPersonatges[nom] = Object.assign({}, prev, {
       nom,
       estil_veu: prev.estil_veu || (estils[nom] || ''),
@@ -2674,7 +2689,7 @@ Retorna EXCLUSIVAMENT JSON:
       ferida_nuclear: nou.ferida_nuclear || prev.ferida_nuclear || '',
       mascara_social: nou.mascara_social || prev.mascara_social || '',
       etapa_arc_intern: normalitzarEtapaArcIntern(nou.etapa_arc_intern || prev.etapa_arc_intern || 'negacio'),
-      estat_animic_actual: nou.estat_animic_actual || prev.estat_animic_actual || 'Tranquil'
+      estat_animic_actual: nou.estat_animic_actual || prev.estat_animic_actual || inferirEstatAnimicDesDeVeu(prev.estil_veu || obtenirEstilPerNom(nom), nou.perfil_psicologic || prev.perfil_psicologic)
     });
   });
 
