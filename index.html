@@ -2527,6 +2527,13 @@ async function generarPerfilsPsicologics(userConfig) {
     return key ? (mapaEstilsNormalitzat[key] || '') : '';
   };
 
+  const limitarParaules = (txt = '', maxParaules = 50) => {
+    const net = String(txt || '').replace(/\s+/g, ' ').trim();
+    if (!net) return '';
+    const parts = net.split(' ');
+    return parts.length <= maxParaules ? net : parts.slice(0, maxParaules).join(' ');
+  };
+
   const llista = noms.map((nom, i) => `${i + 1}. ${nom}
 Estil de veu:
 ${(obtenirEstilPerNom(nom) || '(no trobat)').substring(0, 900)}`).join('\n');
@@ -2534,6 +2541,7 @@ ${(obtenirEstilPerNom(nom) || '(no trobat)').substring(0, 900)}`).join('\n');
   const msgs = [{
     role: 'user',
     content: `Analitza aquests personatges i genera un perfil psicològic breu (trets de personalitat, pors, motivacions) per a cadascun.
+IMPORTANT: El camp "perfil_psicologic" ha de tenir un màxim de 50 paraules.
 Afegeix també: "ferida_nuclear", "mascara_social" i "etapa_arc_intern" (una de: negacio, resistencia, fractura, insight, integracio).
 Retorna un JSON on cada personatge tingui aquests camps.
 Es requereix l'anàlisi de EXACTAMENT ${noms.length} personatges.
@@ -2565,7 +2573,7 @@ Retorna EXCLUSIVAMENT JSON vàlid:
         if (!nomOriginal) return;
         perfilMap[nomOriginal] = {
           nom: nomOriginal,
-          perfil_psicologic: String(p.perfil_psicologic || '').trim(),
+          perfil_psicologic: limitarParaules(String(p.perfil_psicologic || '').trim(), 50),
           ferida_nuclear: String(p.ferida_nuclear || '').trim(),
           mascara_social: String(p.mascara_social || '').trim(),
           etapa_arc_intern: normalitzarEtapaArcIntern(p.etapa_arc_intern),
@@ -2582,6 +2590,7 @@ ${(obtenirEstilPerNom(nom) || '(no trobat)').substring(0, 900)}`).join('\n');
       const msgsBloc = [{
         role: 'user',
         content: `Analitza aquests personatges i genera un perfil psicològic breu (trets de personalitat, pors, motivacions) per a cadascun.
+IMPORTANT: El camp "perfil_psicologic" ha de tenir un màxim de 50 paraules.
 Afegeix també: "ferida_nuclear", "mascara_social" i "etapa_arc_intern" (una de: negacio, resistencia, fractura, insight, integracio).
 Retorna un JSON on cada personatge tingui aquests camps.
 Es requereix l'anàlisi de EXACTAMENT ${blocNoms.length} personatges.
@@ -2620,7 +2629,7 @@ Retorna EXCLUSIVAMENT JSON vàlid:
       for (const nomFaltant of faltants) {
         const retryMsgs = [{
           role: 'user',
-          content: `Genera el perfil psicològic d'aquest únic personatge.
+          content: `Genera el perfil psicològic d'aquest únic personatge. El camp "perfil_psicologic" ha de tenir un màxim de 50 paraules.
 
 PERSONATGE:
 - ${nomFaltant}
@@ -2658,7 +2667,10 @@ Retorna EXCLUSIVAMENT JSON:
     ESTAT._perfilsPersonatges[nom] = Object.assign({}, prev, {
       nom,
       estil_veu: prev.estil_veu || (estils[nom] || ''),
-      perfil_psicologic: nou.perfil_psicologic || prev.perfil_psicologic || '',
+      perfil_psicologic: limitarParaules(
+        nou.perfil_psicologic || prev.perfil_psicologic || `Personatge amb conflicte intern marcat; combina desig de control amb por a la pèrdua, i pren decisions defensives que tensionen les relacions.`,
+        50
+      ),
       ferida_nuclear: nou.ferida_nuclear || prev.ferida_nuclear || '',
       mascara_social: nou.mascara_social || prev.mascara_social || '',
       etapa_arc_intern: normalitzarEtapaArcIntern(nou.etapa_arc_intern || prev.etapa_arc_intern || 'negacio'),
