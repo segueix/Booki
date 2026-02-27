@@ -1429,6 +1429,9 @@ const ESTAT = {
   estilsParla:              null,
   _perfilsPersonatges:      {},
   _matriuRelacional:        [],
+  _matriuRelacionalHistorial: [],
+  _arcTransitionWarnings:   [],
+  _plaReescripturaPsicologica: null,
   // Novel·la (fases 10-12)
   estructuraNovella:        null,
   _estructuraCapitols:      [],
@@ -1791,7 +1794,7 @@ function renderLlistaAmbRecomanat(text, wrapId, listaKey, idxKey, btnId) {
       <input type="radio" name="${wrapId}-radio" id="${wrapId}-r-${i}">
       <label for="${wrapId}-r-${i}">${badge}${escHtml(textNet)}</label>
     </div>`;
-  }).join('');
+  }).join('\n');
 
   // Auto-seleccionar el recomanat
   if (autoIdx !== null) {
@@ -1989,7 +1992,7 @@ async function escriureSeguentPart() {
 function mostrarConte(text) {
   const cos  = document.getElementById('conte-cos');
   const pars = text.split(/\n\n+/).filter(p => p.trim().length > 0);
-  const html = pars.map(p => `<p>${escHtml(p.trim())}</p>`).join('');
+  const html = pars.map(p => `<p>${escHtml(p.trim())}</p>`).join('\n');
 
   const wc = compteParaules(text);
   document.getElementById('conte-wordcount').textContent = `${wc.toLocaleString('ca')} paraules`;
@@ -2098,7 +2101,7 @@ function renderLlistaWorldbuilding(text) {
       <input type="checkbox" id="world-cb-${i}" ${checkedAttr} onclick="event.stopPropagation();" onchange="syncWorldItem(${i})">
       <label for="world-cb-${i}">${badge}${displayHtml}</label>
     </div>`;
-  }).join('');
+  }).join('\n');
 
   document.getElementById('world-selector').classList.remove('hidden');
   setTimeout(() => {
@@ -2162,7 +2165,7 @@ function mostrarResultatWorldbuilding(text) {
       </div>`;
     }
     return `<div class="world-bloc"><div class="world-bloc-desc">${escHtml(bloc.trim())}</div></div>`;
-  }).join('');
+  }).join('\n');
 
   document.getElementById('world-result-wrap').classList.remove('hidden');
   setTimeout(() => {
@@ -2240,7 +2243,7 @@ function renderElencPersonatges(text) {
       <input type="checkbox" id="elenc-cb-${i}" ${checkedAttr} onclick="event.stopPropagation();" onchange="syncElencItem(${i})">
       <label for="elenc-cb-${i}">${badge}${displayHtml}</label>
     </div>`;
-  }).join('');
+  }).join('\n');
 
   document.getElementById('elenc-selector').classList.remove('hidden');
   setTimeout(() => {
@@ -2341,9 +2344,7 @@ async function generarPerfilsPsicologics(userConfig) {
   const estils = extreureEstilsPerPersonatge(ESTAT.estilsParla);
   const llista = noms.map((nom, i) => `${i + 1}. ${nom}
 Estil de veu:
-${(estils[nom] || '(no trobat)').substring(0, 900)}`).join('
-
-');
+${(estils[nom] || '(no trobat)').substring(0, 900)}`).join('\n');
 
   const msgs = [{
     role: 'user',
@@ -2417,6 +2418,9 @@ Retorna EXCLUSIVAMENT JSON:
           perfilMap[nom] = {
             nom,
             perfil_psicologic: String(p.perfil_psicologic || '').trim(),
+            ferida_nuclear: String(p.ferida_nuclear || '').trim(),
+            mascara_social: String(p.mascara_social || '').trim(),
+            etapa_arc_intern: normalitzarEtapaArcIntern(p.etapa_arc_intern),
             estat_animic_actual: (ESTAT._perfilsPersonatges && ESTAT._perfilsPersonatges[nom] && ESTAT._perfilsPersonatges[nom].estat_animic_actual) || 'Tranquil'
           };
         });
@@ -2456,6 +2460,7 @@ async function actualitzarEstatsAnimics(textCapitol, idx, userConfig) {
   }).join('\n');
 
   const resum = resumAutomaticCapitol(textCapitol || '').substring(0, 900);
+  const resumPerArc = resumAutomaticCapitol(textCapitol || '').substring(0, 1200);
   const msgs = [{
     role: 'user',
     content: `Llegeix el resum d'aquest capítol i l'estat anímic anterior dels personatges. Com han afectat els esdeveniments d'aquest capítol a la psicologia de cadascun? Retorna un JSON amb l'"estat_animic_actual" actualitzat (ex: "Enfurismat", "Deprimit", "Ple d'esperança") per a cada personatge que hagi aparegut.
@@ -2489,12 +2494,19 @@ Retorna EXCLUSIVAMENT JSON vàlid:
       if (!p || !p.nom) return;
       const nom = String(p.nom).trim();
       const prev = ESTAT._perfilsPersonatges[nom] || { nom, estil_veu: '', perfil_psicologic: '', estat_animic_actual: 'Tranquil' };
+      const etapaInferida = inferirEtapaArcDesDeResum(resumPerArc, prev.etapa_arc_intern || 'negacio');
+      const etapaValidada = validarIRegistrarTransicioArc(nom, prev.etapa_arc_intern || 'negacio', etapaInferida, `Cap.${idx + 1}`);
       ESTAT._perfilsPersonatges[nom] = Object.assign({}, prev, {
-        estat_animic_actual: String(p.estat_animic_actual || '').trim() || prev.estat_animic_actual || 'Tranquil'
+        estat_animic_actual: String(p.estat_animic_actual || '').trim() || prev.estat_animic_actual || 'Tranquil',
+        etapa_arc_intern: etapaValidada
       });
     });
   } catch (err) {
     console.warn('Estats anímics: no bloquejant:', err.message);
+  }
+
+  if (Array.isArray(ESTAT._matriuRelacional) && ESTAT._matriuRelacional.length > 0) {
+    ESTAT._matriuRelacional = actualitzarMatriuRelacionalDesDeRegistre(ESTAT._matriuRelacional);
   }
 }
 
@@ -2533,8 +2545,7 @@ function mostrarPerfilsPsicologics(dades) {
         <div><div class="veu-camp-label">Estat anímic actual</div><div class="veu-camp-val">${anim}</div></div>
       </div>
     </div>`;
-  }).join('
-');
+  }).join('\n');
 
   document.getElementById('psicologia-result').classList.remove('hidden');
   setTimeout(() => document.getElementById('fase-9-2').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -2567,6 +2578,46 @@ function etiquetaEtapaArcIntern(v) {
   return labels[k] || 'Negació';
 }
 
+
+function potTransicioArcIntern(etapaAnterior, etapaNova) {
+  const a = normalitzarEtapaArcIntern(etapaAnterior);
+  const b = normalitzarEtapaArcIntern(etapaNova);
+  const allowed = {
+    negacio: ['negacio', 'resistencia'],
+    resistencia: ['resistencia', 'fractura', 'negacio'],
+    fractura: ['fractura', 'insight', 'resistencia'],
+    insight: ['insight', 'integracio', 'fractura'],
+    integracio: ['integracio', 'insight']
+  };
+  return !!(allowed[a] && allowed[a].includes(b));
+}
+
+function validarIRegistrarTransicioArc(nom, etapaAnterior, etapaNova, contextCapitol = '') {
+  const a = normalitzarEtapaArcIntern(etapaAnterior);
+  const b = normalitzarEtapaArcIntern(etapaNova);
+  if (potTransicioArcIntern(a, b)) return b;
+  const fallback = a;
+  ESTAT._arcTransitionWarnings = ESTAT._arcTransitionWarnings || [];
+  ESTAT._arcTransitionWarnings.push({
+    nom,
+    etapa_anterior: a,
+    etapa_proposada: b,
+    etapa_aplicada: fallback,
+    context: String(contextCapitol || '').slice(0, 220)
+  });
+  return fallback;
+}
+
+function inferirEtapaArcDesDeResum(resum = '', etapaActual = 'negacio') {
+  const txt = String(resum || '').toLowerCase();
+  const actual = normalitzarEtapaArcIntern(etapaActual);
+  if (/accepta|integra|reconcilia|perdona|fa\s+les\s+pau/.test(txt)) return 'integracio';
+  if (/admet|ent[eé]n|compr[eè]n|insight|revela\s+la\s+veritat/.test(txt)) return 'insight';
+  if (/trenca|col.lapse|col·lapse|crisi|desbord|p[àa]nic/.test(txt)) return 'fractura';
+  if (/resisteix|evita|nega|fug|bloqueja|es\s+tanca/.test(txt)) return actual === 'negacio' ? 'resistencia' : actual;
+  return actual;
+}
+
 function mostrarFeridaArc(dades) {
   const cos = document.getElementById('ferida-arc-cos');
   const perfils = dades && Array.isArray(dades.personatges)
@@ -2586,8 +2637,7 @@ function mostrarFeridaArc(dades) {
         <div><div class="veu-camp-label">Etapa arc intern</div><div class="veu-camp-val">${etapa}</div></div>
       </div>
     </div>`;
-  }).join('
-');
+  }).join('\n');
 
   document.getElementById('ferida-arc-result').classList.remove('hidden');
 }
@@ -2609,6 +2659,52 @@ async function iniciarFaseFeridaArc() {
   }
 }
 
+function scoreRelacioPerEtiqueta(textBase = '') {
+  const txt = String(textBase || '').toLowerCase();
+  let score = 50;
+  if (/estima|cura|admir|lleial|confia|protegeix/.test(txt)) score += 18;
+  if (/por|desconf|rival|gelos|odi|ressent|venjan[çc]a/.test(txt)) score -= 22;
+  if (/culpa|vergonya|depend[eè]ncia|obsessi[oó]/.test(txt)) score -= 8;
+  return Math.max(5, Math.min(95, score));
+}
+
+function estimarTipusRelacio(score) {
+  if (score >= 66) return 'vincle';
+  if (score <= 38) return 'tensio';
+  return 'ambivalencia';
+}
+
+function actualitzarMatriuRelacionalDesDeRegistre(matriuBase = []) {
+  const map = new Map((matriuBase || []).map(r => [r.parella, Object.assign({}, r)]));
+  const caps = (ESTAT.llibreRegistre && Array.isArray(ESTAT.llibreRegistre.capitols)) ? ESTAT.llibreRegistre.capitols : [];
+
+  caps.forEach(cap => {
+    if (!cap) return;
+    const text = String((cap.resum_capitol || cap.resum || '')).toLowerCase();
+    const noms = Array.isArray(cap.personatges_presents) ? cap.personatges_presents.filter(Boolean) : [];
+    for (let i = 0; i < noms.length; i++) {
+      for (let j = i + 1; j < noms.length; j++) {
+        const parella = `${noms[i]} ↔ ${noms[j]}`;
+        const actual = map.get(parella) || { parella, tipus: 'ambivalencia', intensitat: 50, tendencia: 'estable', nota: '' };
+        const delta = /discuteix|enfront|tra[iï]ci[oó]|amena[çc]|trenca/.test(text)
+          ? -8
+          : (/ajuda|salva|confessa|repara|abra[çc]a/.test(text) ? 7 : 0);
+        const nova = Math.max(5, Math.min(95, (Number(actual.intensitat) || 50) + delta));
+        actual.intensitat = nova;
+        actual.tipus = estimarTipusRelacio(nova);
+        actual.tendencia = delta > 0 ? 'millorant' : (delta < 0 ? 'empitjorant' : (actual.tendencia || 'estable'));
+        if (delta !== 0) actual.nota = `Ajustat pel registre de capítols (${delta > 0 ? '+' : ''}${delta}).`;
+        map.set(parella, actual);
+      }
+    }
+  });
+
+  const resultat = Array.from(map.values()).sort((a, b) => (b.intensitat || 0) - (a.intensitat || 0));
+  ESTAT._matriuRelacionalHistorial = ESTAT._matriuRelacionalHistorial || [];
+  ESTAT._matriuRelacionalHistorial.push({ t: Date.now(), total: resultat.length });
+  return resultat;
+}
+
 function generarMatriuRelacionalLocal() {
   const noms = (ESTAT._personatgesSeleccionats || []).filter(Boolean);
   const perf = ESTAT._perfilsPersonatges || {};
@@ -2617,21 +2713,19 @@ function generarMatriuRelacionalLocal() {
     for (let j = i + 1; j < noms.length; j++) {
       const a = noms[i], b = noms[j];
       const pa = perf[a] || {}, pb = perf[b] || {};
-      const textBase = `${pa.perfil_psicologic || ''} ${pb.perfil_psicologic || ''}`.toLowerCase();
-      let tipus = 'ambivalencia';
-      if (/por|desconf|rival|gelos|odi|ressent/.test(textBase)) tipus = 'tensio';
-      else if (/cura|prote|estima|admir|lleial/.test(textBase)) tipus = 'vincle';
-      const intensitat = Math.min(95, Math.max(35, Math.round((String(pa.etapa_arc_intern||'').length + String(pb.etapa_arc_intern||'').length) * 7)));
+      const textBase = `${pa.perfil_psicologic || ''} ${pb.perfil_psicologic || ''} ${pa.ferida_nuclear || ''} ${pb.ferida_nuclear || ''}`;
+      const intensitat = scoreRelacioPerEtiqueta(textBase);
+      const tipus = estimarTipusRelacio(intensitat);
       matriu.push({
         parella: `${a} ↔ ${b}`,
         tipus,
         intensitat,
-        tendencia: tipus === 'tensio' ? 'pujant' : 'estable',
+        tendencia: 'estable',
         nota: `${a} projecta "${(pa.mascara_social || 'reserva')}", mentre ${b} respon des de "${(pb.mascara_social || 'control')}".`
       });
     }
   }
-  return matriu;
+  return actualitzarMatriuRelacionalDesDeRegistre(matriu);
 }
 
 function mostrarMatriuRelacional(matriu) {
@@ -2644,8 +2738,7 @@ function mostrarMatriuRelacional(matriu) {
       <div><div class="veu-camp-label">Intensitat</div><div class="veu-camp-val">${escHtml(String(r.intensitat || 0))}/100 (${escHtml(r.tendencia || 'estable')})</div></div>
       <div><div class="veu-camp-label">Subtext relacional</div><div class="veu-camp-val">${escHtml(r.nota || '')}</div></div>
     </div>
-  </div>`).join('
-');
+  </div>`).join('\n');
   document.getElementById('relacions-result').classList.remove('hidden');
 }
 
@@ -2660,6 +2753,7 @@ async function iniciarFaseRelacions() {
     ESTAT._matriuRelacional = generarMatriuRelacionalLocal();
     hideLoader('9-4');
     mostrarMatriuRelacional(ESTAT._matriuRelacional);
+    toast('Matriu relacional actualitzada amb memòria de capítols.');
   } catch (err) {
     hideLoader('9-4');
     toast('Error en matriu relacional: ' + err.message);
@@ -2904,7 +2998,7 @@ function mostrarEstructura(text) {
         const nivell = Math.min(10, Math.max(1, t.nivell || 1));
         const bar    = barres[Math.floor((nivell - 1) / 10 * barres.length)] || '▄';
         return `<span title="Cap.${t.capitol}: ${t.tipus || ''} (${nivell}/10)">${bar}</span>`;
-      }).join('');
+      }).join('\n');
       html += `<div class="world-bloc">
         <div class="world-bloc-titol">📈 Corba de Tensió</div>
         <div style="font-size:1.4rem;letter-spacing:2px;color:var(--accent2);margin:6px 0;">${visualCorba}</div>
@@ -2921,7 +3015,7 @@ function mostrarEstructura(text) {
             `<div style="padding:4px 0;border-bottom:1px solid var(--border);font-size:.85rem;">
               <span style="color:var(--accent2);">Cap.${p.plantada_capitol}→${p.resolucio_capitol}:</span> ${escHtml(p.element || '')}
             </div>`
-          ).join('')}
+          ).join('\n')}
         </div>
       </div>`;
     }
@@ -2940,7 +3034,7 @@ function mostrarEstructura(text) {
           <div class="world-bloc-titol">Capítol ${cap.numero}: ${escHtml(cap.titol || '')}</div>
           <div class="world-bloc-desc">${detall}</div>
         </div>`;
-      }).join('');
+      }).join('\n');
     }
 
     cos.innerHTML = html;
@@ -2960,7 +3054,7 @@ function mostrarEstructura(text) {
         </div>`;
       }
       return `<div class="world-bloc"><div class="world-bloc-desc">${escHtml(bloc.trim())}</div></div>`;
-    }).join('');
+    }).join('\n');
   }
 
   document.getElementById('estructura-wrap').classList.remove('hidden');
@@ -3105,7 +3199,7 @@ function renderLlistaCapitols() {
       <span class="capitol-titol">${escHtml(cap.titol || 'Capítol ' + (i + 1))}</span>
       ${btnCopia}
     </div>`;
-  }).join('');
+  }).join('\n');
 }
 
 function copiarCapitol(idx) {
@@ -3206,7 +3300,7 @@ function mostrarCapitol(idx, text) {
   document.getElementById('capitol-actual-titol').textContent = `Capítol ${idx + 1}: ${titol}`;
   const cos  = document.getElementById('capitol-actual-cos');
   const pars = text.split(/\n\n+/).filter(p => p.trim().length > 0);
-  const html = pars.map(p => `<p>${escHtml(p.trim())}</p>`).join('');
+  const html = pars.map(p => `<p>${escHtml(p.trim())}</p>`).join('\n');
 
   const wc = compteParaules(text);
   document.getElementById('capitol-actual-wordcount').textContent = `${wc.toLocaleString('ca')} paraules`;
@@ -3289,7 +3383,7 @@ function mostrarRevisioCapitol(revisat, idx, isLast) {
     ${problemes.length > 0 ? `<div style="font-size:.83rem;margin-bottom:10px;">
       <strong style="color:var(--text2);">Observacions:</strong>
       <ul style="margin:6px 0 0 16px;color:var(--text);line-height:1.7;">
-        ${problemes.map(p => `<li>${escHtml(String(p))}</li>`).join('')}
+        ${problemes.map(p => `<li>${escHtml(String(p))}</li>`).join('\n')}
       </ul></div>` : ''}
     ${instruccions && !ok ? `<div style="font-size:.8rem;color:var(--text2);margin-top:8px;padding:10px 14px;background:var(--surface);border-radius:6px;border-left:2px solid var(--warning);">
       <strong>Instruccions:</strong> ${escHtml(instruccions)}</div>` : ''}
@@ -3376,7 +3470,7 @@ function mostrarCheckpointIntermedi(checkpoint, capitolActual, totalCapitols) {
   const subtramesHtml = (checkpoint.estat_subtrames || []).map(st => {
     const color = st.estat === 'activa' ? 'var(--success)' : st.urgent ? '#f87171' : 'var(--warning)';
     return `<li style="color:${color};margin-bottom:4px;"><strong>${escHtml(st.nom)}</strong> (${escHtml(st.estat)}) — ${escHtml(st.nota || '')}</li>`;
-  }).join('');
+  }).join('\n');
 
   const absentsHtml = (checkpoint.personatges_absents || []).length > 0
     ? `<p style="margin:8px 0 4px;font-size:.82rem;color:var(--text2);"><strong>Personatges a recuperar:</strong> ${escHtml((checkpoint.personatges_absents || []).join(', '))}</p>`
@@ -3384,7 +3478,7 @@ function mostrarCheckpointIntermedi(checkpoint, capitolActual, totalCapitols) {
 
   const prefUrgentsHtml = (checkpoint.prefiguracions_urgents || []).map(p =>
     `<li style="font-size:.82rem;color:var(--text2);">Cap.${p.capitol_resolucio}: <strong>${escHtml(p.element || '')}</strong> — ${escHtml(p.nota || '')}</li>`
-  ).join('');
+  ).join('\n');
 
   const derivaHtml = checkpoint.deriva_detectada
     ? `<p style="margin:8px 0 4px;font-size:.82rem;color:#f87171;"><strong>Deriva detectada:</strong> ${escHtml(checkpoint.deriva_detectada)}</p>`
@@ -3546,23 +3640,66 @@ async function actualitzarLlibreRegistreBackground(textCapitol, idx) {
 // ═══════════════════════════════════════════════════════════
 //  FASE 12: Control d'Arcs (Opus) + Epíleg (Sonnet)
 // ═══════════════════════════════════════════════════════════
+function extreureEvidenciesTermometre(capitols = []) {
+  const senyals = [
+    { regex: /plora|tremola|confessa|culpa|vergonya|por/i, tipus: 'vulnerabilitat' },
+    { regex: /silenci|evita|amaga|insinua|contradiu/i, tipus: 'subtext' },
+    { regex: /decideix|admet|renuncia|accepta|cedeix/i, tipus: 'canvi_intern' }
+  ];
+  const evid = [];
+  capitols.forEach((cap, idx) => {
+    const txt = String(cap || '').replace(/\s+/g, ' ').trim();
+    if (!txt) return;
+    const tall = txt.substring(0, 700);
+    senyals.forEach(s => {
+      const m = tall.match(s.regex);
+      if (m && evid.length < 6) {
+        evid.push({
+          capitol: idx + 1,
+          tipus: s.tipus,
+          fragment: tall.substring(Math.max(0, m.index - 45), Math.min(tall.length, (m.index || 0) + 90)).trim()
+        });
+      }
+    });
+  });
+  return evid;
+}
+
+function generarPlaReescripturaPsicologica(termometre) {
+  const pla = [];
+  if ((termometre.total || 0) < 65) {
+    pla.push('Afegir una escena de vulnerabilitat explícita per al protagonista en el proper capítol.');
+  }
+  if ((termometre.subtext || 0) < 45) {
+    pla.push('Reescriure 1-2 diàlegs clau substituint exposició directa per subtext i contradicció.');
+  }
+  if ((termometre.canviIntern || 0) < 45) {
+    pla.push('Forçar una decisió amb cost intern irreversible abans del clímax.');
+  }
+  if ((ESTAT._arcTransitionWarnings || []).length > 0) {
+    pla.push('Revisar salts d\'arc intern no plausibles detectats i inserir transició emocional intermèdia.');
+  }
+  ESTAT._plaReescripturaPsicologica = pla;
+  return pla;
+}
+
 function calcularTermometreVeritatEmocional() {
   const caps = ESTAT._capitols_generats || [];
-  const text = caps.join('
-
-').toLowerCase();
+  const text = caps.join('\n').toLowerCase();
   const perfilCount = Object.values(ESTAT._perfilsPersonatges || {}).filter(p => p && p.ferida_nuclear && p.mascara_social).length;
   const base = Math.min(40, perfilCount * 7);
   const subtext = Math.min(20, (text.match(/silenci|evita|amaga|insinua|contradiu/g) || []).length);
   const vulnerabilitat = Math.min(20, (text.match(/plora|tremola|confessa|culpa|vergonya|por/g) || []).length);
   const canviIntern = Math.min(20, (text.match(/decideix|admet|renuncia|accepta|cedeix/g) || []).length);
   const total = Math.min(100, base + subtext + vulnerabilitat + canviIntern);
+  const evidencies = extreureEvidenciesTermometre(caps);
   return {
     total,
     autenticitat: Math.min(100, base + vulnerabilitat + 20),
     vulnerabilitat: Math.min(100, vulnerabilitat * 5),
     subtext: Math.min(100, subtext * 5),
-    canviIntern: Math.min(100, canviIntern * 5)
+    canviIntern: Math.min(100, canviIntern * 5),
+    evidencies
   };
 }
 
@@ -3570,6 +3707,15 @@ function renderTermometreVeritatEmocional() {
   const t = calcularTermometreVeritatEmocional();
   const el = document.getElementById('termometre-veritat');
   if (!el) return;
+  const pla = generarPlaReescripturaPsicologica(t);
+  const evidHtml = (t.evidencies || []).length > 0
+    ? `<ul style="margin:8px 0 0 16px;padding:0;">${t.evidencies.map(e => `<li style="margin-bottom:6px;"><strong>Cap. ${e.capitol}</strong> · ${escHtml(e.tipus)} — <span style="color:var(--text2)">${escHtml(e.fragment)}...</span></li>`).join('\n')}</ul>`
+    : '<p style="margin:8px 0 0;color:var(--text2);">No s'han detectat evidències textuals clares. Recomanat reforçar escenes emocionals.</p>';
+  const plaHtml = pla.length > 0
+    ? `<ul style="margin:8px 0 0 16px;padding:0;">${pla.map(p => `<li style="margin-bottom:6px;">${escHtml(p)}</li>`).join('\n')}</ul>`
+    : '<p style="margin:8px 0 0;color:var(--success);">Cap pla de reescriptura necessari: veritat emocional en bon nivell.</p>';
+  const warns = ESTAT._arcTransitionWarnings || [];
+
   el.innerHTML = `<div class="worldbuilding-result">
     <div class="world-bloc">
       <div class="world-bloc-titol">🧪 Termòmetre de veritat emocional</div>
@@ -3578,8 +3724,18 @@ function renderTermometreVeritatEmocional() {
         Autenticitat emocional: ${t.autenticitat}/100 · Vulnerabilitat: ${t.vulnerabilitat}/100 · Subtext: ${t.subtext}/100 · Canvi intern: ${t.canviIntern}/100
       </div>
     </div>
+    <div class="world-bloc">
+      <div class="world-bloc-titol">🔍 Evidència traçable</div>
+      <div class="world-bloc-desc">${evidHtml}</div>
+    </div>
+    <div class="world-bloc">
+      <div class="world-bloc-titol">🛠️ Pla de reescriptura psicològica</div>
+      <div class="world-bloc-desc">${plaHtml}</div>
+    </div>
+    ${warns.length > 0 ? `<div class="world-bloc"><div class="world-bloc-titol">⚠️ Transicions d'arc bloquejades</div><div class="world-bloc-desc">${escHtml(String(warns.length))} salts no plausibles s'han mantingut en l'etapa anterior per preservar coherència.</div></div>` : ''}
   </div>`;
 }
+
 
 async function iniciarFase12() {
   ESTAT.fase = 12;
@@ -3610,7 +3766,7 @@ async function iniciarFase12() {
         </div>`;
       }
       return `<div class="world-bloc"><div class="world-bloc-desc">${escHtml(bloc.trim())}</div></div>`;
-    }).join('') + `</div>`;
+    }).join('\n') + `</div>`;
 
     // Si Opus menciona epíleg, mostra el botó
     if (/epíleg|epilog/i.test(res.response)) {
@@ -3638,7 +3794,7 @@ async function escriureEpileg() {
 
     const epilegText = document.getElementById('epileg-text');
     const pars = epilegNet.split(/\n\n+/).filter(p => p.trim().length > 0);
-    const html = pars.map(p => `<p>${escHtml(p.trim())}</p>`).join('');
+    const html = pars.map(p => `<p>${escHtml(p.trim())}</p>`).join('\n');
     document.getElementById('epileg-cos').classList.remove('hidden');
     toast('Epíleg escrit per Sonnet.');
 
@@ -3673,15 +3829,15 @@ function obrirLlibreRegistre() {
           : pers.map(p => `<div style="padding:8px 14px;background:var(--surface2);border-radius:8px;margin-bottom:6px;font-size:.86rem;">
               <strong>${escHtml(p.nom || '')}</strong>
               <span style="color:var(--text2);"> — ${escHtml(p.ubicacio || '')} · ${escHtml(p.estat_actual || '')}</span>
-            </div>`).join('')}
+            </div>`).join('\n')}
       </div>
       ${filsOberts.length > 0 ? `<div style="margin-bottom:18px;">
         <div class="world-bloc-titol" style="margin-bottom:8px;">Fils oberts</div>
-        ${filsOberts.map(f => `<div style="padding:5px 12px;border-left:2px solid var(--warning);margin-bottom:5px;font-size:.84rem;">${escHtml(f)}</div>`).join('')}
+        ${filsOberts.map(f => `<div style="padding:5px 12px;border-left:2px solid var(--warning);margin-bottom:5px;font-size:.84rem;">${escHtml(f)}</div>`).join('\n')}
       </div>` : ''}
       ${filsTancat.length > 0 ? `<div style="margin-bottom:18px;">
         <div class="world-bloc-titol" style="margin-bottom:8px;">Fils tancats</div>
-        ${filsTancat.map(f => `<div style="padding:5px 12px;border-left:2px solid var(--success);margin-bottom:5px;font-size:.84rem;">${escHtml(f)}</div>`).join('')}
+        ${filsTancat.map(f => `<div style="padding:5px 12px;border-left:2px solid var(--success);margin-bottom:5px;font-size:.84rem;">${escHtml(f)}</div>`).join('\n')}
       </div>` : ''}
       <div>
         <div class="world-bloc-titol" style="margin-bottom:10px;">Resums per capítol</div>
@@ -3689,7 +3845,7 @@ function obrirLlibreRegistre() {
           <div style="padding:10px 14px;background:var(--surface2);border-radius:8px;margin-bottom:8px;">
             <div style="font-weight:600;font-size:.82rem;color:var(--accent2);margin-bottom:4px;">Capítol ${i + 1}</div>
             <div style="font-size:.84rem;color:var(--text);line-height:1.6;">${escHtml(c.resum_capitol || '(sense resum)')}</div>
-          </div>` : '').join('')}
+          </div>` : '').join('\n')}
       </div>`;
   }
   document.getElementById('modal-registre').classList.remove('hidden');
@@ -3757,13 +3913,13 @@ function mostrarResultatRevisioGlobal(dades) {
           return `<div style="padding:7px 12px;border-left:2px solid ${grav};margin-bottom:5px;font-size:.83rem;">
             <strong style="color:var(--text);">Cap. ${p.capitol || '?'} [${escHtml(p.tipus || '')}]:</strong> ${escHtml(p.descripcio || '')}
           </div>`;
-        }).join('')}
+        }).join('\n')}
       </div>` : '';
 
   const prefsHtml = prefsPendents.length > 0
     ? `<div style="margin-top:10px;">
         <div style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);margin-bottom:6px;">Prefiguracions pendents:</div>
-        ${prefsPendents.map(p => `<div style="padding:5px 12px;border-left:2px solid var(--warning);margin-bottom:4px;font-size:.82rem;">${escHtml(p)}</div>`).join('')}
+        ${prefsPendents.map(p => `<div style="padding:5px 12px;border-left:2px solid var(--warning);margin-bottom:4px;font-size:.82rem;">${escHtml(p)}</div>`).join('\n')}
       </div>` : '';
 
   resultEl.innerHTML = `
@@ -3791,7 +3947,7 @@ function mostrarResultatRevisioGlobal(dades) {
         return `<button class="btn btn-secondary" onclick="reescriureCapitolGlobal(${idx}, ${escHtml(JSON.stringify(instruccions))})">
           ✏️ Reescriure Cap. ${numCap}
         </button>`;
-      }).join('')}`;
+      }).join('\n')}`;
   }
 
   // --- INICI BOTÓ META-ENGINYERIA ---
@@ -3897,13 +4053,13 @@ function obrirBiblia() {
 
   let html = '';
   if (b.regles_mon && b.regles_mon.length > 0) {
-    html += `<h4 style="color:var(--accent2);margin:14px 0 8px">🌍 Regles del Món</h4><ul style="padding-left:18px">${b.regles_mon.map(r => `<li style="margin-bottom:4px">${r}</li>`).join('')}</ul>`;
+    html += `<h4 style="color:var(--accent2);margin:14px 0 8px">🌍 Regles del Món</h4><ul style="padding-left:18px">${b.regles_mon.map(r => `<li style="margin-bottom:4px">${r}</li>`).join('\n')}</ul>`;
   }
   if (b.llocs_importants && b.llocs_importants.length > 0) {
-    html += `<h4 style="color:var(--accent2);margin:14px 0 8px">📍 Llocs Importants</h4><ul style="padding-left:18px">${b.llocs_importants.map(l => `<li style="margin-bottom:4px"><strong>${l.nom}</strong>: ${l.descripcio}</li>`).join('')}</ul>`;
+    html += `<h4 style="color:var(--accent2);margin:14px 0 8px">📍 Llocs Importants</h4><ul style="padding-left:18px">${b.llocs_importants.map(l => `<li style="margin-bottom:4px"><strong>${l.nom}</strong>: ${l.descripcio}</li>`).join('\n')}</ul>`;
   }
   if (b.objectes_clau && b.objectes_clau.length > 0) {
-    html += `<h4 style="color:var(--accent2);margin:14px 0 8px">🔑 Objectes Clau</h4><ul style="padding-left:18px">${b.objectes_clau.map(o => `<li style="margin-bottom:4px"><strong>${o.nom}</strong>: ${o.significat}</li>`).join('')}</ul>`;
+    html += `<h4 style="color:var(--accent2);margin:14px 0 8px">🔑 Objectes Clau</h4><ul style="padding-left:18px">${b.objectes_clau.map(o => `<li style="margin-bottom:4px"><strong>${o.nom}</strong>: ${o.significat}</li>`).join('\n')}</ul>`;
   }
   if (b.fitxes_personatges && b.fitxes_personatges.length > 0) {
     html += `<h4 style="color:var(--accent2);margin:14px 0 8px">👤 Personatges</h4>`;
@@ -3917,7 +4073,7 @@ function obrirBiblia() {
     });
   }
   if (b.fets_canonics && b.fets_canonics.length > 0) {
-    html += `<h4 style="color:var(--accent2);margin:14px 0 8px">📜 Fets Canònics</h4><ul style="padding-left:18px">${b.fets_canonics.slice(-10).map(f => `<li style="margin-bottom:4px">${f}</li>`).join('')}</ul>`;
+    html += `<h4 style="color:var(--accent2);margin:14px 0 8px">📜 Fets Canònics</h4><ul style="padding-left:18px">${b.fets_canonics.slice(-10).map(f => `<li style="margin-bottom:4px">${f}</li>`).join('\n')}</ul>`;
   }
   if (!html) {
     html = '<p style="color:var(--text2);text-align:center;padding:24px">La bíblia narrativa encara no s\'ha inicialitzat.</p>';
@@ -4065,11 +4221,11 @@ function mostrarCheckpoint(dades, idx) {
     </div>
     ${dades.problemes_detectats && dades.problemes_detectats.length > 0
       ? `<div style="font-weight:600;color:#f87171;margin-bottom:6px">⚠️ Problemes detectats</div>
-         <ul style="padding-left:18px;font-size:.88rem;color:var(--text2)">${dades.problemes_detectats.map(p => `<li style="margin-bottom:4px">${p}</li>`).join('')}</ul>`
+         <ul style="padding-left:18px;font-size:.88rem;color:var(--text2)">${dades.problemes_detectats.map(p => `<li style="margin-bottom:4px">${p}</li>`).join('\n')}</ul>`
       : '<div style="color:var(--success);font-size:.9rem">✓ Coherència correcta fins ara</div>'}
     ${dades.recomanacions && dades.recomanacions.length > 0
       ? `<div style="font-weight:600;color:var(--accent2);margin:10px 0 6px">💡 Recomanacions per als pròxims capítols</div>
-         <ul style="padding-left:18px;font-size:.88rem">${dades.recomanacions.map(r => `<li style="margin-bottom:4px">${r}</li>`).join('')}</ul>`
+         <ul style="padding-left:18px;font-size:.88rem">${dades.recomanacions.map(r => `<li style="margin-bottom:4px">${r}</li>`).join('\n')}</ul>`
       : ''}
   `;
   container.appendChild(panel);
@@ -8325,7 +8481,7 @@ function detectarRepeticions() {
     const paraules = text.toLowerCase().replace(/[.,;:!?«»""''()\[\]]/g, ' ').split(/\s+/).filter(p => p.length > 2);
     const ngrams = {};
     for (let i = 0; i <= paraules.length - n; i++) {
-      const ng = paraules.slice(i, i + n).join(' ');
+      const ng = paraules.slice(i, i + n).join('\n');
       ngrams[ng] = (ngrams[ng] || 0) + 1;
     }
     return ngrams;
@@ -8376,7 +8532,7 @@ function detectarRepeticionsTematiques() {
     const personatgesClau = (r.personatges_involucrats || []).sort().join('+');
     const tema = r.descripcio.toLowerCase()
       .replace(/[^a-zA-ZàèéíòóúüçÀÈÉÍÒÓÚÜÇ\s]/g, '')
-      .split(/\s+/).filter(p => p.length > 3).slice(0, 5).join(' ');
+      .split(/\s+/).filter(p => p.length > 3).slice(0, 5).join('\n');
     const clau = `${personatgesClau}::${tema}`;
     if (!grups[clau]) grups[clau] = [];
     grups[clau].push(r);
@@ -8555,7 +8711,7 @@ async function processarVeuSemilla() {
           ? manual.trets_distinctius
           : String(manual.trets_distinctius).split(/[,·\n]+/).map(t => t.trim()).filter(Boolean);
         if (trets.length > 0) {
-          tretsHtml = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">${trets.map(t => `<span style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:2px 10px;font-size:.82rem;color:var(--text2)">${escHtml(t)}</span>`).join('')}</div>`;
+          tretsHtml = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">${trets.map(t => `<span style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:2px 10px;font-size:.82rem;color:var(--text2)">${escHtml(t)}</span>`).join('\n')}</div>`;
         }
       }
 
@@ -8570,7 +8726,7 @@ async function processarVeuSemilla() {
       const extresHtml = Object.keys(manual)
         .filter(k => !CAMPS_CONEGUTS.includes(k) && manual[k] != null)
         .map(k => `<div style="margin-bottom:8px"><span style="font-size:.78rem;font-weight:600;color:var(--accent2);text-transform:uppercase;letter-spacing:.04em">${escHtml(k)}</span><div style="font-size:.88rem;color:var(--text);margin-top:2px">${escHtml(String(manual[k]))}</div></div>`)
-        .join('');
+        .join('\n');
 
       resultDiv.style.color = '';
       resultDiv.innerHTML = `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:8px"><div style="font-weight:600;color:var(--success);margin-bottom:10px">✅ Manual d'estil generat</div>${tretsHtml}${campsHtml}${extresHtml}</div>`;
@@ -8626,7 +8782,7 @@ function analitzarVarianciaVeu(text) {
   const ratioConsecutives = longituds.length > 1 ? consecutivesSimilars / (longituds.length - 1) : 0;
 
   // Starts repetitius (primers 2 mots)
-  const starts = frases.map(f => f.split(/\s+/).slice(0, 2).join(' ').toLowerCase());
+  const starts = frases.map(f => f.split(/\s+/).slice(0, 2).join('\n').toLowerCase());
   const startCounts = {};
   starts.forEach(s => { startCounts[s] = (startCounts[s] || 0) + 1; });
   const startsRepetits = Object.values(startCounts).filter(c => c >= 2).reduce((a, b) => a + b, 0);
@@ -8980,7 +9136,7 @@ function actualitzarEstimacio() {
   const panellAvisos = document.getElementById('panellAvisos');
   if (panellAvisos) {
     panellAvisos.innerHTML = est.avisos.length > 0
-      ? est.avisos.map(a => `<div style="padding:4px 0;border-bottom:1px solid #eee;">${a}</div>`).join('')
+      ? est.avisos.map(a => `<div style="padding:4px 0;border-bottom:1px solid #eee;">${a}</div>`).join('\n')
       : '';
   }
 
@@ -9073,7 +9229,7 @@ function carregarCapitolManuscrit(idx) {
   const text = ESTAT._capitols_generats[idx] || '';
 
   // Converteix els salts de línia a paràgrafs per a edició correcta
-  editor.innerHTML = text.split(/\n\n+/).filter(p => p.trim().length > 0).map(p => `<p>${escHtml(p.trim())}</p>`).join('');
+  editor.innerHTML = text.split(/\n\n+/).filter(p => p.trim().length > 0).map(p => `<p>${escHtml(p.trim())}</p>`).join('\n');
 
   // Actualitza sidebar UI
   const sidebar = document.getElementById('manuscrit-sidebar');
