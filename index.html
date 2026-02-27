@@ -1260,6 +1260,10 @@ function reprendreProjecteLocal() {
     if (ESTAT._openaiApiKey) document.getElementById('openaiApiKey').value = ESTAT._openaiApiKey;
     if (ESTAT._geminiApiKey) document.getElementById('geminiApiKey').value = ESTAT._geminiApiKey;
 
+    if (typeof poblarSelectorsModels === 'function') poblarSelectorsModels();
+    if (typeof sincronitzarCampsConfigModels === 'function') sincronitzarCampsConfigModels();
+    if (typeof guardarClausAPI === 'function') guardarClausAPI();
+
     restaurarInterficieDesDeEstat();
     toast('Projecte recuperat amb èxit.');
   } catch (e) {
@@ -1606,6 +1610,7 @@ function setModelPerRol(rol, modelId) {
     case 'generacio':  ESTAT._modelGeneracio  = modelId; break;
     case 'arquitecte': ESTAT._modelArquitecte = modelId; break;
   }
+  sincronitzarCampsConfigModels();
   actualitzarEstimacio();
 }
 
@@ -1629,7 +1634,15 @@ function aplicarPreset(preset) {
   if (selDraft) selDraft.value = p.draft;
   if (selGen)   selGen.value   = p.generacio;
   if (selArq)   selArq.value   = p.arquitecte;
+  sincronitzarCampsConfigModels();
   actualitzarEstimacio();
+}
+
+function sincronitzarCampsConfigModels() {
+  const genInput = document.getElementById('config-model-generacio');
+  const arqInput = document.getElementById('config-model-arquitectura');
+  if (genInput && ESTAT._modelGeneracio) genInput.value = ESTAT._modelGeneracio;
+  if (arqInput && ESTAT._modelArquitecte) arqInput.value = ESTAT._modelArquitecte;
 }
 
 // Alias backward compatible
@@ -1650,17 +1663,30 @@ function actualitzarConfigProvider() {
   if (provGenSel) provGenSel.value = provider;
   if (provArqSel) provArqSel.value = provider;
 
-  // Actualitzem els valors per defecte recomanats segons el proveïdor
-  if (provider === 'anthropic') {
-    genInput.value = 'claude-sonnet-4-6';
-    arqInput.value = 'claude-opus-4-6';
-  } else if (provider === 'gemini') {
-    genInput.value = 'gemini-3-flash-preview';
-    arqInput.value = 'gemini-3-flash-preview';
-  } else if (provider === 'openai') {
-    genInput.value = 'gpt-4o-mini';
-    arqInput.value = 'gpt-4o';
-  }
+  const defaults = {
+    anthropic: { draft: 'claude-haiku-4-5-20251001', generacio: 'claude-sonnet-4-6', arquitectura: 'claude-opus-4-6' },
+    gemini:    { draft: 'gemini-3-flash-preview',    generacio: 'gemini-3-flash-preview', arquitectura: 'gemini-3-flash-preview' },
+    openai:    { draft: 'gpt-5.2',                   generacio: 'gpt-4o-mini',            arquitectura: 'gpt-4o' }
+  };
+  const p = defaults[provider] || defaults.anthropic;
+
+  // Quan canvia el proveïdor principal, apliquem models coherents amb aquest proveïdor.
+  if (genInput) genInput.value = p.generacio;
+  if (arqInput) arqInput.value = p.arquitectura;
+
+  ESTAT._modelDraft = p.draft;
+  ESTAT._modelGeneracio = p.generacio;
+  ESTAT._modelArquitecte = p.arquitectura;
+
+  const selDraft = document.getElementById('selectModelDraft');
+  const selGen = document.getElementById('selectModelGen');
+  const selArq = document.getElementById('selectModelArq');
+  if (selDraft) selDraft.value = p.draft;
+  if (selGen) selGen.value = p.generacio;
+  if (selArq) selArq.value = p.arquitectura;
+
+  sincronitzarCampsConfigModels();
+  actualitzarEstimacio();
 }
 
 // Manté compatibilitat si algú cridava l'antiga funció
@@ -1695,17 +1721,28 @@ function guardarIComencar() {
     if (geminiKey)    ESTAT._geminiApiKey    = geminiKey;
     if (openaiKey)    ESTAT._openaiApiKey    = openaiKey;
 
-    const modelGeneracio    = document.getElementById('config-model-generacio').value.trim();
-    const modelArquitectura = document.getElementById('config-model-arquitectura').value.trim();
+    const modelGeneracioInput    = document.getElementById('config-model-generacio').value.trim();
+    const modelArquitecturaInput = document.getElementById('config-model-arquitectura').value.trim();
     const fluxAutomatic     = document.getElementById('config-flux-automatic').checked;
+
+    // Prioritzem el que l'usuari veu al panell en aquest moment (inputs/selectors),
+    // per evitar arrossegar valors antics d'ESTAT d'un proveïdor diferent.
+    const selectDraft = document.getElementById('selectModelDraft');
+    const selectGen = document.getElementById('selectModelGen');
+    const selectArq = document.getElementById('selectModelArq');
+
+    const modelDraft = (selectDraft && selectDraft.value.trim()) || ESTAT._modelDraft || modelGeneracioInput;
+    const modelGeneracio = modelGeneracioInput || (selectGen && selectGen.value.trim()) || ESTAT._modelGeneracio;
+    const modelArquitectura = modelArquitecturaInput || (selectArq && selectArq.value.trim()) || ESTAT._modelArquitecte;
 
     if (!modelGeneracio)    { toast('Introdueix el model de generació.'); return; }
     if (!modelArquitectura) { toast("Introdueix el model d'arquitectura."); return; }
 
-    // AQUESTA ÉS LA CLAU: Sobreescriure l'ESTAT intern perquè oblidi Claude
+    // Sobreescriure l'estat amb els valors finals del panell de configuració.
     ESTAT._modelGeneracio  = modelGeneracio;
     ESTAT._modelArquitecte = modelArquitectura;
-    ESTAT._modelDraft      = modelGeneracio;
+    ESTAT._modelDraft      = modelDraft;
+    sincronitzarCampsConfigModels();
 
     const genere = document.getElementById('config-genere') ? document.getElementById('config-genere').value : '';
     const autor = document.getElementById('config-autor') ? document.getElementById('config-autor').value : '';
@@ -1719,8 +1756,13 @@ function guardarIComencar() {
       apiKey,
       modelGeneracio,
       modelArquitectura,
-      modelDraft: modelGeneracio,
+      modelDraft,
       modelArquitecte: modelArquitectura,
+      models: {
+        draft: modelDraft,
+        generacio: modelGeneracio,
+        arquitecte: modelArquitectura
+      },
       fluxAutomatic
     };
 
@@ -2524,7 +2566,7 @@ async function iniciarFasePsicologia() {
     mostrarPerfilsPsicologics(dades);
   } catch (err) {
     hideLoader('9-2');
-    toast('Error en l'anàlisi psicològica: ' + err.message);
+    toast("Error en l'anàlisi psicològica: " + err.message);
   }
 }
 
@@ -3228,7 +3270,7 @@ function refrescarPlaPsicologicPerSeguentCapitol() {
     const t = calcularTermometreVeritatEmocional();
     return generarPlaReescripturaPsicologica(t);
   } catch (err) {
-    console.warn('Pla psicològic: no s'ha pogut refrescar:', err.message);
+    console.warn("Pla psicològic: no s'ha pogut refrescar:", err.message);
     return ESTAT._plaReescripturaPsicologica || [];
   }
 }
@@ -3734,7 +3776,7 @@ function renderTermometreVeritatEmocional() {
   const pla = generarPlaReescripturaPsicologica(t);
   const evidHtml = (t.evidencies || []).length > 0
     ? `<ul style="margin:8px 0 0 16px;padding:0;">${t.evidencies.map(e => `<li style="margin-bottom:6px;"><strong>Cap. ${e.capitol}</strong> · ${escHtml(e.tipus)} — <span style="color:var(--text2)">${escHtml(e.fragment)}...</span></li>`).join('\n')}</ul>`
-    : '<p style="margin:8px 0 0;color:var(--text2);">No s'han detectat evidències textuals clares. Recomanat reforçar escenes emocionals.</p>';
+    : "<p style=\"margin:8px 0 0;color:var(--text2);\">No s'han detectat evidències textuals clares. Recomanat reforçar escenes emocionals.</p>";
   const plaHtml = pla.length > 0
     ? `<ul style="margin:8px 0 0 16px;padding:0;">${pla.map(p => `<li style="margin-bottom:6px;">${escHtml(p)}</li>`).join('\n')}</ul>`
     : '<p style="margin:8px 0 0;color:var(--success);">Cap pla de reescriptura necessari: veritat emocional en bon nivell.</p>';
@@ -4413,28 +4455,56 @@ function getMaxTokens(safeConfig, modelId) {
 // tag: 'generacio' | 'arquitecte' | 'arquitectura'
 // config._esDraft: true → usa model Draft (Haiku o equivalent)
 // config.model: override explícit del model (màxima prioritat)
+function normalizeProviderId(provider) {
+  const p = String(provider || '').toLowerCase().trim();
+  if (p === 'google-gemini' || p === 'google') return 'gemini';
+  return p;
+}
+
 function getProviderPerRol(config, tag) {
   const cfg = config || {};
   const isArq = (tag === 'arquitecte' || tag === 'arquitectura');
   const roleProvider = isArq
     ? (cfg.providerArquitectura || cfg.provider_arq)
     : (cfg.providerGeneracio || cfg.provider_gen || cfg.providerDraft);
-  return (roleProvider || cfg.provider || 'anthropic');
+  return normalizeProviderId(roleProvider || cfg.provider || 'anthropic');
+}
+
+function getModelIdPerRol(config, tag) {
+  const cfg = config || {};
+  const isArq = (tag === 'arquitecte' || tag === 'arquitectura');
+
+  if (isArq) {
+    return cfg.modelArquitectura || cfg.modelArquitecte || cfg.model;
+  }
+
+  if (cfg._esDraft) {
+    return cfg.modelDraft || cfg.modelHaiku || cfg.model;
+  }
+
+  return cfg.modelGeneracio || cfg.model;
+}
+
+function getProviderAndModelPerRol(config, tag) {
+  const modelId = getModelIdPerRol(config, tag);
+  let proveidor = getProviderPerRol(config, tag);
+  const reg = MODEL_REGISTRY[modelId];
+  const providerDelModel = normalizeProviderId(reg && reg.proveidor);
+
+  // Si model i provider no coincideixen, prioritzem el proveïdor real del model.
+  if (providerDelModel && providerDelModel !== proveidor) {
+    console.warn(`[LLM Router] Provider ajustat per coherència model/proveïdor: ${proveidor} -> ${providerDelModel} (model: ${modelId})`);
+    proveidor = providerDelModel;
+  }
+
+  return { modelId, proveidor };
 }
 
 async function callLLMMulti(messages, systemPrompt, config, tag) {
   const safeConfig = config || {};
 
   // Assignem el model segons si la tasca és d'arquitectura o de generació
-  let modelId;
-  if (tag === 'arquitecte' || tag === 'arquitectura') {
-    modelId = safeConfig.modelArquitectura || safeConfig.model;
-  } else {
-    // Si no és arquitectura, o és draft/generació, usem el de generació
-    modelId = safeConfig.modelGeneracio || safeConfig.model;
-  }
-
-  const proveidor = getProviderPerRol(safeConfig, tag);
+  const { modelId, proveidor } = getProviderAndModelPerRol(safeConfig, tag);
 
   // Obtenim la clau API corresponent
   let apiKey;
@@ -4457,14 +4527,7 @@ async function callLLMMulti(messages, systemPrompt, config, tag) {
 async function callLLMWithContinuation(messages, systemPrompt, config, tag, maxCont = 3) {
   const safeConfig = config || {};
 
-  let modelId;
-  if (tag === 'arquitecte' || tag === 'arquitectura') {
-    modelId = safeConfig.modelArquitectura || safeConfig.model;
-  } else {
-    modelId = safeConfig.modelGeneracio || safeConfig.model;
-  }
-
-  const proveidor = getProviderPerRol(safeConfig, tag);
+  const { modelId, proveidor } = getProviderAndModelPerRol(safeConfig, tag);
 
   let apiKey;
   if (proveidor === 'anthropic') apiKey = ESTAT._anthropicApiKey || safeConfig.apiKey;
@@ -4520,14 +4583,7 @@ function textSemblaIncomplet(text) {
 async function callLLMOneShotPlusCompletion(messages, systemPrompt, config, tag) {
   const safeConfig = config || {};
 
-  let modelId;
-  if (tag === 'arquitecte' || tag === 'arquitectura') {
-    modelId = safeConfig.modelArquitectura || safeConfig.model;
-  } else {
-    modelId = safeConfig.modelGeneracio || safeConfig.model;
-  }
-
-  const proveidor = getProviderPerRol(safeConfig, tag);
+  const { modelId, proveidor } = getProviderAndModelPerRol(safeConfig, tag);
   let apiKey;
   if (proveidor === 'anthropic') apiKey = ESTAT._anthropicApiKey || safeConfig.apiKey;
   if (proveidor === 'google' || proveidor === 'gemini') apiKey = ESTAT._geminiApiKey || safeConfig.apiKey;
@@ -4592,14 +4648,7 @@ No repeteixis res del que ja has escrit.` }
 async function callLLMOneShotConditionalCompletion(messages, systemPrompt, config, tag) {
   const safeConfig = config || {};
 
-  let modelId;
-  if (tag === 'arquitecte' || tag === 'arquitectura') {
-    modelId = safeConfig.modelArquitectura || safeConfig.model;
-  } else {
-    modelId = safeConfig.modelGeneracio || safeConfig.model;
-  }
-
-  const proveidor = getProviderPerRol(safeConfig, tag);
+  const { modelId, proveidor } = getProviderAndModelPerRol(safeConfig, tag);
   let apiKey;
   if (proveidor === 'anthropic') apiKey = ESTAT._anthropicApiKey || safeConfig.apiKey;
   if (proveidor === 'google' || proveidor === 'gemini') apiKey = ESTAT._geminiApiKey || safeConfig.apiKey;
