@@ -687,6 +687,10 @@
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="9.2">Psicologia</div>
     <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="9.3">Ferida/Arc</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="9.4">Relacions</div>
+    <div class="step-arrow">›</div>
     <div class="step-pill" data-step="9.5">Trames</div>
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="10">Estructura</div>
@@ -931,6 +935,44 @@
     <div id="psicologia-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
       <button class="btn btn-secondary" onclick="hideCard('fase-9-2');showCard('fase-9');">← Tornar a Veus</button>
+      <button class="btn btn-primary" onclick="iniciarFaseFeridaArc()">🩹 Definir Ferida + Arc</button>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- FASE 9.3: Ferida nuclear + màscara + arc intern -->
+<div class="card hidden" id="fase-9-3">
+  <h2><span class="icon">🩹</span> Ferida Nuclear i Arc Intern</h2>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Consolidem la psicologia profunda: ferida nuclear, màscara social i etapa de l'arc intern (5 etapes).</p>
+  <div class="loader-wrap" id="loader-9-3">
+    <div class="spinner"></div>
+    <span>Definint ferides i arcs interns...</span>
+  </div>
+
+  <div id="ferida-arc-result" class="hidden">
+    <div id="ferida-arc-cos" class="veu-result"></div>
+    <div class="btn-row" style="margin-top:24px;">
+      <button class="btn btn-secondary" onclick="hideCard('fase-9-3');showCard('fase-9-2');">← Tornar a Psicologia</button>
+      <button class="btn btn-primary" onclick="iniciarFaseRelacions()">🧷 Matriu relacional</button>
+    </div>
+  </div>
+</div>
+
+<!-- FASE 9.4: Matriu relacional emocional -->
+<div class="card hidden" id="fase-9-4">
+  <h2><span class="icon">🧷</span> Matriu Relacional Emocional</h2>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Definim la tensió emocional entre parelles de personatges per reforçar conflicte i subtext.</p>
+  <div class="loader-wrap" id="loader-9-4">
+    <div class="spinner"></div>
+    <span>Calculant dinàmiques de relació...</span>
+  </div>
+
+  <div id="relacions-result" class="hidden">
+    <div id="relacions-cos" class="veu-result"></div>
+    <div class="btn-row" style="margin-top:24px;">
+      <button class="btn btn-secondary" onclick="hideCard('fase-9-4');showCard('fase-9-3');">← Tornar a Ferida/Arc</button>
       <button class="btn btn-primary" onclick="iniciarFaseTrames()">🕸️ Dissenyar Trames Opus</button>
     </div>
   </div>
@@ -1048,6 +1090,7 @@
   </div>
   <div id="arcs-result" class="hidden">
     <div id="arcs-cos"></div>
+    <div id="termometre-veritat" style="margin-top:16px;"></div>
     <div class="btn-row" style="margin-top:20px;">
       <button class="btn btn-primary hidden" id="btn-epileg" onclick="escriureEpileg()">✨ Escriure Epíleg Resolutiu <span class="badge-model badge-sonnet">Sonnet</span></button>
     </div>
@@ -1236,6 +1279,10 @@ function restaurarInterficieDesDeEstat() {
     if (c.id !== 'card-config') c.classList.add('hidden');
   });
   if (Math.abs(fase - 9.2) < 0.001) showCard('fase-9-2');
+  else if (Math.abs(fase - 9.3) < 0.001) showCard('fase-9-3');
+  else if (Math.abs(fase - 9.4) < 0.001) showCard('fase-9-4');
+  else if (Math.abs(fase - 9.5) < 0.001) showCard('fase-9-5');
+  else if (Math.abs(fase - 10.5) < 0.001) showCard('fase-10-5');
   else showCard('fase-' + Math.floor(fase));
 
   // Reconstruir l'estat visual depenent de la fase
@@ -1247,6 +1294,8 @@ function restaurarInterficieDesDeEstat() {
   if (fase >= 7 && ESTAT.worldbuilding) mostrarResultatWorldbuilding(ESTAT.worldbuilding);
   if (fase >= 9 && ESTAT.estilsParla) mostrarEstilsParla(ESTAT.estilsParla);
   if (fase >= 9.2 && ESTAT._perfilsPersonatges && Object.keys(ESTAT._perfilsPersonatges).length > 0) mostrarPerfilsPsicologics({ personatges: Object.values(ESTAT._perfilsPersonatges) });
+  if (fase >= 9.3 && ESTAT._perfilsPersonatges && Object.keys(ESTAT._perfilsPersonatges).length > 0) mostrarFeridaArc({ personatges: Object.values(ESTAT._perfilsPersonatges) });
+  if (fase >= 9.4 && ESTAT._matriuRelacional && ESTAT._matriuRelacional.length > 0) mostrarMatriuRelacional(ESTAT._matriuRelacional);
   if (fase >= 10 && ESTAT._estructuraCapitols.length > 0) mostrarEstructura('Reconstruït des de memòria (dades en JSON actiu)');
   if (fase >= 10.5 && ESTAT._escaletes.length > 0) {
     mostrarEscaleta(ESTAT._escaletes);
@@ -1379,6 +1428,7 @@ const ESTAT = {
   _personatgesSeleccionats: [],
   estilsParla:              null,
   _perfilsPersonatges:      {},
+  _matriuRelacional:        [],
   // Novel·la (fases 10-12)
   estructuraNovella:        null,
   _estructuraCapitols:      [],
@@ -2276,6 +2326,9 @@ function construirContextPsicologicPersonatges(limit = 8) {
     return `- Nom: ${nom}
   Estil_veu: ${(p.estil_veu || '').substring(0, 220) || '(pendent)'}
   Perfil_psicologic: ${(p.perfil_psicologic || '').substring(0, 260) || '(pendent)'}
+  Ferida_nuclear: ${(p.ferida_nuclear || '').substring(0, 180) || '(pendent)'}
+  Mascara_social: ${(p.mascara_social || '').substring(0, 160) || '(pendent)'}
+  Etapa_arc_intern: ${etiquetaEtapaArcIntern(p.etapa_arc_intern)}
   Estat_animic_actual: ${p.estat_animic_actual || 'Tranquil'}`;
   });
   return seleccionats.length > 0 ? seleccionats.join('\n') : '';
@@ -2294,7 +2347,9 @@ ${(estils[nom] || '(no trobat)').substring(0, 900)}`).join('
 
   const msgs = [{
     role: 'user',
-    content: `Analitza aquests personatges i genera un perfil psicològic breu (trets de personalitat, pors, motivacions) per a cadascun. Retorna un JSON on cada personatge tingui el seu "perfil_psicologic".
+    content: `Analitza aquests personatges i genera un perfil psicològic breu (trets de personalitat, pors, motivacions) per a cadascun.
+Afegeix també: "ferida_nuclear", "mascara_social" i "etapa_arc_intern" (una de: negacio, resistencia, fractura, insight, integracio).
+Retorna un JSON on cada personatge tingui aquests camps.
 Es requereix l'anàlisi de EXACTAMENT ${noms.length} personatges.
 
 PERSONATGES:
@@ -2303,14 +2358,14 @@ ${llista}
 Retorna EXCLUSIVAMENT JSON vàlid:
 {
   "personatges": [
-    {"nom": "Nom", "perfil_psicologic": "..."}
+    {"nom": "Nom", "perfil_psicologic": "...", "ferida_nuclear":"...", "mascara_social":"...", "etapa_arc_intern":"negacio"}
   ]
 }`
   }];
 
   const models = getModelConfig(userConfig || USER_CONFIG || {});
   const perfilMap = {};
-  noms.forEach(n => { perfilMap[n] = { nom: n, perfil_psicologic: '', estat_animic_actual: 'Tranquil' }; });
+  noms.forEach(n => { perfilMap[n] = { nom: n, perfil_psicologic: '', ferida_nuclear: '', mascara_social: '', etapa_arc_intern: 'negacio', estat_animic_actual: 'Tranquil' }; });
 
   try {
     const raw = await callLLMMulti(
@@ -2327,6 +2382,9 @@ Retorna EXCLUSIVAMENT JSON vàlid:
         perfilMap[nom] = {
           nom,
           perfil_psicologic: String(p.perfil_psicologic || '').trim(),
+          ferida_nuclear: String(p.ferida_nuclear || '').trim(),
+          mascara_social: String(p.mascara_social || '').trim(),
+          etapa_arc_intern: normalitzarEtapaArcIntern(p.etapa_arc_intern),
           estat_animic_actual: (ESTAT._perfilsPersonatges && ESTAT._perfilsPersonatges[nom] && ESTAT._perfilsPersonatges[nom].estat_animic_actual) || 'Tranquil'
         };
       });
@@ -2341,7 +2399,7 @@ Retorna EXCLUSIVAMENT JSON vàlid:
 Retorna EXCLUSIVAMENT JSON:
 {
   "personatges": [
-    {"nom": "Nom", "perfil_psicologic": "..."}
+    {"nom": "Nom", "perfil_psicologic": "...", "ferida_nuclear":"...", "mascara_social":"...", "etapa_arc_intern":"negacio"}
   ]
 }`
       }];
@@ -2371,11 +2429,14 @@ Retorna EXCLUSIVAMENT JSON:
   ESTAT._perfilsPersonatges = ESTAT._perfilsPersonatges || {};
   noms.forEach(nom => {
     const prev = ESTAT._perfilsPersonatges[nom] || {};
-    const nou = perfilMap[nom] || { nom, perfil_psicologic: '', estat_animic_actual: 'Tranquil' };
+    const nou = perfilMap[nom] || { nom, perfil_psicologic: '', ferida_nuclear: '', mascara_social: '', etapa_arc_intern: 'negacio', estat_animic_actual: 'Tranquil' };
     ESTAT._perfilsPersonatges[nom] = Object.assign({}, prev, {
       nom,
       estil_veu: prev.estil_veu || (estils[nom] || ''),
       perfil_psicologic: nou.perfil_psicologic || prev.perfil_psicologic || '',
+      ferida_nuclear: nou.ferida_nuclear || prev.ferida_nuclear || '',
+      mascara_social: nou.mascara_social || prev.mascara_social || '',
+      etapa_arc_intern: normalitzarEtapaArcIntern(nou.etapa_arc_intern || prev.etapa_arc_intern || 'negacio'),
       estat_animic_actual: nou.estat_animic_actual || prev.estat_animic_actual || 'Tranquil'
     });
   });
@@ -2477,6 +2538,132 @@ function mostrarPerfilsPsicologics(dades) {
 
   document.getElementById('psicologia-result').classList.remove('hidden');
   setTimeout(() => document.getElementById('fase-9-2').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+}
+
+function normalitzarEtapaArcIntern(v) {
+  const raw = String(v || '').toLowerCase().trim();
+  const map = {
+    'negacio': 'negacio',
+    'negació': 'negacio',
+    'resistencia': 'resistencia',
+    'resistència': 'resistencia',
+    'fractura': 'fractura',
+    'insight': 'insight',
+    'integracio': 'integracio',
+    'integració': 'integracio'
+  };
+  return map[raw] || 'negacio';
+}
+
+function etiquetaEtapaArcIntern(v) {
+  const k = normalitzarEtapaArcIntern(v);
+  const labels = {
+    negacio: 'Negació',
+    resistencia: 'Resistència',
+    fractura: 'Fractura',
+    insight: 'Insight',
+    integracio: 'Integració'
+  };
+  return labels[k] || 'Negació';
+}
+
+function mostrarFeridaArc(dades) {
+  const cos = document.getElementById('ferida-arc-cos');
+  const perfils = dades && Array.isArray(dades.personatges)
+    ? dades.personatges
+    : Object.values(ESTAT._perfilsPersonatges || {});
+
+  cos.innerHTML = perfils.map(p => {
+    const nom = escHtml(String(p.nom || 'Personatge').trim());
+    const ferida = escHtml(String(p.ferida_nuclear || '(pendent)').trim());
+    const mascara = escHtml(String(p.mascara_social || '(pendent)').trim());
+    const etapa = escHtml(etiquetaEtapaArcIntern(p.etapa_arc_intern));
+    return `<div class="veu-card">
+      <div class="veu-card-nom">👤 ${nom}</div>
+      <div class="veu-card-camps">
+        <div><div class="veu-camp-label">Ferida nuclear</div><div class="veu-camp-val">${ferida}</div></div>
+        <div><div class="veu-camp-label">Màscara social</div><div class="veu-camp-val">${mascara}</div></div>
+        <div><div class="veu-camp-label">Etapa arc intern</div><div class="veu-camp-val">${etapa}</div></div>
+      </div>
+    </div>`;
+  }).join('
+');
+
+  document.getElementById('ferida-arc-result').classList.remove('hidden');
+}
+
+async function iniciarFaseFeridaArc() {
+  ESTAT.fase = 9.3;
+  updateProgress(9.3);
+  hideCard('fase-9-2');
+  showCard('fase-9-3');
+  document.getElementById('ferida-arc-result').classList.add('hidden');
+  showLoader('9-3');
+  try {
+    const dades = await generarPerfilsPsicologics(USER_CONFIG);
+    hideLoader('9-3');
+    mostrarFeridaArc(dades);
+  } catch (err) {
+    hideLoader('9-3');
+    toast('Error en definir ferida/arc: ' + err.message);
+  }
+}
+
+function generarMatriuRelacionalLocal() {
+  const noms = (ESTAT._personatgesSeleccionats || []).filter(Boolean);
+  const perf = ESTAT._perfilsPersonatges || {};
+  const matriu = [];
+  for (let i = 0; i < noms.length; i++) {
+    for (let j = i + 1; j < noms.length; j++) {
+      const a = noms[i], b = noms[j];
+      const pa = perf[a] || {}, pb = perf[b] || {};
+      const textBase = `${pa.perfil_psicologic || ''} ${pb.perfil_psicologic || ''}`.toLowerCase();
+      let tipus = 'ambivalencia';
+      if (/por|desconf|rival|gelos|odi|ressent/.test(textBase)) tipus = 'tensio';
+      else if (/cura|prote|estima|admir|lleial/.test(textBase)) tipus = 'vincle';
+      const intensitat = Math.min(95, Math.max(35, Math.round((String(pa.etapa_arc_intern||'').length + String(pb.etapa_arc_intern||'').length) * 7)));
+      matriu.push({
+        parella: `${a} ↔ ${b}`,
+        tipus,
+        intensitat,
+        tendencia: tipus === 'tensio' ? 'pujant' : 'estable',
+        nota: `${a} projecta "${(pa.mascara_social || 'reserva')}", mentre ${b} respon des de "${(pb.mascara_social || 'control')}".`
+      });
+    }
+  }
+  return matriu;
+}
+
+function mostrarMatriuRelacional(matriu) {
+  const cos = document.getElementById('relacions-cos');
+  const files = Array.isArray(matriu) ? matriu : [];
+  cos.innerHTML = files.map(r => `<div class="veu-card">
+    <div class="veu-card-nom">🔗 ${escHtml(r.parella || 'Parella')}</div>
+    <div class="veu-card-camps">
+      <div><div class="veu-camp-label">Dinàmica</div><div class="veu-camp-val">${escHtml(r.tipus || 'ambivalencia')}</div></div>
+      <div><div class="veu-camp-label">Intensitat</div><div class="veu-camp-val">${escHtml(String(r.intensitat || 0))}/100 (${escHtml(r.tendencia || 'estable')})</div></div>
+      <div><div class="veu-camp-label">Subtext relacional</div><div class="veu-camp-val">${escHtml(r.nota || '')}</div></div>
+    </div>
+  </div>`).join('
+');
+  document.getElementById('relacions-result').classList.remove('hidden');
+}
+
+async function iniciarFaseRelacions() {
+  ESTAT.fase = 9.4;
+  updateProgress(9.4);
+  hideCard('fase-9-3');
+  showCard('fase-9-4');
+  document.getElementById('relacions-result').classList.add('hidden');
+  showLoader('9-4');
+  try {
+    ESTAT._matriuRelacional = generarMatriuRelacionalLocal();
+    hideLoader('9-4');
+    mostrarMatriuRelacional(ESTAT._matriuRelacional);
+  } catch (err) {
+    hideLoader('9-4');
+    toast('Error en matriu relacional: ' + err.message);
+  }
 }
 
 function mostrarEstilsParla(text) {
@@ -3359,6 +3546,41 @@ async function actualitzarLlibreRegistreBackground(textCapitol, idx) {
 // ═══════════════════════════════════════════════════════════
 //  FASE 12: Control d'Arcs (Opus) + Epíleg (Sonnet)
 // ═══════════════════════════════════════════════════════════
+function calcularTermometreVeritatEmocional() {
+  const caps = ESTAT._capitols_generats || [];
+  const text = caps.join('
+
+').toLowerCase();
+  const perfilCount = Object.values(ESTAT._perfilsPersonatges || {}).filter(p => p && p.ferida_nuclear && p.mascara_social).length;
+  const base = Math.min(40, perfilCount * 7);
+  const subtext = Math.min(20, (text.match(/silenci|evita|amaga|insinua|contradiu/g) || []).length);
+  const vulnerabilitat = Math.min(20, (text.match(/plora|tremola|confessa|culpa|vergonya|por/g) || []).length);
+  const canviIntern = Math.min(20, (text.match(/decideix|admet|renuncia|accepta|cedeix/g) || []).length);
+  const total = Math.min(100, base + subtext + vulnerabilitat + canviIntern);
+  return {
+    total,
+    autenticitat: Math.min(100, base + vulnerabilitat + 20),
+    vulnerabilitat: Math.min(100, vulnerabilitat * 5),
+    subtext: Math.min(100, subtext * 5),
+    canviIntern: Math.min(100, canviIntern * 5)
+  };
+}
+
+function renderTermometreVeritatEmocional() {
+  const t = calcularTermometreVeritatEmocional();
+  const el = document.getElementById('termometre-veritat');
+  if (!el) return;
+  el.innerHTML = `<div class="worldbuilding-result">
+    <div class="world-bloc">
+      <div class="world-bloc-titol">🧪 Termòmetre de veritat emocional</div>
+      <div class="world-bloc-desc">
+        Global: <strong>${t.total}/100</strong><br>
+        Autenticitat emocional: ${t.autenticitat}/100 · Vulnerabilitat: ${t.vulnerabilitat}/100 · Subtext: ${t.subtext}/100 · Canvi intern: ${t.canviIntern}/100
+      </div>
+    </div>
+  </div>`;
+}
+
 async function iniciarFase12() {
   ESTAT.fase = 12;
   updateProgress(12);
@@ -3394,6 +3616,7 @@ async function iniciarFase12() {
     if (/epíleg|epilog/i.test(res.response)) {
       document.getElementById('btn-epileg').classList.remove('hidden');
     }
+    renderTermometreVeritatEmocional();
     document.getElementById('arcs-result').classList.remove('hidden');
     setTimeout(() => document.getElementById('fase-12').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   } catch (err) {
