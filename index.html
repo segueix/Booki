@@ -5881,20 +5881,45 @@ async function assegurarLlibreriaDocx() {
     'https://unpkg.com/docx@8.5.0/build/index.js'
   ];
 
-  const carregarScript = (src) => new Promise((resolve) => {
+  const carregarScript = (src, timeoutMs = 8000) => new Promise((resolve) => {
+    let resolt = false;
+    const acabar = (ok) => {
+      if (resolt) return;
+      resolt = true;
+      resolve(!!ok);
+    };
+    const timeoutId = setTimeout(() => acabar(false), timeoutMs);
+
     const existent = Array.from(document.scripts).find(s => s.src && s.src.includes(src));
     if (existent) {
-      if (typeof docx !== 'undefined') return resolve(true);
-      existent.addEventListener('load', () => resolve(typeof docx !== 'undefined'), { once: true });
-      existent.addEventListener('error', () => resolve(false), { once: true });
+      if (typeof docx !== 'undefined') {
+        clearTimeout(timeoutId);
+        return acabar(true);
+      }
+      const onLoad = () => {
+        clearTimeout(timeoutId);
+        acabar(typeof docx !== 'undefined');
+      };
+      const onError = () => {
+        clearTimeout(timeoutId);
+        acabar(false);
+      };
+      existent.addEventListener('load', onLoad, { once: true });
+      existent.addEventListener('error', onError, { once: true });
       return;
     }
 
     const s = document.createElement('script');
     s.src = src;
     s.async = true;
-    s.onload = () => resolve(typeof docx !== 'undefined');
-    s.onerror = () => resolve(false);
+    s.onload = () => {
+      clearTimeout(timeoutId);
+      acabar(typeof docx !== 'undefined');
+    };
+    s.onerror = () => {
+      clearTimeout(timeoutId);
+      acabar(false);
+    };
     document.head.appendChild(s);
   });
 
@@ -5903,6 +5928,18 @@ async function assegurarLlibreriaDocx() {
     if (ok && typeof docx !== 'undefined' && docx.Document && docx.Packer) return true;
   }
   return false;
+}
+
+async function ambTimeout(promise, ms, missatge = 'Operació excedida') {
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(missatge)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 }
 
 function descarregarTextFallback(titol, contingut, base = 'document') {
@@ -5965,13 +6002,18 @@ async function exportarADoc(titol, contingut) {
   });
 
   try {
-    const blob = await Packer.toBlob(doc);
+    const blob = await ambTimeout(
+      Packer.toBlob(doc),
+      15000,
+      'Temps d\'exportació DOCX excedit'
+    );
     const nomFitxer = normalitzarNomFitxerDocx(titol || 'conte', 'conte');
     descarregarBlobDocx(blob, nomFitxer);
     toast('📄 Descarregat: ' + nomFitxer);
   } catch (err) {
-    toast("Error a l'exportar DOCX: " + err.message);
-    throw err;
+    console.warn('[exportarADoc] Fallback TXT per error DOCX:', err.message);
+    const nomTxt = descarregarTextFallback(titol, contingut, 'conte');
+    toast(`⚠️ Exportació DOCX no disponible (${err.message}). S'ha descarregat ${nomTxt}.`);
   }
 }
 
@@ -6134,13 +6176,28 @@ async function exportarNovella(titol, caps, estructura, epileg) {
   });
 
   try {
-    const blob = await Packer.toBlob(doc);
+    const blob = await ambTimeout(
+      Packer.toBlob(doc),
+      25000,
+      'Temps d\'exportació de la novel·la excedit'
+    );
     const nomFitxer = normalitzarNomFitxerDocx(titol || 'novella', 'novella');
     descarregarBlobDocx(blob, nomFitxer);
     toast('📖 Descarregat: ' + nomFitxer);
   } catch (err) {
-    toast("Error a l'exportar la novel·la DOCX: " + err.message);
-    throw err;
+    console.warn('[exportarNovella] Fallback TXT per error DOCX:', err.message);
+    const capitolsFallback = (caps || [])
+      .map((c, i) => ({ text: c, titolCap: (estructura[i] && estructura[i].titol ? String(estructura[i].titol).trim() : '') || `Capítol ${i + 1}` }))
+      .filter(c => c.text);
+    const indexFallback = capitolsFallback.map((c, i) => `${i + 1}. ${c.titolCap}`).join('\n');
+    const contingutFallback = [
+      titol || 'Novel·la IA',
+      indexFallback ? `Índex de capítols\n${indexFallback}` : '',
+      ...capitolsFallback.map((c, i) => `Capítol ${i + 1} — ${c.titolCap}\n\n${netejarTabulacionsInicials(c.text)}`),
+      (epileg && String(epileg).trim()) ? `Epíleg\n\n${netejarTabulacionsInicials(epileg)}` : ''
+    ].filter(Boolean).join('\n\n');
+    const nomTxt = descarregarTextFallback(titol, contingutFallback, 'novella');
+    toast(`⚠️ Exportació DOCX no disponible (${err.message}). S'ha descarregat ${nomTxt}.`);
   }
 }
 
