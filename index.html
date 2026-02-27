@@ -5581,9 +5581,58 @@ function descarregarBlobDocx(blob, nomFitxer) {
   setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
-function exportarADoc(titol, contingut) {
-  if (typeof docx === 'undefined') {
-    toast("Error: La llibreria DOCX no s'ha carregat. Comprova la connexió.");
+async function assegurarLlibreriaDocx() {
+  if (typeof docx !== 'undefined' && docx && docx.Document && docx.Packer) return true;
+
+  const urls = [
+    'https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.js',
+    'https://unpkg.com/docx@8.5.0/build/index.js'
+  ];
+
+  const carregarScript = (src) => new Promise((resolve) => {
+    const existent = Array.from(document.scripts).find(s => s.src && s.src.includes(src));
+    if (existent) {
+      if (typeof docx !== 'undefined') return resolve(true);
+      existent.addEventListener('load', () => resolve(typeof docx !== 'undefined'), { once: true });
+      existent.addEventListener('error', () => resolve(false), { once: true });
+      return;
+    }
+
+    const s = document.createElement('script');
+    s.src = src;
+    s.async = true;
+    s.onload = () => resolve(typeof docx !== 'undefined');
+    s.onerror = () => resolve(false);
+    document.head.appendChild(s);
+  });
+
+  for (const u of urls) {
+    const ok = await carregarScript(u);
+    if (ok && typeof docx !== 'undefined' && docx.Document && docx.Packer) return true;
+  }
+  return false;
+}
+
+function descarregarTextFallback(titol, contingut, base = 'document') {
+  const nomTxt = normalitzarNomFitxerDocx(titol || base, base).replace(/\.docx$/i, '.txt');
+  const blob = new Blob([String(contingut || '')], { type: 'text/plain;charset=utf-8' });
+  descarregarBlobDocx(blob, nomTxt);
+  toast(`⚠️ DOCX no disponible. S'ha descarregat TXT: ${nomTxt}`);
+  return nomTxt;
+}
+
+function obrirGoogleDocsPerImportar(nomFitxer = '') {
+  window.open('https://docs.google.com/document/u/0/', '_blank', 'noopener');
+  if (nomFitxer) {
+    toast(`Google Docs obert. Importa-hi el fitxer ${nomFitxer}.`);
+  }
+}
+
+async function exportarADoc(titol, contingut) {
+  const docxDisponible = await assegurarLlibreriaDocx();
+  if (!docxDisponible) {
+    const nomTxt = descarregarTextFallback(titol, contingut, 'conte');
+    obrirGoogleDocsPerImportar(nomTxt);
     return;
   }
 
@@ -5623,13 +5672,14 @@ function exportarADoc(titol, contingut) {
     const nomFitxer = normalitzarNomFitxerDocx(titol || 'conte', 'conte');
     descarregarBlobDocx(blob, nomFitxer);
     toast('📄 Descarregat: ' + nomFitxer);
+    obrirGoogleDocsPerImportar(nomFitxer);
   }).catch(err => {
     toast("Error a l'exportar DOCX: " + err.message);
   });
 }
 
 
-function descarregarNovella() {
+async function descarregarNovella() {
   const capsGenerats = ESTAT._capitols_generats || [];
   if (!capsGenerats.some(Boolean)) {
     toast('No hi ha cap capítol generat per descarregar.');
@@ -5657,12 +5707,22 @@ function descarregarNovella() {
     }
   }
 
-  exportarNovella(titolDefinitiu, capsGenerats, ESTAT._estructuraCapitols || [], netejarTabulacionsInicials(textEpileg));
+  await exportarNovella(titolDefinitiu, capsGenerats, ESTAT._estructuraCapitols || [], netejarTabulacionsInicials(textEpileg));
 }
 
-function exportarNovella(titol, caps, estructura, epileg) {
-  if (typeof docx === 'undefined') {
-    toast("Error: La llibreria DOCX no s'ha carregat.");
+async function exportarNovella(titol, caps, estructura, epileg) {
+  const docxDisponible = await assegurarLlibreriaDocx();
+  if (!docxDisponible) {
+    const contingutFallback = [
+      ...caps.filter(Boolean).map((c, i) => `Capítol ${i + 1}
+
+${netejarTabulacionsInicials(c)}`),
+      (epileg && String(epileg).trim()) ? `Epíleg
+
+${netejarTabulacionsInicials(epileg)}` : ''
+    ].filter(Boolean).join('\n\n');
+    const nomTxt = descarregarTextFallback(titol, contingutFallback, 'novella');
+    obrirGoogleDocsPerImportar(nomTxt);
     return;
   }
 
@@ -5747,6 +5807,7 @@ function exportarNovella(titol, caps, estructura, epileg) {
     const nomFitxer = normalitzarNomFitxerDocx(titol || 'novella', 'novella');
     descarregarBlobDocx(blob, nomFitxer);
     toast('📖 Descarregat: ' + nomFitxer);
+    obrirGoogleDocsPerImportar(nomFitxer);
   }).catch(err => {
     toast("Error a l'exportar la novel·la DOCX: " + err.message);
   });
