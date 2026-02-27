@@ -968,6 +968,17 @@ function initDefaultSmartCategories() {
 
 const SHARE_INTRO_TEXT = 'Descobreix els nostres Youtubers:';
 const SHARE_IMAGE_NAME = 'icon-512.png';
+const SHARE_BASE_URL = 'https://segueix.github.io/Segueix/';
+
+function buildAppShareUrl(query = '', hash = '') {
+    const normalizedQuery = query
+        ? (query.startsWith('?') ? query : `?${query}`)
+        : '';
+    const normalizedHash = hash
+        ? (hash.startsWith('#') ? hash : `#${hash}`)
+        : '';
+    return `${SHARE_BASE_URL}${normalizedQuery}${normalizedHash}`;
+}
 
 async function getShareImageFile() {
     try {
@@ -1008,7 +1019,7 @@ async function buildShareData(label, url, title = 'CaTube - Seguint!') {
 // Function to handle custom sharing logic
 async function shareVideo(videoData) {
     // Construct the URL with the video ID parameter
-    const shareUrl = `${window.location.origin}${window.location.pathname}?v=${videoData.id}`;
+    const shareUrl = buildAppShareUrl(`v=${videoData.id}`);
     const { data: shareData, text: shareText } = await buildShareData(videoData.title, shareUrl);
 
     // Use native sharing API if available (Mobile/Modern browsers)
@@ -1076,7 +1087,7 @@ function resolveShareChannelData(channelId, fallback = {}) {
 
 async function shareChannelProfile(channelId, fallback = {}) {
     const channelData = resolveShareChannelData(channelId, fallback);
-    const shareUrl = `${window.location.origin}${window.location.pathname}?channel=${encodeURIComponent(channelData.id)}#follow`;
+    const shareUrl = buildAppShareUrl(`channel=${encodeURIComponent(channelData.id)}`, 'follow');
     const { data: shareData, text: shareText } = await buildShareData(channelData.name, shareUrl);
 
     if (navigator.share) {
@@ -3556,7 +3567,7 @@ async function handleCategoryShare(categoryName) {
     if (channelIds.length > 0) {
         await shareCategoryWithYoutubers(categoryName, channelIds);
     } else {
-        const shareUrl = `${window.location.origin}?add_tag=${encodeURIComponent(categoryName)}`;
+        const shareUrl = buildAppShareUrl(`add_tag=${encodeURIComponent(categoryName)}`);
         const { data: shareData, text: shareText } = await buildShareData(categoryName, shareUrl, 'CaTube - Categoria');
         if (navigator.share) {
             try {
@@ -7893,7 +7904,7 @@ async function shareCategoryWithYoutubers(categoryName, channelIds) {
 
                 if (data.status === 'success') {
                     const encodedId = encodeCategoryId(data.id);
-                    const shareUrl = `${window.location.origin}${window.location.pathname}?cat=${encodedId}`;
+                    const shareUrl = buildAppShareUrl(`cat=${encodedId}`);
 
                     if (navigator.share) {
                         try {
@@ -7983,7 +7994,7 @@ async function shareSegueixPlaylist(playlistName) {
 
                 if (data.status === 'success') {
                     const encodedId = encodePlaylistId(data.id);
-                    const shareUrl = `${window.location.origin}${window.location.pathname}?list=${encodedId}`;
+                    const shareUrl = buildAppShareUrl(`list=${encodedId}`);
                     
                     // Native Share or Fallback
                     if (navigator.share) {
