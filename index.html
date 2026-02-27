@@ -5763,23 +5763,66 @@ function parseJsonRobust(text, expectedKeys = []) {
   }
   const s = text.trim();
 
-  function parseLenientJson(candidate) {
-    if (!candidate || typeof candidate !== 'string') return null;
-    const cleaned = candidate
+  function netejarCandidate(candidate = '') {
+    return String(candidate || '')
       .replace(/[“”]/g, '"')
       .replace(/[‘’]/g, "'")
-      .replace(/,\s*([}\]])/g, '$1');
-    try { return JSON.parse(cleaned); } catch (e) { return null; }
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+      .replace(/,\s*([}\]])/g, '$1')
+      .trim();
+  }
+
+  function tancarJsonIncomplet(candidate = '') {
+    const src = String(candidate || '');
+    if (!src) return src;
+
+    const stack = [];
+    let inString = false;
+    let escaped = false;
+
+    for (let i = 0; i < src.length; i++) {
+      const ch = src[i];
+
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (ch === '\\') { escaped = true; continue; }
+        if (ch === '"') { inString = false; }
+        continue;
+      }
+
+      if (ch === '"') { inString = true; continue; }
+      if (ch === '{') stack.push('}');
+      else if (ch === '[') stack.push(']');
+      else if ((ch === '}' || ch === ']') && stack.length > 0 && stack[stack.length - 1] === ch) stack.pop();
+    }
+
+    let out = src;
+    if (inString) out += '"';
+    while (stack.length > 0) out += stack.pop();
+    return out;
+  }
+
+  function parseLenientJson(candidate) {
+    if (!candidate || typeof candidate !== 'string') return null;
+
+    const cleaned = netejarCandidate(candidate);
+    try { return JSON.parse(cleaned); } catch (e) {}
+
+    // Heurística clau: si la resposta s'ha tallat, intentem tancar l'objecte/array i parsejar.
+    const repaired = netejarCandidate(tancarJsonIncomplet(cleaned));
+    try { return JSON.parse(repaired); } catch (e) { return null; }
   }
 
   function validar(resultat, metode) {
     if (!resultat) return null;
-    // Si s'han passat claus obligatòries, les comprovem
     if (expectedKeys && expectedKeys.length > 0) {
       const missing = expectedKeys.filter(k => !(k in resultat));
       if (missing.length > 0) {
         console.warn(`⚠️ [parseJsonRobust] JSON recuperat via ${metode}, però falten claus estructurals: ${missing.join(', ')}`);
-        return null; // Forcem error perquè el sistema faci un retry automàtic
+        return null;
       }
     }
     if (metode !== 'Directe') {
@@ -5801,19 +5844,21 @@ function parseJsonRobust(text, expectedKeys = []) {
     if (parsedCode) return validar(parsedCode, 'Markdown Block');
   }
 
-  // 3. Primer objecte { ... } complet
+  // 3. Primer objecte { ... } (també prova reparació si està truncat)
   const objStart = s.indexOf('{');
   const objEnd   = s.lastIndexOf('}');
-  if (objStart !== -1 && objEnd > objStart) {
-    let parsedObject = parseLenientJson(s.slice(objStart, objEnd + 1));
+  if (objStart !== -1) {
+    const objectCandidate = objEnd > objStart ? s.slice(objStart, objEnd + 1) : s.slice(objStart);
+    let parsedObject = parseLenientJson(objectCandidate);
     if (parsedObject) return validar(parsedObject, 'Extracció Objecte {}');
   }
 
-  // 4. Primer array [ ... ] complet
+  // 4. Primer array [ ... ] (també prova reparació si està truncat)
   const arrStart = s.indexOf('[');
   const arrEnd   = s.lastIndexOf(']');
-  if (arrStart !== -1 && arrEnd > arrStart) {
-    let parsedArray = parseLenientJson(s.slice(arrStart, arrEnd + 1));
+  if (arrStart !== -1) {
+    const arrayCandidate = arrEnd > arrStart ? s.slice(arrStart, arrEnd + 1) : s.slice(arrStart);
+    let parsedArray = parseLenientJson(arrayCandidate);
     if (parsedArray) return validar(parsedArray, 'Extracció Array []');
   }
 
