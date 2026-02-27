@@ -2188,12 +2188,17 @@ async function handleMillorarConte() {
 // ═══════════════════════════════════════════════════════════
 //  EXPORT LOCAL
 // ═══════════════════════════════════════════════════════════
-function exportarDoc() {
+async function exportarDoc() {
   if (!ESTAT.conteText) { toast('No hi ha cap conte per exportar.'); return; }
   const titol = ESTAT.premissaTriada
     ? ESTAT.premissaTriada.substring(0, 55) + (ESTAT.premissaTriada.length > 55 ? '…' : '')
     : 'Conte IA';
-  exportarADoc(titol, ESTAT.conteText);
+
+  try {
+    await exportarADoc(titol, ESTAT.conteText);
+  } catch (error) {
+    toast("Error general exportant: " + error.message);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -5771,7 +5776,8 @@ async function exportarADoc(titol, contingut) {
 
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = docx;
 
-  const paragrafsText = contingut.split(/\n\n+/).filter(p => p.trim().length > 0);
+  const textNet = netejarTabulacionsInicials(contingut);
+  const paragrafsText = textNet.split(/\n\n+/).filter(p => p.trim().length > 0);
   const fills = [
     new Paragraph({
       text: titol || 'Conte IA',
@@ -5787,11 +5793,14 @@ async function exportarADoc(titol, contingut) {
   ];
 
   paragrafsText.forEach((p, i) => {
-    fills.push(new Paragraph({
+    const pOptions = {
       text: p.trim(),
-      indent: i > 0 ? { firstLine: 720 } : undefined, // Sangria a partir del segon paràgraf
       spacing: { after: 200 }
-    }));
+    };
+    if (i > 0) {
+      pOptions.indent = { firstLine: 720 };
+    }
+    fills.push(new Paragraph(pOptions));
   });
 
   const doc = new Document({
@@ -5805,6 +5814,7 @@ async function exportarADoc(titol, contingut) {
     const nomFitxer = normalitzarNomFitxerDocx(titol || 'conte', 'conte');
     descarregarBlobDocx(blob, nomFitxer);
     toast('📄 Descarregat: ' + nomFitxer);
+    // Atenció: Google Docs pot ser bloquejat pel navegador si no és una acció directa de l'usuari.
     obrirGoogleDocsPerImportar(nomFitxer);
   }).catch(err => {
     toast("Error a l'exportar DOCX: " + err.message);
