@@ -50,6 +50,34 @@
   }
   header p { color: var(--text2); font-size: .95rem; }
 
+
+  /* ── Accions ràpides projecte (top-right) ── */
+  .project-actions-top {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 1100;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: min(92vw, 520px);
+  }
+  .project-actions-top .btn {
+    padding: 8px 12px;
+    font-size: .8rem;
+  }
+  @media (max-width: 720px) {
+    .project-actions-top {
+      position: sticky;
+      top: 6px;
+      right: auto;
+      width: 100%;
+      max-width: 860px;
+      margin: 0 auto 10px;
+    }
+  }
+
   /* ── Progress bar ── */
   #progress-wrap {
     width: 100%;
@@ -283,9 +311,8 @@
   }
   .conte-reader p {
     margin-bottom: 1.1em;
-    text-indent: 1.8em;
+    text-indent: 0;
   }
-  .conte-reader p:first-child { text-indent: 0; }
   @media (max-width: 600px) {
     .conte-reader { padding: 24px 20px; font-size: .97rem; }
   }
@@ -531,6 +558,11 @@
 </head>
 <body>
 
+<div class="project-actions-top">
+  <button class="btn btn-ghost" onclick="exportarCopiaSeguretat()">💾 Exportar projecte</button>
+  <button class="btn btn-ghost" onclick="obrirImportarCopiaSeguretat()">📥 Importar projecte</button>
+</div>
+
 <header>
   <h1>📖 Conte IA</h1>
   <p>Crea el teu conte pas a pas amb intel·ligència artificial</p>
@@ -659,6 +691,9 @@
   <div class="btn-row">
     <button class="btn btn-primary" onclick="guardarIComencar()">Guardar i Començar Nou</button>
     <button id="btn-reprendre" class="btn btn-secondary hidden" onclick="reprendreProjecteLocal()">📂 Reprendre projecte anterior</button>
+    <button class="btn btn-ghost" onclick="exportarCopiaSeguretat()">💾 Exportar còpia (.json)</button>
+    <button class="btn btn-ghost" onclick="obrirImportarCopiaSeguretat()">📥 Importar còpia</button>
+    <input type="file" id="input-copia-seguretat" accept="application/json,.json" class="hidden" onchange="importarCopiaSeguretat(event)">
   </div>
 </div>
 
@@ -925,7 +960,7 @@
 <!-- FASE 9.2: Perfils Psicològics -->
 <div class="card hidden" id="fase-9-2">
   <h2><span class="icon">🧠</span> Perfils Psicològics</h2>
-  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Anàlisi de personalitat i estat d'ànim base per a tots els personatges seleccionats.</p>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Anàlisi de personalitat i estat d'ànim base del protagonista i de l'elenc que has seleccionat a la fase 8.</p>
   <div class="loader-wrap" id="loader-9-2">
     <div class="spinner"></div>
     <span>Analitzant la psicologia dels personatges...</span>
@@ -1230,45 +1265,110 @@ function togglePausaFlux() {
 }
 
 // --- SISTEMA DE PERSISTÈNCIA ---
+const CLAU_PROJECTE_ACTUAL = 'booki_projecte_actual';
+const CLAU_HISTORIAL = 'booki_projecte_historial';
+const MAX_SNAPSHOTS = 6;
+
+function construirSnapshotProjecte() {
+  return {
+    versio: 1,
+    guardat_el: new Date().toISOString(),
+    estat: ESTAT,
+    config: USER_CONFIG
+  };
+}
+
 function guardarProjecteLocal() {
   if (ESTAT.fase === 0) return; // No guardem si no ha començat
   try {
-    const dades = { estat: ESTAT, config: USER_CONFIG };
-    localStorage.setItem('booki_projecte_actual', JSON.stringify(dades));
+    const snapshot = construirSnapshotProjecte();
+    localStorage.setItem(CLAU_PROJECTE_ACTUAL, JSON.stringify(snapshot));
+
+    const hist = JSON.parse(localStorage.getItem(CLAU_HISTORIAL) || '[]');
+    hist.push(snapshot);
+    const histCurt = hist.slice(-MAX_SNAPSHOTS);
+    localStorage.setItem(CLAU_HISTORIAL, JSON.stringify(histCurt));
   } catch (e) {
     console.warn("No s'ha pogut guardar a localStorage:", e);
   }
 }
 
 function comprovarProjecteGuardat() {
-  const guardat = localStorage.getItem('booki_projecte_actual');
+  const guardat = localStorage.getItem(CLAU_PROJECTE_ACTUAL);
   if (guardat) {
     document.getElementById('btn-reprendre').classList.remove('hidden');
   }
 }
 
+function aplicarSnapshotProjecte(dades) {
+  if (!dades || !dades.estat) throw new Error('Format de còpia no vàlid');
+
+  Object.assign(ESTAT, dades.estat);
+  USER_CONFIG = dades.config || USER_CONFIG;
+
+  if (ESTAT._anthropicApiKey) document.getElementById('anthropicApiKey').value = ESTAT._anthropicApiKey;
+  if (ESTAT._openaiApiKey) document.getElementById('openaiApiKey').value = ESTAT._openaiApiKey;
+  if (ESTAT._geminiApiKey) document.getElementById('geminiApiKey').value = ESTAT._geminiApiKey;
+
+  if (typeof poblarSelectorsModels === 'function') poblarSelectorsModels();
+  if (typeof sincronitzarCampsConfigModels === 'function') sincronitzarCampsConfigModels();
+  if (typeof guardarClausAPI === 'function') guardarClausAPI();
+
+  restaurarInterficieDesDeEstat();
+}
+
 function reprendreProjecteLocal() {
-  const guardat = localStorage.getItem('booki_projecte_actual');
+  const guardat = localStorage.getItem(CLAU_PROJECTE_ACTUAL);
   if (!guardat) return;
   try {
     const dades = JSON.parse(guardat);
-    Object.assign(ESTAT, dades.estat);
-    USER_CONFIG = dades.config;
-
-    // Restaurar Claus API a la UI (opcional però útil)
-    if (ESTAT._anthropicApiKey) document.getElementById('anthropicApiKey').value = ESTAT._anthropicApiKey;
-    if (ESTAT._openaiApiKey) document.getElementById('openaiApiKey').value = ESTAT._openaiApiKey;
-    if (ESTAT._geminiApiKey) document.getElementById('geminiApiKey').value = ESTAT._geminiApiKey;
-
-    if (typeof poblarSelectorsModels === 'function') poblarSelectorsModels();
-    if (typeof sincronitzarCampsConfigModels === 'function') sincronitzarCampsConfigModels();
-    if (typeof guardarClausAPI === 'function') guardarClausAPI();
-
-    restaurarInterficieDesDeEstat();
+    aplicarSnapshotProjecte(dades);
     toast('Projecte recuperat amb èxit.');
   } catch (e) {
     toast('Error en recuperar el projecte: ' + e.message);
   }
+}
+
+function exportarCopiaSeguretat() {
+  if (ESTAT.fase === 0) {
+    toast('Encara no hi ha cap projecte per exportar.');
+    return;
+  }
+  try {
+    const snapshot = construirSnapshotProjecte();
+    const nom = `booki_backup_fase_${String(ESTAT.fase).replace('.', '_')}_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json;charset=utf-8' });
+    descarregarBlobDocx(blob, nom);
+    toast('Còpia exportada: ' + nom);
+  } catch (err) {
+    toast("No s'ha pogut exportar la còpia: " + err.message);
+  }
+}
+
+function obrirImportarCopiaSeguretat() {
+  const input = document.getElementById('input-copia-seguretat');
+  if (!input) return;
+  input.value = '';
+  input.click();
+}
+
+function importarCopiaSeguretat(event) {
+  const file = event && event.target && event.target.files ? event.target.files[0] : null;
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const dades = JSON.parse(String(reader.result || '{}'));
+      aplicarSnapshotProjecte(dades);
+      localStorage.setItem(CLAU_PROJECTE_ACTUAL, JSON.stringify(dades));
+      toast('Còpia importada correctament.');
+    } catch (err) {
+      toast('Fitxer de còpia invàlid: ' + err.message);
+    }
+  };
+  reader.onerror = () => toast("No s'ha pogut llegir el fitxer de còpia.");
+  reader.readAsText(file, 'utf-8');
 }
 
 function restaurarInterficieDesDeEstat() {
@@ -1387,9 +1487,10 @@ function compteParaules(text) {
 function netejarTabulacionsInicials(text = '') {
   if (!text) return '';
   return String(text)
-    .replace(/^[ \u00A0]*\t+/gm, '')
-    .replace(/\r\n/g, '\n');
+    .replace(/\r\n/g, '\n')
+    .replace(/^[\t \u00A0]+/gm, '');
 }
+
 
 // ═══════════════════════════════════════════════════════════
 //  ESTAT GLOBAL
@@ -2087,12 +2188,17 @@ async function handleMillorarConte() {
 // ═══════════════════════════════════════════════════════════
 //  EXPORT LOCAL
 // ═══════════════════════════════════════════════════════════
-function exportarDoc() {
+async function exportarDoc() {
   if (!ESTAT.conteText) { toast('No hi ha cap conte per exportar.'); return; }
   const titol = ESTAT.premissaTriada
     ? ESTAT.premissaTriada.substring(0, 55) + (ESTAT.premissaTriada.length > 55 ? '…' : '')
     : 'Conte IA';
-  exportarADoc(titol, ESTAT.conteText);
+
+  try {
+    await exportarADoc(titol, ESTAT.conteText);
+  } catch (error) {
+    toast("Error general exportant: " + error.message);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2305,6 +2411,53 @@ function syncElencItem(idx) {
   el.classList.toggle('chosen', cb.checked);
 }
 
+function extreureNomPersonatge(raw = '') {
+  let txt = String(raw || '').trim();
+  if (!txt) return '';
+  txt = txt.replace(/^\d+[.)]\s*/, '').trim();
+  txt = txt.replace(/\*\*/g, '').trim();
+  const abansPipe = txt.split('|')[0] || txt;
+  txt = abansPipe.trim();
+  txt = txt.replace(/^[\[(]\s*/, '').replace(/[\])]\s*$/, '').trim();
+  if (!txt) return '';
+  return txt.split(',')[0].trim();
+}
+
+function normalitzarNomPersonatge(raw = '') {
+  return String(raw || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function inferirEstatAnimicDesDeVeu(estilVeu = '', perfilText = '') {
+  const txt = `${estilVeu || ''} ${perfilText || ''}`.toLowerCase();
+  const estatsBase = ['Serè', 'Neguitós', 'Reservat', 'Esperançat', 'Melancòlic', 'Irritat', 'Determinant', 'Vulnerable'];
+  const seleccionarEstatDeterminista = (seed = '') => {
+    const src = String(seed || '').trim();
+    if (!src) return 'Serè';
+    let hash = 0;
+    for (let i = 0; i < src.length; i++) {
+      hash = ((hash << 5) - hash + src.charCodeAt(i)) | 0;
+    }
+    const idx = Math.abs(hash) % estatsBase.length;
+    return estatsBase[idx];
+  };
+
+  if (!txt.trim()) return seleccionarEstatDeterminista(estilVeu || perfilText || 'estat-base');
+  if (/fur[ií]|rabia|ira|hostil|agress|violent/.test(txt)) return 'Irritat';
+  if (/por|ansi|anx|panic|p[àa]nic|nerv|inquiet/.test(txt)) return 'Neguitós';
+  if (/trist|dol|abat|depr|melancol/.test(txt)) return 'Melancòlic';
+  if (/ironi|sarcas|fred|calculador|anal[ií]tic/.test(txt)) return 'Reservat';
+  if (/esperan[çc]|optim|euf[oò]r|entusias/.test(txt)) return 'Esperançat';
+  if (/poetic|emocional|sensible|vulnerable/.test(txt)) return 'Sensibilitzat';
+  if (/fermat|disciplina|voluntat|control|estrateg/.test(txt)) return 'Determinant';
+  return seleccionarEstatDeterminista(txt);
+}
+
 // ═══════════════════════════════════════════════════════════
 //  FASE 8 → FASE 9: Estils de parla
 // ═══════════════════════════════════════════════════════════
@@ -2314,7 +2467,7 @@ async function generarEstilsParla() {
 
   const seleccionats = Array.from(checkboxes).map(cb => {
     const item = document.getElementById(cb.id.replace('elenc-cb-', 'elenc-item-'));
-    return item ? item.dataset.text : '';
+    return item ? extreureNomPersonatge(item.dataset.text) : '';
   }).filter(t => t.length > 0);
 
   ESTAT._personatgesSeleccionats = seleccionats;
@@ -2325,7 +2478,7 @@ async function generarEstilsParla() {
       nom,
       estil_veu: prev.estil_veu || '',
       perfil_psicologic: prev.perfil_psicologic || '',
-      estat_animic_actual: prev.estat_animic_actual || 'Tranquil'
+      estat_animic_actual: prev.estat_animic_actual || inferirEstatAnimicDesDeVeu(prev.estil_veu, prev.perfil_psicologic)
     });
   });
   ESTAT.fase = 9;
@@ -2384,14 +2537,63 @@ async function generarPerfilsPsicologics(userConfig) {
   if (noms.length === 0 || !ESTAT.estilsParla) return { personatges: [] };
 
   const estils = extreureEstilsPerPersonatge(ESTAT.estilsParla);
+  const mapaEstilsNormalitzat = {};
+  Object.keys(estils).forEach(nom => {
+    const key = normalitzarNomPersonatge(extreureNomPersonatge(nom) || nom);
+    if (!key || mapaEstilsNormalitzat[key]) return;
+    mapaEstilsNormalitzat[key] = estils[nom];
+  });
+
+  const obtenirEstilPerNom = (nom) => {
+    if (estils[nom]) return estils[nom];
+    const nomNet = extreureNomPersonatge(nom);
+    if (nomNet && estils[nomNet]) return estils[nomNet];
+    const key = normalitzarNomPersonatge(nomNet || nom);
+    return key ? (mapaEstilsNormalitzat[key] || '') : '';
+  };
+
+  const limitarParaules = (txt = '', maxParaules = 50) => {
+    const net = String(txt || '').replace(/\s+/g, ' ').trim();
+    if (!net) return '';
+    const parts = net.split(' ');
+    let out = parts.length <= maxParaules ? net : parts.slice(0, maxParaules).join(' ');
+    out = out.replace(/[,:;\-–—]+$/g, '').trim();
+    if (out && !/[.!?…]$/.test(out)) out += '.';
+    return out;
+  };
+
+  const completarAprox50Paraules = (txt = '', context = '') => {
+    const base = limitarParaules(txt, 50);
+    if (!base) {
+      return limitarParaules(`Personatge marcat per contradiccions internes. Vol ser estimat però tem mostrar fragilitat; oscil·la entre control i impuls, i converteix cada relació en un camp de prova emocional. Necessita reparar una pèrdua antiga per triar amb honestedat i assumir conseqüències sense fugir.`, 50);
+    }
+    const parts = base.split(/\s+/).filter(Boolean);
+    if (parts.length >= 42) return base;
+    const cua = limitarParaules(`Aquesta tensió, alimentada per ${context || 'el passat no resolt'}, condiciona les seves decisions i el porta a protegir-se amb conductes defensives que, paradoxalment, agreugen el conflicte que més vol evitar.`, Math.max(6, 50 - parts.length));
+    return limitarParaules(`${base} ${cua}`, 50);
+  };
+
+  const generarEtapaPerNom = (nom = '') => {
+    const etapes = ['negacio', 'resistencia', 'fractura', 'insight'];
+    const net = normalitzarNomPersonatge(nom);
+    if (!net) return 'resistencia';
+    let hash = 0;
+    for (let i = 0; i < net.length; i++) hash = ((hash << 5) - hash + net.charCodeAt(i)) | 0;
+    return etapes[Math.abs(hash) % etapes.length];
+  };
+
   const llista = noms.map((nom, i) => `${i + 1}. ${nom}
 Estil de veu:
-${(estils[nom] || '(no trobat)').substring(0, 900)}`).join('\n');
+${(obtenirEstilPerNom(nom) || '(no trobat)').substring(0, 900)}`).join('\n');
 
   const msgs = [{
     role: 'user',
     content: `Analitza aquests personatges i genera un perfil psicològic breu (trets de personalitat, pors, motivacions) per a cadascun.
-Afegeix també: "ferida_nuclear", "mascara_social" i "etapa_arc_intern" (una de: negacio, resistencia, fractura, insight, integracio).
+IMPORTANT:
+- "perfil_psicologic", "ferida_nuclear" i "mascara_social" han de tenir APROXIMADAMENT 50 paraules cadascun (entre 40 i 55).
+- "estat_animic_actual" ha de ser variat i coherent (evita repetir "Tranquil" per defecte).
+- "etapa_arc_intern" ha de reflectir la situació pròpia de cada personatge (no posis "negacio" a tothom).
+Afegeix: "ferida_nuclear", "mascara_social", "estat_animic_actual" i "etapa_arc_intern" (una de: negacio, resistencia, fractura, insight, integracio).
 Retorna un JSON on cada personatge tingui aquests camps.
 Es requereix l'anàlisi de EXACTAMENT ${noms.length} personatges.
 
@@ -2401,71 +2603,113 @@ ${llista}
 Retorna EXCLUSIVAMENT JSON vàlid:
 {
   "personatges": [
-    {"nom": "Nom", "perfil_psicologic": "...", "ferida_nuclear":"...", "mascara_social":"...", "etapa_arc_intern":"negacio"}
+    {"nom": "Nom", "perfil_psicologic": "...", "ferida_nuclear":"...", "mascara_social":"...", "estat_animic_actual":"...", "etapa_arc_intern":"negacio"}
   ]
 }`
   }];
 
   const models = getModelConfig(userConfig || USER_CONFIG || {});
   const perfilMap = {};
-  noms.forEach(n => { perfilMap[n] = { nom: n, perfil_psicologic: '', ferida_nuclear: '', mascara_social: '', etapa_arc_intern: 'negacio', estat_animic_actual: 'Tranquil' }; });
+  noms.forEach(n => { perfilMap[n] = { nom: n, perfil_psicologic: '', ferida_nuclear: '', mascara_social: '', etapa_arc_intern: generarEtapaPerNom(n), estat_animic_actual: inferirEstatAnimicDesDeVeu(obtenirEstilPerNom(n), '') }; });
 
   try {
-    const raw = await callLLMMulti(
-      msgs,
-      'Ets un psicòleg narratiu. Retorna només JSON vàlid en català.',
-      Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 1800, model: models.modelArquitecte }),
-      'arquitectura'
-    );
-    const data = parseJsonRobust(raw);
-    if (data && Array.isArray(data.personatges)) {
-      data.personatges.forEach(p => {
+    const systemPsico = 'Ets un psicòleg narratiu. Retorna només JSON vàlid en català.';
+
+    const aplicarPerfils = (items = [], llistaObjectiu = noms) => {
+      if (!Array.isArray(items)) return;
+      items.forEach(p => {
         const nom = p && p.nom ? String(p.nom).trim() : '';
-        if (!nom || !noms.includes(nom)) return;
-        perfilMap[nom] = {
-          nom,
-          perfil_psicologic: String(p.perfil_psicologic || '').trim(),
-          ferida_nuclear: String(p.ferida_nuclear || '').trim(),
-          mascara_social: String(p.mascara_social || '').trim(),
-          etapa_arc_intern: normalitzarEtapaArcIntern(p.etapa_arc_intern),
-          estat_animic_actual: (ESTAT._perfilsPersonatges && ESTAT._perfilsPersonatges[nom] && ESTAT._perfilsPersonatges[nom].estat_animic_actual) || 'Tranquil'
+        const key = normalitzarNomPersonatge(extreureNomPersonatge(nom) || nom);
+        const nomOriginal = llistaObjectiu.find(n => normalitzarNomPersonatge(extreureNomPersonatge(n) || n) === key);
+        if (!nomOriginal) return;
+        perfilMap[nomOriginal] = {
+          nom: nomOriginal,
+          perfil_psicologic: completarAprox50Paraules(String(p.perfil_psicologic || '').trim(), 'la por de no ser suficient'),
+          ferida_nuclear: completarAprox50Paraules(String(p.ferida_nuclear || '').trim(), 'una ferida antiga de rebuig'),
+          mascara_social: completarAprox50Paraules(String(p.mascara_social || '').trim(), 'la necessitat de semblar invulnerable'),
+          etapa_arc_intern: normalitzarEtapaArcIntern(p.etapa_arc_intern || generarEtapaPerNom(nomOriginal)),
+          estat_animic_actual: String(p.estat_animic_actual || '').trim() || (ESTAT._perfilsPersonatges && ESTAT._perfilsPersonatges[nomOriginal] && ESTAT._perfilsPersonatges[nomOriginal].estat_animic_actual) || inferirEstatAnimicDesDeVeu(obtenirEstilPerNom(nomOriginal), String(p.perfil_psicologic || ''))
         };
       });
+    };
+
+    const generarBlocPerfils = async (blocNoms, maxTokens = 1400) => {
+      if (!Array.isArray(blocNoms) || blocNoms.length === 0) return;
+      const llistaBloc = blocNoms.map((nom, i) => `${i + 1}. ${nom}
+Estil de veu:
+${(obtenirEstilPerNom(nom) || '(no trobat)').substring(0, 900)}`).join('\n');
+      const msgsBloc = [{
+        role: 'user',
+        content: `Analitza aquests personatges i genera un perfil psicològic breu (trets de personalitat, pors, motivacions) per a cadascun.
+IMPORTANT:
+- "perfil_psicologic", "ferida_nuclear" i "mascara_social" han de tenir APROXIMADAMENT 50 paraules cadascun (entre 40 i 55).
+- "estat_animic_actual" ha de ser variat i coherent (evita repetir "Tranquil" per defecte).
+- "etapa_arc_intern" ha de reflectir la situació pròpia de cada personatge (no posis "negacio" a tothom).
+Afegeix també: "ferida_nuclear", "mascara_social", "estat_animic_actual" i "etapa_arc_intern" (una de: negacio, resistencia, fractura, insight, integracio).
+Retorna un JSON on cada personatge tingui aquests camps.
+Es requereix l'anàlisi de EXACTAMENT ${blocNoms.length} personatges.
+
+PERSONATGES:
+${llistaBloc}
+
+Retorna EXCLUSIVAMENT JSON vàlid:
+{
+  "personatges": [
+    {"nom": "Nom", "perfil_psicologic": "...", "ferida_nuclear":"...", "mascara_social":"...", "estat_animic_actual":"...", "etapa_arc_intern":"negacio"}
+  ]
+}`
+      }];
+
+      const rawBloc = await callLLMMulti(
+        msgsBloc,
+        systemPsico,
+        Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens, model: models.modelArquitecte }),
+        'arquitectura'
+      );
+      const dataBloc = parseJsonRobust(rawBloc);
+      if (dataBloc && Array.isArray(dataBloc.personatges)) {
+        aplicarPerfils(dataBloc.personatges, blocNoms);
+      }
+    };
+
+    const CHUNK_PSICO = 4;
+    for (let i = 0; i < noms.length; i += CHUNK_PSICO) {
+      const bloc = noms.slice(i, i + CHUNK_PSICO);
+      await generarBlocPerfils(bloc, 1300);
     }
 
-    const faltants = noms.filter(nom => !(perfilMap[nom] && perfilMap[nom].perfil_psicologic));
+    let faltants = noms.filter(nom => !(perfilMap[nom] && perfilMap[nom].perfil_psicologic));
     if (faltants.length > 0) {
-      const retryMsgs = [{
-        role: 'user',
-        content: `T'has deixat els següents personatges: ${faltants.join(', ')}. Genera només el JSON per aquests.
+      for (const nomFaltant of faltants) {
+        const retryMsgs = [{
+          role: 'user',
+          content: `Genera el perfil psicològic d'aquest únic personatge.
+"perfil_psicologic", "ferida_nuclear" i "mascara_social" han de tenir aproximadament 50 paraules (40-55).
+Proposa també "estat_animic_actual" variat i "etapa_arc_intern" no genèrica.
+
+PERSONATGE:
+- ${nomFaltant}
+Estil de veu:
+${(obtenirEstilPerNom(nomFaltant) || '(no trobat)').substring(0, 900)}
 
 Retorna EXCLUSIVAMENT JSON:
 {
   "personatges": [
-    {"nom": "Nom", "perfil_psicologic": "...", "ferida_nuclear":"...", "mascara_social":"...", "etapa_arc_intern":"negacio"}
+    {"nom": "${nomFaltant}", "perfil_psicologic": "...", "ferida_nuclear":"...", "mascara_social":"...", "estat_animic_actual":"...", "etapa_arc_intern":"negacio"}
   ]
 }`
-      }];
-      const rawRetry = await callLLMMulti(
-        retryMsgs,
-        'Ets un psicòleg narratiu. Retorna només JSON vàlid en català.',
-        Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 1000, model: models.modelArquitecte }),
-        'arquitectura'
-      );
-      const retryData = parseJsonRobust(rawRetry);
-      if (retryData && Array.isArray(retryData.personatges)) {
-        retryData.personatges.forEach(p => {
-          const nom = p && p.nom ? String(p.nom).trim() : '';
-          if (!nom || !faltants.includes(nom)) return;
-          perfilMap[nom] = {
-            nom,
-            perfil_psicologic: String(p.perfil_psicologic || '').trim(),
-            ferida_nuclear: String(p.ferida_nuclear || '').trim(),
-            mascara_social: String(p.mascara_social || '').trim(),
-            etapa_arc_intern: normalitzarEtapaArcIntern(p.etapa_arc_intern),
-            estat_animic_actual: (ESTAT._perfilsPersonatges && ESTAT._perfilsPersonatges[nom] && ESTAT._perfilsPersonatges[nom].estat_animic_actual) || 'Tranquil'
-          };
-        });
+        }];
+
+        const rawRetry = await callLLMMulti(
+          retryMsgs,
+          systemPsico,
+          Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 700, model: models.modelArquitecte }),
+          'arquitectura'
+        );
+        const retryData = parseJsonRobust(rawRetry);
+        if (retryData && Array.isArray(retryData.personatges)) {
+          aplicarPerfils(retryData.personatges, [nomFaltant]);
+        }
       }
     }
   } catch (err) {
@@ -2473,17 +2717,25 @@ Retorna EXCLUSIVAMENT JSON:
   }
 
   ESTAT._perfilsPersonatges = ESTAT._perfilsPersonatges || {};
+  const etapesDisponibles = ['negacio', 'resistencia', 'fractura', 'insight', 'integracio'];
+  const etapesActuals = noms.map(n => normalitzarEtapaArcIntern((perfilMap[n] || {}).etapa_arc_intern));
+  const totNegacio = etapesActuals.every(e => e === 'negacio');
+
   noms.forEach(nom => {
     const prev = ESTAT._perfilsPersonatges[nom] || {};
-    const nou = perfilMap[nom] || { nom, perfil_psicologic: '', ferida_nuclear: '', mascara_social: '', etapa_arc_intern: 'negacio', estat_animic_actual: 'Tranquil' };
+    const nou = perfilMap[nom] || { nom, perfil_psicologic: '', ferida_nuclear: '', mascara_social: '', etapa_arc_intern: 'negacio', estat_animic_actual: '' };
+    const etapaDiversa = totNegacio ? etapesDisponibles[Math.abs(nom.length) % etapesDisponibles.length] : normalitzarEtapaArcIntern(nou.etapa_arc_intern || prev.etapa_arc_intern || generarEtapaPerNom(nom));
     ESTAT._perfilsPersonatges[nom] = Object.assign({}, prev, {
       nom,
       estil_veu: prev.estil_veu || (estils[nom] || ''),
-      perfil_psicologic: nou.perfil_psicologic || prev.perfil_psicologic || '',
-      ferida_nuclear: nou.ferida_nuclear || prev.ferida_nuclear || '',
-      mascara_social: nou.mascara_social || prev.mascara_social || '',
-      etapa_arc_intern: normalitzarEtapaArcIntern(nou.etapa_arc_intern || prev.etapa_arc_intern || 'negacio'),
-      estat_animic_actual: nou.estat_animic_actual || prev.estat_animic_actual || 'Tranquil'
+      perfil_psicologic: completarAprox50Paraules(
+        nou.perfil_psicologic || prev.perfil_psicologic || `Personatge amb conflicte intern marcat; combina desig de control amb por a la pèrdua, i pren decisions defensives que tensionen les relacions.`,
+        'la contradicció entre desig i autoprotecció'
+      ),
+      ferida_nuclear: completarAprox50Paraules(nou.ferida_nuclear || prev.ferida_nuclear || '', 'una humiliació o pèrdua fundacional'),
+      mascara_social: completarAprox50Paraules(nou.mascara_social || prev.mascara_social || '', 'l intenció d aparentar fortalesa'),
+      etapa_arc_intern: etapaDiversa,
+      estat_animic_actual: String(nou.estat_animic_actual || '').trim() || prev.estat_animic_actual || inferirEstatAnimicDesDeVeu(prev.estil_veu || obtenirEstilPerNom(nom), nou.perfil_psicologic || prev.perfil_psicologic)
     });
   });
 
@@ -2701,19 +2953,30 @@ async function iniciarFaseFeridaArc() {
   }
 }
 
-function scoreRelacioPerEtiqueta(textBase = '') {
+function hashDeterminista(txt = '') {
+  const src = String(txt || '');
+  let hash = 0;
+  for (let i = 0; i < src.length; i++) hash = ((hash << 5) - hash + src.charCodeAt(i)) | 0;
+  return Math.abs(hash);
+}
+
+function scoreRelacioPerEtiqueta(textBase = '', seed = '') {
   const txt = String(textBase || '').toLowerCase();
   let score = 50;
   if (/estima|cura|admir|lleial|confia|protegeix/.test(txt)) score += 18;
   if (/por|desconf|rival|gelos|odi|ressent|venjan[çc]a/.test(txt)) score -= 22;
   if (/culpa|vergonya|depend[eè]ncia|obsessi[oó]/.test(txt)) score -= 8;
-  return Math.max(5, Math.min(95, score));
+  const variacio = (hashDeterminista(seed || txt) % 17) - 8;
+  return Math.max(5, Math.min(95, score + variacio));
 }
 
-function estimarTipusRelacio(score) {
-  if (score >= 66) return 'vincle';
-  if (score <= 38) return 'tensio';
-  return 'ambivalencia';
+function estimarTipusRelacio(score, seed = '') {
+  const taula = score >= 66
+    ? ['vincle protector', 'complicitat intensa', 'aliança fràgil', 'lleialtat incòmoda']
+    : (score <= 38
+      ? ['rivalitat oberta', 'tensió soterrada', 'hostilitat continguda', 'dependència conflictiva']
+      : ['ambivalència magnètica', 'interdependència inestable', 'equilibri tens', 'proximitat desconfiada']);
+  return taula[hashDeterminista(`${seed}|${score}`) % taula.length];
 }
 
 function actualitzarMatriuRelacionalDesDeRegistre(matriuBase = []) {
@@ -2733,8 +2996,8 @@ function actualitzarMatriuRelacionalDesDeRegistre(matriuBase = []) {
           : (/ajuda|salva|confessa|repara|abra[çc]a/.test(text) ? 7 : 0);
         const nova = Math.max(5, Math.min(95, (Number(actual.intensitat) || 50) + delta));
         actual.intensitat = nova;
-        actual.tipus = estimarTipusRelacio(nova);
-        actual.tendencia = delta > 0 ? 'millorant' : (delta < 0 ? 'empitjorant' : (actual.tendencia || 'estable'));
+        actual.tipus = estimarTipusRelacio(nova, `${parella}|${text}`);
+        actual.tendencia = delta > 0 ? 'millorant' : (delta < 0 ? 'empitjorant' : (actual.tendencia || 'inestable'));
         if (delta !== 0) actual.nota = `Ajustat pel registre de capítols (${delta > 0 ? '+' : ''}${delta}).`;
         map.set(parella, actual);
       }
@@ -2756,14 +3019,16 @@ function generarMatriuRelacionalLocal() {
       const a = noms[i], b = noms[j];
       const pa = perf[a] || {}, pb = perf[b] || {};
       const textBase = `${pa.perfil_psicologic || ''} ${pb.perfil_psicologic || ''} ${pa.ferida_nuclear || ''} ${pb.ferida_nuclear || ''}`;
-      const intensitat = scoreRelacioPerEtiqueta(textBase);
-      const tipus = estimarTipusRelacio(intensitat);
+      const seedRelacio = `${a}|${b}|${pa.etapa_arc_intern || ''}|${pb.etapa_arc_intern || ''}|${pa.estat_animic_actual || ''}|${pb.estat_animic_actual || ''}`;
+      const intensitat = scoreRelacioPerEtiqueta(textBase, seedRelacio);
+      const tipus = estimarTipusRelacio(intensitat, seedRelacio);
+      const tendenciaBase = (hashDeterminista(seedRelacio) % 3 === 0) ? 'inestable' : ((hashDeterminista(seedRelacio) % 2 === 0) ? 'millorant' : 'empitjorant');
       matriu.push({
         parella: `${a} ↔ ${b}`,
         tipus,
         intensitat,
-        tendencia: 'estable',
-        nota: `${a} projecta "${(pa.mascara_social || 'reserva')}", mentre ${b} respon des de "${(pb.mascara_social || 'control')}".`
+        tendencia: tendenciaBase,
+        nota: `${a} projecta "${(pa.mascara_social || 'reserva')}", mentre ${b} respon des de "${(pb.mascara_social || 'control')}"; la fricció entre ${(pa.estat_animic_actual || 'contenció')} i ${(pb.estat_animic_actual || 'alerta')} modula la dinàmica.`
       });
     }
   }
@@ -5422,11 +5687,15 @@ Format ESTRICTE (res més, sense cap introducció):
 async function fase9_estilParla(protagonistaTriat, personatgesSecundaris, conteActual, tematica, estilDesc, history, userConfig) {
   const totsPersonatges = Array.from(new Set([protagonistaTriat, ...personatgesSecundaris].filter(Boolean)));
   const historyCurt = Array.isArray(history) ? history.slice(-6) : [];
-  const CHUNK = 6;
+  const PRIMERA_TONGADA = 7;
   const partsResposta = [];
 
-  for (let i = 0; i < totsPersonatges.length; i += CHUNK) {
-    const blocPersonatges = totsPersonatges.slice(i, i + CHUNK);
+  const tongades = [
+    totsPersonatges.slice(0, PRIMERA_TONGADA),
+    totsPersonatges.slice(PRIMERA_TONGADA)
+  ].filter(bloc => bloc.length > 0);
+
+  for (const blocPersonatges of tongades) {
     const llista = blocPersonatges.map((p, j) => `${j + 1}. ${p}`).join('\n');
 
     const msgs = [
@@ -5507,15 +5776,94 @@ Per assegurar que hi caben tots en la teva resposta, sigues molt concís: dedica
 //
 // Genera un document HTML semàntic amb <h1> i <p> i el descarrega
 // directament al navegador mitjançant Blob + URL.createObjectURL.
-function exportarADoc(titol, contingut) {
-  if (typeof docx === 'undefined') {
-    toast("Error: La llibreria DOCX no s'ha carregat. Comprova la connexió.");
+// Genera un nom de fitxer segur i consistent per a descàrregues DOCX.
+function normalitzarNomFitxerDocx(base, fallback = 'document') {
+  const net = String(base || '')
+    .replace(/[<>:"/\\|?*]/g, ' ')
+    .replace(/\s+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .substring(0, 80);
+  return `${net || fallback}.docx`;
+}
+
+function descarregarBlobDocx(blob, nomFitxer) {
+  if (window.navigator && typeof window.navigator.msSaveOrOpenBlob === 'function') {
+    window.navigator.msSaveOrOpenBlob(blob, nomFitxer);
+    return;
+  }
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nomFitxer;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  // Alguns navegadors cancel·len la descàrrega si el revoke és immediat.
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+async function assegurarLlibreriaDocx() {
+  if (typeof docx !== 'undefined' && docx && docx.Document && docx.Packer) return true;
+
+  const urls = [
+    'https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.js',
+    'https://unpkg.com/docx@8.5.0/build/index.js'
+  ];
+
+  const carregarScript = (src) => new Promise((resolve) => {
+    const existent = Array.from(document.scripts).find(s => s.src && s.src.includes(src));
+    if (existent) {
+      if (typeof docx !== 'undefined') return resolve(true);
+      existent.addEventListener('load', () => resolve(typeof docx !== 'undefined'), { once: true });
+      existent.addEventListener('error', () => resolve(false), { once: true });
+      return;
+    }
+
+    const s = document.createElement('script');
+    s.src = src;
+    s.async = true;
+    s.onload = () => resolve(typeof docx !== 'undefined');
+    s.onerror = () => resolve(false);
+    document.head.appendChild(s);
+  });
+
+  for (const u of urls) {
+    const ok = await carregarScript(u);
+    if (ok && typeof docx !== 'undefined' && docx.Document && docx.Packer) return true;
+  }
+  return false;
+}
+
+function descarregarTextFallback(titol, contingut, base = 'document') {
+  const nomTxt = normalitzarNomFitxerDocx(titol || base, base).replace(/\.docx$/i, '.txt');
+  const blob = new Blob([String(contingut || '')], { type: 'text/plain;charset=utf-8' });
+  descarregarBlobDocx(blob, nomTxt);
+  toast(`⚠️ DOCX no disponible. S'ha descarregat TXT: ${nomTxt}`);
+  return nomTxt;
+}
+
+function obrirGoogleDocsPerImportar(nomFitxer = '') {
+  window.open('https://docs.google.com/document/u/0/', '_blank', 'noopener');
+  if (nomFitxer) {
+    toast(`Google Docs obert. Importa-hi el fitxer ${nomFitxer}.`);
+  }
+}
+
+async function exportarADoc(titol, contingut) {
+  const docxDisponible = await assegurarLlibreriaDocx();
+  if (!docxDisponible) {
+    const nomTxt = descarregarTextFallback(titol, contingut, 'conte');
+    obrirGoogleDocsPerImportar(nomTxt);
     return;
   }
 
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = docx;
 
-  const paragrafsText = contingut.split(/\n\n+/).filter(p => p.trim().length > 0);
+  const textNet = netejarTabulacionsInicials(contingut);
+  const paragrafsText = textNet.split(/\n\n+/).filter(p => p.trim().length > 0);
   const fills = [
     new Paragraph({
       text: titol || 'Conte IA',
@@ -5531,11 +5879,14 @@ function exportarADoc(titol, contingut) {
   ];
 
   paragrafsText.forEach((p, i) => {
-    fills.push(new Paragraph({
+    const pOptions = {
       text: p.trim(),
-      indent: i > 0 ? { firstLine: 720 } : undefined, // Sangria a partir del segon paràgraf
       spacing: { after: 200 }
-    }));
+    };
+    if (i > 0) {
+      pOptions.indent = { firstLine: 720 };
+    }
+    fills.push(new Paragraph(pOptions));
   });
 
   const doc = new Document({
@@ -5545,26 +5896,19 @@ function exportarADoc(titol, contingut) {
     }]
   });
 
-  Packer.toBlob(doc).then(blob => {
-    const url = URL.createObjectURL(blob);
-    const nomFitxer = (titol || 'conte')
-      .replace(/[<>:"/\\|?*]/g, '').trim().replace(/\s+/g, '_').substring(0, 80) + '.docx';
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = nomFitxer;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  try {
+    const blob = await Packer.toBlob(doc);
+    const nomFitxer = normalitzarNomFitxerDocx(titol || 'conte', 'conte');
+    descarregarBlobDocx(blob, nomFitxer);
     toast('📄 Descarregat: ' + nomFitxer);
-  }).catch(err => {
+  } catch (err) {
     toast("Error a l'exportar DOCX: " + err.message);
-  });
+    throw err;
+  }
 }
 
 
-function descarregarNovella() {
+async function descarregarNovella() {
   const capsGenerats = ESTAT._capitols_generats || [];
   if (!capsGenerats.some(Boolean)) {
     toast('No hi ha cap capítol generat per descarregar.');
@@ -5592,21 +5936,43 @@ function descarregarNovella() {
     }
   }
 
-  exportarNovella(titolDefinitiu, capsGenerats, ESTAT._estructuraCapitols || [], netejarTabulacionsInicials(textEpileg));
+  await exportarNovella(titolDefinitiu, capsGenerats, ESTAT._estructuraCapitols || [], netejarTabulacionsInicials(textEpileg));
 }
 
-function exportarNovella(titol, caps, estructura, epileg) {
-  if (typeof docx === 'undefined') {
-    toast("Error: La llibreria DOCX no s'ha carregat.");
+async function exportarNovella(titol, caps, estructura, epileg) {
+  const docxDisponible = await assegurarLlibreriaDocx();
+  if (!docxDisponible) {
+    const capitolsFallback = caps
+      .map((c, i) => ({ text: c, titolCap: (estructura[i] && estructura[i].titol ? String(estructura[i].titol).trim() : '') || `Capítol ${i + 1}` }))
+      .filter(c => c.text);
+    const indexFallback = capitolsFallback.map((c, i) => `${i + 1}. ${c.titolCap}`).join('\n');
+    const contingutFallback = [
+      titol || 'Novel·la IA',
+      indexFallback ? `Índex de capítols\n${indexFallback}` : '',
+      ...capitolsFallback.map((c, i) => `Capítol ${i + 1} — ${c.titolCap}\n\n${netejarTabulacionsInicials(c.text)}`),
+      (epileg && String(epileg).trim()) ? `Epíleg\n\n${netejarTabulacionsInicials(epileg)}` : ''
+    ].filter(Boolean).join('\n\n');
+    const nomTxt = descarregarTextFallback(titol, contingutFallback, 'novella');
+    obrirGoogleDocsPerImportar(nomTxt);
     return;
   }
 
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, PageBreak } = docx;
   const fills = [];
 
-  // Portada
+  const titolObra = titol || 'Novel·la IA';
+  const capitolsAmbText = caps
+    .map((text, i) => ({
+      text,
+      idx: i,
+      cap: estructura[i] || null,
+      titolCap: (estructura[i] && estructura[i].titol ? String(estructura[i].titol).trim() : '') || `Capítol ${i + 1}`
+    }))
+    .filter(item => item.text);
+
+  // Portada + índex
   fills.push(new Paragraph({
-    text: titol || 'Novel·la IA',
+    text: titolObra,
     heading: HeadingLevel.TITLE,
     alignment: AlignmentType.CENTER,
     spacing: { before: 2400, after: 400 }
@@ -5616,30 +5982,41 @@ function exportarNovella(titol, caps, estructura, epileg) {
     alignment: AlignmentType.CENTER,
     spacing: { after: 800 }
   }));
-  fills.push(new Paragraph({ children: [new PageBreak()] })); // Salt de pàgina després de la portada
+
+  fills.push(new Paragraph({
+    text: 'Índex de capítols',
+    heading: HeadingLevel.HEADING_2,
+    alignment: AlignmentType.LEFT,
+    spacing: { before: 600, after: 260 }
+  }));
+
+  capitolsAmbText.forEach((item, pos) => {
+    fills.push(new Paragraph({
+      text: `${pos + 1}. ${item.titolCap}`,
+      spacing: { after: 120 }
+    }));
+  });
+
+  fills.push(new Paragraph({ children: [new PageBreak()] })); // Salt de pàgina després de la portada + índex
 
   // Capítols
-  caps.forEach((text, i) => {
-    if (!text) return;
-    const cap = estructura[i];
-    const titolCap = cap ? (cap.titol || '') : '';
+  capitolsAmbText.forEach((item, pos) => {
+    const text = item.text;
+    const i = item.idx;
+    const titolCap = item.titolCap;
 
     fills.push(new Paragraph({
-      children: [new TextRun({ text: `Capítol ${i + 1}`, color: "888888", size: 24 })],
+      children: [new TextRun({ text: titolObra, color: "888888", size: 22 })],
       alignment: AlignmentType.CENTER,
-      spacing: { before: 800, after: 200 }
+      spacing: { before: 600, after: 120 }
     }));
 
-    if (titolCap) {
-      fills.push(new Paragraph({
-        text: titolCap,
-        heading: HeadingLevel.HEADING_2,
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 600 }
-      }));
-    } else {
-      fills.push(new Paragraph({ spacing: { after: 600 } }));
-    }
+    fills.push(new Paragraph({
+      text: `Capítol ${pos + 1} — ${titolCap}`,
+      heading: HeadingLevel.HEADING_2,
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 600 }
+    }));
 
     const paragrafsText = netejarTabulacionsInicials(text).split(/\n\n+/).filter(p => p.trim().length > 0);
     paragrafsText.forEach((p, index) => {
@@ -5678,20 +6055,15 @@ function exportarNovella(titol, caps, estructura, epileg) {
     sections: [{ properties: {}, children: fills }]
   });
 
-  Packer.toBlob(doc).then(blob => {
-    const url = URL.createObjectURL(blob);
-    const nomFitxer = (titol || 'novella').replace(/[<>:"/\\|?*]/g, '').trim().replace(/\s+/g, '_').substring(0, 80) + '.docx';
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = nomFitxer;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  try {
+    const blob = await Packer.toBlob(doc);
+    const nomFitxer = normalitzarNomFitxerDocx(titol || 'novella', 'novella');
+    descarregarBlobDocx(blob, nomFitxer);
     toast('📖 Descarregat: ' + nomFitxer);
-  }).catch(err => {
+  } catch (err) {
     toast("Error a l'exportar la novel·la DOCX: " + err.message);
-  });
+    throw err;
+  }
 }
 
 
@@ -5705,23 +6077,66 @@ function parseJsonRobust(text, expectedKeys = []) {
   }
   const s = text.trim();
 
-  function parseLenientJson(candidate) {
-    if (!candidate || typeof candidate !== 'string') return null;
-    const cleaned = candidate
+  function netejarCandidate(candidate = '') {
+    return String(candidate || '')
       .replace(/[“”]/g, '"')
       .replace(/[‘’]/g, "'")
-      .replace(/,\s*([}\]])/g, '$1');
-    try { return JSON.parse(cleaned); } catch (e) { return null; }
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+      .replace(/,\s*([}\]])/g, '$1')
+      .trim();
+  }
+
+  function tancarJsonIncomplet(candidate = '') {
+    const src = String(candidate || '');
+    if (!src) return src;
+
+    const stack = [];
+    let inString = false;
+    let escaped = false;
+
+    for (let i = 0; i < src.length; i++) {
+      const ch = src[i];
+
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (ch === '\\') { escaped = true; continue; }
+        if (ch === '"') { inString = false; }
+        continue;
+      }
+
+      if (ch === '"') { inString = true; continue; }
+      if (ch === '{') stack.push('}');
+      else if (ch === '[') stack.push(']');
+      else if ((ch === '}' || ch === ']') && stack.length > 0 && stack[stack.length - 1] === ch) stack.pop();
+    }
+
+    let out = src;
+    if (inString) out += '"';
+    while (stack.length > 0) out += stack.pop();
+    return out;
+  }
+
+  function parseLenientJson(candidate) {
+    if (!candidate || typeof candidate !== 'string') return null;
+
+    const cleaned = netejarCandidate(candidate);
+    try { return JSON.parse(cleaned); } catch (e) {}
+
+    // Heurística clau: si la resposta s'ha tallat, intentem tancar l'objecte/array i parsejar.
+    const repaired = netejarCandidate(tancarJsonIncomplet(cleaned));
+    try { return JSON.parse(repaired); } catch (e) { return null; }
   }
 
   function validar(resultat, metode) {
     if (!resultat) return null;
-    // Si s'han passat claus obligatòries, les comprovem
     if (expectedKeys && expectedKeys.length > 0) {
       const missing = expectedKeys.filter(k => !(k in resultat));
       if (missing.length > 0) {
         console.warn(`⚠️ [parseJsonRobust] JSON recuperat via ${metode}, però falten claus estructurals: ${missing.join(', ')}`);
-        return null; // Forcem error perquè el sistema faci un retry automàtic
+        return null;
       }
     }
     if (metode !== 'Directe') {
@@ -5743,19 +6158,21 @@ function parseJsonRobust(text, expectedKeys = []) {
     if (parsedCode) return validar(parsedCode, 'Markdown Block');
   }
 
-  // 3. Primer objecte { ... } complet
+  // 3. Primer objecte { ... } (també prova reparació si està truncat)
   const objStart = s.indexOf('{');
   const objEnd   = s.lastIndexOf('}');
-  if (objStart !== -1 && objEnd > objStart) {
-    let parsedObject = parseLenientJson(s.slice(objStart, objEnd + 1));
+  if (objStart !== -1) {
+    const objectCandidate = objEnd > objStart ? s.slice(objStart, objEnd + 1) : s.slice(objStart);
+    let parsedObject = parseLenientJson(objectCandidate);
     if (parsedObject) return validar(parsedObject, 'Extracció Objecte {}');
   }
 
-  // 4. Primer array [ ... ] complet
+  // 4. Primer array [ ... ] (també prova reparació si està truncat)
   const arrStart = s.indexOf('[');
   const arrEnd   = s.lastIndexOf(']');
-  if (arrStart !== -1 && arrEnd > arrStart) {
-    let parsedArray = parseLenientJson(s.slice(arrStart, arrEnd + 1));
+  if (arrStart !== -1) {
+    const arrayCandidate = arrEnd > arrStart ? s.slice(arrStart, arrEnd + 1) : s.slice(arrStart);
+    let parsedArray = parseLenientJson(arrayCandidate);
     if (parsedArray) return validar(parsedArray, 'Extracció Array []');
   }
 
