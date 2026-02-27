@@ -2953,19 +2953,30 @@ async function iniciarFaseFeridaArc() {
   }
 }
 
-function scoreRelacioPerEtiqueta(textBase = '') {
+function hashDeterminista(txt = '') {
+  const src = String(txt || '');
+  let hash = 0;
+  for (let i = 0; i < src.length; i++) hash = ((hash << 5) - hash + src.charCodeAt(i)) | 0;
+  return Math.abs(hash);
+}
+
+function scoreRelacioPerEtiqueta(textBase = '', seed = '') {
   const txt = String(textBase || '').toLowerCase();
   let score = 50;
   if (/estima|cura|admir|lleial|confia|protegeix/.test(txt)) score += 18;
   if (/por|desconf|rival|gelos|odi|ressent|venjan[çc]a/.test(txt)) score -= 22;
   if (/culpa|vergonya|depend[eè]ncia|obsessi[oó]/.test(txt)) score -= 8;
-  return Math.max(5, Math.min(95, score));
+  const variacio = (hashDeterminista(seed || txt) % 17) - 8;
+  return Math.max(5, Math.min(95, score + variacio));
 }
 
-function estimarTipusRelacio(score) {
-  if (score >= 66) return 'vincle';
-  if (score <= 38) return 'tensio';
-  return 'ambivalencia';
+function estimarTipusRelacio(score, seed = '') {
+  const taula = score >= 66
+    ? ['vincle protector', 'complicitat intensa', 'aliança fràgil', 'lleialtat incòmoda']
+    : (score <= 38
+      ? ['rivalitat oberta', 'tensió soterrada', 'hostilitat continguda', 'dependència conflictiva']
+      : ['ambivalència magnètica', 'interdependència inestable', 'equilibri tens', 'proximitat desconfiada']);
+  return taula[hashDeterminista(`${seed}|${score}`) % taula.length];
 }
 
 function actualitzarMatriuRelacionalDesDeRegistre(matriuBase = []) {
@@ -2985,8 +2996,8 @@ function actualitzarMatriuRelacionalDesDeRegistre(matriuBase = []) {
           : (/ajuda|salva|confessa|repara|abra[çc]a/.test(text) ? 7 : 0);
         const nova = Math.max(5, Math.min(95, (Number(actual.intensitat) || 50) + delta));
         actual.intensitat = nova;
-        actual.tipus = estimarTipusRelacio(nova);
-        actual.tendencia = delta > 0 ? 'millorant' : (delta < 0 ? 'empitjorant' : (actual.tendencia || 'estable'));
+        actual.tipus = estimarTipusRelacio(nova, `${parella}|${text}`);
+        actual.tendencia = delta > 0 ? 'millorant' : (delta < 0 ? 'empitjorant' : (actual.tendencia || 'inestable'));
         if (delta !== 0) actual.nota = `Ajustat pel registre de capítols (${delta > 0 ? '+' : ''}${delta}).`;
         map.set(parella, actual);
       }
@@ -3008,14 +3019,16 @@ function generarMatriuRelacionalLocal() {
       const a = noms[i], b = noms[j];
       const pa = perf[a] || {}, pb = perf[b] || {};
       const textBase = `${pa.perfil_psicologic || ''} ${pb.perfil_psicologic || ''} ${pa.ferida_nuclear || ''} ${pb.ferida_nuclear || ''}`;
-      const intensitat = scoreRelacioPerEtiqueta(textBase);
-      const tipus = estimarTipusRelacio(intensitat);
+      const seedRelacio = `${a}|${b}|${pa.etapa_arc_intern || ''}|${pb.etapa_arc_intern || ''}|${pa.estat_animic_actual || ''}|${pb.estat_animic_actual || ''}`;
+      const intensitat = scoreRelacioPerEtiqueta(textBase, seedRelacio);
+      const tipus = estimarTipusRelacio(intensitat, seedRelacio);
+      const tendenciaBase = (hashDeterminista(seedRelacio) % 3 === 0) ? 'inestable' : ((hashDeterminista(seedRelacio) % 2 === 0) ? 'millorant' : 'empitjorant');
       matriu.push({
         parella: `${a} ↔ ${b}`,
         tipus,
         intensitat,
-        tendencia: 'estable',
-        nota: `${a} projecta "${(pa.mascara_social || 'reserva')}", mentre ${b} respon des de "${(pb.mascara_social || 'control')}".`
+        tendencia: tendenciaBase,
+        nota: `${a} projecta "${(pa.mascara_social || 'reserva')}", mentre ${b} respon des de "${(pb.mascara_social || 'control')}"; la fricció entre ${(pa.estat_animic_actual || 'contenció')} i ${(pb.estat_animic_actual || 'alerta')} modula la dinàmica.`
       });
     }
   }
