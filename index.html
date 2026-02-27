@@ -2194,10 +2194,15 @@ async function exportarDoc() {
     ? ESTAT.premissaTriada.substring(0, 55) + (ESTAT.premissaTriada.length > 55 ? '…' : '')
     : 'Conte IA';
 
+  const btn = document.querySelector('[onclick="exportarDoc()"]');
+  const origText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Generant DOCX…'; }
   try {
     await exportarADoc(titol, ESTAT.conteText);
   } catch (error) {
     toast("Error general exportant: " + error.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = origText; }
   }
 }
 
@@ -4269,14 +4274,15 @@ function mostrarResultatRevisioGlobal(dades) {
   resultEl.classList.remove('hidden');
 
   // Botons de reescriptura per als capítols problemàtics
-  if (capitolsReescriure.length > 0 && dades.instruccions_reescriptura) {
+  if (capitolsReescriure.length > 0) {
+    // Guardem les instruccions a ESTAT per evitar passar JSON complex via onclick
+    ESTAT._instruccionsReescripturaGlobal = dades.instruccions_reescriptura || {};
     reescrEl.innerHTML = `
       <div style="width:100%;font-size:.82rem;color:var(--text2);margin-bottom:6px;">Opus suggereix reescriure els capítols:</div>
       ${capitolsReescriure.map(numCap => {
         const idx = numCap - 1;
-        const instruccions = dades.instruccions_reescriptura[String(numCap)] || '';
-        return `<button class="btn btn-secondary" onclick="reescriureCapitolGlobal(${idx}, ${escHtml(JSON.stringify(instruccions))})">
-          ✏️ Reescriure Cap. ${numCap}
+        return `<button class="btn btn-secondary" data-cap-idx="${idx}" onclick="reescriureCapitolGlobal(${idx})">
+          ✏️ Reeditar Cap. ${numCap}
         </button>`;
       }).join('\n')}`;
   }
@@ -4368,12 +4374,61 @@ Retorna EXCLUSIVAMENT el text del prompt llest per copiar i enganxar, escrit en 
   }
 }
 
-async function reescriureCapitolGlobal(idx, instruccions) {
-  if (!instruccions || !ESTAT._capitols_generats[idx]) return;
-  // Reutilitzem la funció existent
-  ESTAT._revisioInstruccions = ESTAT._revisioInstruccions || {};
-  ESTAT._revisioInstruccions[idx] = instruccions;
-  await reescriureCapitol(idx);
+async function reescriureCapitolGlobal(idx) {
+  if (!ESTAT._capitols_generats[idx]) { toast('Capítol no disponible.'); return; }
+
+  // Llegim les instruccions del mapa guardat per Opus (pot ser buit si Opus no les va donar)
+  const instruccions = (ESTAT._instruccionsReescripturaGlobal && ESTAT._instruccionsReescripturaGlobal[String(idx + 1)]) || '';
+
+  // Deshabilitem el botó que s'ha premut
+  const reescrEl = document.getElementById('revisio-global-reescriptures');
+  const btn = reescrEl && reescrEl.querySelector(`[data-cap-idx="${idx}"]`);
+  if (btn) { btn.disabled = true; btn.textContent = `⏳ Reescrivint Cap. ${idx + 1}…`; }
+
+  // Amagatem el panell de revisió global i mostrem el loader
+  document.getElementById('btn-control-arcs-wrap').classList.add('hidden');
+  document.getElementById('capitol-actual-wrap').classList.add('hidden');
+  document.getElementById('revisio-panel').classList.add('hidden');
+  showLoader(11);
+  document.getElementById('loader-11-text').textContent = `🟣 Sonnet reescrivint el Capítol ${idx + 1}…`;
+
+  try {
+    const res = await reescriureCapitolAmbInstruccions(idx, instruccions, USER_CONFIG);
+    const textNet = netejarTabulacionsInicials(res.response);
+    ESTAT._capitols_generats[idx] = textNet;
+    renderLlistaCapitols();
+    hideLoader(11);
+    mostrarCapitol(idx, textNet);
+
+    // Tornem a mostrar el panell de revisió global amb el capítol reescrit marcat i botó per re-avaluar
+    document.getElementById('btn-control-arcs-wrap').classList.remove('hidden');
+    if (reescrEl) {
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = `✓ Cap. ${idx + 1} reescrit`;
+        btn.classList.remove('btn-secondary');
+        btn.classList.add('btn-ghost');
+      }
+      // Afegim/actualitzem el botó de nova revisió global
+      let reavBtn = document.getElementById('btn-nova-revisio-global');
+      if (!reavBtn) {
+        reavBtn = document.createElement('button');
+        reavBtn.id = 'btn-nova-revisio-global';
+        reavBtn.className = 'btn btn-primary';
+        reavBtn.style.cssText = 'width:100%;margin-top:12px;';
+        reavBtn.onclick = iniciarRevisioGlobal;
+        reescrEl.appendChild(reavBtn);
+      }
+      reavBtn.textContent = '🔄 Nova Revisió Global del Llibre';
+    }
+    toast(`✓ Capítol ${idx + 1} reescrit amb millores literàries.`);
+  } catch (err) {
+    hideLoader(11);
+    document.getElementById('btn-control-arcs-wrap').classList.remove('hidden');
+    document.getElementById('capitol-actual-wrap').classList.remove('hidden');
+    if (btn) { btn.disabled = false; btn.textContent = `✏️ Reeditar Cap. ${idx + 1}`; }
+    toast('Error en reeditar: ' + err.message);
+  }
 }
 
 // ─── SISTEMA 1: Bíblia Narrativa ─────────────────────────────────────────────
@@ -5936,7 +5991,17 @@ async function descarregarNovella() {
     }
   }
 
-  await exportarNovella(titolDefinitiu, capsGenerats, ESTAT._estructuraCapitols || [], netejarTabulacionsInicials(textEpileg));
+  const btns = document.querySelectorAll('[onclick="descarregarNovella()"]');
+  const origTexts = Array.from(btns).map(b => b.textContent);
+  btns.forEach(b => { b.disabled = true; b.textContent = '⏳ Generant DOCX…'; });
+  try {
+    await exportarNovella(titolDefinitiu, capsGenerats, ESTAT._estructuraCapitols || [], netejarTabulacionsInicials(textEpileg));
+  } catch (err) {
+    toast('Error al descarregar la novel·la: ' + err.message);
+    console.error('[descarregarNovella]', err);
+  } finally {
+    btns.forEach((b, i) => { b.disabled = false; b.textContent = origTexts[i]; });
+  }
 }
 
 async function exportarNovella(titol, caps, estructura, epileg) {
@@ -7056,7 +7121,6 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense cap text addicional, sense m
 // ═══════════════════════════════════════════════════════════
 async function revisarCapitol(textCapitol, idx, userConfig) {
   const cap       = ESTAT._estructuraCapitols[idx];
-  const capText   = cap ? cap.resum || cap.text : '';
   const registreCtx = buildRegistreContext(idx);
   const { aPlantarAra, aRecollirAra } = getPrefiguracionsActives(idx);
 
@@ -7070,17 +7134,85 @@ async function revisarCapitol(textCapitol, idx, userConfig) {
       aRecollirAra.map(p => `- ${p.element}`).join('\n');
   }
 
+  // Planificació completa del capítol (tots els camps)
+  const planificacioCompleta = (() => {
+    if (!cap) return `Capítol ${idx + 1}`;
+    const lines = [];
+    if (cap.titol)       lines.push(`Títol: ${cap.titol}`);
+    if (cap.fil)         lines.push(`Fil principal: ${cap.fil}`);
+    if (cap.toRitme)     lines.push(`To i ritme: ${cap.toRitme}`);
+    if (cap.personatges && cap.personatges.length > 0)
+      lines.push(`Personatges: ${cap.personatges.join(', ')}`);
+    if (cap.resum)       lines.push(`\nResum/Planificació:\n${cap.resum}`);
+    if (cap.connexioAnterior) lines.push(`\nConnexió amb l'anterior: ${cap.connexioAnterior}`);
+    if (cap.connexioSeguent)  lines.push(`Connexió amb el següent: ${cap.connexioSeguent}`);
+    if (cap.prefiguracionsPlantar && cap.prefiguracionsPlantar.length > 0)
+      lines.push(`\nPrefiguracions a plantar: ${cap.prefiguracionsPlantar.join(' | ')}`);
+    if (cap.prefiguracionsRecollir && cap.prefiguracionsRecollir.length > 0)
+      lines.push(`Prefiguracions a recollir: ${cap.prefiguracionsRecollir.join(' | ')}`);
+    // text = JSON original complet del planificador
+    if (cap.text) lines.push(`\nPlanificació original (JSON complet):\n${cap.text}`);
+    return lines.join('\n');
+  })();
+
+  // Estat del NKG: personatges, últimes accions i fets canònics
+  const nkgEstat = (() => {
+    const nkg = ESTAT._nkg;
+    if (!nkg) return '';
+    const parts = [];
+
+    const pers = Object.values(nkg.personatges);
+    if (pers.length > 0) {
+      parts.push('PERSONATGES (estat NKG actualitzat fins a l\'escena anterior):\n' +
+        pers.map(p => {
+          const inv = Array.isArray(p.objectes_inventari) && p.objectes_inventari.length > 0
+            ? p.objectes_inventari.join(', ') : '(sense objectes)';
+          let line = `• ${p.nom}: emoció="${p.estat_emocional || 'neutre'}"`;
+          if (p.estat_fisic)        line += ` | físic="${p.estat_fisic}"`;
+          if (p.indumentaria_actual) line += ` | roba="${p.indumentaria_actual}"`;
+          line += ` | inventari=[${inv}]`;
+          if (p.ubicacio)           line += ` | ubicació="${p.ubicacio}"`;
+          if (p.viu === false)      line += ' | MORT';
+          return line;
+        }).join('\n'));
+    }
+
+    if (Array.isArray(nkg.timeline_accions) && nkg.timeline_accions.length > 0) {
+      parts.push('ÚLTIMES ACCIONS CONSUMADES (detecta regressió si el capítol les torna a narrar):\n' +
+        nkg.timeline_accions.slice(-10).map(a => `• ${a}`).join('\n'));
+    }
+
+    if (Array.isArray(nkg.fets_canonics) && nkg.fets_canonics.length > 0) {
+      parts.push('FETS CANÒNICS ESTABLERTS (no han de contradir-se):\n' +
+        nkg.fets_canonics.slice(-10).map(f => `• Cap.${f.capitol_origen}: ${f.descripcio}`).join('\n'));
+    }
+
+    return parts.join('\n\n');
+  })();
+
+  // Text complet de tots els capítols anteriors per detectar incongruències creuades
+  const capitolsAnteriors = (ESTAT._capitols_generats || [])
+    .slice(0, idx)
+    .map((text, i) => text ? `═══ CAPÍTOL ${i + 1} ═══\n${text}` : null)
+    .filter(Boolean)
+    .join('\n\n');
+
   const msgs = [{
     role: 'user',
-    content: `Revisa aquest capítol i comprova la coherència amb la planificació i el Registre narratiu.
+    content: `Revisa aquest capítol i comprova la coherència amb tots els capítols anteriors i amb la planificació narrativa.
+${capitolsAnteriors ? `
+CAPÍTOLS ANTERIORS (text complet — usa'ls per detectar incongruències, repeticions, contradiccions de fets, objectes, roba o emocions):
+${capitolsAnteriors}
 
-PLANIFICACIÓ D'AQUEST CAPÍTOL:
-${capText}
+` : ''}
+PLANIFICACIÓ COMPLETA D'AQUEST CAPÍTOL:
+${planificacioCompleta}
 ${registreCtx}
 ${prefCtx}
+${nkgEstat ? `\nESTAT DEL NKG:\n${nkgEstat}` : ''}
 
 CAPÍTOL ${idx + 1} GENERAT:
-${textCapitol.substring(0, 5000)}${textCapitol.length > 5000 ? '\n[…text truncat…]' : ''}
+${textCapitol}
 
 La teva tasca és avaluar si el text és publicable i si compleix amb els objectius de l'escaleta.
 Fixa't especialment en:
@@ -7213,6 +7345,15 @@ async function reescriureCapitolAmbInstruccions(idx, instruccions, userConfig) {
   const capText     = cap ? cap.text : '';
   const systemPrompt= buildSystemPromptCapitol();
 
+  const promptMilIora = `
+CRITERIS DE QUALITAT LITERÀRIA (aplica sempre en la reescriptura):
+- MOSTRA, no expliquis: substitueix el "telling" emocional ("va sentir por", "estava nerviós", "es va posar content") per accions, diàleg o pensament intern que mostrin l'emoció.
+- Alterna frases curtes, mitjanes i llargues per crear ritme i evitar la monotonia robòtica.
+- Varia els inicis de frase; no comencis massa seguides amb el nom del personatge o el mateix connector.
+- Elimina adjectius febles i substitueix-los per verbs d'acció forts.
+- Mantén veus diferenciades per a cada personatge; no parlin tots amb la mateixa cadència.
+- Evita clixés, resolucions mandroses i diàlegs que exposen informació que els personatges ja saben.`;
+
   const msgs = [{
     role: 'user',
     content: `Reescriu el Capítol ${idx + 1} incorporant les correccions de l'editor.
@@ -7224,7 +7365,8 @@ CAPÍTOL ACTUAL:
 ${textActual.substring(0, 4000)}${textActual.length > 4000 ? '\n[…]' : ''}
 
 INSTRUCCIONS DE CORRECCIÓ DE L'EDITOR (Opus):
-${instruccions}
+${instruccions || 'Millora la qualitat literària general del capítol.'}
+${promptMilIora}
 
 Reescriu el capítol complet incorporant les correccions. Mantén la mateixa veu i extensió (~2000 paraules). Escriu directament la narració en català, sense títol ni notes.`
   }];
@@ -8102,6 +8244,7 @@ function crearNKG() {
     fets_canonics: [],
     esdeveniments: [],
     relacions: [],
+    timeline_accions: [], // Registre d'Accions Consumades (NKG CHRONOS): "C3E2: Maja entra al laboratori"
     ultima_actualitzacio: { capitol: 0, escena: 0 },
     versio: 1
   };
@@ -8193,6 +8336,12 @@ function nkgQueryEscenaContext(escenaSpec) {
     objectesRellevants.forEach(o => {
       parts.push(`• ${o.nom}${o.significat_simbolic ? ' — ' + o.significat_simbolic : ''}`);
     });
+  }
+
+  // NKG CHRONOS: àncora temporal — última acció registrada al timeline
+  if (Array.isArray(nkg.timeline_accions) && nkg.timeline_accions.length > 0) {
+    const ultimaAccio = nkg.timeline_accions[nkg.timeline_accions.length - 1];
+    parts.push(`\nÚLTIMA ACCIÓ REGISTRADA: ${ultimaAccio}`);
   }
 
   return parts.join('\n');
@@ -8486,6 +8635,19 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
     if (nkg.esdeveniments.length > 30) nkg.esdeveniments = nkg.esdeveniments.slice(-30);
   }
 
+  // NKG CHRONOS: registrar accions consumades per al protocol anti-regressió
+  if (Array.isArray(dades.accions_consumades) && dades.accions_consumades.length > 0) {
+    if (!Array.isArray(nkg.timeline_accions)) nkg.timeline_accions = [];
+    const novesAccions = dades.accions_consumades
+      .filter(a => typeof a === 'string' && a.trim().length > 0)
+      .map(a => `C${capitol}E${escena}: ${a.trim()}`);
+    nkg.timeline_accions.push(...novesAccions);
+    // Mantenim les últimes 20 accions per no saturar el context
+    if (nkg.timeline_accions.length > 20) {
+      nkg.timeline_accions = nkg.timeline_accions.slice(-20);
+    }
+  }
+
   nkg.ultima_actualitzacio = { capitol, escena };
 }
 
@@ -8517,7 +8679,7 @@ IMPORTANT: Per omplir aquest JSON, has de llegir el text de la nova escena i ten
 TEXT:
 ${textEscena.substring(0, 3000)}${textEscena.length > 3000 ? '\n[…text truncat…]' : ''}
 
-Retorna EXCLUSIVAMENT un JSON vàlid:
+Retorna EXCLUSIVAMENT un JSON vàlid amb EXACTAMENT aquests camps:
 {
   "personatges": [
     {
@@ -8532,8 +8694,15 @@ Retorna EXCLUSIVAMENT un JSON vàlid:
         }
       ]
     }
+  ],
+  "accions_consumades": [
+    "ha obert la porta del laboratori",
+    "ha disparat la pistola cap al sostre",
+    "ha llegit el fitxer secret"
   ]
-}`
+}
+
+El camp "accions_consumades" ha de contenir 3-5 accions físiques IRREVERSIBLES que han succeït en aquesta escena concreta. Cada acció ha d'estar en tercera persona passada i ser prou específica per poder-se usar com a restricció ("ha creuat el portal", "ha firmat el document", "ha matat el guarda"). Si no n'hi ha prou, posa les que hi hagi. NO inventes accions que no surten al text.`
   }];
 
   const models = getModelConfig(userConfig);
@@ -8715,10 +8884,24 @@ async function escriureEscenaDirectaAmbJutge(capitol, escenaIdx, escenaSpec, use
 
   const blocPlaPsico = construirBlocPlaPsicologicPerPrompt(capitol, escenaIdx);
 
+  // NKG CHRONOS: restricció negativa anti-regressió
+  const accionsRecents = (ESTAT._nkg && Array.isArray(ESTAT._nkg.timeline_accions) && ESTAT._nkg.timeline_accions.length > 0)
+    ? ESTAT._nkg.timeline_accions.slice(-8).join('\n- ')
+    : '';
+  const blocAntiRegressio = accionsRecents
+    ? `[CONTROL DE CONTINUÏTAT — ACCIONS JA CONSUMADES]
+Les següents accions JA han succeït en els capítols/escenes anteriors immediats.
+ESTÀ TERMINANTMENT PROHIBIT TORNAR A NARRAR-LES o presentar-les com a noves.
+La teva escena ha de començar TEMPORALMENT DESPRÉS d'aquests fets:
+- ${accionsRecents}
+
+Si l'escaleta et demana una acció que ja està a la llista superior, assumeix que ja s'ha realitzat i narra la CONSEQÜÈNCIA directa, no l'acció en si.`
+    : '';
+
   const promptUnificat = `ESCRIPTURA D'ESCENA — Capítol ${capitol}, Escena ${escenaIdx + 1}
 
 ${contextNKG}
-${contextCapitolEnCurs}
+${blocAntiRegressio ? blocAntiRegressio + '\n' : ''}${contextCapitolEnCurs}
 ${goldenRef}
 ${estilsPresents}${manualRef}
 ${blocPlaPsico}
