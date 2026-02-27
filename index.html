@@ -4438,13 +4438,19 @@ function getMaxTokens(safeConfig, modelId) {
 // tag: 'generacio' | 'arquitecte' | 'arquitectura'
 // config._esDraft: true → usa model Draft (Haiku o equivalent)
 // config.model: override explícit del model (màxima prioritat)
+function normalizeProviderId(provider) {
+  const p = String(provider || '').toLowerCase().trim();
+  if (p === 'google-gemini' || p === 'google') return 'gemini';
+  return p;
+}
+
 function getProviderPerRol(config, tag) {
   const cfg = config || {};
   const isArq = (tag === 'arquitecte' || tag === 'arquitectura');
   const roleProvider = isArq
     ? (cfg.providerArquitectura || cfg.provider_arq)
     : (cfg.providerGeneracio || cfg.provider_gen || cfg.providerDraft);
-  return (roleProvider || cfg.provider || 'anthropic');
+  return normalizeProviderId(roleProvider || cfg.provider || 'anthropic');
 }
 
 function getModelIdPerRol(config, tag) {
@@ -4462,13 +4468,26 @@ function getModelIdPerRol(config, tag) {
   return cfg.modelGeneracio || cfg.model;
 }
 
+function getProviderAndModelPerRol(config, tag) {
+  const modelId = getModelIdPerRol(config, tag);
+  let proveidor = getProviderPerRol(config, tag);
+  const reg = MODEL_REGISTRY[modelId];
+  const providerDelModel = normalizeProviderId(reg && reg.proveidor);
+
+  // Si model i provider no coincideixen, prioritzem el proveïdor real del model.
+  if (providerDelModel && providerDelModel !== proveidor) {
+    console.warn(`[LLM Router] Provider ajustat per coherència model/proveïdor: ${proveidor} -> ${providerDelModel} (model: ${modelId})`);
+    proveidor = providerDelModel;
+  }
+
+  return { modelId, proveidor };
+}
+
 async function callLLMMulti(messages, systemPrompt, config, tag) {
   const safeConfig = config || {};
 
   // Assignem el model segons si la tasca és d'arquitectura o de generació
-  const modelId = getModelIdPerRol(safeConfig, tag);
-
-  const proveidor = getProviderPerRol(safeConfig, tag);
+  const { modelId, proveidor } = getProviderAndModelPerRol(safeConfig, tag);
 
   // Obtenim la clau API corresponent
   let apiKey;
@@ -4491,9 +4510,7 @@ async function callLLMMulti(messages, systemPrompt, config, tag) {
 async function callLLMWithContinuation(messages, systemPrompt, config, tag, maxCont = 3) {
   const safeConfig = config || {};
 
-  const modelId = getModelIdPerRol(safeConfig, tag);
-
-  const proveidor = getProviderPerRol(safeConfig, tag);
+  const { modelId, proveidor } = getProviderAndModelPerRol(safeConfig, tag);
 
   let apiKey;
   if (proveidor === 'anthropic') apiKey = ESTAT._anthropicApiKey || safeConfig.apiKey;
@@ -4549,9 +4566,7 @@ function textSemblaIncomplet(text) {
 async function callLLMOneShotPlusCompletion(messages, systemPrompt, config, tag) {
   const safeConfig = config || {};
 
-  const modelId = getModelIdPerRol(safeConfig, tag);
-
-  const proveidor = getProviderPerRol(safeConfig, tag);
+  const { modelId, proveidor } = getProviderAndModelPerRol(safeConfig, tag);
   let apiKey;
   if (proveidor === 'anthropic') apiKey = ESTAT._anthropicApiKey || safeConfig.apiKey;
   if (proveidor === 'google' || proveidor === 'gemini') apiKey = ESTAT._geminiApiKey || safeConfig.apiKey;
@@ -4616,9 +4631,7 @@ No repeteixis res del que ja has escrit.` }
 async function callLLMOneShotConditionalCompletion(messages, systemPrompt, config, tag) {
   const safeConfig = config || {};
 
-  const modelId = getModelIdPerRol(safeConfig, tag);
-
-  const proveidor = getProviderPerRol(safeConfig, tag);
+  const { modelId, proveidor } = getProviderAndModelPerRol(safeConfig, tag);
   let apiKey;
   if (proveidor === 'anthropic') apiKey = ESTAT._anthropicApiKey || safeConfig.apiKey;
   if (proveidor === 'google' || proveidor === 'gemini') apiKey = ESTAT._geminiApiKey || safeConfig.apiKey;
