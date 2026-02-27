@@ -8369,6 +8369,7 @@ function crearNKG() {
     relacions: [],
     timeline_accions: [], // Registre d'Accions Consumades (NKG CHRONOS): "C3E2: Maja entra al laboratori"
     timeline_objectes: [], // Registre de moviment d'objectes: C3E2: [Claus] Personatge A -> Personatge B (motiu)
+    timeline_personatges: [], // Registre de canvis de personatge: ubicació/roba/estat per escena
     ultima_actualitzacio: { capitol: 0, escena: 0 },
     versio: 1
   };
@@ -8449,6 +8450,49 @@ function nkgSincronitzarInventariPersonatge(nkg, abans, despres, capitol, escena
       );
     }
   });
+}
+
+function nkgRegistrarCanvisPersonatge(nkg, abans, despres, capitol, escena) {
+  if (!nkg || !despres || !despres.nom) return;
+  if (!Array.isArray(nkg.timeline_personatges)) nkg.timeline_personatges = [];
+
+  const canvis = [];
+  const abansUbi = (abans && abans.ubicacio) ? String(abans.ubicacio) : '';
+  const despresUbi = (despres && despres.ubicacio) ? String(despres.ubicacio) : '';
+  if ((abansUbi || '') !== (despresUbi || '') && despresUbi) {
+    canvis.push(`ubicació: ${abansUbi || '(desconeguda)'} → ${despresUbi}`);
+  }
+
+  const abansRoba = (abans && abans.indumentaria_actual) ? String(abans.indumentaria_actual) : '';
+  const despresRoba = (despres && despres.indumentaria_actual) ? String(despres.indumentaria_actual) : '';
+  if ((abansRoba || '') !== (despresRoba || '') && despresRoba) {
+    canvis.push(`vestimenta: ${abansRoba || '(sense dades)'} → ${despresRoba}`);
+  }
+
+  const abansEmo = (abans && abans.estat_emocional) ? String(abans.estat_emocional) : '';
+  const despresEmo = (despres && despres.estat_emocional) ? String(despres.estat_emocional) : '';
+  if ((abansEmo || '') !== (despresEmo || '') && despresEmo) {
+    canvis.push(`emoció: ${abansEmo || '(desconeguda)'} → ${despresEmo}`);
+  }
+
+  if (canvis.length === 0) return;
+
+  const linia = `C${capitol}E${escena}: [${despres.nom}] ${canvis.join(' | ')}`;
+  nkg.timeline_personatges.push(linia);
+  if (nkg.timeline_personatges.length > 120) nkg.timeline_personatges = nkg.timeline_personatges.slice(-120);
+
+  // Historial estructurat dins del personatge
+  if (!Array.isArray(despres.historial_ubicacions)) despres.historial_ubicacions = [];
+  if (!Array.isArray(despres.historial_indumentaria)) despres.historial_indumentaria = [];
+
+  if ((abansUbi || '') !== (despresUbi || '') && despresUbi) {
+    despres.historial_ubicacions.push({ capitol, escena, ubicacio: despresUbi });
+    if (despres.historial_ubicacions.length > 60) despres.historial_ubicacions = despres.historial_ubicacions.slice(-60);
+  }
+  if ((abansRoba || '') !== (despresRoba || '') && despresRoba) {
+    despres.historial_indumentaria.push({ capitol, escena, indumentaria_actual: despresRoba });
+    if (despres.historial_indumentaria.length > 60) despres.historial_indumentaria = despres.historial_indumentaria.slice(-60);
+  }
 }
 
 function nkgQueryPersonatge(nom) {
@@ -8535,6 +8579,11 @@ function nkgQueryEscenaContext(escenaSpec) {
   if (Array.isArray(nkg.timeline_objectes) && nkg.timeline_objectes.length > 0) {
     parts.push('\nÚLTIMS MOVIMENTS D\'OBJECTES:');
     nkg.timeline_objectes.slice(-5).forEach(m => parts.push(`• ${m}`));
+  }
+
+  if (Array.isArray(nkg.timeline_personatges) && nkg.timeline_personatges.length > 0) {
+    parts.push('\nÚLTIMS CANVIS DE PERSONATGES (ubicació/roba):');
+    nkg.timeline_personatges.slice(-8).forEach(m => parts.push(`• ${m}`));
   }
 
   // NKG CHRONOS: àncora temporal — última acció registrada al timeline
@@ -8745,6 +8794,8 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
           objectes_inventari: Array.isArray(p.objectes_inventari) ? p.objectes_inventari : [],
           objectes_descartats: Array.isArray(p.objectes_descartats) ? p.objectes_descartats : [],
           ubicacio: p.ubicacio || '',
+          historial_ubicacions: p.ubicacio ? [{ capitol, escena, ubicacio: p.ubicacio }] : [],
+          historial_indumentaria: p.indumentaria_actual ? [{ capitol, escena, indumentaria_actual: p.indumentaria_actual }] : [],
           objectius: p.nous_objectius || [],
           secrets: p.nous_secrets || [],
           viu: p.viu !== undefined ? p.viu : true,
@@ -8778,6 +8829,7 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
 
       const despres = nkg.personatges[clau];
       nkgSincronitzarInventariPersonatge(nkg, abans, despres, capitol, escena);
+      nkgRegistrarCanvisPersonatge(nkg, abans, despres, capitol, escena);
 
       // Registrar descarts explícits d'objectes amb ubicació si existeix.
       const descarts = Array.isArray(p.objectes_descartats) ? p.objectes_descartats : [];
@@ -8943,6 +8995,7 @@ Retorna EXCLUSIVAMENT un JSON vàlid amb EXACTAMENT aquests camps:
     {
       "nom": "Nom del personatge",
       "estat_emocional": "Descripció concisa del seu estat d'ànim a l'acabar l'escena.",
+      "ubicacio": "On és físicament el personatge al final de l'escena (lloc concret).",
       "indumentaria_actual": "Què porta posat i en quin estat es troba (ex: 'Abric negre mullat, camisa arrugada').",
       "objectes_inventari": ["Pistola carregada", "Claus del cotxe", "Carta arrugada"],
       "objectes_descartats": [
@@ -9449,13 +9502,26 @@ function buildNkgContextRevisio(idx, esborrany) {
   });
 
   const timelineRecente = (ESTAT._nkg.timeline_accions || []).slice(-10).join('\n');
+  const timelinePersonatges = (ESTAT._nkg.timeline_personatges || []).slice(-15).join('\n');
   const objectesRecents = Object.values(ESTAT._nkg.objectes || {})
     .slice(0, 20)
     .map(o => `- ${o.nom || 'objecte'} | posseidor:${o.posseidor || '-'} | ubicacio:${o.ubicacio || '-'} | estat:${o.estat || '-'}`)
     .join('\n');
+  const personatgesRecents = Object.values(ESTAT._nkg.personatges || {})
+    .slice(0, 24)
+    .map(p => {
+      const ultUbi = Array.isArray(p.historial_ubicacions) && p.historial_ubicacions.length > 0
+        ? p.historial_ubicacions[p.historial_ubicacions.length - 1]
+        : null;
+      const ultRoba = Array.isArray(p.historial_indumentaria) && p.historial_indumentaria.length > 0
+        ? p.historial_indumentaria[p.historial_indumentaria.length - 1]
+        : null;
+      return `- ${p.nom || 'personatge'} | ubicacio_actual:${p.ubicacio || '-'}${ultUbi ? ` | darrer_canvi_ubicacio:C${ultUbi.capitol}E${ultUbi.escena}` : ''} | roba_actual:${p.indumentaria_actual || '-'}${ultRoba ? ` | darrer_canvi_roba:C${ultRoba.capitol}E${ultRoba.escena}` : ''}`;
+    })
+    .join('\n');
 
   const pistaDraft = String(esborrany || '').slice(0, 1200);
-  return `${base}\n\nTIMELINE RECENT:\n${timelineRecente || '(sense accions recents)'}\n\nOBJECTES (control de continuïtat):\n${objectesRecents || '(sense objectes indexats)'}\n\nPISTA ESBORRANY (detecció de divergències):\n${pistaDraft}`;
+  return `${base}\n\nTIMELINE RECENT:\n${timelineRecente || '(sense accions recents)'}\n\nTIMELINE PERSONATGES (ubicació/roba):\n${timelinePersonatges || '(sense canvis recents)'}\n\nOBJECTES (control de continuïtat):\n${objectesRecents || '(sense objectes indexats)'}\n\nPERSONATGES (control de continuïtat):\n${personatgesRecents || '(sense personatges indexats)'}\n\nPISTA ESBORRANY (detecció de divergències):\n${pistaDraft}`;
 }
 
 function normalitzarRevisioArquitecta(raw) {
