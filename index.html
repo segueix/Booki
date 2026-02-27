@@ -5810,15 +5810,15 @@ async function exportarADoc(titol, contingut) {
     }]
   });
 
-  Packer.toBlob(doc).then(blob => {
+  try {
+    const blob = await Packer.toBlob(doc);
     const nomFitxer = normalitzarNomFitxerDocx(titol || 'conte', 'conte');
     descarregarBlobDocx(blob, nomFitxer);
     toast('📄 Descarregat: ' + nomFitxer);
-    // Atenció: Google Docs pot ser bloquejat pel navegador si no és una acció directa de l'usuari.
-    obrirGoogleDocsPerImportar(nomFitxer);
-  }).catch(err => {
+  } catch (err) {
     toast("Error a l'exportar DOCX: " + err.message);
-  });
+    throw err;
+  }
 }
 
 
@@ -5969,14 +5969,15 @@ async function exportarNovella(titol, caps, estructura, epileg) {
     sections: [{ properties: {}, children: fills }]
   });
 
-  Packer.toBlob(doc).then(blob => {
+  try {
+    const blob = await Packer.toBlob(doc);
     const nomFitxer = normalitzarNomFitxerDocx(titol || 'novella', 'novella');
     descarregarBlobDocx(blob, nomFitxer);
     toast('📖 Descarregat: ' + nomFitxer);
-    obrirGoogleDocsPerImportar(nomFitxer);
-  }).catch(err => {
+  } catch (err) {
     toast("Error a l'exportar la novel·la DOCX: " + err.message);
-  });
+    throw err;
+  }
 }
 
 
