@@ -7121,7 +7121,6 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense cap text addicional, sense m
 // ═══════════════════════════════════════════════════════════
 async function revisarCapitol(textCapitol, idx, userConfig) {
   const cap       = ESTAT._estructuraCapitols[idx];
-  const capText   = cap ? cap.resum || cap.text : '';
   const registreCtx = buildRegistreContext(idx);
   const { aPlantarAra, aRecollirAra } = getPrefiguracionsActives(idx);
 
@@ -7134,6 +7133,62 @@ async function revisarCapitol(textCapitol, idx, userConfig) {
     prefCtx += '\nPREFIGURACIONS QUE CALIA RECOLLIR EN AQUEST CAPÍTOL:\n' +
       aRecollirAra.map(p => `- ${p.element}`).join('\n');
   }
+
+  // Planificació completa del capítol (tots els camps)
+  const planificacioCompleta = (() => {
+    if (!cap) return `Capítol ${idx + 1}`;
+    const lines = [];
+    if (cap.titol)       lines.push(`Títol: ${cap.titol}`);
+    if (cap.fil)         lines.push(`Fil principal: ${cap.fil}`);
+    if (cap.toRitme)     lines.push(`To i ritme: ${cap.toRitme}`);
+    if (cap.personatges && cap.personatges.length > 0)
+      lines.push(`Personatges: ${cap.personatges.join(', ')}`);
+    if (cap.resum)       lines.push(`\nResum/Planificació:\n${cap.resum}`);
+    if (cap.connexioAnterior) lines.push(`\nConnexió amb l'anterior: ${cap.connexioAnterior}`);
+    if (cap.connexioSeguent)  lines.push(`Connexió amb el següent: ${cap.connexioSeguent}`);
+    if (cap.prefiguracionsPlantar && cap.prefiguracionsPlantar.length > 0)
+      lines.push(`\nPrefiguracions a plantar: ${cap.prefiguracionsPlantar.join(' | ')}`);
+    if (cap.prefiguracionsRecollir && cap.prefiguracionsRecollir.length > 0)
+      lines.push(`Prefiguracions a recollir: ${cap.prefiguracionsRecollir.join(' | ')}`);
+    // text = JSON original complet del planificador
+    if (cap.text) lines.push(`\nPlanificació original (JSON complet):\n${cap.text}`);
+    return lines.join('\n');
+  })();
+
+  // Estat del NKG: personatges, últimes accions i fets canònics
+  const nkgEstat = (() => {
+    const nkg = ESTAT._nkg;
+    if (!nkg) return '';
+    const parts = [];
+
+    const pers = Object.values(nkg.personatges);
+    if (pers.length > 0) {
+      parts.push('PERSONATGES (estat NKG actualitzat fins a l\'escena anterior):\n' +
+        pers.map(p => {
+          const inv = Array.isArray(p.objectes_inventari) && p.objectes_inventari.length > 0
+            ? p.objectes_inventari.join(', ') : '(sense objectes)';
+          let line = `• ${p.nom}: emoció="${p.estat_emocional || 'neutre'}"`;
+          if (p.estat_fisic)        line += ` | físic="${p.estat_fisic}"`;
+          if (p.indumentaria_actual) line += ` | roba="${p.indumentaria_actual}"`;
+          line += ` | inventari=[${inv}]`;
+          if (p.ubicacio)           line += ` | ubicació="${p.ubicacio}"`;
+          if (p.viu === false)      line += ' | MORT';
+          return line;
+        }).join('\n'));
+    }
+
+    if (Array.isArray(nkg.timeline_accions) && nkg.timeline_accions.length > 0) {
+      parts.push('ÚLTIMES ACCIONS CONSUMADES (detecta regressió si el capítol les torna a narrar):\n' +
+        nkg.timeline_accions.slice(-10).map(a => `• ${a}`).join('\n'));
+    }
+
+    if (Array.isArray(nkg.fets_canonics) && nkg.fets_canonics.length > 0) {
+      parts.push('FETS CANÒNICS ESTABLERTS (no han de contradir-se):\n' +
+        nkg.fets_canonics.slice(-10).map(f => `• Cap.${f.capitol_origen}: ${f.descripcio}`).join('\n'));
+    }
+
+    return parts.join('\n\n');
+  })();
 
   // Text complet de tots els capítols anteriors per detectar incongruències creuades
   const capitolsAnteriors = (ESTAT._capitols_generats || [])
@@ -7150,10 +7205,11 @@ CAPÍTOLS ANTERIORS (text complet — usa'ls per detectar incongruències, repet
 ${capitolsAnteriors}
 
 ` : ''}
-PLANIFICACIÓ D'AQUEST CAPÍTOL:
-${capText}
+PLANIFICACIÓ COMPLETA D'AQUEST CAPÍTOL:
+${planificacioCompleta}
 ${registreCtx}
 ${prefCtx}
+${nkgEstat ? `\nESTAT DEL NKG:\n${nkgEstat}` : ''}
 
 CAPÍTOL ${idx + 1} GENERAT:
 ${textCapitol}
