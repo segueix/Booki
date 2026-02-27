@@ -2448,18 +2448,14 @@ Retorna EXCLUSIVAMENT JSON vàlid:
   noms.forEach(n => { perfilMap[n] = { nom: n, perfil_psicologic: '', ferida_nuclear: '', mascara_social: '', etapa_arc_intern: 'negacio', estat_animic_actual: 'Tranquil' }; });
 
   try {
-    const raw = await callLLMMulti(
-      msgs,
-      'Ets un psicòleg narratiu. Retorna només JSON vàlid en català.',
-      Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 1800, model: models.modelArquitecte }),
-      'arquitectura'
-    );
-    const data = parseJsonRobust(raw);
-    if (data && Array.isArray(data.personatges)) {
-      data.personatges.forEach(p => {
+    const systemPsico = 'Ets un psicòleg narratiu. Retorna només JSON vàlid en català.';
+
+    const aplicarPerfils = (items = [], llistaObjectiu = noms) => {
+      if (!Array.isArray(items)) return;
+      items.forEach(p => {
         const nom = p && p.nom ? String(p.nom).trim() : '';
         const key = normalitzarNomPersonatge(extreureNomPersonatge(nom) || nom);
-        const nomOriginal = noms.find(n => normalitzarNomPersonatge(extreureNomPersonatge(n) || n) === key);
+        const nomOriginal = llistaObjectiu.find(n => normalitzarNomPersonatge(extreureNomPersonatge(n) || n) === key);
         if (!nomOriginal) return;
         perfilMap[nomOriginal] = {
           nom: nomOriginal,
@@ -2470,43 +2466,79 @@ Retorna EXCLUSIVAMENT JSON vàlid:
           estat_animic_actual: (ESTAT._perfilsPersonatges && ESTAT._perfilsPersonatges[nomOriginal] && ESTAT._perfilsPersonatges[nomOriginal].estat_animic_actual) || 'Tranquil'
         };
       });
-    }
+    };
 
-    const faltants = noms.filter(nom => !(perfilMap[nom] && perfilMap[nom].perfil_psicologic));
-    if (faltants.length > 0) {
-      const retryMsgs = [{
+    const generarBlocPerfils = async (blocNoms, maxTokens = 1400) => {
+      if (!Array.isArray(blocNoms) || blocNoms.length === 0) return;
+      const llistaBloc = blocNoms.map((nom, i) => `${i + 1}. ${nom}
+Estil de veu:
+${(obtenirEstilPerNom(nom) || '(no trobat)').substring(0, 900)}`).join('\n');
+      const msgsBloc = [{
         role: 'user',
-        content: `T'has deixat els següents personatges: ${faltants.join(', ')}. Genera només el JSON per aquests.
+        content: `Analitza aquests personatges i genera un perfil psicològic breu (trets de personalitat, pors, motivacions) per a cadascun.
+Afegeix també: "ferida_nuclear", "mascara_social" i "etapa_arc_intern" (una de: negacio, resistencia, fractura, insight, integracio).
+Retorna un JSON on cada personatge tingui aquests camps.
+Es requereix l'anàlisi de EXACTAMENT ${blocNoms.length} personatges.
 
-Retorna EXCLUSIVAMENT JSON:
+PERSONATGES:
+${llistaBloc}
+
+Retorna EXCLUSIVAMENT JSON vàlid:
 {
   "personatges": [
     {"nom": "Nom", "perfil_psicologic": "...", "ferida_nuclear":"...", "mascara_social":"...", "etapa_arc_intern":"negacio"}
   ]
 }`
       }];
-      const rawRetry = await callLLMMulti(
-        retryMsgs,
-        'Ets un psicòleg narratiu. Retorna només JSON vàlid en català.',
-        Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 1000, model: models.modelArquitecte }),
+
+      const rawBloc = await callLLMMulti(
+        msgsBloc,
+        systemPsico,
+        Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens, model: models.modelArquitecte }),
         'arquitectura'
       );
-      const retryData = parseJsonRobust(rawRetry);
-      if (retryData && Array.isArray(retryData.personatges)) {
-        retryData.personatges.forEach(p => {
-          const nom = p && p.nom ? String(p.nom).trim() : '';
-          const key = normalitzarNomPersonatge(extreureNomPersonatge(nom) || nom);
-          const nomOriginal = faltants.find(n => normalitzarNomPersonatge(extreureNomPersonatge(n) || n) === key);
-          if (!nomOriginal) return;
-          perfilMap[nomOriginal] = {
-            nom: nomOriginal,
-            perfil_psicologic: String(p.perfil_psicologic || '').trim(),
-            ferida_nuclear: String(p.ferida_nuclear || '').trim(),
-            mascara_social: String(p.mascara_social || '').trim(),
-            etapa_arc_intern: normalitzarEtapaArcIntern(p.etapa_arc_intern),
-            estat_animic_actual: (ESTAT._perfilsPersonatges && ESTAT._perfilsPersonatges[nomOriginal] && ESTAT._perfilsPersonatges[nomOriginal].estat_animic_actual) || 'Tranquil'
-          };
-        });
+      const dataBloc = parseJsonRobust(rawBloc);
+      if (dataBloc && Array.isArray(dataBloc.personatges)) {
+        aplicarPerfils(dataBloc.personatges, blocNoms);
+      }
+    };
+
+    const CHUNK_PSICO = 4;
+    for (let i = 0; i < noms.length; i += CHUNK_PSICO) {
+      const bloc = noms.slice(i, i + CHUNK_PSICO);
+      await generarBlocPerfils(bloc, 1300);
+    }
+
+    let faltants = noms.filter(nom => !(perfilMap[nom] && perfilMap[nom].perfil_psicologic));
+    if (faltants.length > 0) {
+      for (const nomFaltant of faltants) {
+        const retryMsgs = [{
+          role: 'user',
+          content: `Genera el perfil psicològic d'aquest únic personatge.
+
+PERSONATGE:
+- ${nomFaltant}
+Estil de veu:
+${(obtenirEstilPerNom(nomFaltant) || '(no trobat)').substring(0, 900)}
+
+Retorna EXCLUSIVAMENT JSON:
+{
+  "personatges": [
+    {"nom": "${nomFaltant}", "perfil_psicologic": "...", "ferida_nuclear":"...", "mascara_social":"...", "etapa_arc_intern":"negacio"}
+  ]
+}`
+        }];
+
+        const rawRetry = await callLLMMulti(
+          retryMsgs,
+          systemPsico,
+          Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 700, model: models.modelArquitecte }),
+          'arquitectura'
+        );
+        const retryData = parseJsonRobust(rawRetry);
+        if (retryData && Array.isArray(retryData.personatges)) {
+          aplicarPerfils(retryData.personatges, [nomFaltant]);
+        }
       }
     }
   } catch (err) {
