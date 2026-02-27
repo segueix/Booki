@@ -2435,14 +2435,27 @@ function normalitzarNomPersonatge(raw = '') {
 
 function inferirEstatAnimicDesDeVeu(estilVeu = '', perfilText = '') {
   const txt = `${estilVeu || ''} ${perfilText || ''}`.toLowerCase();
-  if (!txt.trim()) return 'Tranquil';
+  const estatsBase = ['Serè', 'Neguitós', 'Reservat', 'Esperançat', 'Melancòlic', 'Irritat', 'Determinant', 'Vulnerable'];
+  const seleccionarEstatDeterminista = (seed = '') => {
+    const src = String(seed || '').trim();
+    if (!src) return 'Serè';
+    let hash = 0;
+    for (let i = 0; i < src.length; i++) {
+      hash = ((hash << 5) - hash + src.charCodeAt(i)) | 0;
+    }
+    const idx = Math.abs(hash) % estatsBase.length;
+    return estatsBase[idx];
+  };
+
+  if (!txt.trim()) return seleccionarEstatDeterminista(estilVeu || perfilText || 'estat-base');
   if (/fur[ií]|rabia|ira|hostil|agress|violent/.test(txt)) return 'Irritat';
   if (/por|ansi|anx|panic|p[àa]nic|nerv|inquiet/.test(txt)) return 'Neguitós';
   if (/trist|dol|abat|depr|melancol/.test(txt)) return 'Melancòlic';
   if (/ironi|sarcas|fred|calculador|anal[ií]tic/.test(txt)) return 'Reservat';
   if (/esperan[çc]|optim|euf[oò]r|entusias/.test(txt)) return 'Esperançat';
   if (/poetic|emocional|sensible|vulnerable/.test(txt)) return 'Sensibilitzat';
-  return 'Tranquil';
+  if (/fermat|disciplina|voluntat|control|estrateg/.test(txt)) return 'Determinant';
+  return seleccionarEstatDeterminista(txt);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2549,6 +2562,26 @@ async function generarPerfilsPsicologics(userConfig) {
     return out;
   };
 
+  const completarAprox50Paraules = (txt = '', context = '') => {
+    const base = limitarParaules(txt, 50);
+    if (!base) {
+      return limitarParaules(`Personatge marcat per contradiccions internes. Vol ser estimat però tem mostrar fragilitat; oscil·la entre control i impuls, i converteix cada relació en un camp de prova emocional. Necessita reparar una pèrdua antiga per triar amb honestedat i assumir conseqüències sense fugir.`, 50);
+    }
+    const parts = base.split(/\s+/).filter(Boolean);
+    if (parts.length >= 42) return base;
+    const cua = limitarParaules(`Aquesta tensió, alimentada per ${context || 'el passat no resolt'}, condiciona les seves decisions i el porta a protegir-se amb conductes defensives que, paradoxalment, agreugen el conflicte que més vol evitar.`, Math.max(6, 50 - parts.length));
+    return limitarParaules(`${base} ${cua}`, 50);
+  };
+
+  const generarEtapaPerNom = (nom = '') => {
+    const etapes = ['negacio', 'resistencia', 'fractura', 'insight'];
+    const net = normalitzarNomPersonatge(nom);
+    if (!net) return 'resistencia';
+    let hash = 0;
+    for (let i = 0; i < net.length; i++) hash = ((hash << 5) - hash + net.charCodeAt(i)) | 0;
+    return etapes[Math.abs(hash) % etapes.length];
+  };
+
   const llista = noms.map((nom, i) => `${i + 1}. ${nom}
 Estil de veu:
 ${(obtenirEstilPerNom(nom) || '(no trobat)').substring(0, 900)}`).join('\n');
@@ -2556,8 +2589,11 @@ ${(obtenirEstilPerNom(nom) || '(no trobat)').substring(0, 900)}`).join('\n');
   const msgs = [{
     role: 'user',
     content: `Analitza aquests personatges i genera un perfil psicològic breu (trets de personalitat, pors, motivacions) per a cadascun.
-IMPORTANT: El camp "perfil_psicologic" ha de tenir un màxim de 50 paraules.
-Afegeix també: "ferida_nuclear", "mascara_social" i "etapa_arc_intern" (una de: negacio, resistencia, fractura, insight, integracio).
+IMPORTANT:
+- "perfil_psicologic", "ferida_nuclear" i "mascara_social" han de tenir APROXIMADAMENT 50 paraules cadascun (entre 40 i 55).
+- "estat_animic_actual" ha de ser variat i coherent (evita repetir "Tranquil" per defecte).
+- "etapa_arc_intern" ha de reflectir la situació pròpia de cada personatge (no posis "negacio" a tothom).
+Afegeix: "ferida_nuclear", "mascara_social", "estat_animic_actual" i "etapa_arc_intern" (una de: negacio, resistencia, fractura, insight, integracio).
 Retorna un JSON on cada personatge tingui aquests camps.
 Es requereix l'anàlisi de EXACTAMENT ${noms.length} personatges.
 
@@ -2567,14 +2603,14 @@ ${llista}
 Retorna EXCLUSIVAMENT JSON vàlid:
 {
   "personatges": [
-    {"nom": "Nom", "perfil_psicologic": "...", "ferida_nuclear":"...", "mascara_social":"...", "etapa_arc_intern":"negacio"}
+    {"nom": "Nom", "perfil_psicologic": "...", "ferida_nuclear":"...", "mascara_social":"...", "estat_animic_actual":"...", "etapa_arc_intern":"negacio"}
   ]
 }`
   }];
 
   const models = getModelConfig(userConfig || USER_CONFIG || {});
   const perfilMap = {};
-  noms.forEach(n => { perfilMap[n] = { nom: n, perfil_psicologic: '', ferida_nuclear: '', mascara_social: '', etapa_arc_intern: 'negacio', estat_animic_actual: inferirEstatAnimicDesDeVeu(obtenirEstilPerNom(n), '') }; });
+  noms.forEach(n => { perfilMap[n] = { nom: n, perfil_psicologic: '', ferida_nuclear: '', mascara_social: '', etapa_arc_intern: generarEtapaPerNom(n), estat_animic_actual: inferirEstatAnimicDesDeVeu(obtenirEstilPerNom(n), '') }; });
 
   try {
     const systemPsico = 'Ets un psicòleg narratiu. Retorna només JSON vàlid en català.';
@@ -2588,11 +2624,11 @@ Retorna EXCLUSIVAMENT JSON vàlid:
         if (!nomOriginal) return;
         perfilMap[nomOriginal] = {
           nom: nomOriginal,
-          perfil_psicologic: limitarParaules(String(p.perfil_psicologic || '').trim(), 50),
-          ferida_nuclear: String(p.ferida_nuclear || '').trim(),
-          mascara_social: String(p.mascara_social || '').trim(),
-          etapa_arc_intern: normalitzarEtapaArcIntern(p.etapa_arc_intern),
-          estat_animic_actual: (ESTAT._perfilsPersonatges && ESTAT._perfilsPersonatges[nomOriginal] && ESTAT._perfilsPersonatges[nomOriginal].estat_animic_actual) || inferirEstatAnimicDesDeVeu(obtenirEstilPerNom(nomOriginal), String(p.perfil_psicologic || ''))
+          perfil_psicologic: completarAprox50Paraules(String(p.perfil_psicologic || '').trim(), 'la por de no ser suficient'),
+          ferida_nuclear: completarAprox50Paraules(String(p.ferida_nuclear || '').trim(), 'una ferida antiga de rebuig'),
+          mascara_social: completarAprox50Paraules(String(p.mascara_social || '').trim(), 'la necessitat de semblar invulnerable'),
+          etapa_arc_intern: normalitzarEtapaArcIntern(p.etapa_arc_intern || generarEtapaPerNom(nomOriginal)),
+          estat_animic_actual: String(p.estat_animic_actual || '').trim() || (ESTAT._perfilsPersonatges && ESTAT._perfilsPersonatges[nomOriginal] && ESTAT._perfilsPersonatges[nomOriginal].estat_animic_actual) || inferirEstatAnimicDesDeVeu(obtenirEstilPerNom(nomOriginal), String(p.perfil_psicologic || ''))
         };
       });
     };
@@ -2605,8 +2641,11 @@ ${(obtenirEstilPerNom(nom) || '(no trobat)').substring(0, 900)}`).join('\n');
       const msgsBloc = [{
         role: 'user',
         content: `Analitza aquests personatges i genera un perfil psicològic breu (trets de personalitat, pors, motivacions) per a cadascun.
-IMPORTANT: El camp "perfil_psicologic" ha de tenir un màxim de 50 paraules.
-Afegeix també: "ferida_nuclear", "mascara_social" i "etapa_arc_intern" (una de: negacio, resistencia, fractura, insight, integracio).
+IMPORTANT:
+- "perfil_psicologic", "ferida_nuclear" i "mascara_social" han de tenir APROXIMADAMENT 50 paraules cadascun (entre 40 i 55).
+- "estat_animic_actual" ha de ser variat i coherent (evita repetir "Tranquil" per defecte).
+- "etapa_arc_intern" ha de reflectir la situació pròpia de cada personatge (no posis "negacio" a tothom).
+Afegeix també: "ferida_nuclear", "mascara_social", "estat_animic_actual" i "etapa_arc_intern" (una de: negacio, resistencia, fractura, insight, integracio).
 Retorna un JSON on cada personatge tingui aquests camps.
 Es requereix l'anàlisi de EXACTAMENT ${blocNoms.length} personatges.
 
@@ -2616,7 +2655,7 @@ ${llistaBloc}
 Retorna EXCLUSIVAMENT JSON vàlid:
 {
   "personatges": [
-    {"nom": "Nom", "perfil_psicologic": "...", "ferida_nuclear":"...", "mascara_social":"...", "etapa_arc_intern":"negacio"}
+    {"nom": "Nom", "perfil_psicologic": "...", "ferida_nuclear":"...", "mascara_social":"...", "estat_animic_actual":"...", "etapa_arc_intern":"negacio"}
   ]
 }`
       }];
@@ -2644,7 +2683,9 @@ Retorna EXCLUSIVAMENT JSON vàlid:
       for (const nomFaltant of faltants) {
         const retryMsgs = [{
           role: 'user',
-          content: `Genera el perfil psicològic d'aquest únic personatge. El camp "perfil_psicologic" ha de tenir un màxim de 50 paraules.
+          content: `Genera el perfil psicològic d'aquest únic personatge.
+"perfil_psicologic", "ferida_nuclear" i "mascara_social" han de tenir aproximadament 50 paraules (40-55).
+Proposa també "estat_animic_actual" variat i "etapa_arc_intern" no genèrica.
 
 PERSONATGE:
 - ${nomFaltant}
@@ -2654,7 +2695,7 @@ ${(obtenirEstilPerNom(nomFaltant) || '(no trobat)').substring(0, 900)}
 Retorna EXCLUSIVAMENT JSON:
 {
   "personatges": [
-    {"nom": "${nomFaltant}", "perfil_psicologic": "...", "ferida_nuclear":"...", "mascara_social":"...", "etapa_arc_intern":"negacio"}
+    {"nom": "${nomFaltant}", "perfil_psicologic": "...", "ferida_nuclear":"...", "mascara_social":"...", "estat_animic_actual":"...", "etapa_arc_intern":"negacio"}
   ]
 }`
         }];
@@ -2676,20 +2717,25 @@ Retorna EXCLUSIVAMENT JSON:
   }
 
   ESTAT._perfilsPersonatges = ESTAT._perfilsPersonatges || {};
+  const etapesDisponibles = ['negacio', 'resistencia', 'fractura', 'insight', 'integracio'];
+  const etapesActuals = noms.map(n => normalitzarEtapaArcIntern((perfilMap[n] || {}).etapa_arc_intern));
+  const totNegacio = etapesActuals.every(e => e === 'negacio');
+
   noms.forEach(nom => {
     const prev = ESTAT._perfilsPersonatges[nom] || {};
     const nou = perfilMap[nom] || { nom, perfil_psicologic: '', ferida_nuclear: '', mascara_social: '', etapa_arc_intern: 'negacio', estat_animic_actual: '' };
+    const etapaDiversa = totNegacio ? etapesDisponibles[Math.abs(nom.length) % etapesDisponibles.length] : normalitzarEtapaArcIntern(nou.etapa_arc_intern || prev.etapa_arc_intern || generarEtapaPerNom(nom));
     ESTAT._perfilsPersonatges[nom] = Object.assign({}, prev, {
       nom,
       estil_veu: prev.estil_veu || (estils[nom] || ''),
-      perfil_psicologic: limitarParaules(
+      perfil_psicologic: completarAprox50Paraules(
         nou.perfil_psicologic || prev.perfil_psicologic || `Personatge amb conflicte intern marcat; combina desig de control amb por a la pèrdua, i pren decisions defensives que tensionen les relacions.`,
-        50
+        'la contradicció entre desig i autoprotecció'
       ),
-      ferida_nuclear: nou.ferida_nuclear || prev.ferida_nuclear || '',
-      mascara_social: nou.mascara_social || prev.mascara_social || '',
-      etapa_arc_intern: normalitzarEtapaArcIntern(nou.etapa_arc_intern || prev.etapa_arc_intern || 'negacio'),
-      estat_animic_actual: nou.estat_animic_actual || prev.estat_animic_actual || inferirEstatAnimicDesDeVeu(prev.estil_veu || obtenirEstilPerNom(nom), nou.perfil_psicologic || prev.perfil_psicologic)
+      ferida_nuclear: completarAprox50Paraules(nou.ferida_nuclear || prev.ferida_nuclear || '', 'una humiliació o pèrdua fundacional'),
+      mascara_social: completarAprox50Paraules(nou.mascara_social || prev.mascara_social || '', 'l intenció d aparentar fortalesa'),
+      etapa_arc_intern: etapaDiversa,
+      estat_animic_actual: String(nou.estat_animic_actual || '').trim() || prev.estat_animic_actual || inferirEstatAnimicDesDeVeu(prev.estil_veu || obtenirEstilPerNom(nom), nou.perfil_psicologic || prev.perfil_psicologic)
     });
   });
 
