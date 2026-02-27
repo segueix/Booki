@@ -1260,6 +1260,10 @@ function reprendreProjecteLocal() {
     if (ESTAT._openaiApiKey) document.getElementById('openaiApiKey').value = ESTAT._openaiApiKey;
     if (ESTAT._geminiApiKey) document.getElementById('geminiApiKey').value = ESTAT._geminiApiKey;
 
+    if (typeof poblarSelectorsModels === 'function') poblarSelectorsModels();
+    if (typeof sincronitzarCampsConfigModels === 'function') sincronitzarCampsConfigModels();
+    if (typeof guardarClausAPI === 'function') guardarClausAPI();
+
     restaurarInterficieDesDeEstat();
     toast('Projecte recuperat amb èxit.');
   } catch (e) {
@@ -1606,6 +1610,7 @@ function setModelPerRol(rol, modelId) {
     case 'generacio':  ESTAT._modelGeneracio  = modelId; break;
     case 'arquitecte': ESTAT._modelArquitecte = modelId; break;
   }
+  sincronitzarCampsConfigModels();
   actualitzarEstimacio();
 }
 
@@ -1629,7 +1634,15 @@ function aplicarPreset(preset) {
   if (selDraft) selDraft.value = p.draft;
   if (selGen)   selGen.value   = p.generacio;
   if (selArq)   selArq.value   = p.arquitecte;
+  sincronitzarCampsConfigModels();
   actualitzarEstimacio();
+}
+
+function sincronitzarCampsConfigModels() {
+  const genInput = document.getElementById('config-model-generacio');
+  const arqInput = document.getElementById('config-model-arquitectura');
+  if (genInput && ESTAT._modelGeneracio) genInput.value = ESTAT._modelGeneracio;
+  if (arqInput && ESTAT._modelArquitecte) arqInput.value = ESTAT._modelArquitecte;
 }
 
 // Alias backward compatible
@@ -1695,17 +1708,24 @@ function guardarIComencar() {
     if (geminiKey)    ESTAT._geminiApiKey    = geminiKey;
     if (openaiKey)    ESTAT._openaiApiKey    = openaiKey;
 
-    const modelGeneracio    = document.getElementById('config-model-generacio').value.trim();
-    const modelArquitectura = document.getElementById('config-model-arquitectura').value.trim();
+    const modelGeneracioInput    = document.getElementById('config-model-generacio').value.trim();
+    const modelArquitecturaInput = document.getElementById('config-model-arquitectura').value.trim();
     const fluxAutomatic     = document.getElementById('config-flux-automatic').checked;
+
+    // Prioritzem la configuració real del selector per rol si existeix.
+    const modelsSeleccionats = getModelConfig();
+    const modelDraft = modelsSeleccionats.modelDraft || modelGeneracioInput;
+    const modelGeneracio = modelsSeleccionats.modelGeneracio || modelGeneracioInput;
+    const modelArquitectura = modelsSeleccionats.modelArquitecte || modelArquitecturaInput;
 
     if (!modelGeneracio)    { toast('Introdueix el model de generació.'); return; }
     if (!modelArquitectura) { toast("Introdueix el model d'arquitectura."); return; }
 
-    // AQUESTA ÉS LA CLAU: Sobreescriure l'ESTAT intern perquè oblidi Claude
+    // Sobreescriure l'estat amb els valors finals del panell de configuració.
     ESTAT._modelGeneracio  = modelGeneracio;
     ESTAT._modelArquitecte = modelArquitectura;
-    ESTAT._modelDraft      = modelGeneracio;
+    ESTAT._modelDraft      = modelDraft;
+    sincronitzarCampsConfigModels();
 
     const genere = document.getElementById('config-genere') ? document.getElementById('config-genere').value : '';
     const autor = document.getElementById('config-autor') ? document.getElementById('config-autor').value : '';
@@ -1719,8 +1739,13 @@ function guardarIComencar() {
       apiKey,
       modelGeneracio,
       modelArquitectura,
-      modelDraft: modelGeneracio,
+      modelDraft,
       modelArquitecte: modelArquitectura,
+      models: {
+        draft: modelDraft,
+        generacio: modelGeneracio,
+        arquitecte: modelArquitectura
+      },
       fluxAutomatic
     };
 
