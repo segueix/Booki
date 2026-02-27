@@ -3222,6 +3222,29 @@ function actualitzarEstatCapitol(idx, estat) {
   el.querySelector('.capitol-num').textContent = estat === 'fet' ? '✓' : estat === 'actiu' ? '✍️' : '○';
 }
 
+
+function refrescarPlaPsicologicPerSeguentCapitol() {
+  try {
+    const t = calcularTermometreVeritatEmocional();
+    return generarPlaReescripturaPsicologica(t);
+  } catch (err) {
+    console.warn('Pla psicològic: no s'ha pogut refrescar:', err.message);
+    return ESTAT._plaReescripturaPsicologica || [];
+  }
+}
+
+function construirBlocPlaPsicologicPerPrompt(capitol, escenaIdx) {
+  const pla = Array.isArray(ESTAT._plaReescripturaPsicologica)
+    ? ESTAT._plaReescripturaPsicologica.filter(Boolean)
+    : [];
+  if (pla.length === 0) return '';
+  const top = pla.slice(0, 4).map((p, i) => `${i + 1}. ${p}`).join('\n');
+  return `
+PLA PSICOLÒGIC PRIORITARI (aplica-ho en aquest capítol ${capitol}, escena ${escenaIdx + 1}):
+${top}
+`;
+}
+
 async function generarCapitol(idx, intents = 0) {
   if (idx >= ESTAT._estructuraCapitols.length) {
     document.getElementById('btn-control-arcs-wrap').classList.remove('hidden');
@@ -3246,6 +3269,7 @@ async function generarCapitol(idx, intents = 0) {
     `🟣 Sonnet escrivint el Capítol ${idx + 1} — "${titol}"…`;
 
   try {
+    if (idx > 0) refrescarPlaPsicologicPerSeguentCapitol();
     const res = await generarCapitolNKG(idx, USER_CONFIG);
     const textNet = netejarTabulacionsInicials(res.response);
     ESTAT._capitols_generats[idx] = textNet;
@@ -8223,13 +8247,15 @@ async function escriureEscenaDirectaAmbJutge(capitol, escenaIdx, escenaSpec, use
     if (linies.length > 0) manualRef = '\nMANUAL D\'ESTIL:\n' + linies.join('\n');
   }
 
+  const blocPlaPsico = construirBlocPlaPsicologicPerPrompt(capitol, escenaIdx);
+
   const promptUnificat = `ESCRIPTURA D'ESCENA — Capítol ${capitol}, Escena ${escenaIdx + 1}
 
 ${contextNKG}
 ${contextCapitolEnCurs}
 ${goldenRef}
 ${estilsPresents}${manualRef}
-
+${blocPlaPsico}
 ${instruccionsTransicio}
 INSTRUCCIONS D'ESCRIPTURA:
 - Extensió objectiu: ${escenaSpec.paraules_objectiu || 700}-${(escenaSpec.paraules_objectiu || 700) + 200} paraules
