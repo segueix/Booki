@@ -9022,33 +9022,301 @@ INSTRUCCIONS ESTRICTES:
 
 async function avaluarEsborranyAmbHistoric(idx, esborrany, userConfig) {
   const capitol = idx + 1;
-  const historic = (ESTAT._capitols_generats || [])
-    .slice(0, idx)
-    .filter(Boolean)
-    .map((t, i) => `--- CAPÍTOL ${i + 1} ---
-${String(t).slice(-1800)}`)
-    .join('\n\n');
+  const models = getModelConfig(userConfig);
+  const contextRevisio = buildContextRevisioArquitecta(idx, esborrany);
+  const esborranyTallat = String(esborrany || '').slice(0, 14000);
 
-  const msgs = [{
+  const promptFactual = [{
     role: 'user',
-    content: `Compara aquest esborrany amb la novel·la. Busca: 1) Objectes que canvien de mà o desapareixen. 2) Personatges secundaris que sonen genèrics. 3) Diàlegs on s'explica informació ja sabuda (As you know, Bob). 4) Repeticions innecessàries respecte al capítol anterior. Retorna una llista de correccions a aplicar.
+    content: `Fes una REVISIÓ FACTUAL I DE COHERÈNCIA del capítol ${capitol}. Prioritza continuïtat dura i contradiccions.
 
-NOVEL·LA FINS ARA:
-${historic || '(encara no hi ha capítols previs)'}
+${contextRevisio}
 
 ESBORRANY CAPÍTOL ${capitol}:
-${String(esborrany || '').slice(0, 7000)}
+${esborranyTallat}
 
-Respon en bullets curts i accionables.`
+Checklist mínim (obligatori):
+1) Objectes que canvien de mà, desapareixen o reapareixen sense causa.
+2) Contradiccions canòniques amb fets establerts, regles del món o timeline.
+3) Motivacions inconsistents (accions sense causa psicològica creïble).
+4) Incoherència de POV/focalització i salts no justificats.
+5) Repeticions estructurals innecessàries amb capítols anteriors.
+
+Retorna EXCLUSIVAMENT JSON vàlid amb aquest esquema:
+{
+  "errors_critics": [
+    {
+      "id": "C1",
+      "tipus": "continuïtat_objectes|canon|timeline|motivacio|pov",
+      "severitat": "critica",
+      "fragment": "cita exacta curta del text problemàtic",
+      "diagnosi": "què falla i per què",
+      "accio": "canvi concret a aplicar",
+      "proposta_reescriptura": "opcional, 1-3 frases"
+    }
+  ],
+  "errors_mitjans": [],
+  "millores_estil": [],
+  "tests_post_rewrite": ["check verificable 1", "check verificable 2"],
+  "resum_risc": "1-3 línies"
+}`
   }];
 
+  const promptLiterari = [{
+    role: 'user',
+    content: `Fes una REVISIÓ LITERÀRIA I DE QUALITAT narrativa del capítol ${capitol}.
+
+${contextRevisio}
+
+ESBORRANY CAPÍTOL ${capitol}:
+${esborranyTallat}
+
+Checklist mínim (obligatori):
+1) Personatges secundaris que sonen genèrics o intercanviables.
+2) Diàleg expositiu tipus "As you know, Bob".
+3) Show-don't-tell insuficient amb etiquetes emocionals explícites.
+4) Ritme (massa explicació, poca escena) i transicions febles.
+5) Repeticions lèxiques/temàtiques i redundància emocional.
+
+Retorna EXCLUSIVAMENT JSON vàlid amb el mateix esquema:
+{
+  "errors_critics": [],
+  "errors_mitjans": [
+    {
+      "id": "M1",
+      "tipus": "veu|dialeg|ritme|redundancia|estil",
+      "severitat": "mitjana",
+      "fragment": "cita exacta curta",
+      "diagnosi": "què grinyola",
+      "accio": "canvi concret",
+      "proposta_reescriptura": "opcional"
+    }
+  ],
+  "millores_estil": [
+    {
+      "id": "S1",
+      "tipus": "prosa|sensorialitat|to",
+      "fragment": "cita exacta curta",
+      "accio": "millora concreta"
+    }
+  ],
+  "tests_post_rewrite": ["check verificable 1"],
+  "resum_risc": "1-3 línies"
+}`
+  }];
+
+  const [rawFactual, rawLiterari] = await Promise.all([
+    callLLMMulti(
+      promptFactual,
+      'Ets una arquitecta narrativa sènior. Detectes contradiccions i obligues canvis específics amb evidència textual.',
+      Object.assign({}, userConfig, { maxTokens: 2600, model: models.modelArquitecte }),
+      'arquitectura'
+    ),
+    callLLMMulti(
+      promptLiterari,
+      'Ets una arquitecta narrativa sènior. Prioritzes qualitat dramàtica i concreció accionable amb evidència textual.',
+      Object.assign({}, userConfig, { maxTokens: 2600, model: models.modelArquitecte }),
+      'arquitectura'
+    )
+  ]);
+
+  const revFactual = normalitzarRevisioArquitecta(rawFactual);
+  const revLiteraria = normalitzarRevisioArquitecta(rawLiterari);
+  const fusionada = fusionarRevisionsArquitecta(revFactual, revLiteraria);
+  return JSON.stringify(fusionada, null, 2);
+}
+
+function buildContextRevisioArquitecta(idx, esborrany) {
+  const parts = [];
+  const contextCapitols = buildContextCapitolsComplets(idx, { maxParaules: 7500 });
+  if (contextCapitols) parts.push(contextCapitols);
+
+  const registreCtx = buildRegistreContextLegacy(idx);
+  if (registreCtx) parts.push(registreCtx);
+
+  const contextCapitol = buildContextCapitolLegacy(idx);
+  if (contextCapitol) parts.push('\nCONTEXT CANÒNIC DE CAPÍTOL (per contrast de coherència):\n' + contextCapitol);
+
+  const nkgCtx = buildNkgContextRevisio(idx, esborrany);
+  if (nkgCtx) parts.push('\nNKG (VERITAT FACTUAL ACTUAL):\n' + nkgCtx);
+
+  const repsDetectades = detectarRepeticions();
+  if (repsDetectades) {
+    const bigrames = (repsDetectades.bigrames || []).slice(0, 8).map(([ng]) => ng);
+    const trigrames = (repsDetectades.trigrames || []).slice(0, 8).map(([ng]) => ng);
+    if (bigrames.length || trigrames.length) {
+      parts.push(`\nREPETICIONS LÈXIQUES GLOBALS A VIGILAR:\n- Bigrames: ${bigrames.join(', ') || '(cap)'}\n- Trigrames: ${trigrames.join(', ') || '(cap)'}`);
+    }
+  }
+
+  const repsTematiques = detectarRepeticionsTematiques();
+  if (repsTematiques && repsTematiques.length > 0) {
+    parts.push('\nREPETICIONS TEMÀTIQUES PREEXISTENTS (no reiterar sense capa nova):\n' +
+      repsTematiques.map(r => `- ${r.tema} (caps ${r.capitols.join(', ')})`).join('\n'));
+  }
+
+  if (idx > 0 && ESTAT._capitols_generats && ESTAT._capitols_generats[idx - 1]) {
+    const ultCap = String(ESTAT._capitols_generats[idx - 1]);
+    parts.push(`\nREFERÈNCIA RÀPIDA DEL CAPÍTOL ANTERIOR (tram final):\n${ultCap.slice(-2400)}`);
+  }
+
+  parts.push(`\nESBORRANY A REVISAR (${String(esborrany || '').length} caràcters).`);
+  return parts.join('\n\n');
+}
+
+function buildNkgContextRevisio(idx, esborrany) {
+  if (!ESTAT._nkg) return '';
+  const cap = ESTAT._estructuraCapitols ? ESTAT._estructuraCapitols[idx] : null;
+  const personatgesCap = cap && Array.isArray(cap.personatges) ? cap.personatges : [];
+  const lloc = cap ? (cap.localitzacio || '') : '';
+
+  const base = nkgGenerarContextMinim({
+    capitol: idx + 1,
+    escena: 1,
+    personatges: personatgesCap,
+    lloc,
+    escaleta: null
+  });
+
+  const timelineRecente = (ESTAT._nkg.timeline_accions || []).slice(-10).join('\n');
+  const objectesRecents = Object.values(ESTAT._nkg.objectes || {})
+    .slice(0, 20)
+    .map(o => `- ${o.nom || 'objecte'} | posseidor:${o.posseidor || '-'} | ubicacio:${o.ubicacio || '-'} | estat:${o.estat || '-'}`)
+    .join('\n');
+
+  const pistaDraft = String(esborrany || '').slice(0, 1200);
+  return `${base}\n\nTIMELINE RECENT:\n${timelineRecente || '(sense accions recents)'}\n\nOBJECTES (control de continuïtat):\n${objectesRecents || '(sense objectes indexats)'}\n\nPISTA ESBORRANY (detecció de divergències):\n${pistaDraft}`;
+}
+
+function normalitzarRevisioArquitecta(raw) {
+  const parsed = parseJsonRobust(raw) || {};
+  const out = {
+    errors_critics: Array.isArray(parsed.errors_critics) ? parsed.errors_critics : [],
+    errors_mitjans: Array.isArray(parsed.errors_mitjans) ? parsed.errors_mitjans : [],
+    millores_estil: Array.isArray(parsed.millores_estil) ? parsed.millores_estil : [],
+    tests_post_rewrite: Array.isArray(parsed.tests_post_rewrite) ? parsed.tests_post_rewrite : [],
+    resum_risc: String(parsed.resum_risc || '').trim()
+  };
+
+  const sanejarItem = (it, fallbackSeverity) => ({
+    id: String(it?.id || '').trim(),
+    tipus: String(it?.tipus || 'general').trim(),
+    severitat: String(it?.severitat || fallbackSeverity || 'mitjana').trim(),
+    fragment: String(it?.fragment || '').trim(),
+    diagnosi: String(it?.diagnosi || '').trim(),
+    accio: String(it?.accio || '').trim(),
+    proposta_reescriptura: String(it?.proposta_reescriptura || '').trim()
+  });
+
+  out.errors_critics = out.errors_critics.map(it => sanejarItem(it, 'critica')).filter(it => it.accio || it.diagnosi || it.fragment);
+  out.errors_mitjans = out.errors_mitjans.map(it => sanejarItem(it, 'mitjana')).filter(it => it.accio || it.diagnosi || it.fragment);
+  out.millores_estil = out.millores_estil.map(it => sanejarItem(it, 'baixa')).filter(it => it.accio || it.fragment);
+  out.tests_post_rewrite = out.tests_post_rewrite.map(t => String(t || '').trim()).filter(Boolean);
+  return out;
+}
+
+function fusionarRevisionsArquitecta(a, b) {
+  const key = it => `${it.tipus}|${it.fragment}|${it.accio}`.toLowerCase();
+  const dedupe = arr => {
+    const seen = new Set();
+    const out = [];
+    arr.forEach(it => {
+      const k = key(it);
+      if (seen.has(k)) return;
+      seen.add(k);
+      out.push(it);
+    });
+    return out;
+  };
+
+  return {
+    errors_critics: dedupe([...(a.errors_critics || []), ...(b.errors_critics || [])]),
+    errors_mitjans: dedupe([...(a.errors_mitjans || []), ...(b.errors_mitjans || [])]),
+    millores_estil: dedupe([...(a.millores_estil || []), ...(b.millores_estil || [])]),
+    tests_post_rewrite: dedupe(
+      [...(a.tests_post_rewrite || []), ...(b.tests_post_rewrite || [])].map(t => ({ tipus: 'test', fragment: '', accio: t, severitat: 'baixa', diagnosi: '', proposta_reescriptura: '', id: '' }))
+    ).map(it => it.accio),
+    resum_risc: [a.resum_risc, b.resum_risc].filter(Boolean).join(' | ')
+  };
+}
+
+function serialitzarCorreccionsArquitecta(correccionsRaw) {
+  const rev = normalitzarRevisioArquitecta(typeof correccionsRaw === 'string' ? correccionsRaw : JSON.stringify(correccionsRaw || {}));
+  const lines = [];
+  if (rev.errors_critics.length > 0) {
+    lines.push('ERRORS CRÍTICS (obligatori resoldre tots):');
+    rev.errors_critics.forEach((e, i) => {
+      lines.push(`${i + 1}. [${e.tipus}] Fragment: "${e.fragment || '(sense cita)'}"`);
+      if (e.diagnosi) lines.push(`   - Diagnosi: ${e.diagnosi}`);
+      if (e.accio) lines.push(`   - Acció: ${e.accio}`);
+      if (e.proposta_reescriptura) lines.push(`   - Reescriptura suggerida: ${e.proposta_reescriptura}`);
+    });
+  }
+  if (rev.errors_mitjans.length > 0) {
+    lines.push('\nERRORS MITJANS (resoldre si no trenca el flux):');
+    rev.errors_mitjans.forEach((e, i) => {
+      lines.push(`${i + 1}. [${e.tipus}] Fragment: "${e.fragment || '(sense cita)'}"`);
+      if (e.diagnosi) lines.push(`   - Diagnosi: ${e.diagnosi}`);
+      if (e.accio) lines.push(`   - Acció: ${e.accio}`);
+    });
+  }
+  if (rev.millores_estil.length > 0) {
+    lines.push('\nMILLORES D\'ESTIL (prioritat baixa):');
+    rev.millores_estil.forEach((e, i) => {
+      lines.push(`${i + 1}. ${e.accio || e.diagnosi || e.fragment}`);
+    });
+  }
+  if (rev.tests_post_rewrite.length > 0) {
+    lines.push('\nTESTS POST-REWRITE (autocheck):');
+    rev.tests_post_rewrite.forEach((t, i) => lines.push(`${i + 1}. ${t}`));
+  }
+  if (rev.resum_risc) lines.push(`\nRESUM DE RISC: ${rev.resum_risc}`);
+  return lines.join('\n').trim() || String(correccionsRaw || '');
+}
+
+async function validarReescripturaArquitecta(idx, textComplet, correccionsRaw, userConfig) {
+  const capitol = idx + 1;
   const models = getModelConfig(userConfig);
-  return await callLLMMulti(
-    msgs,
-    'Ets una arquitecta narrativa obsessiva amb la micro-continuïtat. Respon de forma tècnica i accionable.',
-    Object.assign({}, userConfig, { maxTokens: 1200, model: models.modelArquitecte }),
+  const correccions = serialitzarCorreccionsArquitecta(correccionsRaw);
+  const prompt = [{
+    role: 'user',
+    content: `Verifica si el CAPÍTOL ${capitol} reescrit ha resolt les correccions de l'arquitecta. Sigues estricta i aporta evidència textual.
+
+CORRECCIONS ORIGINALS:
+${correccions.slice(0, 8000)}
+
+TEXT REESCRIT:
+${String(textComplet || '').slice(0, 14000)}
+
+Retorna EXCLUSIVAMENT JSON:
+{
+  "pendent_critic": [{"fragment":"cita","accio":"què falta","motiu":"per què"}],
+  "pendent_mitja": [{"fragment":"cita","accio":"què falta","motiu":"per què"}],
+  "noves_alertes": [{"severitat":"critica|mitjana","fragment":"cita","accio":"arreglar"}],
+  "veredicte": "ok|retry"
+}`
+  }];
+
+  const raw = await callLLMMulti(
+    prompt,
+    'Ets una arquitecta QA de narrativa. Només aproves quan no queden errors crítics i no hi ha regressions.',
+    Object.assign({}, userConfig, { maxTokens: 2200, model: models.modelArquitecte }),
     'arquitectura'
   );
+
+  const parsed = parseJsonRobust(raw) || {};
+  const pendCritic = Array.isArray(parsed.pendent_critic) ? parsed.pendent_critic : [];
+  const pendMitja = Array.isArray(parsed.pendent_mitja) ? parsed.pendent_mitja : [];
+  const noves = Array.isArray(parsed.noves_alertes) ? parsed.noves_alertes : [];
+  const hasCritic = pendCritic.length > 0 || noves.some(n => String(n?.severitat || '').toLowerCase() === 'critica');
+  const hasMedium = pendMitja.length > 0;
+  return {
+    raw,
+    parsed,
+    ok: !hasCritic && !hasMedium,
+    hasCritic,
+    pendents: { pendCritic, pendMitja, noves }
+  };
 }
 
 async function generarProsaDefinitiva(idx, esborrany, correccions, userConfig) {
@@ -9070,7 +9338,7 @@ ESBORRANY:
 ${String(esborrany || '').slice(0, 12000)}
 
 CORRECCIONS OBLIGATÒRIES:
-${String(correccions || '').slice(0, 3500)}
+${serialitzarCorreccionsArquitecta(correccions).slice(0, 7000)}
 
 Retorna només la versió final del capítol, sense metadades ni notes.`
   }];
@@ -9097,6 +9365,18 @@ async function generarCapitolNKG(idx, userConfig) {
   if (loaderEl) loaderEl.textContent = '✨ Polint i escrivint la prosa definitiva...';
   let textComplet = await generarProsaDefinitiva(idx, esborrany, correccionsArquitecta, userConfig);
   textComplet = netejarTabulacionsInicials(textComplet || '');
+
+  let validacioFinal = await validarReescripturaArquitecta(idx, textComplet, correccionsArquitecta, userConfig);
+  let intentsExtra = 0;
+  while (!validacioFinal.ok && intentsExtra < 2) {
+    intentsExtra++;
+    if (loaderEl) loaderEl.textContent = `🧪 Validació arquitecta pendent (${intentsExtra}/2): aplicant correccions residuals...`;
+    const pendentsText = JSON.stringify(validacioFinal.pendents || {}, null, 2);
+    const correccionsAmplificades = `${serialitzarCorreccionsArquitecta(correccionsArquitecta)}\n\nPENDENTS DETECTATS DESPRÉS DE LA REESCRIPTURA:\n${pendentsText}`;
+    textComplet = await generarProsaDefinitiva(idx, textComplet, correccionsAmplificades, userConfig);
+    textComplet = netejarTabulacionsInicials(textComplet || '');
+    validacioFinal = await validarReescripturaArquitecta(idx, textComplet, correccionsAmplificades, userConfig);
+  }
 
   if (ESTAT._nkg) {
     try {
