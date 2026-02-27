@@ -5552,6 +5552,35 @@ Per assegurar que hi caben tots en la teva resposta, sigues molt concís: dedica
 //
 // Genera un document HTML semàntic amb <h1> i <p> i el descarrega
 // directament al navegador mitjançant Blob + URL.createObjectURL.
+// Genera un nom de fitxer segur i consistent per a descàrregues DOCX.
+function normalitzarNomFitxerDocx(base, fallback = 'document') {
+  const net = String(base || '')
+    .replace(/[<>:"/\\|?*]/g, ' ')
+    .replace(/\s+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .substring(0, 80);
+  return `${net || fallback}.docx`;
+}
+
+function descarregarBlobDocx(blob, nomFitxer) {
+  if (window.navigator && typeof window.navigator.msSaveOrOpenBlob === 'function') {
+    window.navigator.msSaveOrOpenBlob(blob, nomFitxer);
+    return;
+  }
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nomFitxer;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  // Alguns navegadors cancel·len la descàrrega si el revoke és immediat.
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
 function exportarADoc(titol, contingut) {
   if (typeof docx === 'undefined') {
     toast("Error: La llibreria DOCX no s'ha carregat. Comprova la connexió.");
@@ -5591,17 +5620,8 @@ function exportarADoc(titol, contingut) {
   });
 
   Packer.toBlob(doc).then(blob => {
-    const url = URL.createObjectURL(blob);
-    const nomFitxer = (titol || 'conte')
-      .replace(/[<>:"/\\|?*]/g, '').trim().replace(/\s+/g, '_').substring(0, 80) + '.docx';
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = nomFitxer;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const nomFitxer = normalitzarNomFitxerDocx(titol || 'conte', 'conte');
+    descarregarBlobDocx(blob, nomFitxer);
     toast('📄 Descarregat: ' + nomFitxer);
   }).catch(err => {
     toast("Error a l'exportar DOCX: " + err.message);
@@ -5724,15 +5744,8 @@ function exportarNovella(titol, caps, estructura, epileg) {
   });
 
   Packer.toBlob(doc).then(blob => {
-    const url = URL.createObjectURL(blob);
-    const nomFitxer = (titol || 'novella').replace(/[<>:"/\\|?*]/g, '').trim().replace(/\s+/g, '_').substring(0, 80) + '.docx';
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = nomFitxer;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const nomFitxer = normalitzarNomFitxerDocx(titol || 'novella', 'novella');
+    descarregarBlobDocx(blob, nomFitxer);
     toast('📖 Descarregat: ' + nomFitxer);
   }).catch(err => {
     toast("Error a l'exportar la novel·la DOCX: " + err.message);
