@@ -2549,7 +2549,7 @@ async function iniciarFasePsicologia() {
     mostrarPerfilsPsicologics(dades);
   } catch (err) {
     hideLoader('9-2');
-    toast('Error en l'anàlisi psicològica: ' + err.message);
+    toast("Error en l'anàlisi psicològica: " + err.message);
   }
 }
 
@@ -3253,7 +3253,7 @@ function refrescarPlaPsicologicPerSeguentCapitol() {
     const t = calcularTermometreVeritatEmocional();
     return generarPlaReescripturaPsicologica(t);
   } catch (err) {
-    console.warn('Pla psicològic: no s'ha pogut refrescar:', err.message);
+    console.warn("Pla psicològic: no s'ha pogut refrescar:", err.message);
     return ESTAT._plaReescripturaPsicologica || [];
   }
 }
@@ -3759,7 +3759,7 @@ function renderTermometreVeritatEmocional() {
   const pla = generarPlaReescripturaPsicologica(t);
   const evidHtml = (t.evidencies || []).length > 0
     ? `<ul style="margin:8px 0 0 16px;padding:0;">${t.evidencies.map(e => `<li style="margin-bottom:6px;"><strong>Cap. ${e.capitol}</strong> · ${escHtml(e.tipus)} — <span style="color:var(--text2)">${escHtml(e.fragment)}...</span></li>`).join('\n')}</ul>`
-    : '<p style="margin:8px 0 0;color:var(--text2);">No s'han detectat evidències textuals clares. Recomanat reforçar escenes emocionals.</p>';
+    : "<p style=\"margin:8px 0 0;color:var(--text2);\">No s'han detectat evidències textuals clares. Recomanat reforçar escenes emocionals.</p>";
   const plaHtml = pla.length > 0
     ? `<ul style="margin:8px 0 0 16px;padding:0;">${pla.map(p => `<li style="margin-bottom:6px;">${escHtml(p)}</li>`).join('\n')}</ul>`
     : '<p style="margin:8px 0 0;color:var(--success);">Cap pla de reescriptura necessari: veritat emocional en bon nivell.</p>';
