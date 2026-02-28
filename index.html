@@ -1686,6 +1686,7 @@ const ESTAT = {
   _snapshotsFinals: {},
   _traitsImmutablesInicialitzats: false,
   _registreEstil: { frequencies: {}, alertes: [], verbs_atribucio: {}, tancaments: [] },
+  _controlLongitud: { objectiu: 3000, llindarMinim: 0.70, llindarExpansio: 0.85, historicLongituds: [], tendencia: 'estable' },
   _goldenPassage: null,
   _goldenPassageCapitol: -1,
   // NKG (Narrative Knowledge Graph) — v4
@@ -3593,6 +3594,14 @@ async function iniciarFase11() {
   ESTAT._revisionsOpusFinals= {};
   ESTAT.llibreRegistre      = { capitols: [], estat_personatges: [], fils_oberts: [], fils_tancats: [] };
   ESTAT._traitsImmutablesInicialitzats = false;
+  ESTAT._controlLongitud = {
+    objectiu: Number((ESTAT.estil && ESTAT.estil.paraules) || 3000),
+    llindarMinim: 0.70,
+    llindarExpansio: 0.85,
+    historicLongituds: [],
+    tendencia: 'estable',
+    promptForcat: ''
+  };
 
   updateProgress(11);
   showCard('fase-11');
@@ -3885,11 +3894,33 @@ async function generarCapitol(idx, intents = 0) {
     for (const nomPers of capPersonatges) {
       await garantirTretsImmutablesPersonatge(nomPers, USER_CONFIG);
     }
-    const res = await generarCapitolNKG(idx, USER_CONFIG);
-    const textNet = netejarTabulacionsInicials(res.response);
+    let res = await generarCapitolNKG(idx, USER_CONFIG);
+    let textNet = netejarTabulacionsInicials(res.response);
+
+    let decisio = verificarLongitud(idx, textNet);
+    if (decisio.accio === 'expandir') {
+      textNet = await expandirCapitol(textNet, idx, decisio.paraules, USER_CONFIG);
+      const paraulesExp = compteParaules(textNet);
+      if (ESTAT._controlLongitud && Array.isArray(ESTAT._controlLongitud.historicLongituds) && ESTAT._controlLongitud.historicLongituds.length > 0) {
+        ESTAT._controlLongitud.historicLongituds[ESTAT._controlLongitud.historicLongituds.length - 1] = paraulesExp;
+      }
+      decisio = { ...decisio, paraules: paraulesExp, percentatge: paraulesExp / Number((ESTAT._controlLongitud && ESTAT._controlLongitud.objectiu) || 3000), motiu: decisio.motiu + ' Expansió aplicada (1 intent).' };
+    } else if (decisio.accio === 'regenerar') {
+      const regen = await regenerarCapitolPerLongitud(idx, USER_CONFIG);
+      if (regen && regen.text) {
+        textNet = regen.text;
+        res = Object.assign({}, res || {}, regen.meta || {});
+      }
+      const paraulesRegen = compteParaules(textNet);
+      if (ESTAT._controlLongitud && Array.isArray(ESTAT._controlLongitud.historicLongituds) && ESTAT._controlLongitud.historicLongituds.length > 0) {
+        ESTAT._controlLongitud.historicLongituds[ESTAT._controlLongitud.historicLongituds.length - 1] = paraulesRegen;
+      }
+      decisio = { ...decisio, paraules: paraulesRegen, percentatge: paraulesRegen / Number((ESTAT._controlLongitud && ESTAT._controlLongitud.objectiu) || 3000), motiu: decisio.motiu + ' Regeneració aplicada (1 intent).' };
+    }
+
     ESTAT._capitols_generats[idx] = textNet;
     ESTAT._metaCapitols = ESTAT._metaCapitols || {};
-    ESTAT._metaCapitols[idx] = Object.assign({}, ESTAT._metaCapitols[idx] || {}, { textFinal: textNet });
+    ESTAT._metaCapitols[idx] = Object.assign({}, ESTAT._metaCapitols[idx] || {}, { textFinal: textNet, controlLongitud: decisio });
     ESTAT._metaCapitols = ESTAT._metaCapitols || {};
     ESTAT._metaCapitols[idx] = Object.assign({}, ESTAT._metaCapitols[idx] || {}, {
       esbos: res.esborrany || '',
@@ -6745,6 +6776,94 @@ REGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que é
 }
 
 
+
+function buildBlocAlertaLongitud() {
+  const c = ESTAT._controlLongitud;
+  if (!c || c.tendencia !== 'decreixent') return '';
+  const hist = Array.isArray(c.historicLongituds) ? c.historicLongituds : [];
+  const ultimes = hist.slice(-3).join(', ');
+  const minim = Math.round((Number(c.objectiu || 3000)) * Number(c.llindarMinim || 0.7));
+  return `ALERTA DE LONGITUD: Els últims capítols han estat progressivament més curts ([${ultimes}]). Aquest capítol ha de tenir un MÍNIM de ${minim} paraules. Desenvolupa les escenes amb profunditat. No resumeixis; NARRA.`;
+}
+
+function verificarLongitud(capitolIdx, textGenerat) {
+  if (!ESTAT._controlLongitud || typeof ESTAT._controlLongitud !== 'object') {
+    ESTAT._controlLongitud = { objectiu: 3000, llindarMinim: 0.70, llindarExpansio: 0.85, historicLongituds: [], tendencia: 'estable', promptForcat: '' };
+  }
+  const ctrl = ESTAT._controlLongitud;
+  const objectiu = Number(ctrl.objectiu || 3000);
+  const paraules = compteParaules(String(textGenerat || ''));
+  ctrl.historicLongituds = Array.isArray(ctrl.historicLongituds) ? ctrl.historicLongituds : [];
+  ctrl.historicLongituds.push(paraules);
+
+  const h = ctrl.historicLongituds;
+  if (h.length >= 3) {
+    const a = h[h.length - 3], b = h[h.length - 2], c = h[h.length - 1];
+    if (a > b && b > c) ctrl.tendencia = 'decreixent';
+    else if (a < b && b < c) ctrl.tendencia = 'creixent';
+    else ctrl.tendencia = 'estable';
+  } else {
+    ctrl.tendencia = 'estable';
+  }
+
+  const percentatge = objectiu > 0 ? paraules / objectiu : 0;
+  const llMin = Number(ctrl.llindarMinim || 0.70);
+  const llExp = Number(ctrl.llindarExpansio || 0.85);
+
+  if (percentatge >= llExp) {
+    return { paraules, percentatge, accio: 'acceptar', motiu: 'Longitud dins del rang objectiu.' };
+  }
+  if (percentatge >= llMin) {
+    return { paraules, percentatge, accio: 'expandir', motiu: 'Capítol acceptable però massa curt; cal expansió.' };
+  }
+  return { paraules, percentatge, accio: 'regenerar', motiu: 'Capítol massa curt respecte del mínim.' };
+}
+
+async function expandirCapitol(textOriginal, capitolIdx, paraulesActuals, userConfig = USER_CONFIG) {
+  const ctrl = ESTAT._controlLongitud || { objectiu: 3000 };
+  const objectiu = Number(ctrl.objectiu || 3000);
+  const diferencia = Math.max(0, objectiu - Number(paraulesActuals || 0));
+  const systemPrompt = buildSystemPromptCapitol();
+  const msgs = [{
+    role: 'user',
+    content: `El capítol següent té ${paraulesActuals} paraules però l'objectiu és ${objectiu}.
+Falten aproximadament ${diferencia} paraules. EXPANDEIX el capítol afegint:
+- Més profunditat sensorial a les escenes d'acció
+- Interioritat del personatge (pensaments, sensacions, records)
+- Detalls d'ambient i atmosfera
+- Dilatació temporal en els moments de tensió alta
+
+NO afegeixis escenes noves ni subtrames. Enriqueix les existents.
+Retorna el capítol COMPLET expandit.
+
+CAPÍTOL A EXPANDIR:
+${String(textOriginal || '').slice(0, 20000)}`
+  }];
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  const raw = await callLLMOneShotPlusCompletion(
+    msgs,
+    systemPrompt,
+    Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 14000, model: models.modelGeneracio }),
+    'generacio'
+  );
+  return netejarTabulacionsInicials(raw || textOriginal || '');
+}
+
+async function regenerarCapitolPerLongitud(capitolIdx, userConfig = USER_CONFIG) {
+  const ctrl = ESTAT._controlLongitud || { objectiu: 3000, llindarMinim: 0.70 };
+  const minim = Math.round(Number(ctrl.objectiu || 3000) * Number(ctrl.llindarMinim || 0.70));
+  ESTAT._controlLongitud.promptForcat = `OBJECTIU DE LONGITUD (REGENERACIÓ): Aquest capítol HA de tenir un mínim de ${minim} paraules. Desenvolupa les escenes amb profunditat. No resumeixis; NARRA.`;
+  try {
+    const res = await generarCapitolNKG(capitolIdx, userConfig || USER_CONFIG || {});
+    return {
+      text: netejarTabulacionsInicials((res && res.response) || ''),
+      meta: res || {}
+    };
+  } finally {
+    ESTAT._controlLongitud.promptForcat = '';
+  }
+}
+
 function comptarSilLabesAproximades(paraula) {
   const p = String(paraula || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   const grups = p.match(/[aeiouàèéíïòóúü]+/g);
@@ -6988,7 +7107,10 @@ function buildSystemPromptCapitol() {
     if (blocBeatsProhibits) parts.push('\n' + blocBeatsProhibits);
     const blocAlertesEstil = buildBlocAlertesEstil();
     if (blocAlertesEstil) parts.push('\n' + blocAlertesEstil);
+    const blocLongitud = buildBlocAlertaLongitud();
+    if (blocLongitud) parts.push('\n' + blocLongitud);
     if (directivaContinuitat) parts.push('\n' + directivaContinuitat);
+    if (ESTAT._controlLongitud && ESTAT._controlLongitud.promptForcat) parts.push('\n' + ESTAT._controlLongitud.promptForcat);
     if (prohibirIniciMeteorologic) {
       parts.push("PROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg.");
     }
@@ -7000,7 +7122,10 @@ function buildSystemPromptCapitol() {
   if (blocBeatsProhibits) legacyAmbContinuitat += `\n\n${blocBeatsProhibits}`;
   const blocAlertesEstil = buildBlocAlertesEstil();
   if (blocAlertesEstil) legacyAmbContinuitat += `\n\n${blocAlertesEstil}`;
+  const blocLongitud = buildBlocAlertaLongitud();
+  if (blocLongitud) legacyAmbContinuitat += `\n\n${blocLongitud}`;
   if (directivaContinuitat) legacyAmbContinuitat += `\n\n${directivaContinuitat}`;
+  if (ESTAT._controlLongitud && ESTAT._controlLongitud.promptForcat) legacyAmbContinuitat += `\n\n${ESTAT._controlLongitud.promptForcat}`;
   return prohibirIniciMeteorologic
     ? legacyAmbContinuitat + "\n\nPROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg."
     : legacyAmbContinuitat;
