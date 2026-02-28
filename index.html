@@ -4569,32 +4569,41 @@ function tancarModalRegistre() {
 // ═══════════════════════════════════════════════════════════
 async function generarRevisioFinalApp(userConfig) {
   const revisionsAcumulades = (ESTAT._revisionsCodiSistema || [])
-    .map(r => `=== CHECKPOINT cap ${r.capitol} ===\n${r.revisio}`)
+    .map(r => {
+      const parsed = (() => { try { return JSON.parse(r.revisio); } catch { return null; } })();
+      if (!parsed) return `=== CHECKPOINT cap ${r.capitol} ===\n${r.revisio}`;
+      const inconsistencies = (parsed.inconsistencies_cronologiques || []).join('; ') || 'Cap';
+      const punts_febles = (parsed.qualitat_coherencia && parsed.qualitat_coherencia.punts_febles || []).join('; ') || '—';
+      const puntuacio = parsed.qualitat_coherencia ? parsed.qualitat_coherencia.puntuacio : '?';
+      const alerta = parsed.alerta_critica ? `⚠️ ${parsed.alerta_critica}` : '';
+      return `=== CHECKPOINT cap ${r.capitol} (coherència: ${puntuacio}/10) ===\nInconsistències: ${inconsistencies}\nPunts febles: ${punts_febles}${alerta ? '\n' + alerta : ''}`;
+    })
     .join('\n\n');
 
   const msgs = [{
     role: 'user',
-    content: `Ets l'Arquitecte del sistema Booki. Acabes de supervisar la generació completa de la novel·la.
+    content: `Ets l'Arquitecte de la novel·la. Acabes de supervisar la generació completa capítol a capítol.
 
-REVISIONS DE CODI ACUMULADES (una cada 3 capítols):
+REVISIONS DE CONSISTÈNCIA ACUMULADES (una cada 3 capítols):
 ${revisionsAcumulades || '(cap revisió intermèdia disponible)'}
 
-TASCA: Fes una REVISIÓ FINAL i CONSOLIDADA del codi de gestió de l'app:
-1. Quines millores de qualitat del codi de gestió (prompts, funcions de seguiment, injecció de context) han quedat pendents?
-2. Quines implementacions recomanaries per a la propera versió de l'app?
-3. Quins patrons de fallada has detectat al llarg de la generació?
+TASCA: Fes una DIAGNOSI FINAL i CONSOLIDADA de la novel·la des del punt de vista de la coherència i la consistència:
+1. Quines inconsistències cronològiques o de continuïtat han persistit al llarg de la generació?
+2. Quins arcs de personatge o trames han mostrat debilitats estructurals repetides?
+3. Quines millores concretes recomanaries implementar als capítols per a la pròxima generació?
 
 Retorna JSON:
 {
-  "diagnòstic_global": "...",
-  "millores_prioritzades": [{"area": "...", "proposta": "...", "impacte": "alt|mitjà|baix"}],
-  "patrons_fallada": ["..."],
-  "recomanacions_v2": ["..."]
+  "diagnòstic_global": "Avaluació consolidada de la coherència i consistència de tota la novel·la...",
+  "inconsistencies_persistents": ["inconsistència que ha aparegut en múltiples checkpoints"],
+  "millores_prioritzades": [{"area": "cronologia|arc_personatge|trama|continuitat", "proposta": "...", "impacte": "alt|mitjà|baix"}],
+  "patrons_debilitat": ["patró de debilitat narrativa recurrent detectat"],
+  "recomanacions_seguent_generacio": ["recomanació per millorar la propera novel·la generada"]
 }`
   }];
 
   const models = getModelConfig(userConfig);
-  const res = await callLLMOneShotPlusCompletion(msgs, "Ets l'Arquitecte del sistema Booki. Analitza i recomana millores tècniques.", Object.assign({}, userConfig, { model: models.modelArquitecte, maxTokens: 4000 }), 'revisio');
+  const res = await callLLMOneShotPlusCompletion(msgs, "Ets l'Arquitecte de la novel·la. Analitza la coherència i consistència de tota l'obra.", Object.assign({}, userConfig, { model: models.modelArquitecte, maxTokens: 4000 }), 'revisio');
   const dades = parseJsonRobust(res);
   ESTAT._revisioFinalApp = dades;
 }
@@ -10228,23 +10237,50 @@ Retorna només el capítol final.`
 }
 
 async function extreureDadesRegistreIAvaluarSistema(idx, textCapitol, esRevisioSistema, userConfig) {
-  const instruccioRevisio = esRevisioSistema
-    ? `
+  // Context de capítols previs per a la revisió cronològica
+  let contextRevisio = '';
+  if (esRevisioSistema) {
+    const resumsAnteriors = (ESTAT.llibreRegistre.capitols || [])
+      .slice(0, idx)
+      .map((c, i) => {
+        if (!c) return null;
+        const pers = Array.isArray(c.estat_personatges)
+          ? c.estat_personatges.map(p => `${p.nom} (${p.ubicacio || '?'}, ${p.estat_actual || '?'})`).join(', ')
+          : (Array.isArray(c.personatges) ? c.personatges.map(p => `${p.nom} (${p.ubicacio || '?'}, ${p.estat || '?'})`).join(', ') : '');
+        const fils = Array.isArray(c.fils_oberts) ? c.fils_oberts.slice(0, 3).join(' | ') : '';
+        return `Cap.${i + 1}: ${c.resum_capitol || '(sense resum)'} | Personatges: ${pers || '—'} | Fils oberts: ${fils || '—'}`;
+      })
+      .filter(Boolean)
+      .join('\n');
 
-TASCA B: AUDITORIA DE L'APP (Revisió de Sistema)
-Analitza la coherència tècnica d'aquest capítol respecte a com se li passa la informació al Generador. NO suggereixis canvis literaris. Necessitem una auditoria EXTENSA: diagnòstic en 5-8 frases + propostes prioritzades. Evita respostes d'una sola frase.`
-    : '';
+    const timelineNKG = (ESTAT._nkg && Array.isArray(ESTAT._nkg.timeline_accions) && ESTAT._nkg.timeline_accions.length > 0)
+      ? '\nTIMELINE NKG (accions recents en ordre cronològic):\n- ' + ESTAT._nkg.timeline_accions.slice(-12).join('\n- ')
+      : '';
+
+    contextRevisio = `
+
+TASCA B: REVISIÓ DE CONSISTÈNCIA CRONOLÒGICA I COHERÈNCIA NARRATIVA
+Tens accés als resums de tots els capítols escrits fins ara. Analitza el text del Capítol ${idx + 1} en relació amb la novel·la completa i detecta:
+
+1. CRONOLOGIA: Hi ha salts temporals injustificats? Algun personatge apareix en dos llocs alhora? Hi ha accions que contradiuen la seqüència establerta? Algun objecte o fet canvia de posició/estat sense causa narrativa?
+2. COHERÈNCIA D'ARC: Els arcs de personatge progressen de manera consistent o hi ha regressions inexplicades? Es mantenen les motivacions? Es compleixen les conseqüències d'accions anteriors?
+3. QUALITAT DE COHERÈNCIA: Puntua la coherència global d'aquest punt de la novel·la (1-10) i explica els punts febles principals.
+4. MILLORES PROPOSADES: Basant-te exclusivament en les inconsistències i debilitats detectades (no en preferències literàries), proposa millores concretes per als capítols següents.
+
+RESUMS CAPÍTOLS ANTERIORS:
+${resumsAnteriors || '(primer checkpoint, sense capítols previs suficients)'}${timelineNKG}`;
+  }
 
   const msgs = [{
     role: 'user',
-    content: `Ets l'Arquitecta del sistema. El teu objectiu NO és jutjar la qualitat de la prosa, sinó garantir la integritat del Llibre de Registre (NKG) i optimitzar el programari de generació.
+    content: `Ets l'Arquitecta del sistema. Garanteixes la integritat del Llibre de Registre (NKG) i la coherència interna de la novel·la.
 
 TASCA A: ACTUALITZACIÓ DE REGISTRE
 Extreu del següent capítol:
 1. OBJECTES: Nous objectes introduïts, canvis d'estat o de possessió.
 2. PERSONATGES: Ubicació exacta, estat actual, i nous fets canònics confirmats.
 3. ESCENES I TRAMES: Resum executiu i progrés dels fils narratius.
-4. CAMP OBLIGATORI: No deixis cap camp buit; si no hi ha dades, posa "Cap detectat" o "Sense canvis".${instruccioRevisio}
+4. CAMP OBLIGATORI: No deixis cap camp buit; si no hi ha dades, posa "Cap detectat" o "Sense canvis".${contextRevisio}
 
 CAPÍTOL ${idx + 1}:
 ${textCapitol.substring(0, 14000)}
@@ -10260,14 +10296,16 @@ Retorna EXCLUSIVAMENT JSON amb aquesta estructura:
     "claus_prompt_seguent": ["...", "..."]
   }${esRevisioSistema ? `,
   "revisio_sistema": {
-    "diagnostic_sistema": "Diagnòstic tècnic ampli...",
-    "millores_funcions_app": "Proposta tècnica extensa pel codi JS o disseny de prompts...",
-    "accions_prioritzades": [
-      "1) ...",
-      "2) ...",
-      "3) ...",
-      "4) ..."
-    ]
+    "inconsistencies_cronologiques": ["Descripció concreta de cada inconsistència detectada, o 'Cap detectada'"],
+    "qualitat_coherencia": {
+      "puntuacio": 7,
+      "diagnostic": "Avaluació global de la coherència narrativa fins aquest punt...",
+      "punts_febles": ["punt feble 1", "punt feble 2"]
+    },
+    "millores_proposades": [
+      {"capitol_afectat": "cap X o 'generals'", "problema": "...", "proposta": "...", "prioritat": "alta|mitja|baixa"}
+    ],
+    "alerta_critica": "Breu alerta si hi ha una inconsistència cronològica crítica que cal corregir immediatament, o buit si tot és correcte"
   }` : ''}
 }`
   }];
@@ -10276,7 +10314,7 @@ Retorna EXCLUSIVAMENT JSON amb aquesta estructura:
   const raw = await callLLMMulti(
     msgs,
     "Ets l'Arquitecta de Dades i Sistemes. Retorna només JSON.",
-    Object.assign({}, userConfig, { maxTokens: esRevisioSistema ? 2600 : 1800, model: models.modelArquitecte }),
+    Object.assign({}, userConfig, { maxTokens: esRevisioSistema ? 3200 : 1800, model: models.modelArquitecte }),
     'arquitectura'
   );
   const dades = parseJsonRobust(raw) || { actualitzacio_nkg: {} };
