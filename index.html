@@ -3638,7 +3638,7 @@ function renderLlistaCapitols() {
     return `<div class="capitol-item ${cls}" id="cap-item-${i}" ${onClick}>
       <span class="capitol-num">${ico}</span>
       <span class="capitol-titol">${escHtml(cap.titol || 'Capítol ' + (i + 1))}</span>
-      ${btnEsborrar}${btnCopia}
+      ${teText ? `<button class="capitol-delete" onclick="event.stopPropagation();esborrarIRegenerarCapitol(${i})" title="Esborrar i regenerar capítol">🗑️</button>` : ''}${btnCopia}
     </div>`;
   }).join('\n');
 }
@@ -10521,8 +10521,6 @@ Retorna EXCLUSIVAMENT JSON:
   };
 }
 
-  return avaluacioTxt;
-}
 async function generarProsaDefinitiva(idx, esborrany, correccions, userConfig) {
   const capitol = idx + 1;
   const cap = ESTAT._estructuraCapitols[idx] || {};
@@ -10652,33 +10650,20 @@ async function generarCapitolNKG(idx, userConfig) {
   const loaderEl = document.getElementById('loader-11-text');
   const contextCapitol = buildContextCapitol(idx);
 
-  if (loaderEl) loaderEl.textContent = `✨ Generant directament el capítol ${capitol} final...`;
+  if (loaderEl) loaderEl.textContent = `✍️ Escrivint directament el capítol ${capitol}...`;
+  let textComplet = await escriureCapitolDirecte(idx, contextCapitol, userConfig);
+  textComplet = netejarTabulacionsInicials(textComplet || '');
 
   const infoInjectadaEsbos = `CAPÍTOL ${capitol}
 CONTEXT CAPÍTOL:
 ${contextCapitol}
 `;
-
-  if (loaderEl) loaderEl.textContent = "🔍 Arquitecta revisant continuïtat d'objectes i veus...";
-  const correccionsArquitecta = await avaluarEsborranyAmbHistoric(idx, esborrany, userConfig);
   const infoInjectadaRevisioOpus = `Novel·la fins ara (fragments):
-${(ESTAT._capitols_generats || []).slice(0, idx).filter(Boolean).map((t, i) => `--- CAPÍTOL ${i + 1} ---\n${String(t).slice(-1800)}`).join('\n\n') || '(encara no hi ha capítols previs)'}
+${(ESTAT._capitols_generats || []).slice(0, idx).filter(Boolean).map((t, i) => `--- CAPÍTOL ${i + 1} ---\n${String(t).slice(-1800)}`).join('\n\n') || '(encara no hi ha capítols previs)'}`;
+  const correccionsArquitecta = '';
 
-Esborrany a revisar:
-${String(esborrany || '').slice(0, 7000)}`;
-
-  if (loaderEl) loaderEl.textContent = "📊 Arquitecta extraient dades de registre i avaluant el sistema...";
-
-  let validacioFinal = await validarReescripturaArquitecta(idx, textComplet, correccionsArquitecta, userConfig);
-  let intentsExtra = 0;
-  while (!validacioFinal.ok && intentsExtra < 2) {
-    intentsExtra++;
-    if (loaderEl) loaderEl.textContent = `🧪 Validació arquitecta pendent (${intentsExtra}/2): aplicant correccions residuals...`;
-    const pendentsText = JSON.stringify(validacioFinal.pendents || {}, null, 2);
-    const correccionsAmplificades = `${serialitzarCorreccionsArquitecta(correccionsArquitecta)}\n\nPENDENTS DETECTATS DESPRÉS DE LA REESCRIPTURA:\n${pendentsText}`;
-    textComplet = await generarProsaDefinitiva(idx, textComplet, correccionsAmplificades, userConfig);
-    textComplet = netejarTabulacionsInicials(textComplet || '');
-    validacioFinal = await validarReescripturaArquitecta(idx, textComplet, correccionsAmplificades, userConfig);
+  if (!textComplet || !textComplet.trim()) {
+    throw new Error(`No s'ha pogut generar el capítol ${capitol} en mode directe.`);
   }
 
   if (ESTAT._nkg) {
@@ -10689,7 +10674,7 @@ ${String(esborrany || '').slice(0, 7000)}`;
     }
   }
 
-  return { response: textComplet, esborrany, correccionsArquitecta, infoInjectadaEsbos, infoInjectadaRevisioOpus };
+  return { response: textComplet, esborrany: textComplet, correccionsArquitecta, infoInjectadaEsbos, infoInjectadaRevisioOpus };
 }
 
 function renderitzarNKG() {
