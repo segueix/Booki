@@ -1706,6 +1706,8 @@ const ESTAT = {
   _anthropicApiKey: '',
   _geminiApiKey:    '',
   _openaiApiKey:    '',
+  _revisionsCodiSistema: [],
+  _revisioFinalApp: null,
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -3863,132 +3865,117 @@ ${top}
 }
 
 async function generarCapitol(idx, intents = 0) {
+  // Fi: revisió final
   if (idx >= ESTAT._estructuraCapitols.length) {
     document.getElementById('btn-control-arcs-wrap').classList.remove('hidden');
     await executarLoopCoherenciaFinal(USER_CONFIG);
-    try { await generarRevisioFinalApp(USER_CONFIG); } catch (err) { console.warn('Post-mortem app:', err.message); }
-    iniciarRevisioGlobal();  // FASE 6: auto-trigger revisió global
+    try { await generarRevisioFinalApp(USER_CONFIG); } catch (err) { console.warn('Revisió final app:', err.message); }
+    iniciarRevisioGlobal();
     return;
   }
 
+  // Setup UI
   ESTAT._capitolActual = idx;
   amagarBotoSeguentCapitolManual();
   renderLlistaCapitols();
   actualitzarEstatCapitol(idx, 'actiu');
-
-  const cap   = ESTAT._estructuraCapitols[idx];
+  const cap = ESTAT._estructuraCapitols[idx];
   const titol = cap.titol || 'Capítol ' + (idx + 1);
-
   document.getElementById('capitol-actual-wrap').classList.add('hidden');
   document.getElementById('revisio-panel').classList.add('hidden');
   document.getElementById('checkpoint-intermedi-panel').classList.add('hidden');
   document.getElementById('btn-control-arcs-wrap').classList.add('hidden');
   showLoader(11);
-  document.getElementById('loader-11-text').textContent =
-    `🟣 Sonnet escrivint el Capítol ${idx + 1} — "${titol}"…`;
+  document.getElementById('loader-11-text').textContent = `🟣 Sonnet escrivint el Capítol ${idx + 1} — "${titol}"…`;
 
   try {
+    // Preparació (trets immutables personatges)
     if (idx > 0) refrescarPlaPsicologicPerSeguentCapitol();
     const capPersonatges = (cap && Array.isArray(cap.personatges)) ? cap.personatges : [];
     for (const nomPers of capPersonatges) {
       await garantirTretsImmutablesPersonatge(nomPers, USER_CONFIG);
     }
+
+    // GENERADOR: escriu el capítol
     let res = await generarCapitolNKG(idx, USER_CONFIG);
     let textNet = netejarTabulacionsInicials(res.response);
 
-    let decisio = verificarLongitud(idx, textNet);
-    if (decisio.accio === 'expandir') {
-      textNet = await expandirCapitol(textNet, idx, decisio.paraules, USER_CONFIG);
-      const paraulesExp = compteParaules(textNet);
-      if (ESTAT._controlLongitud && Array.isArray(ESTAT._controlLongitud.historicLongituds) && ESTAT._controlLongitud.historicLongituds.length > 0) {
-        ESTAT._controlLongitud.historicLongituds[ESTAT._controlLongitud.historicLongituds.length - 1] = paraulesExp;
-      }
-      decisio = { ...decisio, paraules: paraulesExp, percentatge: paraulesExp / Number((ESTAT._controlLongitud && ESTAT._controlLongitud.objectiu) || 3000), motiu: decisio.motiu + ' Expansió aplicada (1 intent).' };
-    } else if (decisio.accio === 'regenerar') {
-      const regen = await regenerarCapitolPerLongitud(idx, USER_CONFIG);
-      if (regen && regen.text) {
-        textNet = regen.text;
-        res = Object.assign({}, res || {}, regen.meta || {});
-      }
-      const paraulesRegen = compteParaules(textNet);
-      if (ESTAT._controlLongitud && Array.isArray(ESTAT._controlLongitud.historicLongituds) && ESTAT._controlLongitud.historicLongituds.length > 0) {
-        ESTAT._controlLongitud.historicLongituds[ESTAT._controlLongitud.historicLongituds.length - 1] = paraulesRegen;
-      }
-      decisio = { ...decisio, paraules: paraulesRegen, percentatge: paraulesRegen / Number((ESTAT._controlLongitud && ESTAT._controlLongitud.objectiu) || 3000), motiu: decisio.motiu + ' Regeneració aplicada (1 intent).' };
-    }
+    // Control de longitud unificat
+    const ajust = await ajustarLongitud(idx, textNet, USER_CONFIG);
+    textNet = ajust.text;
 
+    // Guardar capítol
     ESTAT._capitols_generats[idx] = textNet;
     ESTAT._metaCapitols = ESTAT._metaCapitols || {};
-    ESTAT._metaCapitols[idx] = Object.assign({}, ESTAT._metaCapitols[idx] || {}, { textFinal: textNet, controlLongitud: decisio });
-    ESTAT._metaCapitols = ESTAT._metaCapitols || {};
-    ESTAT._metaCapitols[idx] = Object.assign({}, ESTAT._metaCapitols[idx] || {}, {
+    ESTAT._metaCapitols[idx] = {
+      textFinal: textNet,
+      controlLongitud: ajust.decisio,
       esbos: res.esborrany || '',
       correccionsArquitecta: res.correccionsArquitecta || '',
       infoInjectadaEsbos: res.infoInjectadaEsbos || '',
       infoInjectadaRevisioOpus: res.infoInjectadaRevisioOpus || ''
-    });
+    };
+
+    // UI
     renderLlistaCapitols();
     hideLoader(11);
     mostrarCapitol(idx, textNet);
 
-    try {
-      await actualitzarBiblia(res.response, idx, USER_CONFIG);
-    } catch (err) {
-      console.warn('Bíblia async:', err.message);
-    }
+    // ARQUITECTE: recull totes les dades de seguiment
+    await arxitectePostCapitol(idx, textNet, USER_CONFIG);
 
-    try {
-      await actualitzarLlibreRegistreBackground(res.response, idx);
-    } catch (err) {
-      console.warn('Registre async:', err.message);
-    }
+    // Recursió al capítol següent
+    generarCapitol(idx + 1);
 
-    try {
-      await generarSnapshotFinalCapitol(idx, USER_CONFIG);
-    } catch (err) {
-      console.warn('Continuity snapshot async:', err.message);
-    }
-
-    try {
-      await actualitzarBeatsNarratiusGastats(textNet, idx + 1, USER_CONFIG);
-    } catch (err) {
-      console.warn('Beats gastats async:', err.message);
-    }
-
-    try {
-      actualitzarRegistreEstil(idx, textNet);
-      generarAlertesEstil();
-    } catch (err) {
-      console.warn('Registre estil async:', err.message);
-    }
-
-    const esCheckpoint = (idx + 1) % 3 === 0 && idx + 1 < ESTAT._estructuraCapitols.length;
-    if (esCheckpoint) {
-      await executarCheckpoint(idx, USER_CONFIG);
-    }
-
-    const esCompressio = (idx + 1) % 5 === 0 && idx + 1 < ESTAT._estructuraCapitols.length;
-    if (esCompressio) {
-      document.getElementById('loader-11-text').textContent = '🔵 Opus comprimint memòria narrativa…';
-      await comprimirMemoria(idx + 1, USER_CONFIG);
-    }
-
-    if (res.revisio_sistema && (idx + 1) % 3 === 0) {
-      mostrarAuditoriaSistemaCapitol(idx, res.revisio_sistema);
-    }
-
-    const isLast = idx >= ESTAT._estructuraCapitols.length - 1;
-    mostrarAccionsCapitolSimple(idx, isLast);
   } catch (err) {
     if (USER_CONFIG && USER_CONFIG.fluxAutomatic && intents < 3) {
       document.getElementById('loader-11-text').textContent = `⚠️ Error detectat. Reintentant capítol en 5 segons (Intent ${intents + 1}/3)...`;
       setTimeout(() => generarCapitol(idx, intents + 1), 5000);
       return;
     }
-
     hideLoader(11);
-    toast('Error Sonnet: ' + err.message);
+    console.error(`Error en capítol ${idx + 1}:`, err.message);
+    toast(`Error capítol ${idx + 1}: ${err.message}`);
   }
+}
+
+async function arxitectePostCapitol(idx, textCapitol, userConfig) {
+  const esRevisioSistema = idx > 0 && idx % 3 === 2; // cada 3 capítols (cap 3, 6, 9, 12...)
+
+  // 1. Bíblia narrativa
+  try { await actualitzarBiblia(textCapitol, idx, userConfig); } catch (e) { console.warn('Bíblia:', e.message); }
+
+  // 2. Llibre de registre (+ revisió de codi JS cada 3 capítols)
+  try { await actualitzarLlibreRegistreBackground(textCapitol, idx, esRevisioSistema, userConfig); } catch (e) { console.warn('Registre:', e.message); }
+
+  // 3. Snapshot de continuïtat
+  try { await generarSnapshotFinalCapitol(idx, userConfig); } catch (e) { console.warn('Snapshot:', e.message); }
+
+  // 4. Beats narratius gastats
+  try { await actualitzarBeatsNarratiusGastats(textCapitol, idx + 1, userConfig); } catch (e) { console.warn('Beats:', e.message); }
+
+  // 5. Registre d'estil (sincrò, sense crida LLM)
+  try { actualitzarRegistreEstil(idx, textCapitol); generarAlertesEstil(); } catch (e) { console.warn('Estil:', e.message); }
+
+  // Checkpoint de coherència narrativa cada 3 capítols
+  const esCheckpoint = (idx + 1) % 3 === 0 && idx + 1 < ESTAT._estructuraCapitols.length;
+  if (esCheckpoint) {
+    try { await executarCheckpoint(idx, userConfig); } catch (e) { console.warn('Checkpoint:', e.message); }
+  }
+
+  // Compressió de memòria cada 5 capítols
+  const esCompressio = (idx + 1) % 5 === 0 && idx + 1 < ESTAT._estructuraCapitols.length;
+  if (esCompressio) {
+    const loaderEl = document.getElementById('loader-11-text');
+    if (loaderEl) loaderEl.textContent = '🔵 Opus comprimint memòria narrativa…';
+    try { await comprimirMemoria(idx + 1, userConfig); } catch (e) { console.warn('Compressió:', e.message); }
+  }
+
+  // Mostra panel de revisió de codi si escau
+  if (esRevisioSistema) mostrarCheckpointIntermedi(idx);
+
+  const isLast = idx >= ESTAT._estructuraCapitols.length - 1;
+  mostrarAccionsCapitolSimple(idx, isLast);
 }
 
 function mostrarCapitol(idx, text) {
@@ -4341,40 +4328,22 @@ function reconciliarFilsRegistre(dades) {
 }
 
 // FASE 8: registre síncron amb retry — s'awaita des de generarCapitol
-async function actualitzarLlibreRegistreBackgroundLegacy(textCapitol, idx) {
-  let intents = 0;
-  while (intents < 2) {
-    try {
-      const res   = await actualitzarRegistre(textCapitol, idx, USER_CONFIG);
-      const dadesRaw = parseJsonRobust(res.response);
-      if (dadesRaw) {
-        const dades = normalitzarEntradaRegistre(dadesRaw, textCapitol, idx);
-        if (!ESTAT.llibreRegistre.capitols) ESTAT.llibreRegistre.capitols = [];
-        ESTAT.llibreRegistre.capitols[idx] = dades;
-
-        if (Array.isArray(dades.estat_personatges) && dades.estat_personatges.length > 0)
-          ESTAT.llibreRegistre.estat_personatges = dades.estat_personatges;
-
-        reconciliarFilsRegistre(dades);
-
-        await actualitzarEstatsAnimics(textCapitol, idx, USER_CONFIG);
-        return;  // èxit
-      }
-      intents++;
-    } catch (err) {
-      console.warn(`Registre intent ${intents + 1}:`, err.message);
-      intents++;
-    }
+async function actualitzarLlibreRegistreBackground(textCapitol, idx, esRevisioSistema = false, userConfig) {
+  const cfg = userConfig || USER_CONFIG;
+  const dades = await extreureDadesRegistreIAvaluarSistema(idx, textCapitol, esRevisioSistema, cfg);
+  if (dades && dades.actualitzacio_nkg) {
+    const entrada = dades.actualitzacio_nkg;
+    if (!ESTAT.llibreRegistre.capitols) ESTAT.llibreRegistre.capitols = [];
+    ESTAT.llibreRegistre.capitols[idx] = normalitzarEntradaRegistre(entrada, textCapitol, idx);
+    if (Array.isArray(entrada.personatges) && entrada.personatges.length > 0)
+      ESTAT.llibreRegistre.estat_personatges = entrada.personatges;
+    reconciliarFilsRegistre(ESTAT.llibreRegistre.capitols[idx]);
+  } else {
+    if (!ESTAT.llibreRegistre.capitols) ESTAT.llibreRegistre.capitols = [];
+    ESTAT.llibreRegistre.capitols[idx] = normalitzarEntradaRegistre(null, textCapitol, idx);
+    console.warn('Registre: fallback local aplicat (entrada mínima) per al capítol', idx + 1);
   }
-
-  if (!ESTAT.llibreRegistre.capitols) ESTAT.llibreRegistre.capitols = [];
-  ESTAT.llibreRegistre.capitols[idx] = normalitzarEntradaRegistre(null, textCapitol, idx);
-  await actualitzarEstatsAnimics(textCapitol, idx, USER_CONFIG);
-  console.warn('Registre: fallback local aplicat (entrada mínima) per al capítol', idx + 1);
-}
-
-async function actualitzarLlibreRegistreBackground(textCapitol, idx) {
-  return await actualitzarLlibreRegistreBackgroundLegacy(textCapitol, idx);
+  await actualitzarEstatsAnimics(textCapitol, idx, cfg);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -4596,8 +4565,40 @@ function tancarModalRegistre() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 6: Revisió Global (Opus) — UI
+//  FASE 6: Revisió Final App (Arquitecte) + Revisió Global (Opus) — UI
 // ═══════════════════════════════════════════════════════════
+async function generarRevisioFinalApp(userConfig) {
+  const revisionsAcumulades = (ESTAT._revisionsCodiSistema || [])
+    .map(r => `=== CHECKPOINT cap ${r.capitol} ===\n${r.revisio}`)
+    .join('\n\n');
+
+  const msgs = [{
+    role: 'user',
+    content: `Ets l'Arquitecte del sistema Booki. Acabes de supervisar la generació completa de la novel·la.
+
+REVISIONS DE CODI ACUMULADES (una cada 3 capítols):
+${revisionsAcumulades || '(cap revisió intermèdia disponible)'}
+
+TASCA: Fes una REVISIÓ FINAL i CONSOLIDADA del codi de gestió de l'app:
+1. Quines millores de qualitat del codi de gestió (prompts, funcions de seguiment, injecció de context) han quedat pendents?
+2. Quines implementacions recomanaries per a la propera versió de l'app?
+3. Quins patrons de fallada has detectat al llarg de la generació?
+
+Retorna JSON:
+{
+  "diagnòstic_global": "...",
+  "millores_prioritzades": [{"area": "...", "proposta": "...", "impacte": "alt|mitjà|baix"}],
+  "patrons_fallada": ["..."],
+  "recomanacions_v2": ["..."]
+}`
+  }];
+
+  const models = getModelConfig(userConfig);
+  const res = await callLLMOneShotPlusCompletion(msgs, "Ets l'Arquitecte del sistema Booki. Analitza i recomana millores tècniques.", Object.assign({}, userConfig, { model: models.modelArquitecte, maxTokens: 4000 }), 'revisio');
+  const dades = parseJsonRobust(res);
+  ESTAT._revisioFinalApp = dades;
+}
+
 async function iniciarRevisioGlobal() {
   const loaderEl  = document.getElementById('revisio-global-loader');
   const resultEl  = document.getElementById('revisio-global-result');
@@ -6524,48 +6525,6 @@ function buildResumConteBreu() {
   return `INICI: ${primer}\n[...]\nMIG: ${mig}\n[...]\nFINAL: ${ultim}`;
 }
 
-// ═══════════════════════════════════════════════════════════
-//  HELPERS per al context de la novel·la
-// ═══════════════════════════════════════════════════════════
-function buildSystemPromptCapitolLegacy() {
-  const resumConte = buildResumConteBreu();
-  const brief      = buildBriefNarratiu();
-  const world      = ESTAT.worldbuilding ? ESTAT.worldbuilding.substring(0, 3000) + (ESTAT.worldbuilding.length > 3000 ? '\n[…]' : '') : 'No definida';
-  const veus       = ESTAT.estilsParla   ? ESTAT.estilsParla : 'No definits';
-
-  let base = `${getSystemPromptNovella(ESTAT.tematica)}
-
-${brief}
-
-RESUM DEL CONTE ORIGINAL:
-${resumConte}
-
-BÍBLIA DE MÓN:
-${world}
-
-ESTILS DE PARLA DELS PERSONATGES:
-${veus}
-
-REGLA D'ESTIL OBLIGATÒRIA (SHOW, DON'T TELL): Tens totalment prohibit utilitzar etiquetes emocionals explícites per descriure com se sent un personatge (ex: prohibit dir \"estava trist\", \"se sentia enfadat\", \"estava nerviós\"). En comptes d'això, has de MOSTRAR l'emoció a través d'accions físiques, interaccions amb els objectes del seu inventari, la seva vestimenta, el llenguatge corporal o detalls de l'entorn (ex: \"jugava compulsivament amb el botó descosit de l'abric\", \"va prémer les claus fins que els artells se li van posar blancs\").
-
-REGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que és el final del capítol, NO tanquis artificialment l'energia narrativa. Mantén continuïtat orgànica segons el to de l'obra: suspens d'acció, ressonància lírica, o desplaçament perceptiu; la següent generació ha de poder recollir el testimoni de forma natural.`;
-
-  if (ESTAT._goldenPassage) {
-    base += `\n\nREFERÈNCIA DE VEU:\nEl següent passatge exemplifica la veu i l'estil que ha de tenir la novel·la. Usa'l com a referència de qualitat:\n\n${ESTAT._goldenPassage}`;
-  }
-  if (ESTAT._capitols_generats.filter(t => t).length >= 3) {
-    const repsDetectades = detectarRepeticions();
-    if (repsDetectades) {
-      const trigrames = repsDetectades.trigrames || [];
-      const bigrames = repsDetectades.bigrames || [];
-      const evitar = [...trigrames.slice(0,5), ...bigrames.slice(0,5)].map(([ng]) => `"${ng}"`);
-      if (evitar.length > 0) base += `\n\nEXPRESSIONS A EVITAR (ja massa repetides): ${evitar.join(', ')}`;
-    }
-  }
-  return base;
-}
-
-
 
 function buildBlocAlertaLongitud() {
   const c = ESTAT._controlLongitud;
@@ -6607,6 +6566,25 @@ function verificarLongitud(capitolIdx, textGenerat) {
     return { paraules, percentatge, accio: 'expandir', motiu: 'Capítol acceptable però massa curt; cal expansió.' };
   }
   return { paraules, percentatge, accio: 'regenerar', motiu: 'Capítol massa curt respecte del mínim.' };
+}
+
+async function ajustarLongitud(idx, text, userConfig) {
+  let decisio = verificarLongitud(idx, text);
+  if (decisio.accio === 'expandir') {
+    text = await expandirCapitol(text, idx, decisio.paraules, userConfig);
+    const p = compteParaules(text);
+    if (ESTAT._controlLongitud && Array.isArray(ESTAT._controlLongitud.historicLongituds) && ESTAT._controlLongitud.historicLongituds.length > 0)
+      ESTAT._controlLongitud.historicLongituds[ESTAT._controlLongitud.historicLongituds.length - 1] = p;
+    decisio = { ...decisio, paraules: p, percentatge: p / (ESTAT._controlLongitud?.objectiu || 3000), motiu: decisio.motiu + ' Expansió aplicada.' };
+  } else if (decisio.accio === 'regenerar') {
+    const regen = await regenerarCapitolPerLongitud(idx, userConfig);
+    if (regen?.text) text = regen.text;
+    const p = compteParaules(text);
+    if (ESTAT._controlLongitud && Array.isArray(ESTAT._controlLongitud.historicLongituds) && ESTAT._controlLongitud.historicLongituds.length > 0)
+      ESTAT._controlLongitud.historicLongituds[ESTAT._controlLongitud.historicLongituds.length - 1] = p;
+    decisio = { ...decisio, paraules: p, percentatge: p / (ESTAT._controlLongitud?.objectiu || 3000), motiu: decisio.motiu + ' Regeneració aplicada.' };
+  }
+  return { text, decisio };
 }
 
 async function expandirCapitol(textOriginal, capitolIdx, paraulesActuals, userConfig = USER_CONFIG) {
@@ -7000,21 +6978,8 @@ function buildSystemPromptCapitol() {
     }
     return parts.join('\n');
   }
-  const legacy = buildSystemPromptCapitolLegacy();
-  const blocBeatsProhibits = buildBlocBeatsNarratiusProhibits();
-  let legacyAmbContinuitat = legacy;
-  if (blocBeatsProhibits) legacyAmbContinuitat += `\n\n${blocBeatsProhibits}`;
-  const blocAlertesEstil = buildBlocAlertesEstil();
-  if (blocAlertesEstil) legacyAmbContinuitat += `\n\n${blocAlertesEstil}`;
-  const blocLongitud = buildBlocAlertaLongitud();
-  if (blocLongitud) legacyAmbContinuitat += `\n\n${blocLongitud}`;
-  if (directivaFils) legacyAmbContinuitat += `\n\n${directivaFils}`;
-  if (blocAntiProliferacioFils) legacyAmbContinuitat += `\n\n${blocAntiProliferacioFils}`;
-  if (directivaContinuitat) legacyAmbContinuitat += `\n\n${directivaContinuitat}`;
-  if (ESTAT._controlLongitud && ESTAT._controlLongitud.promptForcat) legacyAmbContinuitat += `\n\n${ESTAT._controlLongitud.promptForcat}`;
-  return prohibirIniciMeteorologic
-    ? legacyAmbContinuitat + "\n\nPROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg."
-    : legacyAmbContinuitat;
+  // ESTAT._nkg és sempre truthy en producció; la branca no-NKG s'ha eliminat
+  return '';
 }
 
 function buildRegistreContextLegacy(idx) {
@@ -7847,51 +7812,6 @@ function generarInstruccionsGanxoFinalCapitol(idx) {
   }
 
   return `Al tram final crea un moment que faci la lectura addictiva. ${tecniques}`;
-}
-
-async function escriureCapitol(idx, userConfig) {
-  const cap          = ESTAT._estructuraCapitols[idx];
-  const capPlanificacio = cap ? (cap.resum || cap.text) : `Capítol ${idx + 1}`;
-  const context      = buildContextCapitol(idx);
-  const systemPrompt = buildSystemPromptCapitol();
-  const instruccionsFinalCapitol = generarInstruccionsGanxoFinalCapitol(idx);
-
-  // Instruccions de personatges presents i els seus estils
-  const persPresents = cap && cap.personatges ? cap.personatges : [];
-  let instruccionsVeu = '';
-  if (persPresents.length > 0 && ESTAT.estilsParla) {
-    const ctxPsico = construirContextPsicologicPersonatges(12);
-    instruccionsVeu = `\n\nPERSONATGES EN AQUEST CAPÍTOL I ELS SEUS ESTILS DE PARLA:
-Aplica estrictament l'estil de veu definit per a cada personatge en els seus diàlegs.
-Cada personatge ha de sonar inconfusiblement diferent dels altres.
-Personatges presents: ${persPresents.join(', ')}\n\nESTAT ANIMIC ACTUAL: Adapta l'estil de veu base de cada personatge al seu estat d'ànim actual. Per exemple, si el seu estil és 'frases curtes i analítiques' però el seu estat anímic actual és 'pànic absolut', la seva veu ha de reflectir el pànic perdent l'estructura analítica.${ctxPsico ? '\n\nPERFIL DINÀMIC (nom, estil_veu, perfil_psicologic, estat_animic_actual):\n' + ctxPsico : ''}`;
-  }
-
-  const msgs = [{
-    role: 'user',
-    content: `Escriu el CAPÍTOL ${idx + 1} de la novel·la.
-
-PLANIFICACIÓ D'AQUEST CAPÍTOL:
-${capPlanificacio}
-
-${context}
-${instruccionsVeu}
-
-INSTRUCCIONS D'ESCRIPTURA:
-- LONGITUD OBLIGATÒRIA: Aquest capítol ha de tenir entre 3.500 i 5.000 paraules. Presa't el teu temps per desenvolupar totes les escenes amb el ritme adequat. Utilitza descripcions sensorials riques, diàlegs ben construïts i accions físiques per expandir el text. NO precipitis el final ni resumeixis els esdeveniments per acabar ràpid. Desenvolupa la prosa de manera literària fins a assolir aquesta extensió de paraules.
-- Desenvolupa les escenes a fons, utilitza diàleg ric i descripcions sensorials. NO resumeixis.
-- Comença directament amb la narració, sense titular el capítol
-- Si hi ha prefiguracions a plantar, integra-les de forma subtil i natural (el lector no ha de notar-les en primera lectura)
-- Si hi ha prefiguracions a recollir, dona'ls resolució satisfactòria
-- Respecta el nivell de tensió objectiu i el to indicat
-- Si no és el primer capítol, la primera frase ha de connectar fluïdament amb el final del capítol anterior
-- ${instruccionsFinalCapitol}
-- Escriu en català`
-  }];
-
-  const models = getModelConfig(userConfig);
-  const response = await callLLMOneShotPlusCompletion(msgs, systemPrompt, Object.assign({}, userConfig, { maxTokens: 14000, model: models.modelGeneracio }), 'generacio');
-  return { response };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -9028,55 +8948,6 @@ async function generarIValidarEscena(promptEscena, systemPrompt, userConfig, opt
 }
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 11: Escriure capítol per escenes (usa escaleta)
-// ═══════════════════════════════════════════════════════════
-async function escriureCapitolPerEscenes(idx, userConfig) {
-  const escaletaCapitol = ESTAT._escaletes.find(e => e.capitol === idx + 1);
-  if (!escaletaCapitol || !escaletaCapitol.escenes || escaletaCapitol.escenes.length === 0) {
-    return await escriureCapitol(idx, userConfig);
-  }
-  const systemPrompt = buildSystemPromptCapitol();
-  const contextCapitol = buildContextCapitol(idx);
-  const escenes = escaletaCapitol.escenes;
-  const instruccionsFinalCapitol = generarInstruccionsGanxoFinalCapitol(idx);
-  let textsEscenes = [];
-  for (let i = 0; i < escenes.length; i++) {
-    const escena = escenes[i];
-    if (document.getElementById('loader-11-text')) {
-      document.getElementById('loader-11-text').textContent = `Escrivint capítol ${idx + 1} — Escena ${i + 1}/${escenes.length}: ${escena.nom || ''}…`;
-    }
-    const esUltimaEscena = i === escenes.length - 1;
-    const tensioEscena = (ESTAT._corbaTensio || []).find(t => t.capitol === idx + 1);
-    const instruccioTensioEscena = obtenirInstruccionsDeTensio(tensioEscena ? tensioEscena.nivell : 5);
-    const textEnllac = i > 0 ? obtenirTextEnllac(textsEscenes[i - 1]) : '';
-    const tipusTransicio = i > 0 ? determinarTipusTransicio(escenes[i - 1], escena) : 'continuacio_directa';
-    const instruccionsTransicio = buildInstruccionsTransicio(textEnllac, tipusTransicio);
-    const promptEscena = `${contextCapitol}
-
-## ESCENA ACTUAL A ESCRIURE
-Escena ${i + 1} de ${escenes.length}: **${escena.nom || ''}**
-Funció narrativa: ${escena.funcio_narrativa || ''}
-Personatges: ${(escena.personatges || []).join(', ')}
-Paraules objectiu: ${escena.paraules_objectiu || 400}
-${escena.punt_inflexio ? '⚡ Aquesta escena conté un punt d\'inflexió important.' : ''}
-Ritme i tensió objectiu: ${instruccioTensioEscena}
-
-${instruccionsTransicio}${esUltimaEscena ? `TANCAMENT DEL CAPÍTOL:
-${instruccionsFinalCapitol}
-
-` : ''}Escriu ara aquesta escena en prosa literària completa, sense títols ni metadades. Aproximadament ${escena.paraules_objectiu || 400} paraules.${!esUltimaEscena ? ' IMPORTANT: no tanquis la situació al final; deixa-la en continuïtat orgànica cap a la següent escena.' : ''}`;
-    const res = await generarIValidarEscena(
-      promptEscena,
-      systemPrompt,
-      userConfig,
-      { intentsMaxims: 2, maxTokens: Math.max(3000, (escena.paraules_objectiu || 700) * 2) }
-    );
-    textsEscenes.push(res || '');
-  }
-  return { response: textsEscenes.join('\n\n') };
-}
-
-// ═══════════════════════════════════════════════════════════
 //  Compressió de Memòria Narrativa (Opus)
 // ═══════════════════════════════════════════════════════════
 async function comprimirMemoria(finsCapitol, userConfig) {
@@ -9975,240 +9846,6 @@ INSTRUCCIONS:
   return res || '';
 }
 
-async function escriureEscenaDirectaAmbJutge(capitol, escenaIdx, escenaSpec, userConfig) {
-  const systemPrompt = buildSystemPromptCapitol();
-  const idx = capitol - 1;
-
-  const nkgSpec = {
-    capitol: capitol,
-    escena: escenaIdx + 1,
-    personatges: escenaSpec.personatges || [],
-    lloc: escenaSpec.lloc || escenaSpec.localitzacio || '',
-    escaleta: escenaSpec
-  };
-
-  for (const nomPers of (escenaSpec.personatges || [])) {
-    await garantirTretsImmutablesPersonatge(nomPers, userConfig);
-  }
-  const contextNKG = nkgGenerarContextMinim(nkgSpec);
-  const contextCapitolEnCurs = obtenirContextCapitolEnCurs(capitol, escenaIdx);
-  const escaletaCap = ESTAT._escaletes ? ESTAT._escaletes.find(e => e.capitol === capitol) : null;
-  const totalEscenesCapitol = escaletaCap && Array.isArray(escaletaCap.escenes) ? escaletaCap.escenes.length : 1;
-  const esUltimaEscenaCapitol = escenaIdx >= totalEscenesCapitol - 1;
-  const instruccionsFinalCapitol = esUltimaEscenaCapitol
-    ? generarInstruccionsGanxoFinalCapitol(idx)
-    : '';
-
-  const escenaAnterior = escenaIdx > 0 && escaletaCap && Array.isArray(escaletaCap.escenes)
-    ? escaletaCap.escenes[escenaIdx - 1]
-    : null;
-  const textEscenaAnterior = (ESTAT._escenes_generades && ESTAT._escenes_generades[idx])
-    ? ESTAT._escenes_generades[idx][escenaIdx - 1]
-    : '';
-  const textEnllac = obtenirTextEnllac(textEscenaAnterior);
-  const tipusTransicio = determinarTipusTransicio(escenaAnterior, escenaSpec);
-  const instruccionsTransicio = buildInstruccionsTransicio(textEnllac, tipusTransicio);
-
-  const tensioObj = (ESTAT._corbaTensio || []).find(t => t.capitol === capitol);
-  const tensioNivell = tensioObj ? Number(tensioObj.nivell) : 5;
-  const instruccionsRitme = obtenirInstruccionsDeTensio(tensioNivell);
-
-  const goldenRef = ESTAT._goldenPassage
-    ? `\nREFERÈNCIA DE VEU (manté aquest to i estil):\n${ESTAT._goldenPassage.substring(0, 800)}`
-    : '';
-
-  let estilsPresents = '';
-  if (ESTAT.estilsParla && escenaSpec.personatges && escenaSpec.personatges.length > 0) {
-    const estils = [];
-    escenaSpec.personatges.forEach(nom => {
-      if (typeof ESTAT.estilsParla === 'string' && ESTAT.estilsParla.includes(nom)) {
-        const nomIdx = ESTAT.estilsParla.indexOf(nom);
-        const nextIdx = ESTAT.estilsParla.indexOf('\n\n', nomIdx + nom.length);
-        const bloc = ESTAT.estilsParla.substring(nomIdx, nextIdx > nomIdx ? nextIdx : nomIdx + 300);
-        estils.push(bloc.substring(0, 200));
-      }
-    });
-    if (estils.length > 0) estilsPresents = '\n\nESTILS DE PARLA:\n' + estils.join('\n');
-  }
-
-  const funcioNarrativa = escenaSpec.funcio_narrativa || '';
-  const autonomiaMatch = funcioNarrativa.match(/\[AUTONOMIA:\s*([^\]]+)\]/i);
-  const instruccionsAutonomia = autonomiaMatch
-    ? `\nESCENA D'AUTONOMIA DEL SECUNDARI: En aquesta escena, ${autonomiaMatch[1].trim()} actua per iniciativa pròpia. Mostra un desig o una por que sigui INDEPENDENT de la trama principal.`
-    : '';
-
-  let instruccionsBeat = '';
-  const beat = (escenaSpec.beat_narratiu || escenaSpec.funcio_narrativa || '').toLowerCase();
-  const conf = ESTAT.configProjecte || { genere: '', autor_referencia: '', focus_climax: '' };
-
-  if (beat.includes('diàleg') || beat.includes('dialog')) {
-    instruccionsBeat = "Mínim 70% diàleg directe. Els personatges han de parlar, interrompre's i reaccionar en temps real. Cada personatge ha de sonar diferent.";
-  } else if (beat.includes('introspecció') || beat.includes('decisió')) {
-    if (tensioNivell >= 8) {
-      instruccionsBeat = `MOMENT DE DECISIÓ CLIMÀTICA. Atura el temps narratiu i NO acceleris el tempo emocional. Enfoca't en detalls minúsculs coherents amb: ${conf.focus_climax}.`;
-    } else {
-      instruccionsBeat = 'Ritme pausat. Pensaments del personatge. Reflexions internes.';
-    }
-  } else if (beat.includes('acció') || beat.includes('accio')) {
-    instruccionsBeat = 'Frases curtes i directes. Ritme trepidant. Verbs d\'acció. Poc diàleg.';
-  } else if (beat.includes('descripció') || beat.includes('descripcio')) {
-    instruccionsBeat = 'Detalls sensorials: olors, sons, textures, llum. El lloc cobra vida.';
-  }
-
-  const ultimaEscenaText = obtenirUltimesEscenes(1, capitol, escenaIdx + 1);
-  const instruccionsVariancia = ultimaEscenaText
-    ? generarInstruccionsVariancia(analitzarVarianciaVeu(ultimaEscenaText))
-    : '';
-
-  let manualRef = '';
-  if (ESTAT._manualEstil) {
-    const m = ESTAT._manualEstil;
-    const linies = [];
-    if (m.longitud_frases) linies.push(`• ${m.longitud_frases}`);
-    if (m.estil_dialeg) linies.push(`• Diàleg: ${m.estil_dialeg}`);
-    if (m.sensorialitat) linies.push(`• Sensorialitat: ${m.sensorialitat}`);
-    if (m.ritme) linies.push(`• Ritme: ${m.ritme}`);
-    if (linies.length > 0) manualRef = '\nMANUAL D\'ESTIL:\n' + linies.join('\n');
-  }
-
-  const blocPlaPsico = construirBlocPlaPsicologicPerPrompt(capitol, escenaIdx);
-
-  // NKG CHRONOS: restricció negativa anti-regressió
-  const accionsRecents = (ESTAT._nkg && Array.isArray(ESTAT._nkg.timeline_accions) && ESTAT._nkg.timeline_accions.length > 0)
-    ? ESTAT._nkg.timeline_accions.slice(-8).join('\n- ')
-    : '';
-  const blocAntiRegressio = accionsRecents
-    ? `[CONTROL DE CONTINUÏTAT — ACCIONS JA CONSUMADES]
-Les següents accions JA han succeït en els capítols/escenes anteriors immediats.
-ESTÀ TERMINANTMENT PROHIBIT TORNAR A NARRAR-LES o presentar-les com a noves.
-La teva escena ha de començar TEMPORALMENT DESPRÉS d'aquests fets:
-- ${accionsRecents}
-
-Si l'escaleta et demana una acció que ja està a la llista superior, assumeix que ja s'ha realitzat i narra la CONSEQÜÈNCIA directa, no l'acció en si.`
-    : '';
-
-  const promptUnificat = `ESCRIPTURA D'ESCENA — Capítol ${capitol}, Escena ${escenaIdx + 1}
-
-${contextNKG}
-${blocAntiRegressio ? blocAntiRegressio + '\n' : ''}${contextCapitolEnCurs}
-${goldenRef}
-${estilsPresents}${manualRef}
-${blocPlaPsico}
-${instruccionsTransicio}
-INSTRUCCIONS D'ESCRIPTURA:
-- Extensió objectiu: ${escenaSpec.paraules_objectiu || 700}-${(escenaSpec.paraules_objectiu || 700) + 200} paraules
-- Objectiu dramàtic d'aquesta escena: ${escenaSpec.objectiu_dramatic || escenaSpec.funcio_narrativa || 'Avançar la trama'}
-- ${instruccionsRitme}
-- ${instruccionsBeat || 'Equilibra narració, diàleg i descripció'}
-- PROHIBIT RESUMIR: Mostra l'acció en temps real, segon a segon. Escriu diàlegs complets i no els tallis.
-- INTEGRACIÓ DE L'ENTORN: Fes que els personatges interactuïn físicament amb l'entorn de forma orgànica.
-- PROHIBIT TELLING EMOCIONAL: Mai etiquetis l'emoció directament. Mostra-ho amb tensió, respiració, accions.
-- Respecta escrupolosament els salts de línia en els diàlegs: un paràgraf nou per a cada personatge.
-- Comença directament amb la narració, sense titular.
-${instruccionsVariancia ? '- VARIÀNCIA: ' + instruccionsVariancia + '\n' : ''}${instruccionsAutonomia}
-- ${instruccionsFinalCapitol || "Mantén la progressió narrativa sense tancar l'escena abruptament."}
-- Escriu en català.`;
-
-  const models = getModelConfig(userConfig);
-  try {
-    const textFinal = await generarIValidarEscena(
-      promptUnificat,
-      systemPrompt,
-      Object.assign({}, userConfig, { model: models.modelGeneracio }),
-      { intentsMaxims: 2, maxTokens: 6000 }
-    );
-
-    if (!ESTAT._escenes_generades) ESTAT._escenes_generades = {};
-    if (!ESTAT._escenes_generades[idx]) ESTAT._escenes_generades[idx] = {};
-    ESTAT._escenes_generades[idx][escenaIdx] = textFinal;
-
-    await nkgActualitzarPostEscena(textFinal, capitol, escenaIdx + 1, userConfig);
-
-    return textFinal || '';
-  } catch (err) {
-    console.error('Error a l\'escriptura directa:', err.message);
-    return '';
-  }
-}
-
-async function generarEsborranyCapitol(idx, userConfig) {
-  const capitol = idx + 1;
-  const escaletaCap = ESTAT._escaletes ? ESTAT._escaletes.find(e => e.capitol === capitol) : null;
-  const escenes = escaletaCap ? (escaletaCap.escenes || null) : null;
-
-  if (ESTAT._nkg && escenes && Array.isArray(escenes) && escenes.length > 0) {
-    const contextNKG = nkgGenerarContextMinim({
-      capitol,
-      escena: 1,
-      personatges: [...new Set(escenes.flatMap(sc => sc.personatges || []))],
-      lloc: escenes[0] ? (escenes[0].lloc || escenes[0].localitzacio || '') : '',
-      escaleta: { capítol: capitol, escenes }
-    });
-    const contextCapitol = buildContextCapitol(idx);
-    const instruccionsFinalCapitol = generarInstruccionsGanxoFinalCapitol(idx);
-
-    const escenesText = escenes
-      .map((sc, i) => `ESCENA ${i + 1}/${escenes.length}
-- Nom: ${sc.nom || ''}
-- Funció narrativa: ${sc.funcio_narrativa || ''}
-- Personatges: ${(sc.personatges || []).join(', ')}
-- Paraules objectiu: ${sc.paraules_objectiu || 500}
-- Beat narratiu: ${sc.beat_narratiu || 'equilibrat'}`)
-      .join('\n\n');
-
-    const paraulesTotal = escenes.reduce((acc, sc) => acc + (sc.paraules_objectiu || 500), 0);
-    const systemPrompt = buildSystemPromptCapitol();
-    const msgs = [{
-      role: 'user',
-      content: `Escriu un primer esborrany complet d'aquest capítol. Centra't en avançar l'acció i els diàlegs, no et preocupis per la prosa perfecta encara.
-
-CAPÍTOL ${capitol}
-
-${contextNKG}
-
-${contextCapitol}
-
-ESCALETA DEL CAPÍTOL:
-${escenesText}
-
-INSTRUCCIONS ESTRICTES:
-- Escriu totes les escenes en ordre i posa aquest marcador al començament de cada escena: [[ESCENA_1]], [[ESCENA_2]], etc.
-- NO afegeixis cap altre encapçalament ni metadades
-- Dins de cada escena escriu prosa literària funcional i transicions naturals
-- Respecta personatges i continuïtat factual
-- LONGITUD OBJECTIU: entre ${Math.round(paraulesTotal * 0.85)} i ${Math.round(paraulesTotal * 1.05)} paraules
-- ${instruccionsFinalCapitol}`
-    }];
-
-    const textRaw = await callLLMOneShotConditionalCompletion(
-      msgs,
-      systemPrompt,
-      Object.assign({}, userConfig, { maxTokens: Math.max(10000, paraulesTotal * 2), model: getModelConfig(userConfig).modelGeneracio }),
-      'generacio'
-    );
-
-    const escenesParsejades = parseEscenesUnificades(textRaw, escenes.length);
-    if (escenesParsejades.length > 0) return escenesParsejades.map(e => e.text).join('\n\n');
-    return textRaw;
-  }
-
-  if (ESTAT._nkg) {
-    const cap = ESTAT._estructuraCapitols ? ESTAT._estructuraCapitols[idx] : null;
-    const escenaSpec = {
-      personatges: cap ? (cap.personatges || []) : [],
-      lloc: cap ? (cap.localitzacio || '') : '',
-      objectiu_dramatic: cap ? (cap.resum || '') : '',
-      funcio_narrativa: cap ? (cap.fil_principal || '') : '',
-      beat_narratiu: cap ? (cap.to_ritme || 'equilibrat') : 'equilibrat',
-      paraules_objectiu: 3000
-    };
-    return await escriureEscenaDirectaAmbJutge(capitol, 0, escenaSpec, userConfig);
-  }
-
-  const res = await escriureCapitolPerEscenes(idx, userConfig);
-  return res.response || '';
-}
-
 async function avaluarEsborranyAmbHistoric(idx, esborrany, userConfig) {
   const capitol = idx + 1;
   const models = getModelConfig(userConfig);
@@ -10642,7 +10279,12 @@ Retorna EXCLUSIVAMENT JSON amb aquesta estructura:
     Object.assign({}, userConfig, { maxTokens: esRevisioSistema ? 2600 : 1800, model: models.modelArquitecte }),
     'arquitectura'
   );
-  return parseJsonRobust(raw) || { actualitzacio_nkg: {} };
+  const dades = parseJsonRobust(raw) || { actualitzacio_nkg: {} };
+  if (esRevisioSistema && dades.revisio_sistema) {
+    ESTAT._revisionsCodiSistema = ESTAT._revisionsCodiSistema || [];
+    ESTAT._revisionsCodiSistema.push({ capitol: idx + 1, revisio: JSON.stringify(dades.revisio_sistema) });
+  }
+  return dades;
 }
 
 async function generarCapitolNKG(idx, userConfig) {
