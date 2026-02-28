@@ -10650,7 +10650,15 @@ async function generarCapitolNKG(idx, userConfig) {
   const loaderEl = document.getElementById('loader-11-text');
   const contextCapitol = buildContextCapitol(idx);
 
-  if (loaderEl) loaderEl.textContent = `✨ Generant directament el capítol ${capitol} final...`;
+  if (loaderEl) loaderEl.textContent = `📝 Generant esborrany del capítol ${capitol}...`;
+  let esborrany = await generarEsborranyCapitol(idx, userConfig);
+  esborrany = netejarTabulacionsInicials(esborrany || '');
+
+  if (!esborrany || !esborrany.trim()) {
+    if (loaderEl) loaderEl.textContent = `⚠️ Esborrany buit. Generant capítol ${capitol} en mode directe...`;
+    esborrany = await escriureCapitolDirecte(idx, contextCapitol, userConfig);
+    esborrany = netejarTabulacionsInicials(esborrany || '');
+  }
 
   const infoInjectadaEsbos = `CAPÍTOL ${capitol}
 CONTEXT CAPÍTOL:
@@ -10659,13 +10667,16 @@ ${contextCapitol}
 
   if (loaderEl) loaderEl.textContent = "🔍 Arquitecta revisant continuïtat d'objectes i veus...";
   const correccionsArquitecta = await avaluarEsborranyAmbHistoric(idx, esborrany, userConfig);
+
+  if (loaderEl) loaderEl.textContent = "✍️ Aplicant correccions i generant versió final...";
+  let textComplet = await generarProsaDefinitiva(idx, esborrany, correccionsArquitecta, userConfig);
+  textComplet = netejarTabulacionsInicials(textComplet || esborrany || '');
+
   const infoInjectadaRevisioOpus = `Novel·la fins ara (fragments):
 ${(ESTAT._capitols_generats || []).slice(0, idx).filter(Boolean).map((t, i) => `--- CAPÍTOL ${i + 1} ---\n${String(t).slice(-1800)}`).join('\n\n') || '(encara no hi ha capítols previs)'}
 
 Esborrany a revisar:
 ${String(esborrany || '').slice(0, 7000)}`;
-
-  if (loaderEl) loaderEl.textContent = "📊 Arquitecta extraient dades de registre i avaluant el sistema...";
 
   let validacioFinal = await validarReescripturaArquitecta(idx, textComplet, correccionsArquitecta, userConfig);
   let intentsExtra = 0;
