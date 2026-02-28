@@ -1685,6 +1685,7 @@ const ESTAT = {
   _memoriasComprimides: [],
   _snapshotsFinals: {},
   _traitsImmutablesInicialitzats: false,
+  _registreEstil: { frequencies: {}, alertes: [], verbs_atribucio: {}, tancaments: [] },
   _goldenPassage: null,
   _goldenPassageCapitol: -1,
   // NKG (Narrative Knowledge Graph) — v4
@@ -3922,6 +3923,13 @@ async function generarCapitol(idx, intents = 0) {
       await actualitzarBeatsNarratiusGastats(textNet, idx + 1, USER_CONFIG);
     } catch (err) {
       console.warn('Beats gastats async:', err.message);
+    }
+
+    try {
+      actualitzarRegistreEstil(idx, textNet);
+      generarAlertesEstil();
+    } catch (err) {
+      console.warn('Registre estil async:', err.message);
     }
 
     const esCheckpoint = (idx + 1) % 3 === 0 && idx + 1 < ESTAT._estructuraCapitols.length;
@@ -6736,6 +6744,117 @@ REGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que é
   return base;
 }
 
+
+function comptarSilLabesAproximades(paraula) {
+  const p = String(paraula || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const grups = p.match(/[aeiouàèéíïòóúü]+/g);
+  return grups ? grups.length : 0;
+}
+
+function obtenirFrases(text) {
+  return String(text || '')
+    .replace(/\s+/g, ' ')
+    .split(/(?<=[.!?…])\s+/)
+    .map(f => f.trim())
+    .filter(Boolean);
+}
+
+function actualitzarRegistreEstil(capitolIdx, textCapitol) {
+  if (!ESTAT._registreEstil || typeof ESTAT._registreEstil !== 'object') {
+    ESTAT._registreEstil = { frequencies: {}, alertes: [], verbs_atribucio: {}, tancaments: [] };
+  }
+
+  const stopWords = new Set([
+    'el','la','els','les','un','una','uns','unes','de','del','dels','a','al','als','i','o','u','que','en','amb','per','pel','pels','sense','sobre','entre','cap','com','si','no','sí','ja','més','mes','tot','tots','tota','totes',
+    'jo','tu','ell','ella','nosaltres','vosaltres','ells','elles','em','et','es','ens','us','meu','teva','seu','seva','nostre','nostra','vostre','vostra'
+  ]);
+
+  const paraules = String(textCapitol || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\s']/g, ' ')
+    .split(/\s+/)
+    .map(w => w.trim())
+    .filter(Boolean);
+
+  paraules.forEach(w => {
+    if (w.length < 3) return;
+    if (stopWords.has(w)) return;
+    if (comptarSilLabesAproximades(w) < 2) return;
+    if (!ESTAT._registreEstil.frequencies[w]) ESTAT._registreEstil.frequencies[w] = { count: 0, ultimCapitol: capitolIdx + 1 };
+    ESTAT._registreEstil.frequencies[w].count += 1;
+    ESTAT._registreEstil.frequencies[w].ultimCapitol = capitolIdx + 1;
+  });
+
+  const reAttrib = /va\s+(dir|xiuxiuejar|cridar|respondre|murmurar|preguntar|ordenar|sentenciar|exclamar|sospirar|tallar|replicar|afegir)/gi;
+  const matches = String(textCapitol || '').matchAll(reAttrib);
+  for (const m of matches) {
+    const v = `va ${String(m[1] || '').toLowerCase()}`;
+    ESTAT._registreEstil.verbs_atribucio[v] = (ESTAT._registreEstil.verbs_atribucio[v] || 0) + 1;
+  }
+
+  const frases = obtenirFrases(textCapitol);
+  const ultimes2 = frases.slice(-2).join(' ');
+  if (ultimes2) {
+    ESTAT._registreEstil.tancaments.push({ capitol: capitolIdx + 1, text: ultimes2 });
+    if (ESTAT._registreEstil.tancaments.length > 30) ESTAT._registreEstil.tancaments = ESTAT._registreEstil.tancaments.slice(-30);
+  }
+}
+
+function generarAlertesEstil() {
+  if (!ESTAT._registreEstil || typeof ESTAT._registreEstil !== 'object') {
+    ESTAT._registreEstil = { frequencies: {}, alertes: [], verbs_atribucio: {}, tancaments: [] };
+  }
+
+  const alertes = [];
+  const capitolsTotals = Math.max(1, (ESTAT._capitols_generats || []).filter(t => t && t.trim()).length);
+
+  Object.entries(ESTAT._registreEstil.frequencies || {}).forEach(([paraula, dades]) => {
+    const count = Number(dades && dades.count ? dades.count : 0);
+    const mitjana = count / capitolsTotals;
+    if (mitjana > 2) {
+      alertes.push(`ALERTA: '${paraula}' s'ha usat ${count} cops en ${capitolsTotals} capítols. Busca sinònims o reformulacions.`);
+    }
+  });
+
+  const verbs = ESTAT._registreEstil.verbs_atribucio || {};
+  const totalVerbs = Object.values(verbs).reduce((a, b) => a + Number(b || 0), 0);
+  if (totalVerbs > 0) {
+    Object.entries(verbs).forEach(([verb, count]) => {
+      const pct = (Number(count || 0) / totalVerbs) * 100;
+      if (pct > 30) {
+        alertes.push(`ALERTA: '${verb}' domina els diàlegs (${pct.toFixed(1)}% de les atribucions). Varia: considerar, murmurar, replicar, tallar, sentenciar...`);
+      }
+    });
+  }
+
+  const tancaments = Array.isArray(ESTAT._registreEstil.tancaments) ? ESTAT._registreEstil.tancaments.slice(-3) : [];
+  if (tancaments.length === 3) {
+    const nomProta = String(ESTAT.protagonistaTriat || '').toLowerCase();
+    const patrons = ["ja no era", "era el", "era la", "havia deixat de ser", "s'havia convertit"];
+    const totsPatro = tancaments.every(t => {
+      const txt = String((t && t.text) || '').toLowerCase();
+      const teNom = nomProta ? txt.includes(nomProta) : /\b(protagonista|maja)\b/.test(txt);
+      const tePatro = patrons.some(p => txt.includes(p));
+      return teNom && tePatro;
+    });
+    if (totsPatro) {
+      alertes.push("ALERTA: Els últims 3 capítols acaben amb sentències metafòriques sobre la protagonista. Trenca el patró: prova acabar amb una imatge, una acció, un diàleg, o un canvi de punt de vista.");
+    }
+  }
+
+  ESTAT._registreEstil.alertes = alertes;
+  return alertes;
+}
+
+function buildBlocAlertesEstil() {
+  const alertes = generarAlertesEstil();
+  if (!alertes || alertes.length === 0) return '';
+  return `ALERTES D'ESTIL ACTIVES (basat en l'anàlisi acumulada dels capítols anteriors):
+${alertes.map(a => `- ${a}`).join('\n')}
+Respecta aquestes alertes per mantenir la frescor de la prosa.`;
+}
+
 function normalitzarBeatNarratiu(beat) {
   const b = String(beat || '')
     .toLowerCase()
@@ -6867,6 +6986,8 @@ function buildSystemPromptCapitol() {
     parts.push("\nREGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que és el final del capítol, NO resolguis la situació ni facis que els personatges abandonin l'escenari al final del text. Deixa l'acció fluint, oberta o en suspens dramàtic, de manera que la següent generació pugui recollir el testimoni de forma natural.");
     const blocBeatsProhibits = buildBlocBeatsNarratiusProhibits();
     if (blocBeatsProhibits) parts.push('\n' + blocBeatsProhibits);
+    const blocAlertesEstil = buildBlocAlertesEstil();
+    if (blocAlertesEstil) parts.push('\n' + blocAlertesEstil);
     if (directivaContinuitat) parts.push('\n' + directivaContinuitat);
     if (prohibirIniciMeteorologic) {
       parts.push("PROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg.");
@@ -6877,6 +6998,8 @@ function buildSystemPromptCapitol() {
   const blocBeatsProhibits = buildBlocBeatsNarratiusProhibits();
   let legacyAmbContinuitat = legacy;
   if (blocBeatsProhibits) legacyAmbContinuitat += `\n\n${blocBeatsProhibits}`;
+  const blocAlertesEstil = buildBlocAlertesEstil();
+  if (blocAlertesEstil) legacyAmbContinuitat += `\n\n${blocAlertesEstil}`;
   if (directivaContinuitat) legacyAmbContinuitat += `\n\n${directivaContinuitat}`;
   return prohibirIniciMeteorologic
     ? legacyAmbContinuitat + "\n\nPROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg."
