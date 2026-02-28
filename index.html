@@ -6910,8 +6910,8 @@ function buildInstruccionsTransicio(textEnllac, tipusTransicio) {
 // ═══════════════════════════════════════════════════════════
 //  FASE 5: Sistema de Prefiguració
 // ═══════════════════════════════════════════════════════════
-function getPrefiguracionsActives(idx) {
-  const prefs  = ESTAT._prefiguracions || [];
+function getPrefiguracionsActives(idx, estat = ESTAT) {
+  const prefs  = estat._prefiguracions || [];
   const capNum = idx + 1;
   const aPlantarAra      = prefs.filter(p => p.plantada_capitol === capNum);
   const aRecollirAra     = prefs.filter(p => p.resolucio_capitol === capNum);
@@ -6929,13 +6929,58 @@ function llistarPrefiguracions() {
   ).join('\n');
 }
 
+function filtrarContextFutur(capitolActualIdx) {
+  // FUTURE MASKING
+  const estatFiltrat = typeof structuredClone === 'function'
+    ? structuredClone(ESTAT)
+    : JSON.parse(JSON.stringify(ESTAT));
+  const redactat = '[REDACTAT — Esdeveniment futur]';
+
+  estatFiltrat._estructuraCapitols = (estatFiltrat._estructuraCapitols || []).map((capitol, i) => {
+    if (i <= capitolActualIdx) return capitol;
+    return {
+      numero: capitol?.numero,
+      titol: capitol?.titol,
+      resum: redactat,
+      prefiguracions_a_recollir: redactat,
+      connexio_seguent: redactat,
+      connexio_anterior: redactat
+    };
+  });
+
+  estatFiltrat._corbaTensio = (estatFiltrat._corbaTensio || []).map(t => (
+    t && t.capitol > capitolActualIdx + 1
+      ? { ...t, nivell: redactat, tipus: redactat }
+      : t
+  ));
+
+  if (estatFiltrat._arcMoral && typeof estatFiltrat._arcMoral === 'object') {
+    if (estatFiltrat._arcMoral.punt_no_retorn && estatFiltrat._arcMoral.punt_no_retorn.capitol > capitolActualIdx) {
+      estatFiltrat._arcMoral.punt_no_retorn = redactat;
+    }
+    if (estatFiltrat._arcMoral.cost_final && estatFiltrat._arcMoral.cost_final.capitol > capitolActualIdx) {
+      estatFiltrat._arcMoral.cost_final = redactat;
+    }
+  }
+
+  estatFiltrat.finalTriat = '[REDACTAT]';
+
+  estatFiltrat._prefiguracions = (estatFiltrat._prefiguracions || []).map(p => (
+    p && p.resolucio_capitol > capitolActualIdx
+      ? { ...p, resolucio_capitol: redactat }
+      : p
+  ));
+
+  return estatFiltrat;
+}
+
 // ═══════════════════════════════════════════════════════════
 //  FASE 3: Context complet per a cada capítol
 // ═══════════════════════════════════════════════════════════
 
-function buildContextCapitolsComplets(idx, opts = {}) {
+function buildContextCapitolsComplets(idx, opts = {}, estat = ESTAT) {
   const entrades = [];
-  (ESTAT._capitols_generats || []).slice(0, idx).forEach((t, i) => {
+  (estat._capitols_generats || []).slice(0, idx).forEach((t, i) => {
     if (t && t.trim()) entrades.push({ idx: i, text: t });
   });
   if (entrades.length === 0) return '';
@@ -6959,7 +7004,7 @@ ${textComplet}`);
       paraulesAcumulades += paraulesText;
     } else {
       // TIER 2: Si ja no hi cap el text sencer, usem el resum del llibre de registre
-      const reg = ESTAT.llibreRegistre?.capitols?.[e.idx];
+      const reg = estat.llibreRegistre?.capitols?.[e.idx];
       let resum = reg?.resum_capitol || textComplet.slice(0, 1000) + '...';
       const paraulesResum = resum.split(/\s+/).length;
 
@@ -6972,14 +7017,14 @@ ${resum}`);
         const cobertaFinsCap = e.idx + 1;
         let memoriaText = '';
 
-        if (ESTAT._memoriasComprimides && ESTAT._memoriasComprimides.length > 0) {
-          const mem = [...ESTAT._memoriasComprimides]
+        if (estat._memoriasComprimides && estat._memoriasComprimides.length > 0) {
+          const mem = [...estat._memoriasComprimides]
             .filter(m => m.finsCap <= cobertaFinsCap)
             .sort((a, b) => b.finsCap - a.finsCap)[0];
           if (mem && mem.text) memoriaText = mem.text;
         }
-        if (!memoriaText && ESTAT._resumCompacte) {
-          memoriaText = ESTAT._resumCompacte;
+        if (!memoriaText && estat._resumCompacte) {
+          memoriaText = estat._resumCompacte;
         }
 
         if (memoriaText) {
@@ -7001,14 +7046,14 @@ CAPÍTOLS ANTERIORS (Context dinàmic per pressupost de tokens):
 ${parts.join('\n\n')}`;
 }
 
-function buildContextCapitolLegacy(idx, skipRegistre = false) {
+function buildContextCapitolLegacy(idx, skipRegistre = false, estat = ESTAT) {
   const parts = [];
 
   // 1) Fonaments globals: Brief + Bíblia + Trames
   const brief = buildBriefNarratiu();
   if (brief && brief.trim()) parts.push(brief);
 
-  const biblia = ESTAT.bibliaNarrativa;
+  const biblia = estat.bibliaNarrativa;
   if (biblia) {
     const bibliaLines = [];
     if (biblia.fets_canonics && biblia.fets_canonics.length > 0) {
@@ -7042,7 +7087,7 @@ function buildContextCapitolLegacy(idx, skipRegistre = false) {
     }
   }
 
-  const trames = ESTAT.trames;
+  const trames = estat.trames;
   if (trames && (trames.trama_principal || trames.subtrames.length > 0)) {
     const tramesLines = ['TRAMES ACTIVES EN AQUEST CAPÍTOL:'];
     if (trames.trama_principal) {
@@ -7062,11 +7107,11 @@ function buildContextCapitolLegacy(idx, skipRegistre = false) {
   }
 
   // 2) Context de capítols i continuïtat (memòria global textual)
-  const capsContext = buildContextCapitolsComplets(idx);
+  const capsContext = buildContextCapitolsComplets(idx, {}, estat);
   if (capsContext) parts.push(capsContext);
 
-  if (idx > 0 && ESTAT._capitols_generats[idx - 1]) {
-    const parasAnterior = ESTAT._capitols_generats[idx - 1].split(/\n\n+/);
+  if (idx > 0 && estat._capitols_generats[idx - 1]) {
+    const parasAnterior = estat._capitols_generats[idx - 1].split(/\n\n+/);
     const ultims = parasAnterior.slice(-2).join('\n\n');
     if (ultims.trim()) {
       parts.push('\nFINAL DEL CAPÍTOL ANTERIOR (mantén la continuïtat de to i escena):\n' + ultims);
@@ -7080,8 +7125,8 @@ function buildContextCapitolLegacy(idx, skipRegistre = false) {
   }
 
   // 4) Ajustos globals de rumb
-  if (ESTAT._ajustosRumb) {
-    const ajustos = typeof ESTAT._ajustosRumb === 'string' ? ESTAT._ajustosRumb : JSON.stringify(ESTAT._ajustosRumb);
+  if (estat._ajustosRumb) {
+    const ajustos = typeof estat._ajustosRumb === 'string' ? estat._ajustosRumb : JSON.stringify(estat._ajustosRumb);
     if (ajustos && ajustos.trim()) {
       parts.push(`\nAJUSTOS DE RUMB (indicació del checkpoint de coherència): ${ajustos}`);
     }
@@ -7091,6 +7136,8 @@ function buildContextCapitolLegacy(idx, skipRegistre = false) {
 }
 
 function buildContextCapitol(idx) {
+  // FUTURE MASKING
+  const estatContext = filtrarContextFutur(idx);
   const capitolsRegistre = (ESTAT.llibreRegistre && Array.isArray(ESTAT.llibreRegistre.capitols))
     ? ESTAT.llibreRegistre.capitols
     : [];
@@ -7098,12 +7145,12 @@ function buildContextCapitol(idx) {
   const r2 = idx - 2 >= 0 ? capitolsRegistre[idx - 2] : null;
   const prohibirIniciMeteorologic = !!(r1 && r2 && r1.inici_meteorologic === true && r2.inici_meteorologic === true);
 
-  const cap = ESTAT._estructuraCapitols ? ESTAT._estructuraCapitols[idx] : null;
+  const cap = estatContext._estructuraCapitols ? estatContext._estructuraCapitols[idx] : null;
 
   // Context global (Brief, Bíblia, Trames, etc.) sempre present
   const ctxGlobalBase = ESTAT._nkg
-    ? buildContextCapitolLegacy(idx, true)
-    : buildContextCapitolLegacy(idx, false);
+    ? buildContextCapitolLegacy(idx, true, estatContext)
+    : buildContextCapitolLegacy(idx, false, estatContext);
 
   // Bloc de planificació/escaleta (què passa en aquest capítol)
   const blocEscaleta = [];
@@ -7119,7 +7166,7 @@ function buildContextCapitol(idx) {
     if (capLines.length > 0) blocEscaleta.push('PLANIFICACIÓ DEL CAPÍTOL ACTUAL:\n' + capLines.join('\n'));
   }
 
-  const escaletaCap = (ESTAT._escaletes || []).find(e => e.capitol === idx + 1);
+  const escaletaCap = (estatContext._escaletes || []).find(e => e.capitol === idx + 1);
   if (escaletaCap && Array.isArray(escaletaCap.escenes) && escaletaCap.escenes.length > 0) {
     const escenes = escaletaCap.escenes.slice(0, 8).map((sc, i) => {
       const p = [];
@@ -7135,7 +7182,7 @@ function buildContextCapitol(idx) {
 
   // Prefiguracions + to/tensió
   const blocFinal = [];
-  const { aPlantarAra, aRecollirAra, plantadesNoResoltes } = getPrefiguracionsActives(idx);
+  const { aPlantarAra, aRecollirAra, plantadesNoResoltes } = getPrefiguracionsActives(idx, estatContext);
   if (aPlantarAra.length > 0) {
     blocFinal.push('PREFIGURACIONS A PLANTAR EN AQUEST CAPÍTOL (integra-les subtilment):');
     aPlantarAra.forEach(p => blocFinal.push(`- ${p.element}`));
@@ -7150,7 +7197,7 @@ function buildContextCapitol(idx) {
   }
 
   if (cap && cap.toRitme) blocFinal.push(`TO I RITME D'AQUEST CAPÍTOL: ${cap.toRitme}`);
-  const tensio = (ESTAT._corbaTensio || []).find(t => t.capitol === idx + 1);
+  const tensio = (estatContext._corbaTensio || []).find(t => t.capitol === idx + 1);
   if (tensio) {
     const instrRitme = getInstruccionsRitme(tensio.nivell, tensio.tipus);
     blocFinal.push(`NIVELL DE TENSIÓ OBJECTIU: ${tensio.nivell}/10 (${tensio.tipus || ''})`);
