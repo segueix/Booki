@@ -3674,30 +3674,34 @@ function obrirDetallCapitol(idx) {
 
   let html = `<div style="font-weight:700;color:var(--accent2);margin-bottom:10px;">${escHtml(titol)}</div>`;
 
-  // 1. Text del capítol
   html += `<div class="capitol-detall-box">
     <h4>📖 Narració</h4>
     <div style="white-space:pre-wrap;font-size:.9rem;line-height:1.6;">${escHtml(textFinal)}</div>
   </div>`;
 
-  // 2. Dades extretes per al registre
-  const llistaPers = (dadesNKG.personatges || []).map(p => `${p.nom} (${p.ubicacio})`).join(' | ');
-  const llistaObj = (dadesNKG.objectes || []).map(o => `${o.nom}`).join(' | ');
+  const llistaPers = (dadesNKG.personatges || []).map(p => `${p.nom} (${p.ubicacio || 'N/D'})`).join(' | ');
+  const llistaObj = (dadesNKG.objectes || []).map(o => `${o.nom} (${o.posseidor || 'N/D'})`).join(' | ');
+  const filsAct = ((dadesNKG.trames && dadesNKG.trames.fils_actualitzats) || []).join(' | ');
+  const nousFils = ((dadesNKG.trames && dadesNKG.trames.nous_fils) || []).join(' | ');
 
   html += `<div class="capitol-detall-box" style="border-left: 3px solid var(--success); margin-top: 15px;">
     <h4 style="color: var(--success);">📊 Ingressat al Llibre de Registres</h4>
     <p><strong>Resum:</strong> ${escHtml(dadesNKG.resum_capitol || 'Sense resum')}</p>
     <p><strong>Personatges actualitzats:</strong> ${escHtml(llistaPers || 'Cap')}</p>
     <p><strong>Objectes detectats:</strong> ${escHtml(llistaObj || 'Cap')}</p>
+    <p><strong>Fils actualitzats:</strong> ${escHtml(filsAct || 'Cap')}</p>
+    <p><strong>Nous fils:</strong> ${escHtml(nousFils || 'Cap')}</p>
   </div>`;
 
-  // 3. Revisió de sistema (només capítols 3, 6, 9...)
   if (revSistema && (idx + 1) % 3 === 0) {
+    const accions = Array.isArray(revSistema.accions_prioritzades) ? revSistema.accions_prioritzades : [];
     html += `<div class="review-panel" style="background: rgba(251, 191, 36, 0.1); border: 1px solid var(--warning); margin-top: 15px;">
       <h4 style="color: var(--warning);">🛠️ Auditoria del Sistema (Arquitecta)</h4>
+      <p style="font-size: 0.9rem; color: var(--text);"><strong>Diagnòstic:</strong> ${escHtml(revSistema.diagnostic_sistema || 'Sense diagnòstic')}</p>
       <p style="font-style: italic; font-size: 0.9rem; color: var(--text);">
         ${escHtml(revSistema.millores_funcions_app || 'Cap millora requerida.')}
       </p>
+      ${accions.length > 0 ? `<ul>${accions.map(a => `<li>${escHtml(a)}</li>`).join('')}</ul>` : ''}
     </div>`;
   }
 
@@ -3706,6 +3710,24 @@ function obrirDetallCapitol(idx) {
   const wrap = document.getElementById('capitol-detall-wrap');
   wrap.classList.remove('hidden');
   wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function mostrarAuditoriaSistemaCapitol(idx, revisioSistema) {
+  if (!revisioSistema) return;
+  const panel = document.getElementById('checkpoint-intermedi-panel');
+  if (!panel) return;
+  const accions = Array.isArray(revisioSistema.accions_prioritzades) ? revisioSistema.accions_prioritzades : [];
+  panel.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <span style="font-size:1.2rem;">🛠️</span>
+      <div style="font-weight:700;color:var(--warning);">Auditoria de Sistema (Capítol ${idx + 1})</div>
+    </div>
+    <p style="font-size:.84rem;color:var(--text2);"><strong>Diagnòstic:</strong> ${escHtml(revisioSistema.diagnostic_sistema || 'N/D')}</p>
+    <p style="font-size:.84rem;color:var(--text2);margin-top:6px;">${escHtml(revisioSistema.millores_funcions_app || 'Sense millores addicionals.')}</p>
+    ${accions.length > 0 ? `<ul style="margin:8px 0 0 18px;line-height:1.5;">${accions.map(a => `<li style="font-size:.82rem;color:var(--text2);">${escHtml(a)}</li>`).join('')}</ul>` : ''}
+    <p style="margin-top:10px;color:var(--success);font-size:.82rem;">✅ Auditoria completada. Pots continuar amb el següent capítol.</p>
+  `;
+  panel.classList.remove('hidden');
 }
 
 async function executarSegonaRevisioOpusCapitol() {
@@ -3844,7 +3866,7 @@ async function generarCapitol(idx, intents = 0) {
 
   ESTAT._capitolActual = idx;
   amagarBotoSeguentCapitolManual();
-  renderLlistaCapitols();  // refresca tota la llista
+  renderLlistaCapitols();
   actualitzarEstatCapitol(idx, 'actiu');
 
   const cap   = ESTAT._estructuraCapitols[idx];
@@ -3869,7 +3891,6 @@ async function generarCapitol(idx, intents = 0) {
     hideLoader(11);
     mostrarCapitol(idx, textNet);
 
-    // SISTEMA 1: actualitzar bíblia i registre (en sèrie, amb tolerància a errors)
     try {
       await actualitzarBiblia(res.response, idx, USER_CONFIG);
     } catch (err) {
@@ -3882,20 +3903,23 @@ async function generarCapitol(idx, intents = 0) {
       console.warn('Registre async:', err.message);
     }
 
-    // SISTEMA 4: checkpoint cada 3 capítols
     const esCheckpoint = (idx + 1) % 3 === 0 && idx + 1 < ESTAT._estructuraCapitols.length;
     if (esCheckpoint) {
       await executarCheckpoint(idx, USER_CONFIG);
     }
 
-    // Compressió de memòria cada 5 capítols
     const esCompressio = (idx + 1) % 5 === 0 && idx + 1 < ESTAT._estructuraCapitols.length;
     if (esCompressio) {
       document.getElementById('loader-11-text').textContent = '🔵 Opus comprimint memòria narrativa…';
       await comprimirMemoria(idx + 1, USER_CONFIG);
     }
 
-    mostrarAccionsCapitol(idx, res.response);
+    if (res.revisio_sistema && (idx + 1) % 3 === 0) {
+      mostrarAuditoriaSistemaCapitol(idx, res.revisio_sistema);
+    }
+
+    const isLast = idx >= ESTAT._estructuraCapitols.length - 1;
+    mostrarAccionsCapitolSimple(idx, isLast);
   } catch (err) {
     if (USER_CONFIG && USER_CONFIG.fluxAutomatic && intents < 3) {
       document.getElementById('loader-11-text').textContent = `⚠️ Error detectat. Reintentant capítol en 5 segons (Intent ${intents + 1}/3)...`;
@@ -9497,7 +9521,7 @@ async function extreureDadesRegistreIAvaluarSistema(idx, textCapitol, esRevisioS
     ? `
 
 TASCA B: AUDITORIA DE L'APP (Revisió de Sistema)
-Analitza la coherència tècnica d'aquest capítol respecte a com se li passa la informació al Generador. NO suggereixis canvis literaris. Suggereix una MILLORA DE DISSENY de les funcions de l'app (ex: "Cal afegir un camp de 'motivació' al prompt de personatges", "S'ha de millorar la injecció de memòria a la funció buildContext") per evitar incoherències futures.`
+Analitza la coherència tècnica d'aquest capítol respecte a com se li passa la informació al Generador. NO suggereixis canvis literaris. Necessitem una auditoria EXTENSA: diagnòstic en 5-8 frases + propostes prioritzades. Evita respostes d'una sola frase.`
     : '';
 
   const msgs = [{
@@ -9508,27 +9532,42 @@ TASCA A: ACTUALITZACIÓ DE REGISTRE
 Extreu del següent capítol:
 1. OBJECTES: Nous objectes introduïts, canvis d'estat o de possessió.
 2. PERSONATGES: Ubicació exacta, estat actual, i nous fets canònics confirmats.
-3. ESCENES I TRAMES: Resum executiu i progrés dels fils narratius.${instruccioRevisio}
+3. ESCENES I TRAMES: Resum executiu i progrés dels fils narratius.
+4. CAMP OBLIGATORI: No deixis cap camp buit; si no hi ha dades, posa "Cap detectat" o "Sense canvis".${instruccioRevisio}
 
 CAPÍTOL ${idx + 1}:
-${textCapitol.substring(0, 12000)}
+${textCapitol.substring(0, 14000)}
 
 Retorna EXCLUSIVAMENT JSON amb aquesta estructura:
 {
   "actualitzacio_nkg": {
-    "resum_capitol": "Resum executiu...",
+    "resum_capitol": "Resum executiu extens de 4-6 frases...",
     "personatges": [{"nom": "...", "ubicacio": "...", "estat": "..."}],
     "objectes": [{"nom": "...", "estat": "...", "posseidor": "..."}],
-    "trames": {"fils_actualitzats": ["..."], "nous_fils": ["..."]}
+    "trames": {"fils_actualitzats": ["..."], "nous_fils": ["..."]},
+    "riscos_continuitat": ["..."],
+    "claus_prompt_seguent": ["...", "..."]
   }${esRevisioSistema ? `,
   "revisio_sistema": {
-    "millores_funcions_app": "Proposta tècnica pel codi JS o disseny de prompts..."
+    "diagnostic_sistema": "Diagnòstic tècnic ampli...",
+    "millores_funcions_app": "Proposta tècnica extensa pel codi JS o disseny de prompts...",
+    "accions_prioritzades": [
+      "1) ...",
+      "2) ...",
+      "3) ...",
+      "4) ..."
+    ]
   }` : ''}
 }`
   }];
 
   const models = getModelConfig(userConfig);
-  const raw = await callLLMMulti(msgs, "Ets l'Arquitecta de Dades i Sistemes. Retorna només JSON.", Object.assign({}, userConfig, { maxTokens: 1500, model: models.modelArquitecte }), 'arquitectura');
+  const raw = await callLLMMulti(
+    msgs,
+    "Ets l'Arquitecta de Dades i Sistemes. Retorna només JSON.",
+    Object.assign({}, userConfig, { maxTokens: esRevisioSistema ? 2600 : 1800, model: models.modelArquitecte }),
+    'arquitectura'
+  );
   return parseJsonRobust(raw) || { actualitzacio_nkg: {} };
 }
 
@@ -9539,27 +9578,50 @@ async function generarCapitolNKG(idx, userConfig) {
 
   if (loaderEl) loaderEl.textContent = `✨ Generant directament el capítol ${capitol} final...`;
 
-  // 1. Generació directa del capítol (sense esbòs)
   const textComplet = await escriureCapitolDirecte(idx, contextCapitol, userConfig);
   const textNet = netejarTabulacionsInicials(textComplet || '');
 
   if (loaderEl) loaderEl.textContent = "📊 Arquitecta extraient dades de registre i avaluant el sistema...";
 
-  // 2. L'Arquitecta extreu dades i, cada 3 capítols, avalua el codi de l'app
   const esRevisioSistema = capitol % 3 === 0;
   const dadesRegistre = await extreureDadesRegistreIAvaluarSistema(idx, textNet, esRevisioSistema, userConfig);
 
-  // 3. Persistència a l'estat global
-  ESTAT._capitols_generats[idx] = textNet;
-  ESTAT.llibreRegistre = ESTAT.llibreRegistre || { capitols: [] };
-  ESTAT.llibreRegistre.capitols[idx] = dadesRegistre.actualitzacio_nkg;
+  const actual = Object.assign({
+    resum_capitol: '',
+    personatges: [],
+    objectes: [],
+    trames: { fils_actualitzats: [], nous_fils: [] },
+    riscos_continuitat: [],
+    claus_prompt_seguent: []
+  }, (dadesRegistre && dadesRegistre.actualitzacio_nkg) ? dadesRegistre.actualitzacio_nkg : {});
 
-  if (esRevisioSistema && dadesRegistre.revisio_sistema) {
-    ESTAT._revisionsSistema = ESTAT._revisionsSistema || {};
-    ESTAT._revisionsSistema[idx] = dadesRegistre.revisio_sistema;
+  if (!actual.resum_capitol || !String(actual.resum_capitol).trim()) {
+    actual.resum_capitol = resumAutomaticCapitol(textNet);
+  }
+  if (!Array.isArray(actual.personatges) || actual.personatges.length === 0) {
+    actual.personatges = [{ nom: 'Cap detectat', ubicacio: 'Sense canvis', estat: 'Sense canvis' }];
+  }
+  if (!Array.isArray(actual.objectes) || actual.objectes.length === 0) {
+    actual.objectes = [{ nom: 'Cap detectat', estat: 'Sense canvis', posseidor: 'N/D' }];
+  }
+  if (!actual.trames || !Array.isArray(actual.trames.fils_actualitzats)) {
+    actual.trames = { fils_actualitzats: ['Sense canvis'], nous_fils: [] };
   }
 
-  return { response: textNet };
+  ESTAT._capitols_generats[idx] = textNet;
+  ESTAT.llibreRegistre = ESTAT.llibreRegistre || { capitols: [] };
+  ESTAT.llibreRegistre.capitols[idx] = actual;
+
+  const revisioSistema = (esRevisioSistema && dadesRegistre && dadesRegistre.revisio_sistema)
+    ? dadesRegistre.revisio_sistema
+    : null;
+
+  if (revisioSistema) {
+    ESTAT._revisionsSistema = ESTAT._revisionsSistema || {};
+    ESTAT._revisionsSistema[idx] = revisioSistema;
+  }
+
+  return { response: textNet, revisio_sistema: revisioSistema };
 }
 
 async function generarRevisioFinalApp(userConfig) {
