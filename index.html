@@ -6540,7 +6540,7 @@ function parseJsonRobust(text, expectedKeys = []) {
   console.warn("⚠️ [parseJsonRobust] Fallada al parse directe. Intentant heurístiques...");
 
   // 2. Bloc de codi markdown ```json ... ```
-  const codeMatch = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const codeMatch = s.match(/```(?:json)?\s*([\s\S]*?)(?:```|$)/i);
   if (codeMatch) {
     let parsedCode = parseLenientJson(codeMatch[1].trim());
     if (parsedCode) return validar(parsedCode, 'Markdown Block');
@@ -7615,23 +7615,26 @@ IMPORTANT: Si detectes solapament de diàlegs entre personatges en un mateix par
   "instruccions_cliffhanger": "instruccions concretes per millorar el cliffhanger si la puntuació és < 6 (buit si no cal)",
   "comentari_editor_final": "possible millora global de capítol (buit si no cal)",
   "golden_passage": "el text del millor passatge (150-250 paraules)"
-}`
+}
+
+IMPORTANT: Has de començar la teva resposta EXACTAMENT amb el caràcter '{'. Està completament prohibit escriure cap salutació, text previ o l'etiqueta \`\`\`json.
+`
   }];
 
-  const response = await callLLMMulti(
+  const textRevisio = await callLLMMulti(
     msgs,
-    'Ets un editor literari sènior. Has de retornar EXCLUSIVAMENT un objecte JSON pur. Està absolutament prohibit utilitzar Markdown, cometes invertides (`) o escriure text conversacional abans o després del JSON. Tota la teva sortida ha de ser parsejable directament per JSON.parse().',
-    Object.assign({}, userConfig, { maxTokens: 1200 }),
+    "Ets un editor literari sènior. Retorna EXCLUSIVAMENT un objecte JSON pur.",
+    Object.assign({}, userConfig, { maxTokens: 2500 }),
     'arquitectura'
   );
 
-  const revisat = parseJsonRobust(response);
+  const revisat = parseJsonRobust(textRevisio);
   if (revisat && revisat.instruccions_correccio) {
     ESTAT._revisioInstruccions = ESTAT._revisioInstruccions || {};
     ESTAT._revisioInstruccions[idx] = revisat.instruccions_correccio;
   }
 
-  return { response };
+  return { response: textRevisio };
 }
 
 
@@ -9425,12 +9428,14 @@ Retorna bullets curts, accionables i prioritzats. Evita soroll i repeticions.`
   }];
 
   const models = getModelConfig(userConfig);
-  return await callLLMMulti(
+  const avaluacioTxt = await callLLMMulti(
     msgs,
-    'Ets una arquitecta narrativa experta en estructura, ritme i veu literària. Respon amb instruccions accionables i conservadores del que ja funciona.',
-    Object.assign({}, userConfig, { maxTokens: 1400, model: models.modelArquitecte }),
+    "Ets un arquitecte narratiu sènior expert en Nordic Noir.",
+    Object.assign({}, userConfig, { maxTokens: 2000, model: models.modelArquitecte }),
     'arquitectura'
   );
+
+  return avaluacioTxt;
 }
 async function generarProsaDefinitiva(idx, esborrany, correccions, userConfig) {
   const capitol = idx + 1;
