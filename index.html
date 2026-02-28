@@ -1713,6 +1713,7 @@ const ESTAT = {
   _revisioFinalApp: null,
   _clausPromptSeguent: [],
   _alertaArquitecte: null,
+  _accionsIrreversibles: [],
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -3916,6 +3917,9 @@ async function generarCapitol(idx, intents = 0) {
       try { await comprimirMemoria(idx, USER_CONFIG); } catch (e) { console.warn('Compressió preventiva:', e.message); }
     }
 
+    // Validació i reompliment de l'escaleta si té escenes buides
+    try { await validarIReomplirEscaleta(idx, USER_CONFIG); } catch (e) { console.warn('Escaleta validació:', e.message); }
+
     // GENERADOR: escriu el capítol
     let res = await generarCapitolNKG(idx, USER_CONFIG);
     let textNet = netejarTabulacionsInicials(res.response);
@@ -3970,6 +3974,9 @@ async function arxitectePostCapitol(idx, textCapitol, userConfig) {
 
   // 3. Snapshot de continuïtat (validat amb fallback si camps buits)
   try { await generarSnapshotValidat(idx, textCapitol, userConfig); } catch (e) { console.warn('Snapshot:', e.message); }
+
+  // 3b. Fils narratius: nous/tancats, beats gastats i accions irreversibles
+  try { await actualitzarFilsNarratius(idx, textCapitol, userConfig); } catch (e) { console.warn('Fils narratius:', e.message); }
 
   // 4. Beats narratius gastats
   try { await actualitzarBeatsNarratiusGastats(textCapitol, idx + 1, userConfig); } catch (e) { console.warn('Beats:', e.message); }
@@ -4359,6 +4366,83 @@ function reconciliarFilsRegistre(dades) {
 
   ESTAT.llibreRegistre.fils_oberts = [...obertsActuals];
   ESTAT.llibreRegistre.fils_tancats = [...tancatsActuals];
+}
+
+async function actualitzarFilsNarratius(idx, textCapitol, userConfig) {
+  const nkg = ESTAT._nkg || {};
+  const reg = ESTAT.llibreRegistre || {};
+  const filsOberts   = Array.isArray(reg.fils_oberts)      ? reg.fils_oberts      : [];
+  const filsTancats  = Array.isArray(reg.fils_tancats)     ? reg.fils_tancats     : [];
+  const beatsGastats = Array.isArray(nkg.beats_gastats)    ? nkg.beats_gastats    : [];
+
+  const msgs = [{
+    role: 'user',
+    content: `Analitza aquest capítol de novel·la des del punt de vista dels fils narratius.
+
+FILS OBERTS ACUMULATS FINS ARA:
+${filsOberts.slice(-10).map(f => `- ${f}`).join('\n') || '(cap)'}
+
+FILS TANCATS ACUMULATS FINS ARA:
+${filsTancats.slice(-5).map(f => `- ${f}`).join('\n') || '(cap)'}
+
+BEATS NARRATIUS JA GASTATS:
+${beatsGastats.slice(-8).map(b => `- ${b}`).join('\n') || '(cap)'}
+
+INICI DEL CAPÍTOL ${idx + 1} (primers 4000 caràcters):
+${textCapitol.substring(0, 4000)}
+
+Retorna EXCLUSIVAMENT JSON vàlid:
+{
+  "nous_fils_oberts": ["nou fil o pregunta oberta introduïda en aquest capítol"],
+  "fils_tancats_en_aquest_capitol": ["fil de la llista anterior que s'ha resolt explícitament"],
+  "nous_beats_gastats": ["beat narratiu consumit en aquest capítol que NO es pot repetir"],
+  "accions_irreversibles": ["acció o canvi d'estat permanent que no té marxa enrere"]
+}`
+  }];
+
+  const models = getModelConfig(userConfig || USER_CONFIG);
+  const raw = await callLLMMulti(
+    msgs,
+    'Ets un analista narratiu. Respon EXCLUSIVAMENT JSON vàlid.',
+    Object.assign({}, userConfig || USER_CONFIG, { maxTokens: 600, model: models.modelArquitecte }),
+    'arquitectura'
+  );
+
+  const dades = parseJsonRobust(raw);
+  if (!dades) return;
+
+  // Actualitzar fils oberts/tancats
+  const obertsSet  = new Set(filsOberts);
+  const tancatsSet = new Set(filsTancats);
+  (dades.nous_fils_oberts || []).forEach(f => { if (f && f.trim()) obertsSet.add(f.trim()); });
+  (dades.fils_tancats_en_aquest_capitol || []).forEach(f => {
+    if (!f || !f.trim()) return;
+    const ft = f.trim();
+    tancatsSet.add(ft);
+    obertsSet.delete(ft);
+    // eliminació per inclusió parcial (variants de redacció)
+    for (const obert of [...obertsSet]) {
+      if (obert.toLowerCase().includes(ft.toLowerCase()) || ft.toLowerCase().includes(obert.toLowerCase())) {
+        tancatsSet.add(obert);
+        obertsSet.delete(obert);
+      }
+    }
+  });
+  ESTAT.llibreRegistre.fils_oberts  = [...obertsSet];
+  ESTAT.llibreRegistre.fils_tancats = [...tancatsSet];
+
+  // Actualitzar beats_gastats al NKG
+  if (!Array.isArray(ESTAT._nkg.beats_gastats)) ESTAT._nkg.beats_gastats = [];
+  (dades.nous_beats_gastats || []).forEach(b => {
+    if (b && b.trim() && !ESTAT._nkg.beats_gastats.includes(b.trim()))
+      ESTAT._nkg.beats_gastats.push(b.trim());
+  });
+
+  // Actualitzar accions irreversibles
+  if (!Array.isArray(ESTAT._accionsIrreversibles)) ESTAT._accionsIrreversibles = [];
+  (dades.accions_irreversibles || []).forEach(a => {
+    if (a && a.trim()) ESTAT._accionsIrreversibles.push({ capitol: idx + 1, accio: a.trim() });
+  });
 }
 
 // FASE 8: registre síncron amb retry — s'awaita des de generarCapitol
@@ -7219,6 +7303,76 @@ function obtenirUbicacioEscaletaCapitol(idx) {
   const escaletaCap = (ESTAT._escaletes || []).find(e => e.capitol === idx + 1);
   const escena0 = escaletaCap && Array.isArray(escaletaCap.escenes) ? escaletaCap.escenes[0] : null;
   return (escena0 && (escena0.lloc || escena0.localitzacio || escena0.ubicacio)) || (cap && cap.localitzacio) || '';
+}
+
+async function validarIReomplirEscaleta(idxCapitol, userConfig) {
+  const escaletaCap = (ESTAT._escaletes || []).find(e => e.capitol === idxCapitol + 1);
+  if (!escaletaCap || !Array.isArray(escaletaCap.escenes)) return;
+
+  // Comprovar si les escenes tenen contingut real
+  const escenesBuides = escaletaCap.escenes.filter(sc =>
+    !sc || !sc.nom || !sc.funcio_narrativa || String(sc.nom).trim().length < 3
+  );
+  if (escenesBuides.length === 0 && escaletaCap.escenes.length >= 3) return; // escaleta vàlida
+
+  console.warn(`Escaleta cap. ${idxCapitol + 1}: ${escenesBuides.length} escenes buides. Reomplint…`);
+
+  const reg = ESTAT.llibreRegistre || {};
+  const beatsGastats = Array.isArray(ESTAT._nkg && ESTAT._nkg.beats_gastats)
+    ? ESTAT._nkg.beats_gastats.slice(-6) : [];
+  const filsTancats = Array.isArray(reg.fils_tancats) ? reg.fils_tancats.slice(-5) : [];
+  const snapshotAnterior = idxCapitol > 0 ? (ESTAT._snapshotsFinals || {})[idxCapitol - 1] : null;
+  const resumAnterior = idxCapitol > 0 && reg.capitols && reg.capitols[idxCapitol - 1]
+    ? reg.capitols[idxCapitol - 1].resum_capitol || '' : '';
+  const cap = (ESTAT._estructuraCapitols && ESTAT._estructuraCapitols[idxCapitol]) || {};
+  const tensio = (ESTAT._corbaTensio || []).find(t => t.capitol === idxCapitol + 1);
+
+  const msgs = [{
+    role: 'user',
+    content: `Genera una escaleta detallada per al capítol ${idxCapitol + 1}: "${cap.titol || ''}".
+
+RESUM DEL CAPÍTOL ANTERIOR:
+${resumAnterior || '(primer capítol)'}
+
+SNAPSHOT DE CONTINUÏTAT (final del cap. anterior):
+${snapshotAnterior
+  ? `Ubicació: ${snapshotAnterior.ubicacio}\nEstat emocional: ${snapshotAnterior.estat_emocional}\nSituació: ${snapshotAnterior.situacio_immediata}`
+  : '(no disponible)'}
+
+BEATS JA GASTATS (NO repetir):
+${beatsGastats.map(b => `- ${b}`).join('\n') || '(cap)'}
+
+FILS JA TANCATS (NO reobrir):
+${filsTancats.map(f => `- ${f}`).join('\n') || '(cap)'}
+
+NIVELL DE TENSIÓ: ${tensio ? tensio.nivell + '/10 (' + (tensio.tipus || '') + ')' : '(no definit)'}
+
+Genera entre 5 i 7 escenes. Retorna EXCLUSIVAMENT JSON vàlid:
+{
+  "escenes": [
+    {
+      "nom": "títol breu (3-5 paraules)",
+      "paraules_objectiu": 600,
+      "funcio_narrativa": "una frase curta",
+      "personatges": ["nom1"],
+      "beat_narratiu": "diàleg"
+    }
+  ]
+}`
+  }];
+
+  const models = getModelConfig(userConfig || USER_CONFIG);
+  const raw = await callLLMMulti(
+    msgs,
+    'Ets un dramaturg expert en narrativa. Respon EXCLUSIVAMENT JSON vàlid.',
+    Object.assign({}, userConfig || USER_CONFIG, { maxTokens: 1200, model: models.modelArquitecte }),
+    'arquitectura'
+  );
+  const dades = parseJsonRobust(raw);
+  if (dades && Array.isArray(dades.escenes) && dades.escenes.length >= 3) {
+    escaletaCap.escenes = dades.escenes;
+    console.log(`Escaleta cap. ${idxCapitol + 1} reomperta: ${dades.escenes.length} escenes.`);
+  }
 }
 
 function normalitzarUbicacioContinuitat(txt) {
