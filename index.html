@@ -1683,6 +1683,7 @@ const ESTAT = {
   },
   _escaletes: [],
   _memoriasComprimides: [],
+  _snapshotsFinals: {},
   _goldenPassage: null,
   _goldenPassageCapitol: -1,
   // NKG (Narrative Knowledge Graph) — v4
@@ -3899,6 +3900,12 @@ async function generarCapitol(idx, intents = 0) {
       await actualitzarLlibreRegistreBackground(res.response, idx);
     } catch (err) {
       console.warn('Registre async:', err.message);
+    }
+
+    try {
+      await generarSnapshotFinalCapitol(idx, USER_CONFIG);
+    } catch (err) {
+      console.warn('Continuity snapshot async:', err.message);
     }
 
     const esCheckpoint = (idx + 1) % 3 === 0 && idx + 1 < ESTAT._estructuraCapitols.length;
@@ -6715,6 +6722,7 @@ REGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que é
 
 function buildSystemPromptCapitol() {
   const idxActual = Number(ESTAT._capitolActual || 0);
+  const directivaContinuitat = generarDirectivaContinuitat(idxActual);
   const capitolsRegistre = (ESTAT.llibreRegistre && Array.isArray(ESTAT.llibreRegistre.capitols))
     ? ESTAT.llibreRegistre.capitols
     : [];
@@ -6771,15 +6779,17 @@ function buildSystemPromptCapitol() {
     }
     parts.push("\nREGLA D'ESTIL OBLIGATÒRIA (SHOW, DON'T TELL): Tens totalment prohibit utilitzar etiquetes emocionals explícites per descriure com se sent un personatge (ex: prohibit dir \"estava trist\", \"se sentia enfadat\", \"estava nerviós\"). En comptes d'això, has de MOSTRAR l'emoció a través d'accions físiques, interaccions amb objectes, vestimenta, llenguatge corporal o detalls de l'entorn.");
     parts.push("\nREGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que és el final del capítol, NO resolguis la situació ni facis que els personatges abandonin l'escenari al final del text. Deixa l'acció fluint, oberta o en suspens dramàtic, de manera que la següent generació pugui recollir el testimoni de forma natural.");
+    if (directivaContinuitat) parts.push('\n' + directivaContinuitat);
     if (prohibirIniciMeteorologic) {
       parts.push("PROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg.");
     }
     return parts.join('\n');
   }
   const legacy = buildSystemPromptCapitolLegacy();
+  const legacyAmbContinuitat = directivaContinuitat ? `${legacy}\n\n${directivaContinuitat}` : legacy;
   return prohibirIniciMeteorologic
-    ? legacy + "\n\nPROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg."
-    : legacy;
+    ? legacyAmbContinuitat + "\n\nPROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg."
+    : legacyAmbContinuitat;
 }
 
 function buildRegistreContextLegacy(idx) {
@@ -6927,6 +6937,100 @@ function llistarPrefiguracions() {
   return prefs.map(p =>
     `Cap.${p.plantada_capitol}→${p.resolucio_capitol}: ${p.element || ''}`
   ).join('\n');
+}
+
+function obtenirUbicacioEscaletaCapitol(idx) {
+  const cap = ESTAT._estructuraCapitols && ESTAT._estructuraCapitols[idx] ? ESTAT._estructuraCapitols[idx] : null;
+  const escaletaCap = (ESTAT._escaletes || []).find(e => e.capitol === idx + 1);
+  const escena0 = escaletaCap && Array.isArray(escaletaCap.escenes) ? escaletaCap.escenes[0] : null;
+  return (escena0 && (escena0.lloc || escena0.localitzacio || escena0.ubicacio)) || (cap && cap.localitzacio) || '';
+}
+
+function normalitzarUbicacioContinuitat(txt) {
+  return String(txt || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function generarSnapshotFinalCapitol(capitolIdx, userConfig = USER_CONFIG) {
+  if (!ESTAT._snapshotsFinals || typeof ESTAT._snapshotsFinals !== 'object') ESTAT._snapshotsFinals = {};
+
+  const textCapitol = (ESTAT._capitols_generats && ESTAT._capitols_generats[capitolIdx])
+    ? String(ESTAT._capitols_generats[capitolIdx])
+    : '';
+  if (!textCapitol.trim()) return null;
+
+  const protagonist = ESTAT.protagonistaTriat || 'la protagonista';
+  const msgs = [{
+    role: 'user',
+    content: `Extreu un snapshot de continuïtat del FINAL del capítol ${capitolIdx + 1}.
+
+PROTAGONISTA: ${protagonist}
+
+CAPÍTOL COMPLET:
+${textCapitol.slice(-14000)}
+
+Retorna EXCLUSIVAMENT JSON vàlid amb aquesta forma:
+{
+  "ubicacio": "Lloc físic exacte on acaba el personatge",
+  "hora_narrativa": "Hora/moment del dia aproximat",
+  "estat_emocional": "Estat psicològic en acabar el capítol",
+  "situacio_immediata": "Què està passant exactament al tancament",
+  "objectes_rellevants": ["llista d'objectes que porta o ha perdut"],
+  "ultimes_3_frases": "Les 3 últimes frases del capítol (literal)"
+}`
+  }];
+
+  try {
+    const models = getModelConfig(userConfig || USER_CONFIG || {});
+    const raw = await callLLMMulti(
+      msgs,
+      "Ets una analista de continuïtat narrativa. Respon només JSON.",
+      Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 900, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+    const parsed = parseJsonRobust(raw) || {};
+    const snapshot = {
+      ubicacio: String(parsed.ubicacio || '').trim() || 'No determinat',
+      hora_narrativa: String(parsed.hora_narrativa || '').trim() || 'No determinat',
+      estat_emocional: String(parsed.estat_emocional || '').trim() || 'No determinat',
+      situacio_immediata: String(parsed.situacio_immediata || '').trim() || 'No determinat',
+      objectes_rellevants: Array.isArray(parsed.objectes_rellevants) ? parsed.objectes_rellevants.map(o => String(o || '').trim()).filter(Boolean) : [],
+      ultimes_3_frases: String(parsed.ultimes_3_frases || '').trim() || textCapitol.split(/(?<=[.!?…])\s+/).slice(-3).join(' ').trim(),
+      protagonista: protagonist
+    };
+    ESTAT._snapshotsFinals[capitolIdx] = snapshot;
+    return snapshot;
+  } catch (err) {
+    console.warn('Snapshot final capítol: error no bloquejant:', err.message);
+    return null;
+  }
+}
+
+function generarDirectivaContinuitat(capitolIdx) {
+  if (capitolIdx <= 0) return '';
+  if (!ESTAT._snapshotsFinals || typeof ESTAT._snapshotsFinals !== 'object') ESTAT._snapshotsFinals = {};
+
+  const snapshotAnterior = ESTAT._snapshotsFinals[capitolIdx - 1];
+  if (!snapshotAnterior) return '';
+
+  const protagonista = snapshotAnterior.protagonista || ESTAT.protagonistaTriat || 'la protagonista';
+  const ubicacioAnterior = snapshotAnterior.ubicacio || 'ubicació no determinada';
+  const ubicacioNova = obtenirUbicacioEscaletaCapitol(capitolIdx) || 'ubicació no especificada';
+  const mateixaUbicacio = normalitzarUbicacioContinuitat(ubicacioAnterior) === normalitzarUbicacioContinuitat(ubicacioNova);
+  const objectes = Array.isArray(snapshotAnterior.objectes_rellevants) && snapshotAnterior.objectes_rellevants.length > 0
+    ? snapshotAnterior.objectes_rellevants.join(', ')
+    : 'cap objecte crític';
+
+  if (mateixaUbicacio) {
+    return `CONTINUÏTAT: El capítol anterior va acabar amb ${protagonista} a ${ubicacioAnterior}, ${snapshotAnterior.situacio_immediata || 'en situació no especificada'}. Hora: ${snapshotAnterior.hora_narrativa || 'no determinada'}. Estat: ${snapshotAnterior.estat_emocional || 'no determinat'}. Objectes: ${objectes}. COMENÇA exactament des d'aquest punt.`;
+  }
+
+  return `ALERTA DE CONTINUÏTAT: El capítol anterior va acabar amb ${protagonista} a ${ubicacioAnterior}, ${snapshotAnterior.situacio_immediata || 'en situació no especificada'}, ${snapshotAnterior.hora_narrativa || 'hora no determinada'}. El nou capítol se situa a ${ubicacioNova}. ÉS IMPERATIU que narris el desplaçament o facis una el·lipsi temporal explícita a l'inici. NO pots començar com si el personatge ja fos allà sense explicació. Estat emocional previ: ${snapshotAnterior.estat_emocional || 'no determinat'}. El personatge NO pot reiniciar-se emocionalment sense motiu.`;
 }
 
 function filtrarContextFutur(capitolActualIdx) {
