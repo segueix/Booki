@@ -6789,12 +6789,21 @@ function parseJsonRobust(text, expectedKeys = []) {
 function getSystemPromptNovella(tematica) {
   const base = `Ets un novel·lista literari expert en català. Escrius novel·la amb profunditat psicològica, diàlegs vius i un ritme narratiu sostingut.
 Apliques les tècniques de Donna Tartt, Elena Ferrante i Carlos Ruiz Zafón: atmòsferes denses, personatges amb contradiccions genuïnes i trames que s'informen mútuament.
-Escrius EXCLUSIVAMENT en català. Mai inclous paraules ni comentaris en anglès o qualsevol altra llengua.
-Mai afegeixes notes meta, indicacions de capítol ni cap text fora de la narració literària. Escriu directament el text.
-DIÀLEGS: Usa SEMPRE el guió llarg (—) per introduir el parlament i les acotacions. PROHIBIT usar cometes («», "", '') per al diàleg directe. Format correcte: —Hola —va dir ella. / —Bon dia. / —Vine aquí —li ordenà. SEPARACIÓ DE PARÀGRAFS: És OBLIGATORI fer un punt i a part (nova línia) cada vegada que canvia el personatge que parla o hi ha un canvi d'acció important. MAI barregis intervencions de dos personatges diferents en el mateix paràgraf.
-NOMS DE PERSONA: Aplica l'article personal (en, la, l', na) i les preposicions contractes quan la normativa catalana ho requereix. Exemples: la Maria, en Pere, l'Anna, en Marc, na Joana; amb la Júlia, amb en Tomàs; del senyor Puig, al doctor Ferrer.
-ESTIL DE PROSA: Evita el barroquisme. Prioritza paraules d'ús habitual i precises; evita adjectivació excessiva (màxim 1 adjectiu rellevant per substantiu, excepte si és imprescindible). En diàleg, fes parlar els personatges de manera natural i versemblant. Aplica la norma de 'Show, don't tell' especialment als conflictes: resol les tensions a través de diàlegs incisius i acció, no amb resums de la veu narradora. Recorda que estàs escrivint una novel·la completa, no un guió ni un conte breu. Pren-te el teu temps per descriure l'atmosfera, explorar el monòleg intern dels personatges i coreografiar els seus moviments per l'espai. Sigues exhaustiu i detallista.
-REGLA DE SUBTEXT ALS DIÀLEGS I ANTI-EXPOSICIÓ: És totalment prohibit que els antagonistes o figures de poder expliquin els seus plans, motivacions o el funcionament del sistema de forma directa (Zero monòlegs de "dolent de James Bond"). Les figures de poder han de parlar sempre en eufemismes corporatius, mitges veritats i to institucional. Mai un personatge explicarà res que l'altre personatge ja sàpiga (info-dumping per al lector). Obliga el lector i el protagonista a deduir l'horror amagat darrere d'un llenguatge aparentment amable o burocràtic.`;
+
+━━━ REGLES INVIOLABLES ━━━
+• LLENGUA: Escrius EXCLUSIVAMENT en català. Cap paraula en anglès ni cap altra llengua.
+• METADADES: Mai afegeixes títols, números de capítol, notes ni cap text fora de la narració. Escriu directament el text literari.
+• DIÀLEGS — FORMAT: Usa SEMPRE el guió llarg (—) per introduir el parlament. PROHIBIT usar cometes («», "", ''). Format: —Hola —va dir ella. / —Vine aquí —li ordenà.
+• DIÀLEGS — PARÀGRAFS: Un punt i a part OBLIGATORI cada vegada que canvia el parlant o hi ha canvi d'acció important. MAI dos personatges al mateix paràgraf.
+• SHOW, DON'T TELL: PROHIBIT etiquetar emocions explícitament ("estava trist", "sentia por", "se sentia nerviós"). MOSTRA l'emoció a través d'accions físiques, gestualitat, interaccions amb objectes o detalls d'entorn.
+• ANTI-EXPOSICIÓ: PROHIBIT que cap personatge expliqui directament els seus plans o motivacions (zero monòlegs de "dolent de James Bond"). Les figures de poder parlen en eufemismes i to institucional. Cap personatge explicarà res que l'interlocutor ja sàpiga.
+• CONTINUÏTAT D'ESCENA: No tanquis artificialment l'energia entre escenes. Cada escena ha de fluir cap a la següent amb una tensió o pregunta oberta, llevat que sigui el tancament explícit del capítol.
+
+━━━ REGLES D'ESTIL ━━━
+• NOMS: Aplica l'article personal (en, la, l', na) i les preposicions contractes quan la normativa catalana ho requereix (la Maria, en Pere, amb la Júlia, del senyor Puig).
+• PROSA: Evita el barroquisme. Màxim 1 adjectiu rellevant per substantiu. Pren-te el teu temps: descriu l'atmosfera, explora el monòleg intern, coreografia els moviments per l'espai. Ets exhaustiu i detallista.
+• RITME: Alterna escenes de tensió activa (frases curtes, diàleg incisiu, acció breu) amb moments de respiració (introspecció, detall sensorial, gest quotidià). El contrast de ritme és el que crea la il·lusió de velocitat.
+• SENSORIALITAT: PROHIBIT la prosa asèptica. Integra textura física i sensorial (olors, suor, fred, fricció material, sons ambientals) especialment quan la tensió és alta. Quan la tensió supera 7/10, els detalls viscerals són OBLIGATORIS.`;
   return base + getGenreStyle(tematica || ESTAT.tematica);
 }
 
@@ -9887,10 +9896,7 @@ function nkgGenerarContextMinim(escenaSpec) {
   const contextNKG = nkgQueryEscenaContext(escenaSpec);
   if (contextNKG) parts.push(contextNKG);
 
-  // CAPA 2: Capítols anteriors literals (si hi caben en context)
-  const capIdxActual = Math.max(0, (escenaSpec.capitol || 1) - 1);
-  const capsContext = buildContextCapitolsComplets(capIdxActual);
-  if (capsContext) parts.push(capsContext);
+  // CAPA 2: omesa — els capítols anteriors ja arriben via buildContextCapitolLegacy (evitar duplicació)
 
   // CAPA 3: Últimes 2 escenes literals (~800 tokens)
   const ultimesEscenes = obtenirUltimesEscenes(2, escenaSpec.capitol, escenaSpec.escena || 1);
@@ -10676,25 +10682,77 @@ Retorna només la versió final del capítol, sense metadades ni notes.`
     'generacio'
   );
 }
+function construirMissioCapitol(idx) {
+  const cap = (ESTAT._estructuraCapitols && ESTAT._estructuraCapitols[idx]) || {};
+  const escaletaCap = (ESTAT._escaletes || []).find(e => e.capitol === idx + 1);
+  const totalCaps = ESTAT._estructuraCapitols ? ESTAT._estructuraCapitols.length : 0;
+  const esUltim = idx >= totalCaps - 1;
+  const esAvantFinal = !esUltim && idx >= totalCaps - 2;
+  const tensio = (ESTAT._corbaTensio || []).find(t => t.capitol === idx + 1);
+  const snapshotAnterior = idx > 0 ? (ESTAT._snapshotsFinals || {})[idx - 1] : null;
+  const paraulesObjectiu = (ESTAT._controlLongitud && ESTAT._controlLongitud.objectiu) ? ESTAT._controlLongitud.objectiu : 3500;
+
+  const lines = [];
+
+  // Objectiu dramàtic del capítol
+  const objectiu = cap.fil || cap.fil_principal || cap.resum || '';
+  if (objectiu) lines.push(`OBJECTIU DRAMÀTIC: ${objectiu}`);
+
+  // Transició emocional del protagonista
+  if (snapshotAnterior && snapshotAnterior.estat_emocional) {
+    lines.push(`ESTAT EMOCIONAL DE PARTIDA: "${snapshotAnterior.estat_emocional}". El protagonista ha de sortir d'aquest capítol en un estat DIFERENT — no cal que millori, però ha de canviar. Un personatge que entra i surt igual ha perdut el capítol.`);
+  }
+
+  // Escena clau i longitud objectiu
+  if (escaletaCap && Array.isArray(escaletaCap.escenes) && escaletaCap.escenes.length > 0) {
+    const escenes = escaletaCap.escenes;
+    const escenaClau = escenes.find(e => e.beat_narratiu === 'introspecció' || e.beat_narratiu === 'acció') || escenes[Math.floor(escenes.length / 2)];
+    if (escenaClau && escenaClau.nom) {
+      lines.push(`ESCENA CLAU (la que NO pots descuidar): "${escenaClau.nom}" — ${escenaClau.funcio_narrativa || ''}. Aquesta escena ha de tenir pes, detall i durada proporcionals.`);
+    }
+    const paraulesPerEscena = Math.round(paraulesObjectiu / escenes.length);
+    lines.push(`LONGITUD: ~${paraulesObjectiu} paraules en ${escenes.length} escenes (~${paraulesPerEscena} paraules per escena). No truncis cap escena: desenvolupa-la fins a la seva resolució natural.`);
+  } else {
+    lines.push(`LONGITUD: ~${paraulesObjectiu} paraules. Desenvolupa cada escena fins a la seva resolució natural, sense truncar.`);
+  }
+
+  // Instrucció d'obertura
+  lines.push(`PRIMERA FRASE: Comença in media res — amb acció, tensió o veu que enganxi immediatament. PROHIBIT: descriure el temps atmosfèric, narrar el despertar d'un son, o obrir amb una frase genèrica ("Era un dia...", "El sol sortia..."). La primera frase ha de posar el lector dins l'escena sense avís.`);
+
+  // Instrucció de tancament dinàmica
+  if (esUltim) {
+    lines.push(`TANCAMENT: És el capítol final. Dóna tancament emocional i narratiu a tots els fils oberts. L'última frase ha de ser una ressonància — una imatge, un gest, un silenci — no una explicació. Evita els epílegs explicatius.`);
+  } else if (esAvantFinal) {
+    lines.push(`TANCAMENT: És el capítol penúltim. Acaba amb màxima urgència narrativa: tot ha d'apuntar al final inevitable. El lector ha de sentir que no pot parar.`);
+  } else if (tensio && Number(tensio.nivell) >= 7) {
+    lines.push(`TANCAMENT (tensió ${tensio.nivell}/10): Acaba en cliffhanger emocional o físic. Una decisió, una revelació, una porta que s'obre o es tanca. El lector no pot deixar el llibre aquí.`);
+  } else {
+    lines.push(`TANCAMENT: Acaba amb un canvi d'estat visible: alguna cosa ha canviat per al protagonista, però alguna cosa nova s'obre. La darrera imatge ha de tenir ressonància visual o emocional.`);
+  }
+
+  return lines.join('\n');
+}
+
 async function escriureCapitolDirecte(idx, contextCapitol, userConfig) {
   const capitol = idx + 1;
   const cap = ESTAT._estructuraCapitols[idx] || {};
   const systemPrompt = buildSystemPromptCapitol();
   const blocPsico = construirBlocPlaPsicologicPerPrompt(capitol, 0);
+  const missio = construirMissioCapitol(idx);
   const msgs = [{
     role: 'user',
-    content: `Escriu directament la versió final del capítol ${capitol} sense fases intermèdies d'esborrany.
+    content: `Escriu la versió final del capítol ${capitol} de la novel·la en català literari.
 
 TÍTOL: ${cap.titol || ''}
-CONTEXT COMPLET:
+
+━━━ CONTEXT I PLANIFICACIÓ ━━━
 ${contextCapitol}
 ${blocPsico}
-INSTRUCCIONS:
-- Mantén coherència estricta amb el context i la continuïtat factual.
-- Prosa literària en català, sense metadades.
-- Mantén tensió i ritme segons el capítol.
+━━━ MISSIÓ ESPECÍFICA D'AQUEST CAPÍTOL (llegeix-la ABANS d'escriure) ━━━
+${missio}
 
-Retorna només el capítol final.`
+━━━ ESCRIU ARA ━━━
+Retorna únicament el text narratiu del capítol. Cap nota, cap metadada, cap comentari del sistema.`
   }];
 
   const models = getModelConfig(userConfig);
