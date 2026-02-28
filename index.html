@@ -1230,7 +1230,10 @@
   <div class="modal-box" style="max-width:760px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
       <h3 style="font-size:1.1rem;font-weight:600;color:var(--accent2);">📚 Bíblia Narrativa</h3>
-      <button class="btn btn-ghost" style="padding:6px 14px;" onclick="tancarModalBiblia()">✕ Tancar</button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button id="btn-regenerar-biblia" class="btn btn-ghost" style="padding:6px 14px;font-size:.82rem;" onclick="regenerarBibliaNarrativa()">🔄 Regenerar</button>
+        <button class="btn btn-ghost" style="padding:6px 14px;" onclick="tancarModalBiblia()">✕ Tancar</button>
+      </div>
     </div>
     <div id="biblia-cos"></div>
   </div>
@@ -4921,6 +4924,21 @@ function obrirBiblia() {
 
 function tancarModalBiblia() {
   document.getElementById('modal-biblia').classList.add('hidden');
+}
+
+async function regenerarBibliaNarrativa() {
+  const btn = document.getElementById('btn-regenerar-biblia');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Regenerant…'; }
+  try {
+    await inicialitzarBiblia(USER_CONFIG);
+    await completarBibliaPersonatges(USER_CONFIG);
+    obrirBiblia();
+    toast('✓ Bíblia Narrativa regenerada.');
+  } catch (err) {
+    toast('Error regenerant la bíblia: ' + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Regenerar'; }
+  }
 }
 
 function normalitzarFetsCanonics(fets) {
