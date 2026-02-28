@@ -650,6 +650,10 @@
       </label>
     </div>
 
+    <label class="field-label" for="config-target-qualitat" style="margin-top:10px;">Qualitat objectiu del jutge (0-100)</label>
+    <input type="number" id="config-target-qualitat" min="60" max="98" step="1" value="85" placeholder="85">
+    <small style="display:block;color:var(--text2);font-size:.78rem;margin-top:4px;">El generador iterarà fins assolir aquest llindar (amb límit de seguretat d'intents).</small>
+
     <!-- Panell de selecció de models flexible v5.1 -->
     <div id="panellModels" style="margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:8px;">
       <h3 style="margin:0 0 10px;font-size:1em;">⚙️ Configuració de Models</h3>
@@ -1354,6 +1358,11 @@ function aplicarSnapshotProjecte(dades) {
   if (typeof sincronitzarCampsConfigModels === 'function') sincronitzarCampsConfigModels();
   if (typeof guardarClausAPI === 'function') guardarClausAPI();
 
+  const targetQualitatInput = document.getElementById('config-target-qualitat');
+  if (targetQualitatInput && USER_CONFIG && USER_CONFIG.targetQualitat != null) {
+    targetQualitatInput.value = USER_CONFIG.targetQualitat;
+  }
+
   restaurarInterficieDesDeEstat();
 }
 
@@ -1868,6 +1877,9 @@ function guardarIComencar() {
     const modelGeneracioInput    = document.getElementById('config-model-generacio').value.trim();
     const modelArquitecturaInput = document.getElementById('config-model-arquitectura').value.trim();
     const fluxAutomatic     = document.getElementById('config-flux-automatic').checked;
+    const targetQualitatEl  = document.getElementById('config-target-qualitat');
+    const targetQualitatRaw = targetQualitatEl ? Number(targetQualitatEl.value) : 85;
+    const targetQualitat    = Math.max(60, Math.min(98, Number.isFinite(targetQualitatRaw) ? targetQualitatRaw : 85));
 
     // Prioritzem el que l'usuari veu al panell en aquest moment (inputs/selectors),
     // per evitar arrossegar valors antics d'ESTAT d'un proveïdor diferent.
@@ -1907,7 +1919,8 @@ function guardarIComencar() {
         generacio: modelGeneracio,
         arquitecte: modelArquitectura
       },
-      fluxAutomatic
+      fluxAutomatic,
+      targetQualitat
     };
 
     if (typeof poblarSelectorsModels === 'function') {
@@ -6088,20 +6101,45 @@ async function assegurarLlibreriaDocx() {
     'https://unpkg.com/docx@8.5.0/build/index.js'
   ];
 
-  const carregarScript = (src) => new Promise((resolve) => {
+  const carregarScript = (src, timeoutMs = 8000) => new Promise((resolve) => {
+    let resolt = false;
+    const acabar = (ok) => {
+      if (resolt) return;
+      resolt = true;
+      resolve(!!ok);
+    };
+    const timeoutId = setTimeout(() => acabar(false), timeoutMs);
+
     const existent = Array.from(document.scripts).find(s => s.src && s.src.includes(src));
     if (existent) {
-      if (typeof docx !== 'undefined') return resolve(true);
-      existent.addEventListener('load', () => resolve(typeof docx !== 'undefined'), { once: true });
-      existent.addEventListener('error', () => resolve(false), { once: true });
+      if (typeof docx !== 'undefined') {
+        clearTimeout(timeoutId);
+        return acabar(true);
+      }
+      const onLoad = () => {
+        clearTimeout(timeoutId);
+        acabar(typeof docx !== 'undefined');
+      };
+      const onError = () => {
+        clearTimeout(timeoutId);
+        acabar(false);
+      };
+      existent.addEventListener('load', onLoad, { once: true });
+      existent.addEventListener('error', onError, { once: true });
       return;
     }
 
     const s = document.createElement('script');
     s.src = src;
     s.async = true;
-    s.onload = () => resolve(typeof docx !== 'undefined');
-    s.onerror = () => resolve(false);
+    s.onload = () => {
+      clearTimeout(timeoutId);
+      acabar(typeof docx !== 'undefined');
+    };
+    s.onerror = () => {
+      clearTimeout(timeoutId);
+      acabar(false);
+    };
     document.head.appendChild(s);
   });
 
@@ -6110,6 +6148,18 @@ async function assegurarLlibreriaDocx() {
     if (ok && typeof docx !== 'undefined' && docx.Document && docx.Packer) return true;
   }
   return false;
+}
+
+async function ambTimeout(promise, ms, missatge = 'Operació excedida') {
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(missatge)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 }
 
 function descarregarTextFallback(titol, contingut, base = 'document') {
@@ -6172,13 +6222,18 @@ async function exportarADoc(titol, contingut) {
   });
 
   try {
-    const blob = await Packer.toBlob(doc);
+    const blob = await ambTimeout(
+      Packer.toBlob(doc),
+      15000,
+      'Temps d\'exportació DOCX excedit'
+    );
     const nomFitxer = normalitzarNomFitxerDocx(titol || 'conte', 'conte');
     descarregarBlobDocx(blob, nomFitxer);
     toast('📄 Descarregat: ' + nomFitxer);
   } catch (err) {
-    toast("Error a l'exportar DOCX: " + err.message);
-    throw err;
+    console.warn('[exportarADoc] Fallback TXT per error DOCX:', err.message);
+    const nomTxt = descarregarTextFallback(titol, contingut, 'conte');
+    toast(`⚠️ Exportació DOCX no disponible (${err.message}). S'ha descarregat ${nomTxt}.`);
   }
 }
 
@@ -6341,13 +6396,28 @@ async function exportarNovella(titol, caps, estructura, epileg) {
   });
 
   try {
-    const blob = await Packer.toBlob(doc);
+    const blob = await ambTimeout(
+      Packer.toBlob(doc),
+      25000,
+      'Temps d\'exportació de la novel·la excedit'
+    );
     const nomFitxer = normalitzarNomFitxerDocx(titol || 'novella', 'novella');
     descarregarBlobDocx(blob, nomFitxer);
     toast('📖 Descarregat: ' + nomFitxer);
   } catch (err) {
-    toast("Error a l'exportar la novel·la DOCX: " + err.message);
-    throw err;
+    console.warn('[exportarNovella] Fallback TXT per error DOCX:', err.message);
+    const capitolsFallback = (caps || [])
+      .map((c, i) => ({ text: c, titolCap: (estructura[i] && estructura[i].titol ? String(estructura[i].titol).trim() : '') || `Capítol ${i + 1}` }))
+      .filter(c => c.text);
+    const indexFallback = capitolsFallback.map((c, i) => `${i + 1}. ${c.titolCap}`).join('\n');
+    const contingutFallback = [
+      titol || 'Novel·la IA',
+      indexFallback ? `Índex de capítols\n${indexFallback}` : '',
+      ...capitolsFallback.map((c, i) => `Capítol ${i + 1} — ${c.titolCap}\n\n${netejarTabulacionsInicials(c.text)}`),
+      (epileg && String(epileg).trim()) ? `Epíleg\n\n${netejarTabulacionsInicials(epileg)}` : ''
+    ].filter(Boolean).join('\n\n');
+    const nomTxt = descarregarTextFallback(titol, contingutFallback, 'novella');
+    toast(`⚠️ Exportació DOCX no disponible (${err.message}). S'ha descarregat ${nomTxt}.`);
   }
 }
 
@@ -8302,9 +8372,19 @@ async function avaluarQualitatLiteraria(textEscena, userConfig) {
   // Si no supera el Nivell 1, tallem l'execució aquí sense cridar a l'API
   if (problemesProgramatics.length > 0) {
     console.log("⛔ Rebutjat pel Jutge Programàtic (estalviant tokens):", problemesProgramatics);
+    const scoreProgramatic = Math.max(30, 72 - (problemesProgramatics.length * 9));
     return {
       aprovat: false,
-      critiques: "Filtre de qualitat automàtic no superat: " + problemesProgramatics.join(" ")
+      critiques: "Filtre de qualitat automàtic no superat: " + problemesProgramatics.join(" "),
+      score_global: scoreProgramatic,
+      blocking_issues: problemesProgramatics,
+      sub_scores: {
+        coherencia: Math.max(35, scoreProgramatic - 8),
+        veu: Math.max(35, scoreProgramatic - 5),
+        dialeg: Math.max(35, scoreProgramatic - 5),
+        prosa: Math.max(35, scoreProgramatic - 7),
+        catala: Math.max(40, scoreProgramatic)
+      }
     };
   }
 
@@ -8327,6 +8407,15 @@ La teva tasca té dues parts:
 Retorna ÚNICAMENT un objecte JSON amb aquest format exacte:
 {
   "aprovat": true/false,
+  "score_global": 0-100,
+  "sub_scores": {
+    "coherencia": 0-100,
+    "veu": 0-100,
+    "dialeg": 0-100,
+    "prosa": 0-100,
+    "catala": 0-100
+  },
+  "blocking_issues": ["error crític 1", "error crític 2"],
   "critiques": "Descriu els errors narratius i/o llista les paraules incorrectes i la seva correcció. Si tot és literàriament correcte, deixa-ho buit."
 }`;
 
@@ -8339,40 +8428,74 @@ Retorna ÚNICAMENT un objecte JSON amb aquest format exacte:
     );
     const parsed = parseJsonRobust(raw);
     if (parsed && typeof parsed.aprovat === 'boolean') {
+      const scoreGlobalRaw = Number(parsed.score_global);
+      const scoreGlobal = Number.isFinite(scoreGlobalRaw) ? Math.max(0, Math.min(100, scoreGlobalRaw)) : (parsed.aprovat ? 86 : 65);
+      const sub = parsed.sub_scores && typeof parsed.sub_scores === 'object' ? parsed.sub_scores : {};
+      const sanitizeScore = (v, fb) => {
+        const n = Number(v);
+        return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : fb;
+      };
       return {
         aprovat: parsed.aprovat,
-        critiques: typeof parsed.critiques === 'string' ? parsed.critiques : ''
+        critiques: typeof parsed.critiques === 'string' ? parsed.critiques : '',
+        score_global: scoreGlobal,
+        blocking_issues: Array.isArray(parsed.blocking_issues) ? parsed.blocking_issues.map(s => String(s || '').trim()).filter(Boolean) : [],
+        sub_scores: {
+          coherencia: sanitizeScore(sub.coherencia, scoreGlobal),
+          veu: sanitizeScore(sub.veu, scoreGlobal),
+          dialeg: sanitizeScore(sub.dialeg, scoreGlobal),
+          prosa: sanitizeScore(sub.prosa, scoreGlobal),
+          catala: sanitizeScore(sub.catala, scoreGlobal)
+        }
       };
     }
   } catch (err) {
     console.warn("Jutge LLM: error a l'avaluació, s'aprova temporalment per evitar bloquejos:", err.message);
   }
 
-  return { aprovat: true, critiques: '' };
+  return {
+    aprovat: true,
+    critiques: '',
+    score_global: 82,
+    blocking_issues: [],
+    sub_scores: { coherencia: 82, veu: 82, dialeg: 82, prosa: 82, catala: 82 }
+  };
 }
 
 async function generarIValidarEscena(promptEscena, systemPrompt, userConfig, opts = {}) {
   const intentsMaxims = Math.max(1, Number(opts.intentsMaxims) || 2);
   const maxTokens = opts.maxTokens || 3000;
+  const targetQualitatRaw = Number(opts.targetQualitat ?? userConfig?.targetQualitat ?? USER_CONFIG?.targetQualitat ?? 85);
+  const targetQualitat = Math.max(60, Math.min(98, Number.isFinite(targetQualitatRaw) ? targetQualitatRaw : 85));
   let escenaAprovada = false;
   let textEscenaGenerada = '';
   let intents = 0;
   let promptTreball = String(promptEscena || '');
+  let millorText = '';
+  let millorScore = -1;
 
   while (!escenaAprovada && intents < intentsMaxims) {
     intents++;
     textEscenaGenerada = await cridaAPI_GenerarText(promptTreball, systemPrompt, userConfig, maxTokens);
 
     const veredicte = await avaluarQualitatLiteraria(textEscenaGenerada, userConfig);
-    if (veredicte.aprovat) {
+    const scoreGlobal = Math.max(0, Math.min(100, Number(veredicte.score_global) || (veredicte.aprovat ? 84 : 64)));
+    const teBloquejos = Array.isArray(veredicte.blocking_issues) && veredicte.blocking_issues.length > 0;
+    if (scoreGlobal > millorScore) {
+      millorScore = scoreGlobal;
+      millorText = textEscenaGenerada || millorText;
+    }
+
+    if (veredicte.aprovat && scoreGlobal >= targetQualitat && !teBloquejos) {
       escenaAprovada = true;
     } else {
-      console.log('El Jutge Literari ha rebutjat l\'escena. Reescrivint... Motius:', veredicte.critiques);
-      promptTreball += `\n\nCRÍTICA DE L'EDITOR: La versió anterior tenia els següents problemes: ${veredicte.critiques || 'massa clixés o prosa plana'}. Reescriu l'escena solucionant AQUESTS problemes específics i evitant llocs comuns.`;
+      console.log(`El Jutge Literari demana millora (${scoreGlobal}/${targetQualitat}). Reescrivint...`, veredicte.critiques);
+      const bloquejosTxt = teBloquejos ? ` Errors crítics detectats: ${veredicte.blocking_issues.join(' | ')}.` : '';
+      promptTreball += `\n\nCRÍTICA DE L'EDITOR: La versió anterior ha obtingut ${scoreGlobal}/100 i l'objectiu és ${targetQualitat}/100.${bloquejosTxt} Problemes detectats: ${veredicte.critiques || 'massa clixés o prosa plana'}. Reescriu l'escena solucionant AQUESTS problemes específics i elevant la qualitat literària per sobre de ${targetQualitat}/100.`;
     }
   }
 
-  return textEscenaGenerada || '';
+  return escenaAprovada ? (textEscenaGenerada || '') : (millorText || textEscenaGenerada || '');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -8465,6 +8588,8 @@ function crearNKG() {
     esdeveniments: [],
     relacions: [],
     timeline_accions: [], // Registre d'Accions Consumades (NKG CHRONOS): "C3E2: Maja entra al laboratori"
+    timeline_objectes: [], // Registre de moviment d'objectes: C3E2: [Claus] Personatge A -> Personatge B (motiu)
+    timeline_personatges: [], // Registre de canvis de personatge: ubicació/roba/estat per escena
     ultima_actualitzacio: { capitol: 0, escena: 0 },
     versio: 1
   };
@@ -8475,6 +8600,119 @@ function nkgNormalitzarNom(nom) {
   return nom.toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, '_').trim();
+}
+
+function nkgRegistrarMovimentObjecte(nkg, objecteNom, fromState, toState, capitol, escena, causa = '') {
+  if (!nkg || !objecteNom) return;
+  const clauObj = nkgNormalitzarNom(objecteNom);
+  if (!clauObj) return;
+
+  const fromPos = fromState && fromState.posseidor ? String(fromState.posseidor) : null;
+  const fromUbi = fromState && fromState.ubicacio ? String(fromState.ubicacio) : '';
+  const toPos   = toState && toState.posseidor ? String(toState.posseidor) : null;
+  const toUbi   = toState && toState.ubicacio ? String(toState.ubicacio) : '';
+  const noCanvi = (fromPos || '') === (toPos || '') && (fromUbi || '') === (toUbi || '');
+  if (noCanvi) return;
+
+  if (!Array.isArray(nkg.timeline_objectes)) nkg.timeline_objectes = [];
+  const linia = `C${capitol}E${escena}: [${objecteNom}] ${fromPos || (fromUbi || '(desconegut)')} -> ${toPos || (toUbi || '(desconegut)')}${causa ? ` (${causa})` : ''}`;
+  nkg.timeline_objectes.push(linia);
+  if (nkg.timeline_objectes.length > 80) nkg.timeline_objectes = nkg.timeline_objectes.slice(-80);
+
+  if (!nkg.objectes[clauObj]) nkg.objectes[clauObj] = { nom: objecteNom, ubicacio: '', posseidor: null, significat_simbolic: '' };
+  const obj = nkg.objectes[clauObj];
+  obj.nom = obj.nom || objecteNom;
+  obj.posseidor = toPos || null;
+  obj.ubicacio = toUbi || '';
+  if (!Array.isArray(obj.historial_ubicacions)) obj.historial_ubicacions = [];
+  obj.historial_ubicacions.push({ capitol, escena, posseidor: obj.posseidor, ubicacio: obj.ubicacio, causa: causa || '' });
+  if (obj.historial_ubicacions.length > 40) obj.historial_ubicacions = obj.historial_ubicacions.slice(-40);
+}
+
+function nkgSincronitzarInventariPersonatge(nkg, abans, despres, capitol, escena) {
+  if (!nkg || !despres || !despres.nom) return;
+  const invAbans = Array.isArray(abans && abans.objectes_inventari) ? abans.objectes_inventari : [];
+  const invDespres = Array.isArray(despres.objectes_inventari) ? despres.objectes_inventari : [];
+  const nomPers = despres.nom;
+  const ubiPers = despres.ubicacio || (abans && abans.ubicacio) || '';
+
+  // Tot objecte que queda a inventari passa a estar en possessió del personatge a la seva ubicació actual.
+  invDespres.forEach(objNom => {
+    const clauObj = nkgNormalitzarNom(objNom);
+    const existent = nkg.objectes[clauObj] || { nom: objNom, posseidor: null, ubicacio: '', significat_simbolic: '' };
+    nkg.objectes[clauObj] = existent;
+    nkgRegistrarMovimentObjecte(
+      nkg,
+      objNom,
+      { posseidor: existent.posseidor, ubicacio: existent.ubicacio },
+      { posseidor: nomPers, ubicacio: ubiPers },
+      capitol,
+      escena,
+      'sincronització inventari'
+    );
+  });
+
+  // Objectes que ja no són a inventari però no han estat descartats explícitament: marquem ubicació incerta.
+  const setDespres = new Set(invDespres.map(n => nkgNormalitzarNom(n)));
+  invAbans.forEach(objNom => {
+    const clauObj = nkgNormalitzarNom(objNom);
+    if (!clauObj || setDespres.has(clauObj) || !nkg.objectes[clauObj]) return;
+    const exObj = nkg.objectes[clauObj];
+    if (exObj.posseidor && nkgNormalitzarNom(exObj.posseidor) === nkgNormalitzarNom(nomPers)) {
+      nkgRegistrarMovimentObjecte(
+        nkg,
+        objNom,
+        { posseidor: exObj.posseidor, ubicacio: exObj.ubicacio },
+        { posseidor: null, ubicacio: exObj.ubicacio || ubiPers || 'ubicació no especificada' },
+        capitol,
+        escena,
+        'objecte surt de l’inventari'
+      );
+    }
+  });
+}
+
+function nkgRegistrarCanvisPersonatge(nkg, abans, despres, capitol, escena) {
+  if (!nkg || !despres || !despres.nom) return;
+  if (!Array.isArray(nkg.timeline_personatges)) nkg.timeline_personatges = [];
+
+  const canvis = [];
+  const abansUbi = (abans && abans.ubicacio) ? String(abans.ubicacio) : '';
+  const despresUbi = (despres && despres.ubicacio) ? String(despres.ubicacio) : '';
+  if ((abansUbi || '') !== (despresUbi || '') && despresUbi) {
+    canvis.push(`ubicació: ${abansUbi || '(desconeguda)'} → ${despresUbi}`);
+  }
+
+  const abansRoba = (abans && abans.indumentaria_actual) ? String(abans.indumentaria_actual) : '';
+  const despresRoba = (despres && despres.indumentaria_actual) ? String(despres.indumentaria_actual) : '';
+  if ((abansRoba || '') !== (despresRoba || '') && despresRoba) {
+    canvis.push(`vestimenta: ${abansRoba || '(sense dades)'} → ${despresRoba}`);
+  }
+
+  const abansEmo = (abans && abans.estat_emocional) ? String(abans.estat_emocional) : '';
+  const despresEmo = (despres && despres.estat_emocional) ? String(despres.estat_emocional) : '';
+  if ((abansEmo || '') !== (despresEmo || '') && despresEmo) {
+    canvis.push(`emoció: ${abansEmo || '(desconeguda)'} → ${despresEmo}`);
+  }
+
+  if (canvis.length === 0) return;
+
+  const linia = `C${capitol}E${escena}: [${despres.nom}] ${canvis.join(' | ')}`;
+  nkg.timeline_personatges.push(linia);
+  if (nkg.timeline_personatges.length > 120) nkg.timeline_personatges = nkg.timeline_personatges.slice(-120);
+
+  // Historial estructurat dins del personatge
+  if (!Array.isArray(despres.historial_ubicacions)) despres.historial_ubicacions = [];
+  if (!Array.isArray(despres.historial_indumentaria)) despres.historial_indumentaria = [];
+
+  if ((abansUbi || '') !== (despresUbi || '') && despresUbi) {
+    despres.historial_ubicacions.push({ capitol, escena, ubicacio: despresUbi });
+    if (despres.historial_ubicacions.length > 60) despres.historial_ubicacions = despres.historial_ubicacions.slice(-60);
+  }
+  if ((abansRoba || '') !== (despresRoba || '') && despresRoba) {
+    despres.historial_indumentaria.push({ capitol, escena, indumentaria_actual: despresRoba });
+    if (despres.historial_indumentaria.length > 60) despres.historial_indumentaria = despres.historial_indumentaria.slice(-60);
+  }
 }
 
 function nkgQueryPersonatge(nom) {
@@ -8556,6 +8794,16 @@ function nkgQueryEscenaContext(escenaSpec) {
     objectesRellevants.forEach(o => {
       parts.push(`• ${o.nom}${o.significat_simbolic ? ' — ' + o.significat_simbolic : ''}`);
     });
+  }
+
+  if (Array.isArray(nkg.timeline_objectes) && nkg.timeline_objectes.length > 0) {
+    parts.push('\nÚLTIMS MOVIMENTS D\'OBJECTES:');
+    nkg.timeline_objectes.slice(-5).forEach(m => parts.push(`• ${m}`));
+  }
+
+  if (Array.isArray(nkg.timeline_personatges) && nkg.timeline_personatges.length > 0) {
+    parts.push('\nÚLTIMS CANVIS DE PERSONATGES (ubicació/roba):');
+    nkg.timeline_personatges.slice(-8).forEach(m => parts.push(`• ${m}`));
   }
 
   // NKG CHRONOS: àncora temporal — última acció registrada al timeline
@@ -8750,6 +8998,13 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
   if (personatgesActualitzats.length > 0) {
     personatgesActualitzats.forEach(p => {
       const clau = nkgNormalitzarNom(p.nom);
+      const abans = nkg.personatges[clau]
+        ? {
+          nom: nkg.personatges[clau].nom,
+          ubicacio: nkg.personatges[clau].ubicacio,
+          objectes_inventari: Array.isArray(nkg.personatges[clau].objectes_inventari) ? [...nkg.personatges[clau].objectes_inventari] : []
+        }
+        : { nom: p.nom, ubicacio: '', objectes_inventari: [] };
       if (!nkg.personatges[clau]) {
         nkg.personatges[clau] = {
           nom: p.nom,
@@ -8759,6 +9014,8 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
           objectes_inventari: Array.isArray(p.objectes_inventari) ? p.objectes_inventari : [],
           objectes_descartats: Array.isArray(p.objectes_descartats) ? p.objectes_descartats : [],
           ubicacio: p.ubicacio || '',
+          historial_ubicacions: p.ubicacio ? [{ capitol, escena, ubicacio: p.ubicacio }] : [],
+          historial_indumentaria: p.indumentaria_actual ? [{ capitol, escena, indumentaria_actual: p.indumentaria_actual }] : [],
           objectius: p.nous_objectius || [],
           secrets: p.nous_secrets || [],
           viu: p.viu !== undefined ? p.viu : true,
@@ -8789,6 +9046,29 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
           ex.autonomia_escenes.push(capitol);
         }
       }
+
+      const despres = nkg.personatges[clau];
+      nkgSincronitzarInventariPersonatge(nkg, abans, despres, capitol, escena);
+      nkgRegistrarCanvisPersonatge(nkg, abans, despres, capitol, escena);
+
+      // Registrar descarts explícits d'objectes amb ubicació si existeix.
+      const descarts = Array.isArray(p.objectes_descartats) ? p.objectes_descartats : [];
+      descarts.forEach(d => {
+        const objNom = d && d.objecte ? d.objecte : '';
+        if (!objNom) return;
+        const clauObj = nkgNormalitzarNom(objNom);
+        const existent = nkg.objectes[clauObj] || { nom: objNom, posseidor: p.nom || null, ubicacio: despres.ubicacio || '', significat_simbolic: '' };
+        nkg.objectes[clauObj] = existent;
+        nkgRegistrarMovimentObjecte(
+          nkg,
+          objNom,
+          { posseidor: existent.posseidor, ubicacio: existent.ubicacio },
+          { posseidor: null, ubicacio: d.ubicacio || despres.ubicacio || '' },
+          capitol,
+          escena,
+          'objecte descartat'
+        );
+      });
     });
   }
 
@@ -8804,7 +9084,37 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
   if (dades.nous_objectes) {
     dades.nous_objectes.forEach(o => {
       const clau = nkgNormalitzarNom(o.nom);
-      nkg.objectes[clau] = { nom: o.nom, ubicacio: o.ubicacio || '', posseidor: o.posseidor || null, significat_simbolic: o.significat_simbolic || '' };
+      const existent = nkg.objectes[clau] || { nom: o.nom, ubicacio: '', posseidor: null, significat_simbolic: '' };
+      nkg.objectes[clau] = existent;
+      nkgRegistrarMovimentObjecte(
+        nkg,
+        o.nom,
+        { posseidor: existent.posseidor, ubicacio: existent.ubicacio },
+        { posseidor: o.posseidor || null, ubicacio: o.ubicacio || '' },
+        capitol,
+        escena,
+        'objecte nou o actualitzat'
+      );
+      if (o.significat_simbolic) existent.significat_simbolic = o.significat_simbolic;
+    });
+  }
+
+  if (Array.isArray(dades.moviments_objectes) && dades.moviments_objectes.length > 0) {
+    dades.moviments_objectes.forEach(m => {
+      const objNom = m && m.objecte ? m.objecte : '';
+      if (!objNom) return;
+      const clauObj = nkgNormalitzarNom(objNom);
+      const existent = nkg.objectes[clauObj] || { nom: objNom, ubicacio: '', posseidor: null, significat_simbolic: '' };
+      nkg.objectes[clauObj] = existent;
+      nkgRegistrarMovimentObjecte(
+        nkg,
+        objNom,
+        { posseidor: m.de_posseidor != null ? m.de_posseidor : existent.posseidor, ubicacio: m.de_ubicacio != null ? m.de_ubicacio : existent.ubicacio },
+        { posseidor: m.a_posseidor != null ? m.a_posseidor : existent.posseidor, ubicacio: m.a_ubicacio != null ? m.a_ubicacio : existent.ubicacio },
+        capitol,
+        escena,
+        m.causa || 'moviment explícit'
+      );
     });
   }
 
@@ -8905,6 +9215,7 @@ Retorna EXCLUSIVAMENT un JSON vàlid amb EXACTAMENT aquests camps:
     {
       "nom": "Nom del personatge",
       "estat_emocional": "Descripció concisa del seu estat d'ànim a l'acabar l'escena.",
+      "ubicacio": "On és físicament el personatge al final de l'escena (lloc concret).",
       "indumentaria_actual": "Què porta posat i en quin estat es troba (ex: 'Abric negre mullat, camisa arrugada').",
       "objectes_inventari": ["Pistola carregada", "Claus del cotxe", "Carta arrugada"],
       "objectes_descartats": [
@@ -8919,10 +9230,22 @@ Retorna EXCLUSIVAMENT un JSON vàlid amb EXACTAMENT aquests camps:
     "ha obert la porta del laboratori",
     "ha disparat la pistola cap al sostre",
     "ha llegit el fitxer secret"
+  ],
+  "moviments_objectes": [
+    {
+      "objecte": "Claus del cotxe",
+      "de_posseidor": "Maja",
+      "de_ubicacio": "Passadís",
+      "a_posseidor": "Nil",
+      "a_ubicacio": "Passadís",
+      "causa": "les hi entrega després de la discussió"
+    }
   ]
 }
 
-El camp "accions_consumades" ha de contenir 3-5 accions físiques IRREVERSIBLES que han succeït en aquesta escena concreta. Cada acció ha d'estar en tercera persona passada i ser prou específica per poder-se usar com a restricció ("ha creuat el portal", "ha firmat el document", "ha matat el guarda"). Si no n'hi ha prou, posa les que hi hagi. NO inventes accions que no surten al text.`
+El camp "accions_consumades" ha de contenir 3-5 accions físiques IRREVERSIBLES que han succeït en aquesta escena concreta. Cada acció ha d'estar en tercera persona passada i ser prou específica per poder-se usar com a restricció ("ha creuat el portal", "ha firmat el document", "ha matat el guarda"). Si no n'hi ha prou, posa les que hi hagi. NO inventes accions que no surten al text.
+
+El camp "moviments_objectes" és opcional però recomanat: inclou els trasllats clars d'objectes (canvi de posseïdor o de lloc) detectats al text. Si no n'hi ha, retorna [].`
   }];
 
   const models = getModelConfig(userConfig);
@@ -9242,33 +9565,314 @@ INSTRUCCIONS ESTRICTES:
 
 async function avaluarEsborranyAmbHistoric(idx, esborrany, userConfig) {
   const capitol = idx + 1;
-  const historic = (ESTAT._capitols_generats || [])
-    .slice(0, idx)
-    .filter(Boolean)
-    .map((t, i) => `--- CAPÍTOL ${i + 1} ---
-${String(t).slice(-1800)}`)
-    .join('\n\n');
+  const models = getModelConfig(userConfig);
+  const contextRevisio = buildContextRevisioArquitecta(idx, esborrany);
+  const esborranyTallat = String(esborrany || '').slice(0, 14000);
 
-  const msgs = [{
+  const promptFactual = [{
     role: 'user',
-    content: `Compara aquest esborrany amb la novel·la. Busca: 1) Objectes que canvien de mà o desapareixen. 2) Personatges secundaris que sonen genèrics. 3) Diàlegs on s'explica informació ja sabuda (As you know, Bob). 4) Repeticions innecessàries respecte al capítol anterior. Retorna una llista de correccions a aplicar.
+    content: `Fes una REVISIÓ FACTUAL I DE COHERÈNCIA del capítol ${capitol}. Prioritza continuïtat dura i contradiccions.
 
-NOVEL·LA FINS ARA:
-${historic || '(encara no hi ha capítols previs)'}
+${contextRevisio}
 
 ESBORRANY CAPÍTOL ${capitol}:
-${String(esborrany || '').slice(0, 7000)}
+${esborranyTallat}
 
-Respon en bullets curts i accionables.`
+Checklist mínim (obligatori):
+1) Objectes que canvien de mà, desapareixen o reapareixen sense causa.
+2) Contradiccions canòniques amb fets establerts, regles del món o timeline.
+3) Motivacions inconsistents (accions sense causa psicològica creïble).
+4) Incoherència de POV/focalització i salts no justificats.
+5) Repeticions estructurals innecessàries amb capítols anteriors.
+
+Retorna EXCLUSIVAMENT JSON vàlid amb aquest esquema:
+{
+  "errors_critics": [
+    {
+      "id": "C1",
+      "tipus": "continuïtat_objectes|canon|timeline|motivacio|pov",
+      "severitat": "critica",
+      "fragment": "cita exacta curta del text problemàtic",
+      "diagnosi": "què falla i per què",
+      "accio": "canvi concret a aplicar",
+      "proposta_reescriptura": "opcional, 1-3 frases"
+    }
+  ],
+  "errors_mitjans": [],
+  "millores_estil": [],
+  "tests_post_rewrite": ["check verificable 1", "check verificable 2"],
+  "resum_risc": "1-3 línies"
+}`
   }];
 
+  const promptLiterari = [{
+    role: 'user',
+    content: `Fes una REVISIÓ LITERÀRIA I DE QUALITAT narrativa del capítol ${capitol}.
+
+${contextRevisio}
+
+ESBORRANY CAPÍTOL ${capitol}:
+${esborranyTallat}
+
+Checklist mínim (obligatori):
+1) Personatges secundaris que sonen genèrics o intercanviables.
+2) Diàleg expositiu tipus "As you know, Bob".
+3) Show-don't-tell insuficient amb etiquetes emocionals explícites.
+4) Ritme (massa explicació, poca escena) i transicions febles.
+5) Repeticions lèxiques/temàtiques i redundància emocional.
+
+Retorna EXCLUSIVAMENT JSON vàlid amb el mateix esquema:
+{
+  "errors_critics": [],
+  "errors_mitjans": [
+    {
+      "id": "M1",
+      "tipus": "veu|dialeg|ritme|redundancia|estil",
+      "severitat": "mitjana",
+      "fragment": "cita exacta curta",
+      "diagnosi": "què grinyola",
+      "accio": "canvi concret",
+      "proposta_reescriptura": "opcional"
+    }
+  ],
+  "millores_estil": [
+    {
+      "id": "S1",
+      "tipus": "prosa|sensorialitat|to",
+      "fragment": "cita exacta curta",
+      "accio": "millora concreta"
+    }
+  ],
+  "tests_post_rewrite": ["check verificable 1"],
+  "resum_risc": "1-3 línies"
+}`
+  }];
+
+  const [rawFactual, rawLiterari] = await Promise.all([
+    callLLMMulti(
+      promptFactual,
+      'Ets una arquitecta narrativa sènior. Detectes contradiccions i obligues canvis específics amb evidència textual.',
+      Object.assign({}, userConfig, { maxTokens: 2600, model: models.modelArquitecte }),
+      'arquitectura'
+    ),
+    callLLMMulti(
+      promptLiterari,
+      'Ets una arquitecta narrativa sènior. Prioritzes qualitat dramàtica i concreció accionable amb evidència textual.',
+      Object.assign({}, userConfig, { maxTokens: 2600, model: models.modelArquitecte }),
+      'arquitectura'
+    )
+  ]);
+
+  const revFactual = normalitzarRevisioArquitecta(rawFactual);
+  const revLiteraria = normalitzarRevisioArquitecta(rawLiterari);
+  const fusionada = fusionarRevisionsArquitecta(revFactual, revLiteraria);
+  return JSON.stringify(fusionada, null, 2);
+}
+
+function buildContextRevisioArquitecta(idx, esborrany) {
+  const parts = [];
+  const contextCapitols = buildContextCapitolsComplets(idx, { maxParaules: 7500 });
+  if (contextCapitols) parts.push(contextCapitols);
+
+  const registreCtx = buildRegistreContextLegacy(idx);
+  if (registreCtx) parts.push(registreCtx);
+
+  const contextCapitol = buildContextCapitolLegacy(idx);
+  if (contextCapitol) parts.push('\nCONTEXT CANÒNIC DE CAPÍTOL (per contrast de coherència):\n' + contextCapitol);
+
+  const nkgCtx = buildNkgContextRevisio(idx, esborrany);
+  if (nkgCtx) parts.push('\nNKG (VERITAT FACTUAL ACTUAL):\n' + nkgCtx);
+
+  const repsDetectades = detectarRepeticions();
+  if (repsDetectades) {
+    const bigrames = (repsDetectades.bigrames || []).slice(0, 8).map(([ng]) => ng);
+    const trigrames = (repsDetectades.trigrames || []).slice(0, 8).map(([ng]) => ng);
+    if (bigrames.length || trigrames.length) {
+      parts.push(`\nREPETICIONS LÈXIQUES GLOBALS A VIGILAR:\n- Bigrames: ${bigrames.join(', ') || '(cap)'}\n- Trigrames: ${trigrames.join(', ') || '(cap)'}`);
+    }
+  }
+
+  const repsTematiques = detectarRepeticionsTematiques();
+  if (repsTematiques && repsTematiques.length > 0) {
+    parts.push('\nREPETICIONS TEMÀTIQUES PREEXISTENTS (no reiterar sense capa nova):\n' +
+      repsTematiques.map(r => `- ${r.tema} (caps ${r.capitols.join(', ')})`).join('\n'));
+  }
+
+  if (idx > 0 && ESTAT._capitols_generats && ESTAT._capitols_generats[idx - 1]) {
+    const ultCap = String(ESTAT._capitols_generats[idx - 1]);
+    parts.push(`\nREFERÈNCIA RÀPIDA DEL CAPÍTOL ANTERIOR (tram final):\n${ultCap.slice(-2400)}`);
+  }
+
+  parts.push(`\nESBORRANY A REVISAR (${String(esborrany || '').length} caràcters).`);
+  return parts.join('\n\n');
+}
+
+function buildNkgContextRevisio(idx, esborrany) {
+  if (!ESTAT._nkg) return '';
+  const cap = ESTAT._estructuraCapitols ? ESTAT._estructuraCapitols[idx] : null;
+  const personatgesCap = cap && Array.isArray(cap.personatges) ? cap.personatges : [];
+  const lloc = cap ? (cap.localitzacio || '') : '';
+
+  const base = nkgGenerarContextMinim({
+    capitol: idx + 1,
+    escena: 1,
+    personatges: personatgesCap,
+    lloc,
+    escaleta: null
+  });
+
+  const timelineRecente = (ESTAT._nkg.timeline_accions || []).slice(-10).join('\n');
+  const timelinePersonatges = (ESTAT._nkg.timeline_personatges || []).slice(-15).join('\n');
+  const objectesRecents = Object.values(ESTAT._nkg.objectes || {})
+    .slice(0, 20)
+    .map(o => `- ${o.nom || 'objecte'} | posseidor:${o.posseidor || '-'} | ubicacio:${o.ubicacio || '-'} | estat:${o.estat || '-'}`)
+    .join('\n');
+  const personatgesRecents = Object.values(ESTAT._nkg.personatges || {})
+    .slice(0, 24)
+    .map(p => {
+      const ultUbi = Array.isArray(p.historial_ubicacions) && p.historial_ubicacions.length > 0
+        ? p.historial_ubicacions[p.historial_ubicacions.length - 1]
+        : null;
+      const ultRoba = Array.isArray(p.historial_indumentaria) && p.historial_indumentaria.length > 0
+        ? p.historial_indumentaria[p.historial_indumentaria.length - 1]
+        : null;
+      return `- ${p.nom || 'personatge'} | ubicacio_actual:${p.ubicacio || '-'}${ultUbi ? ` | darrer_canvi_ubicacio:C${ultUbi.capitol}E${ultUbi.escena}` : ''} | roba_actual:${p.indumentaria_actual || '-'}${ultRoba ? ` | darrer_canvi_roba:C${ultRoba.capitol}E${ultRoba.escena}` : ''}`;
+    })
+    .join('\n');
+
+  const pistaDraft = String(esborrany || '').slice(0, 1200);
+  return `${base}\n\nTIMELINE RECENT:\n${timelineRecente || '(sense accions recents)'}\n\nTIMELINE PERSONATGES (ubicació/roba):\n${timelinePersonatges || '(sense canvis recents)'}\n\nOBJECTES (control de continuïtat):\n${objectesRecents || '(sense objectes indexats)'}\n\nPERSONATGES (control de continuïtat):\n${personatgesRecents || '(sense personatges indexats)'}\n\nPISTA ESBORRANY (detecció de divergències):\n${pistaDraft}`;
+}
+
+function normalitzarRevisioArquitecta(raw) {
+  const parsed = parseJsonRobust(raw) || {};
+  const out = {
+    errors_critics: Array.isArray(parsed.errors_critics) ? parsed.errors_critics : [],
+    errors_mitjans: Array.isArray(parsed.errors_mitjans) ? parsed.errors_mitjans : [],
+    millores_estil: Array.isArray(parsed.millores_estil) ? parsed.millores_estil : [],
+    tests_post_rewrite: Array.isArray(parsed.tests_post_rewrite) ? parsed.tests_post_rewrite : [],
+    resum_risc: String(parsed.resum_risc || '').trim()
+  };
+
+  const sanejarItem = (it, fallbackSeverity) => ({
+    id: String(it?.id || '').trim(),
+    tipus: String(it?.tipus || 'general').trim(),
+    severitat: String(it?.severitat || fallbackSeverity || 'mitjana').trim(),
+    fragment: String(it?.fragment || '').trim(),
+    diagnosi: String(it?.diagnosi || '').trim(),
+    accio: String(it?.accio || '').trim(),
+    proposta_reescriptura: String(it?.proposta_reescriptura || '').trim()
+  });
+
+  out.errors_critics = out.errors_critics.map(it => sanejarItem(it, 'critica')).filter(it => it.accio || it.diagnosi || it.fragment);
+  out.errors_mitjans = out.errors_mitjans.map(it => sanejarItem(it, 'mitjana')).filter(it => it.accio || it.diagnosi || it.fragment);
+  out.millores_estil = out.millores_estil.map(it => sanejarItem(it, 'baixa')).filter(it => it.accio || it.fragment);
+  out.tests_post_rewrite = out.tests_post_rewrite.map(t => String(t || '').trim()).filter(Boolean);
+  return out;
+}
+
+function fusionarRevisionsArquitecta(a, b) {
+  const key = it => `${it.tipus}|${it.fragment}|${it.accio}`.toLowerCase();
+  const dedupe = arr => {
+    const seen = new Set();
+    const out = [];
+    arr.forEach(it => {
+      const k = key(it);
+      if (seen.has(k)) return;
+      seen.add(k);
+      out.push(it);
+    });
+    return out;
+  };
+
+  return {
+    errors_critics: dedupe([...(a.errors_critics || []), ...(b.errors_critics || [])]),
+    errors_mitjans: dedupe([...(a.errors_mitjans || []), ...(b.errors_mitjans || [])]),
+    millores_estil: dedupe([...(a.millores_estil || []), ...(b.millores_estil || [])]),
+    tests_post_rewrite: dedupe(
+      [...(a.tests_post_rewrite || []), ...(b.tests_post_rewrite || [])].map(t => ({ tipus: 'test', fragment: '', accio: t, severitat: 'baixa', diagnosi: '', proposta_reescriptura: '', id: '' }))
+    ).map(it => it.accio),
+    resum_risc: [a.resum_risc, b.resum_risc].filter(Boolean).join(' | ')
+  };
+}
+
+function serialitzarCorreccionsArquitecta(correccionsRaw) {
+  const rev = normalitzarRevisioArquitecta(typeof correccionsRaw === 'string' ? correccionsRaw : JSON.stringify(correccionsRaw || {}));
+  const lines = [];
+  if (rev.errors_critics.length > 0) {
+    lines.push('ERRORS CRÍTICS (obligatori resoldre tots):');
+    rev.errors_critics.forEach((e, i) => {
+      lines.push(`${i + 1}. [${e.tipus}] Fragment: "${e.fragment || '(sense cita)'}"`);
+      if (e.diagnosi) lines.push(`   - Diagnosi: ${e.diagnosi}`);
+      if (e.accio) lines.push(`   - Acció: ${e.accio}`);
+      if (e.proposta_reescriptura) lines.push(`   - Reescriptura suggerida: ${e.proposta_reescriptura}`);
+    });
+  }
+  if (rev.errors_mitjans.length > 0) {
+    lines.push('\nERRORS MITJANS (resoldre si no trenca el flux):');
+    rev.errors_mitjans.forEach((e, i) => {
+      lines.push(`${i + 1}. [${e.tipus}] Fragment: "${e.fragment || '(sense cita)'}"`);
+      if (e.diagnosi) lines.push(`   - Diagnosi: ${e.diagnosi}`);
+      if (e.accio) lines.push(`   - Acció: ${e.accio}`);
+    });
+  }
+  if (rev.millores_estil.length > 0) {
+    lines.push('\nMILLORES D\'ESTIL (prioritat baixa):');
+    rev.millores_estil.forEach((e, i) => {
+      lines.push(`${i + 1}. ${e.accio || e.diagnosi || e.fragment}`);
+    });
+  }
+  if (rev.tests_post_rewrite.length > 0) {
+    lines.push('\nTESTS POST-REWRITE (autocheck):');
+    rev.tests_post_rewrite.forEach((t, i) => lines.push(`${i + 1}. ${t}`));
+  }
+  if (rev.resum_risc) lines.push(`\nRESUM DE RISC: ${rev.resum_risc}`);
+  return lines.join('\n').trim() || String(correccionsRaw || '');
+}
+
+async function validarReescripturaArquitecta(idx, textComplet, correccionsRaw, userConfig) {
+  const capitol = idx + 1;
   const models = getModelConfig(userConfig);
-  return await callLLMMulti(
-    msgs,
-    'Ets una arquitecta narrativa obsessiva amb la micro-continuïtat. Respon de forma tècnica i accionable.',
-    Object.assign({}, userConfig, { maxTokens: 1200, model: models.modelArquitecte }),
+  const correccions = serialitzarCorreccionsArquitecta(correccionsRaw);
+  const prompt = [{
+    role: 'user',
+    content: `Verifica si el CAPÍTOL ${capitol} reescrit ha resolt les correccions de l'arquitecta. Sigues estricta i aporta evidència textual.
+
+CORRECCIONS ORIGINALS:
+${correccions.slice(0, 8000)}
+
+TEXT REESCRIT:
+${String(textComplet || '').slice(0, 14000)}
+
+Retorna EXCLUSIVAMENT JSON:
+{
+  "pendent_critic": [{"fragment":"cita","accio":"què falta","motiu":"per què"}],
+  "pendent_mitja": [{"fragment":"cita","accio":"què falta","motiu":"per què"}],
+  "noves_alertes": [{"severitat":"critica|mitjana","fragment":"cita","accio":"arreglar"}],
+  "veredicte": "ok|retry"
+}`
+  }];
+
+  const raw = await callLLMMulti(
+    prompt,
+    'Ets una arquitecta QA de narrativa. Només aproves quan no queden errors crítics i no hi ha regressions.',
+    Object.assign({}, userConfig, { maxTokens: 2200, model: models.modelArquitecte }),
     'arquitectura'
   );
+
+  const parsed = parseJsonRobust(raw) || {};
+  const pendCritic = Array.isArray(parsed.pendent_critic) ? parsed.pendent_critic : [];
+  const pendMitja = Array.isArray(parsed.pendent_mitja) ? parsed.pendent_mitja : [];
+  const noves = Array.isArray(parsed.noves_alertes) ? parsed.noves_alertes : [];
+  const hasCritic = pendCritic.length > 0 || noves.some(n => String(n?.severitat || '').toLowerCase() === 'critica');
+  const hasMedium = pendMitja.length > 0;
+  return {
+    raw,
+    parsed,
+    ok: !hasCritic && !hasMedium,
+    hasCritic,
+    pendents: { pendCritic, pendMitja, noves }
+  };
 }
 
 async function generarProsaDefinitiva(idx, esborrany, correccions, userConfig) {
@@ -9290,7 +9894,7 @@ ESBORRANY:
 ${String(esborrany || '').slice(0, 12000)}
 
 CORRECCIONS OBLIGATÒRIES:
-${String(correccions || '').slice(0, 3500)}
+${serialitzarCorreccionsArquitecta(correccions).slice(0, 7000)}
 
 Retorna només la versió final del capítol, sense metadades ni notes.`
   }];
@@ -9328,6 +9932,18 @@ ${String(esborrany || '').slice(0, 7000)}`;
   if (loaderEl) loaderEl.textContent = '✨ Polint i escrivint la prosa definitiva...';
   let textComplet = await generarProsaDefinitiva(idx, esborrany, correccionsArquitecta, userConfig);
   textComplet = netejarTabulacionsInicials(textComplet || '');
+
+  let validacioFinal = await validarReescripturaArquitecta(idx, textComplet, correccionsArquitecta, userConfig);
+  let intentsExtra = 0;
+  while (!validacioFinal.ok && intentsExtra < 2) {
+    intentsExtra++;
+    if (loaderEl) loaderEl.textContent = `🧪 Validació arquitecta pendent (${intentsExtra}/2): aplicant correccions residuals...`;
+    const pendentsText = JSON.stringify(validacioFinal.pendents || {}, null, 2);
+    const correccionsAmplificades = `${serialitzarCorreccionsArquitecta(correccionsArquitecta)}\n\nPENDENTS DETECTATS DESPRÉS DE LA REESCRIPTURA:\n${pendentsText}`;
+    textComplet = await generarProsaDefinitiva(idx, textComplet, correccionsAmplificades, userConfig);
+    textComplet = netejarTabulacionsInicials(textComplet || '');
+    validacioFinal = await validarReescripturaArquitecta(idx, textComplet, correccionsAmplificades, userConfig);
+  }
 
   if (ESTAT._nkg) {
     try {
