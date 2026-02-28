@@ -1684,6 +1684,7 @@ const ESTAT = {
   _escaletes: [],
   _memoriasComprimides: [],
   _snapshotsFinals: {},
+  _traitsImmutablesInicialitzats: false,
   _goldenPassage: null,
   _goldenPassageCapitol: -1,
   // NKG (Narrative Knowledge Graph) — v4
@@ -3577,7 +3578,7 @@ function mostrarEscaleta(escaletes) {
 // ═══════════════════════════════════════════════════════════
 //  FASE 11: Escriptura de capítols (Sonnet + Registre)
 // ═══════════════════════════════════════════════════════════
-function iniciarFase11() {
+async function iniciarFase11() {
   if (ESTAT._estructuraCapitols.length === 0) {
     toast('No hi ha capítols a l\'estructura. Torna a generar-la.');
     return;
@@ -3590,7 +3591,7 @@ function iniciarFase11() {
   ESTAT._revisionsOpus      = {};
   ESTAT._revisionsOpusFinals= {};
   ESTAT.llibreRegistre      = { capitols: [], estat_personatges: [], fils_oberts: [], fils_tancats: [] };
-  ESTAT._perfilsPersonatges = {};
+  ESTAT._traitsImmutablesInicialitzats = false;
 
   updateProgress(11);
   showCard('fase-11');
@@ -3604,6 +3605,11 @@ function iniciarFase11() {
   amagarBotoSeguentCapitolManual();
 
   renderLlistaCapitols();
+  try {
+    await inicialitzarTraitsImmutables(USER_CONFIG);
+  } catch (err) {
+    console.warn('Inicialització trets immutables:', err.message);
+  }
   generarCapitol(0);
 }
 
@@ -3874,6 +3880,10 @@ async function generarCapitol(idx, intents = 0) {
 
   try {
     if (idx > 0) refrescarPlaPsicologicPerSeguentCapitol();
+    const capPersonatges = (cap && Array.isArray(cap.personatges)) ? cap.personatges : [];
+    for (const nomPers of capPersonatges) {
+      await garantirTretsImmutablesPersonatge(nomPers, USER_CONFIG);
+    }
     const res = await generarCapitolNKG(idx, USER_CONFIG);
     const textNet = netejarTabulacionsInicials(res.response);
     ESTAT._capitols_generats[idx] = textNet;
@@ -9006,6 +9016,112 @@ function nkgRegistrarCanvisPersonatge(nkg, abans, despres, capitol, escena) {
   }
 }
 
+
+function serialitzarTretsImmutables(trets) {
+  if (!trets || typeof trets !== 'object') return '';
+  const edat = trets.edat_aproximada || 'No determinat';
+  const genere = trets.genere || 'No determinat';
+  const rol = trets.rol_narratiu || 'No determinat';
+  const relacio = trets.relacio_protagonista || 'No determinada';
+  return `[IDENTITAT FIXA — NO MODIFICABLE] ${genere}, ${edat}, ${rol}. Relació amb protagonista: ${relacio}. [FI IDENTITAT FIXA]`;
+}
+
+async function extreureTretsImmutablesPersonatge(nom, userConfig = USER_CONFIG) {
+  const perfilObj = (ESTAT._perfilsPersonatges && ESTAT._perfilsPersonatges[nom]) ? ESTAT._perfilsPersonatges[nom] : null;
+  const perfilTxt = perfilObj ? JSON.stringify(perfilObj, null, 2) : '(No disponible)';
+  const elencTxt = Array.isArray(ESTAT._elencPersonatges) && ESTAT._elencPersonatges.length > 0
+    ? ESTAT._elencPersonatges.join('\n')
+    : '(No disponible)';
+
+  const msgs = [{
+    role: 'user',
+    content: `Extreu els trets immutables del personatge "${nom}".
+
+ELENC DE PERSONATGES:
+${elencTxt}
+
+PERFIL DEL PERSONATGE:
+${perfilTxt}
+
+Retorna EXCLUSIVAMENT JSON vàlid amb aquesta estructura:
+{
+  "edat_aproximada": "...",
+  "genere": "...",
+  "rol_narratiu": "...",
+  "relacio_protagonista": "..."
+}
+
+No incloguis cap camp addicional.`
+  }];
+
+  try {
+    const models = getModelConfig(userConfig || USER_CONFIG || {});
+    const raw = await callLLMMulti(
+      msgs,
+      "Ets una analista de personatges. Retorna només JSON.",
+      Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 500, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+    const parsed = parseJsonRobust(raw) || {};
+    return {
+      edat_aproximada: String(parsed.edat_aproximada || 'No determinat').trim(),
+      genere: String(parsed.genere || 'No determinat').trim(),
+      rol_narratiu: String(parsed.rol_narratiu || 'No determinat').trim(),
+      relacio_protagonista: String(parsed.relacio_protagonista || 'No determinada').trim()
+    };
+  } catch (err) {
+    console.warn(`Trets immutables: no s'ha pogut extreure ${nom}:`, err.message);
+    return {
+      edat_aproximada: 'No determinat',
+      genere: 'No determinat',
+      rol_narratiu: 'No determinat',
+      relacio_protagonista: 'No determinada'
+    };
+  }
+}
+
+async function garantirTretsImmutablesPersonatge(nom, userConfig = USER_CONFIG) {
+  if (!ESTAT._nkg || !nom) return null;
+  const clau = nkgNormalitzarNom(nom);
+  if (!clau) return null;
+  if (!ESTAT._nkg.personatges[clau]) {
+    ESTAT._nkg.personatges[clau] = {
+      nom,
+      estat_fisic: '',
+      estat_emocional: 'neutre',
+      indumentaria_actual: '',
+      objectes_inventari: [],
+      objectes_descartats: [],
+      ubicacio: '',
+      objectius: [],
+      secrets: [],
+      viu: true,
+      primera_aparicio: 0,
+      trets_immutables: null
+    };
+  }
+  const p = ESTAT._nkg.personatges[clau];
+  if (p.trets_immutables && typeof p.trets_immutables === 'object') return p.trets_immutables;
+  const trets = await extreureTretsImmutablesPersonatge(nom, userConfig);
+  p.trets_immutables = trets;
+  return trets;
+}
+
+async function inicialitzarTraitsImmutables(userConfig = USER_CONFIG) {
+  if (!ESTAT._nkg) return;
+  if (ESTAT._traitsImmutablesInicialitzats === true) return;
+
+  const nomsNkg = Object.values(ESTAT._nkg.personatges || {}).map(p => p.nom).filter(Boolean);
+  const nomsElenc = Array.isArray(ESTAT._elencPersonatges) ? ESTAT._elencPersonatges.filter(Boolean) : [];
+  const noms = [...new Set([...nomsNkg, ...nomsElenc])];
+
+  for (const nom of noms) {
+    await garantirTretsImmutablesPersonatge(nom, userConfig);
+  }
+
+  ESTAT._traitsImmutablesInicialitzats = true;
+}
+
 function nkgQueryPersonatge(nom) {
   const nkg = ESTAT._nkg;
   if (!nkg) return null;
@@ -9038,7 +9154,9 @@ function nkgQueryEscenaContext(escenaSpec) {
     persPresents.forEach(nom => {
       const p = nkgQueryPersonatge(nom);
       if (p) {
-        let desc = `• ${p.nom}: ${p.estat_emocional || 'neutre'}`;
+        const identitatFixa = serialitzarTretsImmutables(p.trets_immutables);
+        if (identitatFixa) parts.push(`• ${p.nom}: ${identitatFixa}`);
+        let desc = `• ${p.nom}: estat actual=${p.estat_emocional || 'neutre'}`;
         if (p.estat_fisic) desc += ` | Físic: ${p.estat_fisic}`;
         if (p.indumentaria_actual) desc += ` | Roba: ${p.indumentaria_actual}`;
         if (p.objectes_inventari && p.objectes_inventari.length > 0) desc += ` | Inventari: ${p.objectes_inventari.join(', ')}`;
@@ -9246,7 +9364,8 @@ function nkgInicialitzar() {
           objectius: [],
           secrets: [],
           viu: true,
-          primera_aparicio: 0
+          primera_aparicio: 0,
+          trets_immutables: null
         };
       }
     });
@@ -9289,6 +9408,7 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
   if (personatgesActualitzats.length > 0) {
     personatgesActualitzats.forEach(p => {
       const clau = nkgNormalitzarNom(p.nom);
+      if (Object.prototype.hasOwnProperty.call(p, 'trets_immutables')) delete p.trets_immutables;
       const abans = nkg.personatges[clau]
         ? {
           nom: nkg.personatges[clau].nom,
@@ -9310,7 +9430,8 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
           objectius: p.nous_objectius || [],
           secrets: p.nous_secrets || [],
           viu: p.viu !== undefined ? p.viu : true,
-          primera_aparicio: capitol
+          primera_aparicio: capitol,
+          trets_immutables: null
         };
       } else {
         const ex = nkg.personatges[clau];
@@ -9635,6 +9756,9 @@ async function escriureEscenaDirectaAmbJutge(capitol, escenaIdx, escenaSpec, use
     escaleta: escenaSpec
   };
 
+  for (const nomPers of (escenaSpec.personatges || [])) {
+    await garantirTretsImmutablesPersonatge(nomPers, userConfig);
+  }
   const contextNKG = nkgGenerarContextMinim(nkgSpec);
   const contextCapitolEnCurs = obtenirContextCapitolEnCurs(capitol, escenaIdx);
   const escaletaCap = ESTAT._escaletes ? ESTAT._escaletes.find(e => e.capitol === capitol) : null;
