@@ -586,7 +586,6 @@
   /* ── Camps de config per proveïdor ── */
   .config-section { margin-top: 4px; }
 </style>
-<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
 </head>
 <body>
 
@@ -925,7 +924,7 @@
 
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="regenerarConte()">🔄 Regenerar</button>
-      <button class="btn btn-secondary" onclick="exportarDoc()">📄 Descarregar DOCX</button>
+      <button class="btn btn-secondary" onclick="exportarDoc()">📄 Exportar TXT + Google Docs</button>
       <button class="btn btn-primary"   onclick="iniciarFase7()">🌍 Expandir a novel·la</button>
     </div>
     <div id="export-link-wrap" class="hidden" style="margin-top:14px;"></div>
@@ -1438,7 +1437,7 @@ function exportarCopiaSeguretat() {
     const snapshot = construirSnapshotProjecte();
     const nom = `booki_backup_fase_${String(ESTAT.fase).replace('.', '_')}_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
     const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json;charset=utf-8' });
-    descarregarBlobDocx(blob, nom);
+    descarregarBlobFitxer(blob, nom);
     toast('Còpia exportada: ' + nom);
   } catch (err) {
     toast("No s'ha pogut exportar la còpia: " + err.message);
@@ -1683,6 +1682,10 @@ const ESTAT = {
   },
   _escaletes: [],
   _memoriasComprimides: [],
+  _snapshotsFinals: {},
+  _traitsImmutablesInicialitzats: false,
+  _registreEstil: { frequencies: {}, alertes: [], verbs_atribucio: {}, tancaments: [] },
+  _controlLongitud: { objectiu: 3000, llindarMinim: 0.70, llindarExpansio: 0.85, historicLongituds: [], tendencia: 'estable' },
   _goldenPassage: null,
   _goldenPassageCapitol: -1,
   // NKG (Narrative Knowledge Graph) — v4
@@ -2303,7 +2306,7 @@ async function exportarDoc() {
 
   const btn = document.querySelector('[onclick="exportarDoc()"]');
   const origText = btn ? btn.textContent : '';
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Generant DOCX…'; }
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Generant TXT…'; }
   try {
     await exportarADoc(titol, ESTAT.conteText);
   } catch (error) {
@@ -3576,7 +3579,7 @@ function mostrarEscaleta(escaletes) {
 // ═══════════════════════════════════════════════════════════
 //  FASE 11: Escriptura de capítols (Sonnet + Registre)
 // ═══════════════════════════════════════════════════════════
-function iniciarFase11() {
+async function iniciarFase11() {
   if (ESTAT._estructuraCapitols.length === 0) {
     toast('No hi ha capítols a l\'estructura. Torna a generar-la.');
     return;
@@ -3589,7 +3592,15 @@ function iniciarFase11() {
   ESTAT._revisionsOpus      = {};
   ESTAT._revisionsOpusFinals= {};
   ESTAT.llibreRegistre      = { capitols: [], estat_personatges: [], fils_oberts: [], fils_tancats: [] };
-  ESTAT._perfilsPersonatges = {};
+  ESTAT._traitsImmutablesInicialitzats = false;
+  ESTAT._controlLongitud = {
+    objectiu: Number((ESTAT.estil && ESTAT.estil.paraules) || 3000),
+    llindarMinim: 0.70,
+    llindarExpansio: 0.85,
+    historicLongituds: [],
+    tendencia: 'estable',
+    promptForcat: ''
+  };
 
   updateProgress(11);
   showCard('fase-11');
@@ -3603,6 +3614,11 @@ function iniciarFase11() {
   amagarBotoSeguentCapitolManual();
 
   renderLlistaCapitols();
+  try {
+    await inicialitzarTraitsImmutables(USER_CONFIG);
+  } catch (err) {
+    console.warn('Inicialització trets immutables:', err.message);
+  }
   generarCapitol(0);
 }
 
@@ -3873,11 +3889,37 @@ async function generarCapitol(idx, intents = 0) {
 
   try {
     if (idx > 0) refrescarPlaPsicologicPerSeguentCapitol();
-    const res = await generarCapitolNKG(idx, USER_CONFIG);
-    const textNet = netejarTabulacionsInicials(res.response);
+    const capPersonatges = (cap && Array.isArray(cap.personatges)) ? cap.personatges : [];
+    for (const nomPers of capPersonatges) {
+      await garantirTretsImmutablesPersonatge(nomPers, USER_CONFIG);
+    }
+    let res = await generarCapitolNKG(idx, USER_CONFIG);
+    let textNet = netejarTabulacionsInicials(res.response);
+
+    let decisio = verificarLongitud(idx, textNet);
+    if (decisio.accio === 'expandir') {
+      textNet = await expandirCapitol(textNet, idx, decisio.paraules, USER_CONFIG);
+      const paraulesExp = compteParaules(textNet);
+      if (ESTAT._controlLongitud && Array.isArray(ESTAT._controlLongitud.historicLongituds) && ESTAT._controlLongitud.historicLongituds.length > 0) {
+        ESTAT._controlLongitud.historicLongituds[ESTAT._controlLongitud.historicLongituds.length - 1] = paraulesExp;
+      }
+      decisio = { ...decisio, paraules: paraulesExp, percentatge: paraulesExp / Number((ESTAT._controlLongitud && ESTAT._controlLongitud.objectiu) || 3000), motiu: decisio.motiu + ' Expansió aplicada (1 intent).' };
+    } else if (decisio.accio === 'regenerar') {
+      const regen = await regenerarCapitolPerLongitud(idx, USER_CONFIG);
+      if (regen && regen.text) {
+        textNet = regen.text;
+        res = Object.assign({}, res || {}, regen.meta || {});
+      }
+      const paraulesRegen = compteParaules(textNet);
+      if (ESTAT._controlLongitud && Array.isArray(ESTAT._controlLongitud.historicLongituds) && ESTAT._controlLongitud.historicLongituds.length > 0) {
+        ESTAT._controlLongitud.historicLongituds[ESTAT._controlLongitud.historicLongituds.length - 1] = paraulesRegen;
+      }
+      decisio = { ...decisio, paraules: paraulesRegen, percentatge: paraulesRegen / Number((ESTAT._controlLongitud && ESTAT._controlLongitud.objectiu) || 3000), motiu: decisio.motiu + ' Regeneració aplicada (1 intent).' };
+    }
+
     ESTAT._capitols_generats[idx] = textNet;
     ESTAT._metaCapitols = ESTAT._metaCapitols || {};
-    ESTAT._metaCapitols[idx] = Object.assign({}, ESTAT._metaCapitols[idx] || {}, { textFinal: textNet });
+    ESTAT._metaCapitols[idx] = Object.assign({}, ESTAT._metaCapitols[idx] || {}, { textFinal: textNet, controlLongitud: decisio });
     ESTAT._metaCapitols = ESTAT._metaCapitols || {};
     ESTAT._metaCapitols[idx] = Object.assign({}, ESTAT._metaCapitols[idx] || {}, {
       esbos: res.esborrany || '',
@@ -3899,6 +3941,25 @@ async function generarCapitol(idx, intents = 0) {
       await actualitzarLlibreRegistreBackground(res.response, idx);
     } catch (err) {
       console.warn('Registre async:', err.message);
+    }
+
+    try {
+      await generarSnapshotFinalCapitol(idx, USER_CONFIG);
+    } catch (err) {
+      console.warn('Continuity snapshot async:', err.message);
+    }
+
+    try {
+      await actualitzarBeatsNarratiusGastats(textNet, idx + 1, USER_CONFIG);
+    } catch (err) {
+      console.warn('Beats gastats async:', err.message);
+    }
+
+    try {
+      actualitzarRegistreEstil(idx, textNet);
+      generarAlertesEstil();
+    } catch (err) {
+      console.warn('Registre estil async:', err.message);
     }
 
     const esCheckpoint = (idx + 1) % 3 === 0 && idx + 1 < ESTAT._estructuraCapitols.length;
@@ -4249,10 +4310,34 @@ function normalitzarEntradaRegistre(dades, textCapitol, idx) {
     estat_personatges: estatPersonatges,
     fils_oberts: Array.isArray(base.fils_oberts) ? base.fils_oberts : [],
     fils_tancats: Array.isArray(base.fils_tancats) ? base.fils_tancats : [],
+    fils_nous_detectats: Array.isArray(base.fils_nous_detectats) ? base.fils_nous_detectats : [],
+    fils_resolts_detectats: Array.isArray(base.fils_resolts_detectats) ? base.fils_resolts_detectats : [],
     prefiguracions_detectades: Array.isArray(base.prefiguracions_detectades) ? base.prefiguracions_detectades : [],
     _fallback: !dades,
     _capitol_idx: idx
   };
+}
+
+
+function reconciliarFilsRegistre(dades) {
+  const reg = ESTAT.llibreRegistre || {};
+  const obertsActuals = new Set(Array.isArray(reg.fils_oberts) ? reg.fils_oberts : []);
+  const tancatsActuals = new Set(Array.isArray(reg.fils_tancats) ? reg.fils_tancats : []);
+
+  const obertsDeclarats = new Set(Array.isArray(dades.fils_oberts) ? dades.fils_oberts : []);
+  const tancatsDeclarats = new Set(Array.isArray(dades.fils_tancats) ? dades.fils_tancats : []);
+  const filsNous = new Set(Array.isArray(dades.fils_nous_detectats) ? dades.fils_nous_detectats : []);
+  const filsResolts = new Set(Array.isArray(dades.fils_resolts_detectats) ? dades.fils_resolts_detectats : []);
+
+  [...obertsDeclarats, ...filsNous].forEach(f => { if (f) obertsActuals.add(f); });
+  [...tancatsDeclarats, ...filsResolts].forEach(f => {
+    if (!f) return;
+    tancatsActuals.add(f);
+    obertsActuals.delete(f);
+  });
+
+  ESTAT.llibreRegistre.fils_oberts = [...obertsActuals];
+  ESTAT.llibreRegistre.fils_tancats = [...tancatsActuals];
 }
 
 // FASE 8: registre síncron amb retry — s'awaita des de generarCapitol
@@ -4270,16 +4355,7 @@ async function actualitzarLlibreRegistreBackgroundLegacy(textCapitol, idx) {
         if (Array.isArray(dades.estat_personatges) && dades.estat_personatges.length > 0)
           ESTAT.llibreRegistre.estat_personatges = dades.estat_personatges;
 
-        if (Array.isArray(dades.fils_tancats) && dades.fils_tancats.length > 0) {
-          const tancats = new Set(dades.fils_tancats);
-          ESTAT.llibreRegistre.fils_oberts  = (ESTAT.llibreRegistre.fils_oberts  || []).filter(f => !tancats.has(f));
-          ESTAT.llibreRegistre.fils_tancats = [...new Set([...(ESTAT.llibreRegistre.fils_tancats || []), ...dades.fils_tancats])];
-        }
-        if (Array.isArray(dades.fils_oberts) && dades.fils_oberts.length > 0) {
-          const existents = new Set(ESTAT.llibreRegistre.fils_oberts || []);
-          dades.fils_oberts.forEach(f => existents.add(f));
-          ESTAT.llibreRegistre.fils_oberts = [...existents];
-        }
+        reconciliarFilsRegistre(dades);
 
         await actualitzarEstatsAnimics(textCapitol, idx, USER_CONFIG);
         return;  // èxit
@@ -6157,19 +6233,19 @@ Per assegurar que hi caben tots en la teva resposta, sigues molt concís: dedica
 // Substitueix l'antiga exportarADoc que usava DocumentApp/DriveApp
 // (APIs de Google no disponibles al navegador).
 //
-// Genera un document HTML semàntic amb <h1> i <p> i el descarrega
+// Genera un fitxer TXT i el descarrega
 // directament al navegador mitjançant Blob + URL.createObjectURL.
-// Genera un nom de fitxer segur i consistent per a descàrregues DOCX.
-function normalitzarNomFitxerDocx(base, fallback = 'document') {
+// Genera un nom de fitxer segur i consistent per a descàrregues TXT.
+function normalitzarNomFitxerTxt(base, fallback = 'document') {
   const net = String(base || '')
     .replace(/[<>:"/\\|?*]/g, ' ')
     .replace(/\s+/g, '_')
     .replace(/^_+|_+$/g, '')
     .substring(0, 80);
-  return `${net || fallback}.docx`;
+  return `${net || fallback}.txt`;
 }
 
-function descarregarBlobDocx(blob, nomFitxer) {
+function descarregarBlobFitxer(blob, nomFitxer) {
   if (window.navigator && typeof window.navigator.msSaveOrOpenBlob === 'function') {
     window.navigator.msSaveOrOpenBlob(blob, nomFitxer);
     return;
@@ -6188,148 +6264,42 @@ function descarregarBlobDocx(blob, nomFitxer) {
   setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
-async function assegurarLlibreriaDocx() {
-  if (typeof docx !== 'undefined' && docx && docx.Document && docx.Packer) return true;
-
-  const urls = [
-    'https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.js',
-    'https://unpkg.com/docx@8.5.0/build/index.js'
-  ];
-
-  const carregarScript = (src, timeoutMs = 8000) => new Promise((resolve) => {
-    let resolt = false;
-    const acabar = (ok) => {
-      if (resolt) return;
-      resolt = true;
-      resolve(!!ok);
-    };
-    const timeoutId = setTimeout(() => acabar(false), timeoutMs);
-
-    const existent = Array.from(document.scripts).find(s => s.src && s.src.includes(src));
-    if (existent) {
-      if (typeof docx !== 'undefined') {
-        clearTimeout(timeoutId);
-        return acabar(true);
-      }
-      const onLoad = () => {
-        clearTimeout(timeoutId);
-        acabar(typeof docx !== 'undefined');
-      };
-      const onError = () => {
-        clearTimeout(timeoutId);
-        acabar(false);
-      };
-      existent.addEventListener('load', onLoad, { once: true });
-      existent.addEventListener('error', onError, { once: true });
-      return;
-    }
-
-    const s = document.createElement('script');
-    s.src = src;
-    s.async = true;
-    s.onload = () => {
-      clearTimeout(timeoutId);
-      acabar(typeof docx !== 'undefined');
-    };
-    s.onerror = () => {
-      clearTimeout(timeoutId);
-      acabar(false);
-    };
-    document.head.appendChild(s);
-  });
-
-  for (const u of urls) {
-    const ok = await carregarScript(u);
-    if (ok && typeof docx !== 'undefined' && docx.Document && docx.Packer) return true;
-  }
-  return false;
-}
-
-async function ambTimeout(promise, ms, missatge = 'Operació excedida') {
-  let timeoutId;
-  const timeoutPromise = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error(missatge)), ms);
-  });
-  try {
-    return await Promise.race([promise, timeoutPromise]);
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
-  }
-}
-
 function descarregarTextFallback(titol, contingut, base = 'document') {
-  const nomTxt = normalitzarNomFitxerDocx(titol || base, base).replace(/\.docx$/i, '.txt');
+  const nomTxt = normalitzarNomFitxerTxt(titol || base, base);
   const blob = new Blob([String(contingut || '')], { type: 'text/plain;charset=utf-8' });
-  descarregarBlobDocx(blob, nomTxt);
-  toast(`⚠️ DOCX no disponible. S'ha descarregat TXT: ${nomTxt}`);
+  descarregarBlobFitxer(blob, nomTxt);
   return nomTxt;
 }
 
-function obrirGoogleDocsPerImportar(nomFitxer = '') {
-  window.open('https://docs.google.com/document/u/0/', '_blank', 'noopener');
+async function obrirGoogleDocsPerImportar(contingut = '', nomFitxer = '') {
+  let copiat = false;
+  const text = String(contingut || '');
+  if (text && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    try {
+      await navigator.clipboard.writeText(text);
+      copiat = true;
+    } catch (err) {
+      console.warn('[Google Docs] No s\'ha pogut copiar al porta-retalls:', err.message);
+    }
+  }
+  window.open('https://docs.new', '_blank', 'noopener');
   if (nomFitxer) {
-    toast(`Google Docs obert. Importa-hi el fitxer ${nomFitxer}.`);
+    toast(copiat
+      ? `TXT descarregat (${nomFitxer}) i text copiat. A Google Docs, fes Ctrl/Cmd+V per enganxar-lo.`
+      : `TXT descarregat (${nomFitxer}). S'ha obert Google Docs perquè l'enganxis manualment.`);
   }
 }
 
 async function exportarADoc(titol, contingut) {
-  const docxDisponible = await assegurarLlibreriaDocx();
-  if (!docxDisponible) {
-    const nomTxt = descarregarTextFallback(titol, contingut, 'conte');
-    obrirGoogleDocsPerImportar(nomTxt);
-    return;
-  }
-
-  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = docx;
-
-  const textNet = netejarTabulacionsInicials(contingut);
-  const paragrafsText = textNet.split(/\n\n+/).filter(p => p.trim().length > 0);
-  const fills = [
-    new Paragraph({
-      text: titol || 'Conte IA',
-      heading: HeadingLevel.HEADING_1,
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 400 }
-    }),
-    new Paragraph({
-      children: [new TextRun({ text: "Generat amb Conte IA", color: "888888" })],
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 800 }
-    })
-  ];
-
-  paragrafsText.forEach((p, i) => {
-    const pOptions = {
-      text: p.trim(),
-      spacing: { after: 200 }
-    };
-    if (i > 0) {
-      pOptions.indent = { firstLine: 720 };
-    }
-    fills.push(new Paragraph(pOptions));
-  });
-
-  const doc = new Document({
-    sections: [{
-      properties: {},
-      children: fills
-    }]
-  });
-
-  try {
-    const blob = await ambTimeout(
-      Packer.toBlob(doc),
-      15000,
-      'Temps d\'exportació DOCX excedit'
-    );
-    const nomFitxer = normalitzarNomFitxerDocx(titol || 'conte', 'conte');
-    descarregarBlobDocx(blob, nomFitxer);
-    toast('📄 Descarregat: ' + nomFitxer);
-  } catch (err) {
-    console.warn('[exportarADoc] Fallback TXT per error DOCX:', err.message);
-    const nomTxt = descarregarTextFallback(titol, contingut, 'conte');
-    toast(`⚠️ Exportació DOCX no disponible (${err.message}). S'ha descarregat ${nomTxt}.`);
-  }
+  const textNet = netejarTabulacionsInicials(contingut || '');
+  const txt = [
+    `Títol: ${titol || 'Conte IA'}`,
+    'Generat amb Booki',
+    '',
+    textNet
+  ].join('\n');
+  const nomTxt = descarregarTextFallback(titol, txt, 'conte');
+  await obrirGoogleDocsPerImportar(txt, nomTxt);
 }
 
 
@@ -6363,7 +6333,7 @@ async function descarregarNovella() {
 
   const btns = document.querySelectorAll('[onclick="descarregarNovella()"]');
   const origTexts = Array.from(btns).map(b => b.textContent);
-  btns.forEach(b => { b.disabled = true; b.textContent = '⏳ Generant DOCX…'; });
+  btns.forEach(b => { b.disabled = true; b.textContent = '⏳ Generant TXT…'; });
   try {
     await exportarNovella(titolDefinitiu, capsGenerats, ESTAT._estructuraCapitols || [], netejarTabulacionsInicials(textEpileg));
   } catch (err) {
@@ -6375,28 +6345,8 @@ async function descarregarNovella() {
 }
 
 async function exportarNovella(titol, caps, estructura, epileg) {
-  const docxDisponible = await assegurarLlibreriaDocx();
-  if (!docxDisponible) {
-    const capitolsFallback = caps
-      .map((c, i) => ({ text: c, titolCap: (estructura[i] && estructura[i].titol ? String(estructura[i].titol).trim() : '') || `Capítol ${i + 1}` }))
-      .filter(c => c.text);
-    const indexFallback = capitolsFallback.map((c, i) => `${i + 1}. ${c.titolCap}`).join('\n');
-    const contingutFallback = [
-      titol || 'Novel·la IA',
-      indexFallback ? `Índex de capítols\n${indexFallback}` : '',
-      ...capitolsFallback.map((c, i) => `Capítol ${i + 1} — ${c.titolCap}\n\n${netejarTabulacionsInicials(c.text)}`),
-      (epileg && String(epileg).trim()) ? `Epíleg\n\n${netejarTabulacionsInicials(epileg)}` : ''
-    ].filter(Boolean).join('\n\n');
-    const nomTxt = descarregarTextFallback(titol, contingutFallback, 'novella');
-    obrirGoogleDocsPerImportar(nomTxt);
-    return;
-  }
-
-  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, PageBreak } = docx;
-  const fills = [];
-
   const titolObra = titol || 'Novel·la IA';
-  const capitolsAmbText = caps
+  const capitolsAmbText = (caps || [])
     .map((text, i) => ({
       text,
       idx: i,
@@ -6404,116 +6354,18 @@ async function exportarNovella(titol, caps, estructura, epileg) {
       titolCap: (estructura[i] && estructura[i].titol ? String(estructura[i].titol).trim() : '') || `Capítol ${i + 1}`
     }))
     .filter(item => item.text);
+  const indexText = capitolsAmbText.map((item, pos) => `${pos + 1}. ${item.titolCap}`).join('\n');
+  const contingut = [
+    `Títol proposat per la IA: ${titolObra}`,
+    'Generat amb Booki',
+    '',
+    indexText ? `Índex de capítols\n${indexText}` : '',
+    ...capitolsAmbText.map((item, pos) => `Capítol ${pos + 1} — ${item.titolCap}\n\n${netejarTabulacionsInicials(item.text)}`),
+    (epileg && String(epileg).trim()) ? `Epíleg\n\n${netejarTabulacionsInicials(epileg)}` : ''
+  ].filter(Boolean).join('\n\n');
 
-  // Portada + índex
-  fills.push(new Paragraph({
-    text: titolObra,
-    heading: HeadingLevel.TITLE,
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 2400, after: 400 }
-  }));
-  fills.push(new Paragraph({
-    children: [new TextRun({ text: "Generat amb Booki", color: "888888" })],
-    alignment: AlignmentType.CENTER,
-    spacing: { after: 800 }
-  }));
-
-  fills.push(new Paragraph({
-    text: 'Índex de capítols',
-    heading: HeadingLevel.HEADING_2,
-    alignment: AlignmentType.LEFT,
-    spacing: { before: 600, after: 260 }
-  }));
-
-  capitolsAmbText.forEach((item, pos) => {
-    fills.push(new Paragraph({
-      text: `${pos + 1}. ${item.titolCap}`,
-      spacing: { after: 120 }
-    }));
-  });
-
-  fills.push(new Paragraph({ children: [new PageBreak()] })); // Salt de pàgina després de la portada + índex
-
-  // Capítols
-  capitolsAmbText.forEach((item, pos) => {
-    const text = item.text;
-    const i = item.idx;
-    const titolCap = item.titolCap;
-
-    fills.push(new Paragraph({
-      children: [new TextRun({ text: titolObra, color: "888888", size: 22 })],
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 600, after: 120 }
-    }));
-
-    fills.push(new Paragraph({
-      text: `Capítol ${pos + 1} — ${titolCap}`,
-      heading: HeadingLevel.HEADING_2,
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 600 }
-    }));
-
-    const paragrafsText = netejarTabulacionsInicials(text).split(/\n\n+/).filter(p => p.trim().length > 0);
-    paragrafsText.forEach((p, index) => {
-      fills.push(new Paragraph({
-        text: p.trim(),
-        spacing: { after: 200 }
-      }));
-    });
-    fills.push(new Paragraph({ children: [new PageBreak()] })); // Salt de pàgina al final de cada capítol
-  });
-
-  // Epíleg
-  if (epileg && epileg.trim()) {
-    fills.push(new Paragraph({
-      children: [new TextRun({ text: "—", color: "888888", size: 24 })],
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 800, after: 200 }
-    }));
-    fills.push(new Paragraph({
-      text: "Epíleg",
-      heading: HeadingLevel.HEADING_2,
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 600 }
-    }));
-
-    const paragrafsEpileg = netejarTabulacionsInicials(epileg).split(/\n\n+/).filter(p => p.trim().length > 0);
-    paragrafsEpileg.forEach((p, index) => {
-      fills.push(new Paragraph({
-        text: p.trim(),
-        spacing: { after: 200 }
-      }));
-    });
-  }
-
-  const doc = new Document({
-    sections: [{ properties: {}, children: fills }]
-  });
-
-  try {
-    const blob = await ambTimeout(
-      Packer.toBlob(doc),
-      25000,
-      'Temps d\'exportació de la novel·la excedit'
-    );
-    const nomFitxer = normalitzarNomFitxerDocx(titol || 'novella', 'novella');
-    descarregarBlobDocx(blob, nomFitxer);
-    toast('📖 Descarregat: ' + nomFitxer);
-  } catch (err) {
-    console.warn('[exportarNovella] Fallback TXT per error DOCX:', err.message);
-    const capitolsFallback = (caps || [])
-      .map((c, i) => ({ text: c, titolCap: (estructura[i] && estructura[i].titol ? String(estructura[i].titol).trim() : '') || `Capítol ${i + 1}` }))
-      .filter(c => c.text);
-    const indexFallback = capitolsFallback.map((c, i) => `${i + 1}. ${c.titolCap}`).join('\n');
-    const contingutFallback = [
-      titol || 'Novel·la IA',
-      indexFallback ? `Índex de capítols\n${indexFallback}` : '',
-      ...capitolsFallback.map((c, i) => `Capítol ${i + 1} — ${c.titolCap}\n\n${netejarTabulacionsInicials(c.text)}`),
-      (epileg && String(epileg).trim()) ? `Epíleg\n\n${netejarTabulacionsInicials(epileg)}` : ''
-    ].filter(Boolean).join('\n\n');
-    const nomTxt = descarregarTextFallback(titol, contingutFallback, 'novella');
-    toast(`⚠️ Exportació DOCX no disponible (${err.message}). S'ha descarregat ${nomTxt}.`);
-  }
+  const nomTxt = descarregarTextFallback(titol, contingut, 'novella');
+  await obrirGoogleDocsPerImportar(contingut, nomTxt);
 }
 
 
@@ -6696,7 +6548,7 @@ ${veus}
 
 REGLA D'ESTIL OBLIGATÒRIA (SHOW, DON'T TELL): Tens totalment prohibit utilitzar etiquetes emocionals explícites per descriure com se sent un personatge (ex: prohibit dir \"estava trist\", \"se sentia enfadat\", \"estava nerviós\"). En comptes d'això, has de MOSTRAR l'emoció a través d'accions físiques, interaccions amb els objectes del seu inventari, la seva vestimenta, el llenguatge corporal o detalls de l'entorn (ex: \"jugava compulsivament amb el botó descosit de l'abric\", \"va prémer les claus fins que els artells se li van posar blancs\").
 
-REGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que és el final del capítol, NO resolguis la situació ni facis que els personatges abandonin l'escenari al final del text. Deixa l'acció fluint, oberta o en suspens dramàtic, de manera que la següent generació pugui recollir el testimoni de forma natural.`;
+REGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que és el final del capítol, NO tanquis artificialment l'energia narrativa. Mantén continuïtat orgànica segons el to de l'obra: suspens d'acció, ressonància lírica, o desplaçament perceptiu; la següent generació ha de poder recollir el testimoni de forma natural.`;
 
   if (ESTAT._goldenPassage) {
     base += `\n\nREFERÈNCIA DE VEU:\nEl següent passatge exemplifica la veu i l'estil que ha de tenir la novel·la. Usa'l com a referència de qualitat:\n\n${ESTAT._goldenPassage}`;
@@ -6713,8 +6565,363 @@ REGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que é
   return base;
 }
 
+
+
+function buildBlocAlertaLongitud() {
+  const c = ESTAT._controlLongitud;
+  if (!c || c.tendencia !== 'decreixent') return '';
+  const hist = Array.isArray(c.historicLongituds) ? c.historicLongituds : [];
+  const ultimes = hist.slice(-3).join(', ');
+  const minim = Math.round((Number(c.objectiu || 3000)) * Number(c.llindarMinim || 0.7));
+  return `ALERTA DE LONGITUD: Els últims capítols han estat progressivament més curts ([${ultimes}]). Aquest capítol ha de tenir un MÍNIM de ${minim} paraules. Desenvolupa les escenes amb profunditat. No resumeixis; NARRA.`;
+}
+
+function verificarLongitud(capitolIdx, textGenerat) {
+  if (!ESTAT._controlLongitud || typeof ESTAT._controlLongitud !== 'object') {
+    ESTAT._controlLongitud = { objectiu: 3000, llindarMinim: 0.70, llindarExpansio: 0.85, historicLongituds: [], tendencia: 'estable', promptForcat: '' };
+  }
+  const ctrl = ESTAT._controlLongitud;
+  const objectiu = Number(ctrl.objectiu || 3000);
+  const paraules = compteParaules(String(textGenerat || ''));
+  ctrl.historicLongituds = Array.isArray(ctrl.historicLongituds) ? ctrl.historicLongituds : [];
+  ctrl.historicLongituds.push(paraules);
+
+  const h = ctrl.historicLongituds;
+  if (h.length >= 3) {
+    const a = h[h.length - 3], b = h[h.length - 2], c = h[h.length - 1];
+    if (a > b && b > c) ctrl.tendencia = 'decreixent';
+    else if (a < b && b < c) ctrl.tendencia = 'creixent';
+    else ctrl.tendencia = 'estable';
+  } else {
+    ctrl.tendencia = 'estable';
+  }
+
+  const percentatge = objectiu > 0 ? paraules / objectiu : 0;
+  const llMin = Number(ctrl.llindarMinim || 0.70);
+  const llExp = Number(ctrl.llindarExpansio || 0.85);
+
+  if (percentatge >= llExp) {
+    return { paraules, percentatge, accio: 'acceptar', motiu: 'Longitud dins del rang objectiu.' };
+  }
+  if (percentatge >= llMin) {
+    return { paraules, percentatge, accio: 'expandir', motiu: 'Capítol acceptable però massa curt; cal expansió.' };
+  }
+  return { paraules, percentatge, accio: 'regenerar', motiu: 'Capítol massa curt respecte del mínim.' };
+}
+
+async function expandirCapitol(textOriginal, capitolIdx, paraulesActuals, userConfig = USER_CONFIG) {
+  const ctrl = ESTAT._controlLongitud || { objectiu: 3000 };
+  const objectiu = Number(ctrl.objectiu || 3000);
+  const diferencia = Math.max(0, objectiu - Number(paraulesActuals || 0));
+  const systemPrompt = buildSystemPromptCapitol();
+  const msgs = [{
+    role: 'user',
+    content: `El capítol següent té ${paraulesActuals} paraules però l'objectiu és ${objectiu}.
+Falten aproximadament ${diferencia} paraules. EXPANDEIX el capítol afegint:
+- Més profunditat sensorial a les escenes d'acció
+- Interioritat del personatge (pensaments, sensacions, records)
+- Detalls d'ambient i atmosfera
+- Dilatació temporal en els moments de tensió alta
+
+NO afegeixis escenes noves ni subtrames. Enriqueix les existents.
+Retorna el capítol COMPLET expandit.
+
+CAPÍTOL A EXPANDIR:
+${String(textOriginal || '').slice(0, 20000)}`
+  }];
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  const raw = await callLLMOneShotPlusCompletion(
+    msgs,
+    systemPrompt,
+    Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 14000, model: models.modelGeneracio }),
+    'generacio'
+  );
+  return netejarTabulacionsInicials(raw || textOriginal || '');
+}
+
+async function regenerarCapitolPerLongitud(capitolIdx, userConfig = USER_CONFIG) {
+  const ctrl = ESTAT._controlLongitud || { objectiu: 3000, llindarMinim: 0.70 };
+  const minim = Math.round(Number(ctrl.objectiu || 3000) * Number(ctrl.llindarMinim || 0.70));
+  ESTAT._controlLongitud.promptForcat = `OBJECTIU DE LONGITUD (REGENERACIÓ): Aquest capítol HA de tenir un mínim de ${minim} paraules. Desenvolupa les escenes amb profunditat. No resumeixis; NARRA.`;
+  try {
+    const res = await generarCapitolNKG(capitolIdx, userConfig || USER_CONFIG || {});
+    return {
+      text: netejarTabulacionsInicials((res && res.response) || ''),
+      meta: res || {}
+    };
+  } finally {
+    ESTAT._controlLongitud.promptForcat = '';
+  }
+}
+
+function comptarSilLabesAproximades(paraula) {
+  const p = String(paraula || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const grups = p.match(/[aeiouàèéíïòóúü]+/g);
+  return grups ? grups.length : 0;
+}
+
+function obtenirFrases(text) {
+  return String(text || '')
+    .replace(/\s+/g, ' ')
+    .split(/(?<=[.!?…])\s+/)
+    .map(f => f.trim())
+    .filter(Boolean);
+}
+
+function actualitzarRegistreEstil(capitolIdx, textCapitol) {
+  if (!ESTAT._registreEstil || typeof ESTAT._registreEstil !== 'object') {
+    ESTAT._registreEstil = { frequencies: {}, alertes: [], verbs_atribucio: {}, tancaments: [] };
+  }
+
+  const stopWords = new Set([
+    'el','la','els','les','un','una','uns','unes','de','del','dels','a','al','als','i','o','u','que','en','amb','per','pel','pels','sense','sobre','entre','cap','com','si','no','sí','ja','més','mes','tot','tots','tota','totes',
+    'jo','tu','ell','ella','nosaltres','vosaltres','ells','elles','em','et','es','ens','us','meu','teva','seu','seva','nostre','nostra','vostre','vostra'
+  ]);
+
+  const paraules = String(textCapitol || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\s']/g, ' ')
+    .split(/\s+/)
+    .map(w => w.trim())
+    .filter(Boolean);
+
+  paraules.forEach(w => {
+    if (w.length < 3) return;
+    if (stopWords.has(w)) return;
+    if (comptarSilLabesAproximades(w) < 2) return;
+    if (!ESTAT._registreEstil.frequencies[w]) ESTAT._registreEstil.frequencies[w] = { count: 0, ultimCapitol: capitolIdx + 1 };
+    ESTAT._registreEstil.frequencies[w].count += 1;
+    ESTAT._registreEstil.frequencies[w].ultimCapitol = capitolIdx + 1;
+  });
+
+  const reAttrib = /va\s+(dir|xiuxiuejar|cridar|respondre|murmurar|preguntar|ordenar|sentenciar|exclamar|sospirar|tallar|replicar|afegir)/gi;
+  const matches = String(textCapitol || '').matchAll(reAttrib);
+  for (const m of matches) {
+    const v = `va ${String(m[1] || '').toLowerCase()}`;
+    ESTAT._registreEstil.verbs_atribucio[v] = (ESTAT._registreEstil.verbs_atribucio[v] || 0) + 1;
+  }
+
+  const frases = obtenirFrases(textCapitol);
+  const ultimes2 = frases.slice(-2).join(' ');
+  if (ultimes2) {
+    ESTAT._registreEstil.tancaments.push({ capitol: capitolIdx + 1, text: ultimes2 });
+    if (ESTAT._registreEstil.tancaments.length > 30) ESTAT._registreEstil.tancaments = ESTAT._registreEstil.tancaments.slice(-30);
+  }
+}
+
+function generarAlertesEstil() {
+  if (!ESTAT._registreEstil || typeof ESTAT._registreEstil !== 'object') {
+    ESTAT._registreEstil = { frequencies: {}, alertes: [], verbs_atribucio: {}, tancaments: [] };
+  }
+
+  const alertes = [];
+  const capitolsTotals = Math.max(1, (ESTAT._capitols_generats || []).filter(t => t && t.trim()).length);
+
+  Object.entries(ESTAT._registreEstil.frequencies || {}).forEach(([paraula, dades]) => {
+    const count = Number(dades && dades.count ? dades.count : 0);
+    const mitjana = count / capitolsTotals;
+    if (mitjana > 2) {
+      alertes.push(`ALERTA: '${paraula}' s'ha usat ${count} cops en ${capitolsTotals} capítols. Busca sinònims o reformulacions.`);
+    }
+  });
+
+  const verbs = ESTAT._registreEstil.verbs_atribucio || {};
+  const totalVerbs = Object.values(verbs).reduce((a, b) => a + Number(b || 0), 0);
+  if (totalVerbs > 0) {
+    Object.entries(verbs).forEach(([verb, count]) => {
+      const pct = (Number(count || 0) / totalVerbs) * 100;
+      if (pct > 30) {
+        alertes.push(`ALERTA: '${verb}' domina els diàlegs (${pct.toFixed(1)}% de les atribucions). Varia: considerar, murmurar, replicar, tallar, sentenciar...`);
+      }
+    });
+  }
+
+  const tancaments = Array.isArray(ESTAT._registreEstil.tancaments) ? ESTAT._registreEstil.tancaments.slice(-3) : [];
+  if (tancaments.length === 3) {
+    const nomProta = String(ESTAT.protagonistaTriat || '').toLowerCase();
+    const patrons = ["ja no era", "era el", "era la", "havia deixat de ser", "s'havia convertit"];
+    const totsPatro = tancaments.every(t => {
+      const txt = String((t && t.text) || '').toLowerCase();
+      const teNom = nomProta ? txt.includes(nomProta) : /\b(protagonista|maja)\b/.test(txt);
+      const tePatro = patrons.some(p => txt.includes(p));
+      return teNom && tePatro;
+    });
+    if (totsPatro) {
+      alertes.push("ALERTA: Els últims 3 capítols acaben amb sentències metafòriques sobre la protagonista. Trenca el patró: prova acabar amb una imatge, una acció, un diàleg, o un canvi de punt de vista.");
+    }
+  }
+
+  ESTAT._registreEstil.alertes = alertes;
+  return alertes;
+}
+
+function buildBlocAlertesEstil() {
+  const alertes = generarAlertesEstil();
+  if (!alertes || alertes.length === 0) return '';
+  return `ALERTES D'ESTIL ACTIVES (basat en l'anàlisi acumulada dels capítols anteriors):
+${alertes.map(a => `- ${a}`).join('\n')}
+Respecta aquestes alertes per mantenir la frescor de la prosa.`;
+}
+
+function normalitzarBeatNarratiu(beat) {
+  const b = String(beat || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9_\s-]/g, ' ')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return b.slice(0, 60);
+}
+
+function esBeatNarratiuTrivial(beat) {
+  const b = String(beat || '').toLowerCase();
+  return /^(caminar|parlar|mirar|entrar|sortir|respirar|pensar)$/.test(b)
+    || /(^|[_\s-])(caminar|parlar|mirar)([_\s-]|$)/.test(b);
+}
+
+function buildBlocBeatsNarratiusProhibits() {
+  const beats = (ESTAT._nkg && Array.isArray(ESTAT._nkg.beats_gastats)) ? ESTAT._nkg.beats_gastats : [];
+  if (beats.length === 0) return '';
+  const lines = beats.slice(-30).map(b => `- ${b}`);
+  return `BEATS NARRATIUS PROHIBITS — Aquests recursos dramàtics ja s'han utilitzat en capítols anteriors. NO els repeteixis ni en variació. Troba alternatives originals:
+${lines.join('\n')}
+
+Si l'escaleta del capítol actual requereix una acció similar a un beat prohibit, REIMAGINA'L amb una mecànica diferent.`;
+}
+
+async function actualitzarBeatsNarratiusGastats(textCapitol, capitolNum, userConfig = USER_CONFIG) {
+  if (!ESTAT._nkg) return;
+  if (!Array.isArray(ESTAT._nkg.beats_gastats)) ESTAT._nkg.beats_gastats = [];
+  const txt = String(textCapitol || '').trim();
+  if (!txt) return;
+
+  const msgs = [{
+    role: 'user',
+    content: `Analitza el capítol següent i extreu els BEATS NARRATIUS CLAU: accions dramàtiques úniques, girs de guió, revelacions, confrontacions o moments climàtics que JA S'HAN CONSUMIT i que NO s'haurien de repetir en capítols futurs. Format: array JSON de strings curts i descriptius.
+Exemples: 'protagonista_prem_enviar_dades', 'descoberta_factura_pes', 'confrontacio_directa_antagonista_passadis', 'trucada_testament_exmarit'.
+Retorna NOMÉS el JSON array, res més.
+
+CAPÍTOL ${capitolNum}:
+${txt.slice(0, 14000)}`
+  }];
+
+  try {
+    const models = getModelConfig(userConfig || USER_CONFIG || {});
+    const raw = await callLLMMulti(
+      msgs,
+      'Ets una analista de beats narratius. Retorna exclusivament JSON array.',
+      Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 900, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+    let parsed = parseJsonRobust(raw);
+    if (!Array.isArray(parsed)) {
+      try { parsed = JSON.parse(String(raw || '').trim()); } catch { parsed = []; }
+    }
+    const nous = Array.isArray(parsed) ? parsed : [];
+    const filtrats = nous
+      .map(normalitzarBeatNarratiu)
+      .filter(Boolean)
+      .filter(b => b.length <= 60)
+      .filter(b => !esBeatNarratiuTrivial(b));
+
+    const set = new Set(ESTAT._nkg.beats_gastats);
+    filtrats.forEach(b => set.add(b));
+    ESTAT._nkg.beats_gastats = Array.from(set).slice(-30);
+  } catch (err) {
+    console.warn('Beats narratius: error no bloquejant:', err.message);
+  }
+}
+
+
+function calcularPressioDeTancament(capitolActualIdx) {
+  const totalCapitols = Number(ESTAT._nombreCapitols || (ESTAT._estructuraCapitols ? ESTAT._estructuraCapitols.length : 0) || 0);
+  const reg = ESTAT.llibreRegistre || {};
+  const filsObertsArr = Array.isArray(reg.fils_oberts) ? reg.fils_oberts : [];
+  const filsTancatsArr = Array.isArray(reg.fils_tancats) ? reg.fils_tancats : [];
+  const capitolsRestants = Math.max(0, totalCapitols - capitolActualIdx - 1);
+  const filsOberts = filsObertsArr.length;
+  const ratio = filsOberts / Math.max(capitolsRestants, 1);
+  const filsPerCapitol = Math.ceil(filsOberts / Math.max(capitolsRestants, 1));
+
+  let pressio = 'baixa';
+  if (capitolsRestants === 0) pressio = 'critica';
+  else if (capitolsRestants <= 2) pressio = 'alta';
+  else if (capitolsRestants <= 4) pressio = 'mitjana';
+
+  return {
+    totalCapitols,
+    capitolsRestants,
+    filsOberts,
+    filsTancats: filsTancatsArr.length,
+    ratio,
+    filsPerCapitol,
+    pressio,
+    filsObertsArr,
+    filsTancatsArr
+  };
+}
+
+function classificarPrioritatFil(filTxt) {
+  const f = String(filTxt || '').toLowerCase();
+  const nomsPrincipals = [ESTAT.protagonistaTriat]
+    .concat((ESTAT._personatgesSeleccionats || []).slice(0, 3))
+    .filter(Boolean)
+    .map(n => String(n).toLowerCase());
+  if (nomsPrincipals.some(n => n && f.includes(n))) return 'alta';
+  if (/(trama principal|protagon|antagon|climax|conflicte central|arc)/.test(f)) return 'alta';
+  if (/(subtrama|secundari|aliat|famili|amic|mentor)/.test(f)) return 'mitjana';
+  return 'baixa';
+}
+
+function generarDirectivaFils(capitolActualIdx) {
+  const d = calcularPressioDeTancament(capitolActualIdx);
+  const oberts = d.filsObertsArr || [];
+  if (oberts.length === 0) return "DIRECTIVA DE FILS: No hi ha fils oberts al registre. Mantén la coherència i evita obrir-ne de nous innecessaris.";
+
+  const alta = [];
+  const mitjana = [];
+  const baixa = [];
+  oberts.forEach(f => {
+    const p = classificarPrioritatFil(f);
+    if (p === 'alta') alta.push(f);
+    else if (p === 'mitjana') mitjana.push(f);
+    else baixa.push(f);
+  });
+
+  if (d.pressio === 'baixa') {
+    return `Fils narratius actius (referència): ${oberts.slice(0, 10).join(' | ')}. No cal tancar-los tots, però no els contradiguis.`;
+  }
+
+  if (d.pressio === 'mitjana') {
+    const minim = Math.max(2, d.filsPerCapitol);
+    return `DIRECTIVA DE FILS: Queden ${d.capitolsRestants} capítols. Fils oberts: ${d.filsOberts}. Aquest capítol HA DE tancar o avançar significativament un mínim de ${minim} dels fils següents (en ordre de prioritat):
+PRIORITAT ALTA: ${alta.length ? alta.join(' | ') : '(cap detectada)'}
+PRIORITAT MITJANA: ${mitjana.length ? mitjana.join(' | ') : '(cap detectada)'}
+Per tancar un fil, necessites: resolució explícita, menció del destí del personatge/situació, o tancament temàtic.`;
+  }
+
+  const prioritats = [...alta, ...mitjana].slice(0, Math.max(4, d.filsPerCapitol));
+  const menors = baixa.slice(0, 8);
+  return `URGÈNCIA NARRATIVA: Aquest és un dels ${Math.max(d.capitolsRestants, 1)} últims capítols. Hi ha ${d.filsOberts} fils sense resoldre. És IMPERATIU que aquest capítol resolgui o doni tancament a:
+${prioritats.length ? prioritats.map(f => `- ${f}`).join('\n') : '- (prioritats no detectades)'}
+
+Fils que es poden tancar amb una frase o menció breu:
+${menors.length ? menors.map(f => `- ${f}`).join('\n') : '- (cap fil menor)'}
+
+Cap fil de PRIORITAT ALTA pot quedar obert al final de la novel·la.`;
+}
+
 function buildSystemPromptCapitol() {
   const idxActual = Number(ESTAT._capitolActual || 0);
+  const directivaContinuitat = generarDirectivaContinuitat(idxActual);
+  const directivaFils = generarDirectivaFils(idxActual);
+  const totalCapitolsPlanificats = Number(ESTAT._nombreCapitols || (ESTAT._estructuraCapitols ? ESTAT._estructuraCapitols.length : 0) || 0);
+  const capitolsRestants = Math.max(0, totalCapitolsPlanificats - idxActual - 1);
+  const blocAntiProliferacioFils = capitolsRestants <= 3
+    ? "PROHIBIT OBRIR FILS NOUS: A partir d'aquest punt, no introdueixis cap personatge nou, cap subtrama nova ni cap misteri nou. Només tanca i resol."
+    : '';
   const capitolsRegistre = (ESTAT.llibreRegistre && Array.isArray(ESTAT.llibreRegistre.capitols))
     ? ESTAT.llibreRegistre.capitols
     : [];
@@ -6763,23 +6970,51 @@ function buildSystemPromptCapitol() {
       if (m.vocabulari) linies.push(`• Vocabulari: ${m.vocabulari}`);
       if (linies.length > 0) parts.push('\nMANUAL D\'ESTIL DE REFERÈNCIA:\n' + linies.join('\n'));
     }
+    const autorRef = String((ESTAT.configProjecte && ESTAT.configProjecte.autor_referencia) || '').toLowerCase();
+    const modeTolkien = /tolkien/.test(autorRef);
+    const modeCastaneda = /castaneda/.test(autorRef);
     const tensioActiva = (ESTAT._corbaTensio || []).find(t => t.capitol === (Number(ESTAT._capitolActual || 0) + 1));
-    if (tensioActiva && Number(tensioActiva.nivell) > 7) {
+    if (modeTolkien) {
+      parts.push('\nINTENSITAT NARRATIVA (MODE TOLKIEN): Prioritza gravetat mítica, memòria del paisatge i pes moral de les decisions. La tensió no ha de ser sempre frenètica: alterna amplitud èpica, respiració lírica i conseqüència històrica.');
+    } else if (modeCastaneda) {
+      parts.push("\nINTENSITAT NARRATIVA (MODE CASTANEDA): Prioritza desplaçament perceptiu, ambigüitat ontològica i procés iniciàtic. La tensió pot ser interior i cognitiva: sostén silencis, paradoxes i fractures de percepció sense accelerar artificialment l'acció.");
+    } else if (tensioActiva && Number(tensioActiva.nivell) > 7) {
       parts.push("\nCONTROL DE CONTRAST SENSORIAL (NKG>7): Trenca qualsevol fredor comptable amb detalls viscerals o orgànics (olors, suor, brutícia, reaccions físiques involuntàries). Quan la tensió és alta, aquests detalls són OBLIGATORIS i han d'entrar dins l'acció.");
     } else {
       parts.push('\nCONTROL DE CONTRAST SENSORIAL: Evita la prosa asèptica. Integra textura física i sensorial (cos, entorn, fricció material) per humanitzar la tensió.');
     }
     parts.push("\nREGLA D'ESTIL OBLIGATÒRIA (SHOW, DON'T TELL): Tens totalment prohibit utilitzar etiquetes emocionals explícites per descriure com se sent un personatge (ex: prohibit dir \"estava trist\", \"se sentia enfadat\", \"estava nerviós\"). En comptes d'això, has de MOSTRAR l'emoció a través d'accions físiques, interaccions amb objectes, vestimenta, llenguatge corporal o detalls de l'entorn.");
-    parts.push("\nREGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que és el final del capítol, NO resolguis la situació ni facis que els personatges abandonin l'escenari al final del text. Deixa l'acció fluint, oberta o en suspens dramàtic, de manera que la següent generació pugui recollir el testimoni de forma natural.");
+    parts.push("\nREGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que és el final del capítol, NO tanquis artificialment l'energia narrativa. Mantén continuïtat orgànica segons el to de l'obra: suspens d'acció, ressonància lírica, o desplaçament perceptiu; la següent generació ha de poder recollir el testimoni de forma natural.");
+        const blocBeatsProhibits = buildBlocBeatsNarratiusProhibits();
+    if (blocBeatsProhibits) parts.push('\n' + blocBeatsProhibits);
+    const blocAlertesEstil = buildBlocAlertesEstil();
+    if (blocAlertesEstil) parts.push('\n' + blocAlertesEstil);
+    const blocLongitud = buildBlocAlertaLongitud();
+    if (blocLongitud) parts.push('\n' + blocLongitud);
+    if (directivaFils) parts.push('\n' + directivaFils);
+    if (blocAntiProliferacioFils) parts.push('\n' + blocAntiProliferacioFils);
+    if (directivaContinuitat) parts.push('\n' + directivaContinuitat);
+    if (ESTAT._controlLongitud && ESTAT._controlLongitud.promptForcat) parts.push('\n' + ESTAT._controlLongitud.promptForcat);
     if (prohibirIniciMeteorologic) {
       parts.push("PROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg.");
     }
     return parts.join('\n');
   }
   const legacy = buildSystemPromptCapitolLegacy();
+  const blocBeatsProhibits = buildBlocBeatsNarratiusProhibits();
+  let legacyAmbContinuitat = legacy;
+  if (blocBeatsProhibits) legacyAmbContinuitat += `\n\n${blocBeatsProhibits}`;
+  const blocAlertesEstil = buildBlocAlertesEstil();
+  if (blocAlertesEstil) legacyAmbContinuitat += `\n\n${blocAlertesEstil}`;
+  const blocLongitud = buildBlocAlertaLongitud();
+  if (blocLongitud) legacyAmbContinuitat += `\n\n${blocLongitud}`;
+  if (directivaFils) legacyAmbContinuitat += `\n\n${directivaFils}`;
+  if (blocAntiProliferacioFils) legacyAmbContinuitat += `\n\n${blocAntiProliferacioFils}`;
+  if (directivaContinuitat) legacyAmbContinuitat += `\n\n${directivaContinuitat}`;
+  if (ESTAT._controlLongitud && ESTAT._controlLongitud.promptForcat) legacyAmbContinuitat += `\n\n${ESTAT._controlLongitud.promptForcat}`;
   return prohibirIniciMeteorologic
-    ? legacy + "\n\nPROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg."
-    : legacy;
+    ? legacyAmbContinuitat + "\n\nPROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg."
+    : legacyAmbContinuitat;
 }
 
 function buildRegistreContextLegacy(idx) {
@@ -6910,8 +7145,8 @@ function buildInstruccionsTransicio(textEnllac, tipusTransicio) {
 // ═══════════════════════════════════════════════════════════
 //  FASE 5: Sistema de Prefiguració
 // ═══════════════════════════════════════════════════════════
-function getPrefiguracionsActives(idx) {
-  const prefs  = ESTAT._prefiguracions || [];
+function getPrefiguracionsActives(idx, estat = ESTAT) {
+  const prefs  = estat._prefiguracions || [];
   const capNum = idx + 1;
   const aPlantarAra      = prefs.filter(p => p.plantada_capitol === capNum);
   const aRecollirAra     = prefs.filter(p => p.resolucio_capitol === capNum);
@@ -6929,13 +7164,152 @@ function llistarPrefiguracions() {
   ).join('\n');
 }
 
+function obtenirUbicacioEscaletaCapitol(idx) {
+  const cap = ESTAT._estructuraCapitols && ESTAT._estructuraCapitols[idx] ? ESTAT._estructuraCapitols[idx] : null;
+  const escaletaCap = (ESTAT._escaletes || []).find(e => e.capitol === idx + 1);
+  const escena0 = escaletaCap && Array.isArray(escaletaCap.escenes) ? escaletaCap.escenes[0] : null;
+  return (escena0 && (escena0.lloc || escena0.localitzacio || escena0.ubicacio)) || (cap && cap.localitzacio) || '';
+}
+
+function normalitzarUbicacioContinuitat(txt) {
+  return String(txt || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function generarSnapshotFinalCapitol(capitolIdx, userConfig = USER_CONFIG) {
+  if (!ESTAT._snapshotsFinals || typeof ESTAT._snapshotsFinals !== 'object') ESTAT._snapshotsFinals = {};
+
+  const textCapitol = (ESTAT._capitols_generats && ESTAT._capitols_generats[capitolIdx])
+    ? String(ESTAT._capitols_generats[capitolIdx])
+    : '';
+  if (!textCapitol.trim()) return null;
+
+  const protagonist = ESTAT.protagonistaTriat || 'la protagonista';
+  const msgs = [{
+    role: 'user',
+    content: `Extreu un snapshot de continuïtat del FINAL del capítol ${capitolIdx + 1}.
+
+PROTAGONISTA: ${protagonist}
+
+CAPÍTOL COMPLET:
+${textCapitol.slice(-14000)}
+
+Retorna EXCLUSIVAMENT JSON vàlid amb aquesta forma:
+{
+  "ubicacio": "Lloc físic exacte on acaba el personatge",
+  "hora_narrativa": "Hora/moment del dia aproximat",
+  "estat_emocional": "Estat psicològic en acabar el capítol",
+  "situacio_immediata": "Què està passant exactament al tancament",
+  "objectes_rellevants": ["llista d'objectes que porta o ha perdut"],
+  "ultimes_3_frases": "Les 3 últimes frases del capítol (literal)"
+}`
+  }];
+
+  try {
+    const models = getModelConfig(userConfig || USER_CONFIG || {});
+    const raw = await callLLMMulti(
+      msgs,
+      "Ets una analista de continuïtat narrativa. Respon només JSON.",
+      Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 900, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+    const parsed = parseJsonRobust(raw) || {};
+    const snapshot = {
+      ubicacio: String(parsed.ubicacio || '').trim() || 'No determinat',
+      hora_narrativa: String(parsed.hora_narrativa || '').trim() || 'No determinat',
+      estat_emocional: String(parsed.estat_emocional || '').trim() || 'No determinat',
+      situacio_immediata: String(parsed.situacio_immediata || '').trim() || 'No determinat',
+      objectes_rellevants: Array.isArray(parsed.objectes_rellevants) ? parsed.objectes_rellevants.map(o => String(o || '').trim()).filter(Boolean) : [],
+      ultimes_3_frases: String(parsed.ultimes_3_frases || '').trim() || textCapitol.split(/(?<=[.!?…])\s+/).slice(-3).join(' ').trim(),
+      protagonista: protagonist
+    };
+    ESTAT._snapshotsFinals[capitolIdx] = snapshot;
+    return snapshot;
+  } catch (err) {
+    console.warn('Snapshot final capítol: error no bloquejant:', err.message);
+    return null;
+  }
+}
+
+function generarDirectivaContinuitat(capitolIdx) {
+  if (capitolIdx <= 0) return '';
+  if (!ESTAT._snapshotsFinals || typeof ESTAT._snapshotsFinals !== 'object') ESTAT._snapshotsFinals = {};
+
+  const snapshotAnterior = ESTAT._snapshotsFinals[capitolIdx - 1];
+  if (!snapshotAnterior) return '';
+
+  const protagonista = snapshotAnterior.protagonista || ESTAT.protagonistaTriat || 'la protagonista';
+  const ubicacioAnterior = snapshotAnterior.ubicacio || 'ubicació no determinada';
+  const ubicacioNova = obtenirUbicacioEscaletaCapitol(capitolIdx) || 'ubicació no especificada';
+  const mateixaUbicacio = normalitzarUbicacioContinuitat(ubicacioAnterior) === normalitzarUbicacioContinuitat(ubicacioNova);
+  const objectes = Array.isArray(snapshotAnterior.objectes_rellevants) && snapshotAnterior.objectes_rellevants.length > 0
+    ? snapshotAnterior.objectes_rellevants.join(', ')
+    : 'cap objecte crític';
+
+  if (mateixaUbicacio) {
+    return `CONTINUÏTAT: El capítol anterior va acabar amb ${protagonista} a ${ubicacioAnterior}, ${snapshotAnterior.situacio_immediata || 'en situació no especificada'}. Hora: ${snapshotAnterior.hora_narrativa || 'no determinada'}. Estat: ${snapshotAnterior.estat_emocional || 'no determinat'}. Objectes: ${objectes}. COMENÇA exactament des d'aquest punt.`;
+  }
+
+  return `ALERTA DE CONTINUÏTAT: El capítol anterior va acabar amb ${protagonista} a ${ubicacioAnterior}, ${snapshotAnterior.situacio_immediata || 'en situació no especificada'}, ${snapshotAnterior.hora_narrativa || 'hora no determinada'}. El nou capítol se situa a ${ubicacioNova}. ÉS IMPERATIU que narris el desplaçament o facis una el·lipsi temporal explícita a l'inici. NO pots començar com si el personatge ja fos allà sense explicació. Estat emocional previ: ${snapshotAnterior.estat_emocional || 'no determinat'}. El personatge NO pot reiniciar-se emocionalment sense motiu.`;
+}
+
+function filtrarContextFutur(capitolActualIdx) {
+  // FUTURE MASKING
+  const estatFiltrat = typeof structuredClone === 'function'
+    ? structuredClone(ESTAT)
+    : JSON.parse(JSON.stringify(ESTAT));
+  const redactat = '[REDACTAT — Esdeveniment futur]';
+
+  estatFiltrat._estructuraCapitols = (estatFiltrat._estructuraCapitols || []).map((capitol, i) => {
+    if (i <= capitolActualIdx) return capitol;
+    return {
+      numero: capitol?.numero,
+      titol: capitol?.titol,
+      resum: redactat,
+      prefiguracions_a_recollir: redactat,
+      connexio_seguent: redactat,
+      connexio_anterior: redactat
+    };
+  });
+
+  estatFiltrat._corbaTensio = (estatFiltrat._corbaTensio || []).map(t => (
+    t && t.capitol > capitolActualIdx + 1
+      ? { ...t, nivell: redactat, tipus: redactat }
+      : t
+  ));
+
+  if (estatFiltrat._arcMoral && typeof estatFiltrat._arcMoral === 'object') {
+    if (estatFiltrat._arcMoral.punt_no_retorn && estatFiltrat._arcMoral.punt_no_retorn.capitol > capitolActualIdx) {
+      estatFiltrat._arcMoral.punt_no_retorn = redactat;
+    }
+    if (estatFiltrat._arcMoral.cost_final && estatFiltrat._arcMoral.cost_final.capitol > capitolActualIdx) {
+      estatFiltrat._arcMoral.cost_final = redactat;
+    }
+  }
+
+  estatFiltrat.finalTriat = '[REDACTAT]';
+
+  estatFiltrat._prefiguracions = (estatFiltrat._prefiguracions || []).map(p => (
+    p && p.resolucio_capitol > capitolActualIdx
+      ? { ...p, resolucio_capitol: redactat }
+      : p
+  ));
+
+  return estatFiltrat;
+}
+
 // ═══════════════════════════════════════════════════════════
 //  FASE 3: Context complet per a cada capítol
 // ═══════════════════════════════════════════════════════════
 
-function buildContextCapitolsComplets(idx, opts = {}) {
+function buildContextCapitolsComplets(idx, opts = {}, estat = ESTAT) {
   const entrades = [];
-  (ESTAT._capitols_generats || []).slice(0, idx).forEach((t, i) => {
+  (estat._capitols_generats || []).slice(0, idx).forEach((t, i) => {
     if (t && t.trim()) entrades.push({ idx: i, text: t });
   });
   if (entrades.length === 0) return '';
@@ -6959,7 +7333,7 @@ ${textComplet}`);
       paraulesAcumulades += paraulesText;
     } else {
       // TIER 2: Si ja no hi cap el text sencer, usem el resum del llibre de registre
-      const reg = ESTAT.llibreRegistre?.capitols?.[e.idx];
+      const reg = estat.llibreRegistre?.capitols?.[e.idx];
       let resum = reg?.resum_capitol || textComplet.slice(0, 1000) + '...';
       const paraulesResum = resum.split(/\s+/).length;
 
@@ -6972,14 +7346,14 @@ ${resum}`);
         const cobertaFinsCap = e.idx + 1;
         let memoriaText = '';
 
-        if (ESTAT._memoriasComprimides && ESTAT._memoriasComprimides.length > 0) {
-          const mem = [...ESTAT._memoriasComprimides]
+        if (estat._memoriasComprimides && estat._memoriasComprimides.length > 0) {
+          const mem = [...estat._memoriasComprimides]
             .filter(m => m.finsCap <= cobertaFinsCap)
             .sort((a, b) => b.finsCap - a.finsCap)[0];
           if (mem && mem.text) memoriaText = mem.text;
         }
-        if (!memoriaText && ESTAT._resumCompacte) {
-          memoriaText = ESTAT._resumCompacte;
+        if (!memoriaText && estat._resumCompacte) {
+          memoriaText = estat._resumCompacte;
         }
 
         if (memoriaText) {
@@ -7001,14 +7375,14 @@ CAPÍTOLS ANTERIORS (Context dinàmic per pressupost de tokens):
 ${parts.join('\n\n')}`;
 }
 
-function buildContextCapitolLegacy(idx, skipRegistre = false) {
+function buildContextCapitolLegacy(idx, skipRegistre = false, estat = ESTAT) {
   const parts = [];
 
   // 1) Fonaments globals: Brief + Bíblia + Trames
   const brief = buildBriefNarratiu();
   if (brief && brief.trim()) parts.push(brief);
 
-  const biblia = ESTAT.bibliaNarrativa;
+  const biblia = estat.bibliaNarrativa;
   if (biblia) {
     const bibliaLines = [];
     if (biblia.fets_canonics && biblia.fets_canonics.length > 0) {
@@ -7042,7 +7416,7 @@ function buildContextCapitolLegacy(idx, skipRegistre = false) {
     }
   }
 
-  const trames = ESTAT.trames;
+  const trames = estat.trames;
   if (trames && (trames.trama_principal || trames.subtrames.length > 0)) {
     const tramesLines = ['TRAMES ACTIVES EN AQUEST CAPÍTOL:'];
     if (trames.trama_principal) {
@@ -7062,11 +7436,11 @@ function buildContextCapitolLegacy(idx, skipRegistre = false) {
   }
 
   // 2) Context de capítols i continuïtat (memòria global textual)
-  const capsContext = buildContextCapitolsComplets(idx);
+  const capsContext = buildContextCapitolsComplets(idx, {}, estat);
   if (capsContext) parts.push(capsContext);
 
-  if (idx > 0 && ESTAT._capitols_generats[idx - 1]) {
-    const parasAnterior = ESTAT._capitols_generats[idx - 1].split(/\n\n+/);
+  if (idx > 0 && estat._capitols_generats[idx - 1]) {
+    const parasAnterior = estat._capitols_generats[idx - 1].split(/\n\n+/);
     const ultims = parasAnterior.slice(-2).join('\n\n');
     if (ultims.trim()) {
       parts.push('\nFINAL DEL CAPÍTOL ANTERIOR (mantén la continuïtat de to i escena):\n' + ultims);
@@ -7080,8 +7454,8 @@ function buildContextCapitolLegacy(idx, skipRegistre = false) {
   }
 
   // 4) Ajustos globals de rumb
-  if (ESTAT._ajustosRumb) {
-    const ajustos = typeof ESTAT._ajustosRumb === 'string' ? ESTAT._ajustosRumb : JSON.stringify(ESTAT._ajustosRumb);
+  if (estat._ajustosRumb) {
+    const ajustos = typeof estat._ajustosRumb === 'string' ? estat._ajustosRumb : JSON.stringify(estat._ajustosRumb);
     if (ajustos && ajustos.trim()) {
       parts.push(`\nAJUSTOS DE RUMB (indicació del checkpoint de coherència): ${ajustos}`);
     }
@@ -7091,6 +7465,8 @@ function buildContextCapitolLegacy(idx, skipRegistre = false) {
 }
 
 function buildContextCapitol(idx) {
+  // FUTURE MASKING
+  const estatContext = filtrarContextFutur(idx);
   const capitolsRegistre = (ESTAT.llibreRegistre && Array.isArray(ESTAT.llibreRegistre.capitols))
     ? ESTAT.llibreRegistre.capitols
     : [];
@@ -7098,12 +7474,12 @@ function buildContextCapitol(idx) {
   const r2 = idx - 2 >= 0 ? capitolsRegistre[idx - 2] : null;
   const prohibirIniciMeteorologic = !!(r1 && r2 && r1.inici_meteorologic === true && r2.inici_meteorologic === true);
 
-  const cap = ESTAT._estructuraCapitols ? ESTAT._estructuraCapitols[idx] : null;
+  const cap = estatContext._estructuraCapitols ? estatContext._estructuraCapitols[idx] : null;
 
   // Context global (Brief, Bíblia, Trames, etc.) sempre present
   const ctxGlobalBase = ESTAT._nkg
-    ? buildContextCapitolLegacy(idx, true)
-    : buildContextCapitolLegacy(idx, false);
+    ? buildContextCapitolLegacy(idx, true, estatContext)
+    : buildContextCapitolLegacy(idx, false, estatContext);
 
   // Bloc de planificació/escaleta (què passa en aquest capítol)
   const blocEscaleta = [];
@@ -7119,7 +7495,7 @@ function buildContextCapitol(idx) {
     if (capLines.length > 0) blocEscaleta.push('PLANIFICACIÓ DEL CAPÍTOL ACTUAL:\n' + capLines.join('\n'));
   }
 
-  const escaletaCap = (ESTAT._escaletes || []).find(e => e.capitol === idx + 1);
+  const escaletaCap = (estatContext._escaletes || []).find(e => e.capitol === idx + 1);
   if (escaletaCap && Array.isArray(escaletaCap.escenes) && escaletaCap.escenes.length > 0) {
     const escenes = escaletaCap.escenes.slice(0, 8).map((sc, i) => {
       const p = [];
@@ -7135,7 +7511,7 @@ function buildContextCapitol(idx) {
 
   // Prefiguracions + to/tensió
   const blocFinal = [];
-  const { aPlantarAra, aRecollirAra, plantadesNoResoltes } = getPrefiguracionsActives(idx);
+  const { aPlantarAra, aRecollirAra, plantadesNoResoltes } = getPrefiguracionsActives(idx, estatContext);
   if (aPlantarAra.length > 0) {
     blocFinal.push('PREFIGURACIONS A PLANTAR EN AQUEST CAPÍTOL (integra-les subtilment):');
     aPlantarAra.forEach(p => blocFinal.push(`- ${p.element}`));
@@ -7150,7 +7526,7 @@ function buildContextCapitol(idx) {
   }
 
   if (cap && cap.toRitme) blocFinal.push(`TO I RITME D'AQUEST CAPÍTOL: ${cap.toRitme}`);
-  const tensio = (ESTAT._corbaTensio || []).find(t => t.capitol === idx + 1);
+  const tensio = (estatContext._corbaTensio || []).find(t => t.capitol === idx + 1);
   if (tensio) {
     const instrRitme = getInstruccionsRitme(tensio.nivell, tensio.tipus);
     blocFinal.push(`NIVELL DE TENSIÓ OBJECTIU: ${tensio.nivell}/10 (${tensio.tipus || ''})`);
@@ -7426,6 +7802,9 @@ CRÍTIC: Han de ser EXACTAMENT ${capsQueFalten} capítols. L'últim (${capsEsper
 // ═══════════════════════════════════════════════════════════
 function generarInstruccionsGanxoFinalCapitol(idx) {
   const esUltimCapitol = idx >= ((ESTAT._estructuraCapitols && ESTAT._estructuraCapitols.length) ? ESTAT._estructuraCapitols.length - 1 : 0);
+  const autorRef = String((ESTAT.configProjecte && ESTAT.configProjecte.autor_referencia) || '').toLowerCase();
+  const modeTolkien = /tolkien/.test(autorRef);
+  const modeCastaneda = /castaneda/.test(autorRef);
   const oberts = (ESTAT.llibreRegistre && Array.isArray(ESTAT.llibreRegistre.fils_oberts))
     ? ESTAT.llibreRegistre.fils_oberts.filter(Boolean)
     : [];
@@ -7436,12 +7815,20 @@ function generarInstruccionsGanxoFinalCapitol(idx) {
   const c2 = idx - 2 >= 0 ? capitolsRegistre[idx - 2] : null;
   const dosCliffhangersConsecutius = !!(c1 && c2 && c1.es_cliffhanger === true && c2.es_cliffhanger === true);
 
-  if (dosCliffhangersConsecutius) {
+  if (dosCliffhangersConsecutius && !modeTolkien && !modeCastaneda) {
     return "PROHIBIT acabar amb cliffhanger. Ja n'hi ha hagut dos consecutius. Aquest capítol HA d'acabar amb una resolució parcial o una reflexió interna.";
   }
 
   if (esUltimCapitol) {
     return `Com que és l'últim capítol, tanca els fils prioritaris i deixa una reverberació emocional final potent: una última imatge, una realització del personatge o una resolució que ressoni. Sense cliffhanger fort, però que la darrera frase es quedi gravada.`;
+  }
+
+  if (modeTolkien) {
+    return "TANCAMENT DE CAPÍTOL (MODE TOLKIEN): Evita cliffhangers mecànics. Acaba amb ressonància èpica o lírica: conseqüència moral, memòria del paisatge, jurament, pèrdua o esperança continguda. L'objectiu no és el xoc immediat, sinó la profunditat de món i destí.";
+  }
+
+  if (modeCastaneda) {
+    return "TANCAMENT DE CAPÍTOL (MODE CASTANEDA): Evita cliffhangers d'acció convencionals. Acaba amb desplaçament perceptiu, paradoxa o pregunta iniciàtica que desestabilitzi el marc del personatge. L'objectiu és una fractura de percepció, no un tall efectista.";
   }
 
   const tecniques = `Tria la tècnica que encaixi millor amb el moment narratiu — NO forçis una pregunta retòrica si no és la més efectiva:
@@ -7532,6 +7919,8 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense cap text addicional, sense m
   "estat_personatges": [{"nom": "nom", "ubicacio": "on és ara", "estat_actual": "situació emocional/física actual"}],
   "fils_oberts": ["fil narratiu que queda obert o s'ha introduït"],
   "fils_tancats": ["fil narratiu que s'ha resolt en aquest capítol"],
+  "fils_nous_detectats": ["fils que s'han obert explícitament en aquest capítol"],
+  "fils_resolts_detectats": ["fils preexistents que aquí es resolen"],
   "prefiguracions_detectades": ["element que apareix en aquest capítol i podria ser una prefiguració o referència a una"],
   "inici_meteorologic": true,
   "es_cliffhanger": false
@@ -8730,6 +9119,7 @@ function crearNKG() {
     timeline_accions: [], // Registre d'Accions Consumades (NKG CHRONOS): "C3E2: Maja entra al laboratori"
     timeline_objectes: [], // Registre de moviment d'objectes: C3E2: [Claus] Personatge A -> Personatge B (motiu)
     timeline_personatges: [], // Registre de canvis de personatge: ubicació/roba/estat per escena
+    beats_gastats: [], // Registre de beats narratius consumits (anti-repetició dramàtica)
     ultima_actualitzacio: { capitol: 0, escena: 0 },
     versio: 1
   };
@@ -8855,6 +9245,112 @@ function nkgRegistrarCanvisPersonatge(nkg, abans, despres, capitol, escena) {
   }
 }
 
+
+function serialitzarTretsImmutables(trets) {
+  if (!trets || typeof trets !== 'object') return '';
+  const edat = trets.edat_aproximada || 'No determinat';
+  const genere = trets.genere || 'No determinat';
+  const rol = trets.rol_narratiu || 'No determinat';
+  const relacio = trets.relacio_protagonista || 'No determinada';
+  return `[IDENTITAT FIXA — NO MODIFICABLE] ${genere}, ${edat}, ${rol}. Relació amb protagonista: ${relacio}. [FI IDENTITAT FIXA]`;
+}
+
+async function extreureTretsImmutablesPersonatge(nom, userConfig = USER_CONFIG) {
+  const perfilObj = (ESTAT._perfilsPersonatges && ESTAT._perfilsPersonatges[nom]) ? ESTAT._perfilsPersonatges[nom] : null;
+  const perfilTxt = perfilObj ? JSON.stringify(perfilObj, null, 2) : '(No disponible)';
+  const elencTxt = Array.isArray(ESTAT._elencPersonatges) && ESTAT._elencPersonatges.length > 0
+    ? ESTAT._elencPersonatges.join('\n')
+    : '(No disponible)';
+
+  const msgs = [{
+    role: 'user',
+    content: `Extreu els trets immutables del personatge "${nom}".
+
+ELENC DE PERSONATGES:
+${elencTxt}
+
+PERFIL DEL PERSONATGE:
+${perfilTxt}
+
+Retorna EXCLUSIVAMENT JSON vàlid amb aquesta estructura:
+{
+  "edat_aproximada": "...",
+  "genere": "...",
+  "rol_narratiu": "...",
+  "relacio_protagonista": "..."
+}
+
+No incloguis cap camp addicional.`
+  }];
+
+  try {
+    const models = getModelConfig(userConfig || USER_CONFIG || {});
+    const raw = await callLLMMulti(
+      msgs,
+      "Ets una analista de personatges. Retorna només JSON.",
+      Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 500, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+    const parsed = parseJsonRobust(raw) || {};
+    return {
+      edat_aproximada: String(parsed.edat_aproximada || 'No determinat').trim(),
+      genere: String(parsed.genere || 'No determinat').trim(),
+      rol_narratiu: String(parsed.rol_narratiu || 'No determinat').trim(),
+      relacio_protagonista: String(parsed.relacio_protagonista || 'No determinada').trim()
+    };
+  } catch (err) {
+    console.warn(`Trets immutables: no s'ha pogut extreure ${nom}:`, err.message);
+    return {
+      edat_aproximada: 'No determinat',
+      genere: 'No determinat',
+      rol_narratiu: 'No determinat',
+      relacio_protagonista: 'No determinada'
+    };
+  }
+}
+
+async function garantirTretsImmutablesPersonatge(nom, userConfig = USER_CONFIG) {
+  if (!ESTAT._nkg || !nom) return null;
+  const clau = nkgNormalitzarNom(nom);
+  if (!clau) return null;
+  if (!ESTAT._nkg.personatges[clau]) {
+    ESTAT._nkg.personatges[clau] = {
+      nom,
+      estat_fisic: '',
+      estat_emocional: 'neutre',
+      indumentaria_actual: '',
+      objectes_inventari: [],
+      objectes_descartats: [],
+      ubicacio: '',
+      objectius: [],
+      secrets: [],
+      viu: true,
+      primera_aparicio: 0,
+      trets_immutables: null
+    };
+  }
+  const p = ESTAT._nkg.personatges[clau];
+  if (p.trets_immutables && typeof p.trets_immutables === 'object') return p.trets_immutables;
+  const trets = await extreureTretsImmutablesPersonatge(nom, userConfig);
+  p.trets_immutables = trets;
+  return trets;
+}
+
+async function inicialitzarTraitsImmutables(userConfig = USER_CONFIG) {
+  if (!ESTAT._nkg) return;
+  if (ESTAT._traitsImmutablesInicialitzats === true) return;
+
+  const nomsNkg = Object.values(ESTAT._nkg.personatges || {}).map(p => p.nom).filter(Boolean);
+  const nomsElenc = Array.isArray(ESTAT._elencPersonatges) ? ESTAT._elencPersonatges.filter(Boolean) : [];
+  const noms = [...new Set([...nomsNkg, ...nomsElenc])];
+
+  for (const nom of noms) {
+    await garantirTretsImmutablesPersonatge(nom, userConfig);
+  }
+
+  ESTAT._traitsImmutablesInicialitzats = true;
+}
+
 function nkgQueryPersonatge(nom) {
   const nkg = ESTAT._nkg;
   if (!nkg) return null;
@@ -8887,7 +9383,9 @@ function nkgQueryEscenaContext(escenaSpec) {
     persPresents.forEach(nom => {
       const p = nkgQueryPersonatge(nom);
       if (p) {
-        let desc = `• ${p.nom}: ${p.estat_emocional || 'neutre'}`;
+        const identitatFixa = serialitzarTretsImmutables(p.trets_immutables);
+        if (identitatFixa) parts.push(`• ${p.nom}: ${identitatFixa}`);
+        let desc = `• ${p.nom}: estat actual=${p.estat_emocional || 'neutre'}`;
         if (p.estat_fisic) desc += ` | Físic: ${p.estat_fisic}`;
         if (p.indumentaria_actual) desc += ` | Roba: ${p.indumentaria_actual}`;
         if (p.objectes_inventari && p.objectes_inventari.length > 0) desc += ` | Inventari: ${p.objectes_inventari.join(', ')}`;
@@ -9095,7 +9593,8 @@ function nkgInicialitzar() {
           objectius: [],
           secrets: [],
           viu: true,
-          primera_aparicio: 0
+          primera_aparicio: 0,
+          trets_immutables: null
         };
       }
     });
@@ -9123,6 +9622,8 @@ function nkgInicialitzar() {
     });
   }
 
+  if (!Array.isArray(nkg.beats_gastats)) nkg.beats_gastats = [];
+
   // Inicialitzar emmagatzematge d'escenes
   ESTAT._escenes_generades = {};
 
@@ -9138,6 +9639,7 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
   if (personatgesActualitzats.length > 0) {
     personatgesActualitzats.forEach(p => {
       const clau = nkgNormalitzarNom(p.nom);
+      if (Object.prototype.hasOwnProperty.call(p, 'trets_immutables')) delete p.trets_immutables;
       const abans = nkg.personatges[clau]
         ? {
           nom: nkg.personatges[clau].nom,
@@ -9159,7 +9661,8 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
           objectius: p.nous_objectius || [],
           secrets: p.nous_secrets || [],
           viu: p.viu !== undefined ? p.viu : true,
-          primera_aparicio: capitol
+          primera_aparicio: capitol,
+          trets_immutables: null
         };
       } else {
         const ex = nkg.personatges[clau];
@@ -9484,6 +9987,9 @@ async function escriureEscenaDirectaAmbJutge(capitol, escenaIdx, escenaSpec, use
     escaleta: escenaSpec
   };
 
+  for (const nomPers of (escenaSpec.personatges || [])) {
+    await garantirTretsImmutablesPersonatge(nomPers, userConfig);
+  }
   const contextNKG = nkgGenerarContextMinim(nkgSpec);
   const contextCapitolEnCurs = obtenirContextCapitolEnCurs(capitol, escenaIdx);
   const escaletaCap = ESTAT._escaletes ? ESTAT._escaletes.find(e => e.capitol === capitol) : null;
