@@ -3911,6 +3911,11 @@ async function generarCapitol(idx, intents = 0) {
       await garantirTretsImmutablesPersonatge(nomPers, USER_CONFIG);
     }
 
+    // Compressió preventiva de memòria si cal (primer cop o cada 3 capítols)
+    if (idx > 0 && (idx % 3 === 0 || ESTAT._memoriasComprimides.length === 0)) {
+      try { await comprimirMemoria(idx, USER_CONFIG); } catch (e) { console.warn('Compressió preventiva:', e.message); }
+    }
+
     // GENERADOR: escriu el capítol
     let res = await generarCapitolNKG(idx, USER_CONFIG);
     let textNet = netejarTabulacionsInicials(res.response);
@@ -3963,8 +3968,8 @@ async function arxitectePostCapitol(idx, textCapitol, userConfig) {
   // 2. Llibre de registre (+ revisió de codi JS cada 3 capítols)
   try { await actualitzarLlibreRegistreBackground(textCapitol, idx, esRevisioSistema, userConfig); } catch (e) { console.warn('Registre:', e.message); }
 
-  // 3. Snapshot de continuïtat
-  try { await generarSnapshotFinalCapitol(idx, userConfig); } catch (e) { console.warn('Snapshot:', e.message); }
+  // 3. Snapshot de continuïtat (validat amb fallback si camps buits)
+  try { await generarSnapshotValidat(idx, textCapitol, userConfig); } catch (e) { console.warn('Snapshot:', e.message); }
 
   // 4. Beats narratius gastats
   try { await actualitzarBeatsNarratiusGastats(textCapitol, idx + 1, userConfig); } catch (e) { console.warn('Beats:', e.message); }
@@ -7281,6 +7286,78 @@ Retorna EXCLUSIVAMENT JSON vàlid amb aquesta forma:
   }
 }
 
+async function generarSnapshotValidat(idx, textCapitol, userConfig) {
+  if (!ESTAT._snapshotsFinals || typeof ESTAT._snapshotsFinals !== 'object') ESTAT._snapshotsFinals = {};
+  if (!textCapitol || !textCapitol.trim()) return null;
+
+  const campsBuids = (snap) => !snap ||
+    ['ubicacio', 'hora_narrativa', 'estat_emocional', 'situacio_immediata'].some(c => !snap[c] || snap[c] === 'No determinat');
+
+  const protagonist = ESTAT.protagonistaTriat || 'la protagonista';
+  const ultimes800 = textCapitol.trim().split(/\s+/).slice(-800).join(' ');
+
+  let snapshot = null;
+  try {
+    const models = getModelConfig(userConfig || USER_CONFIG || {});
+    const msgs = [{
+      role: 'user',
+      content: `Extreu un snapshot de continuïtat del FINAL del capítol ${idx + 1}.
+
+PROTAGONISTA: ${protagonist}
+
+FINAL DEL CAPÍTOL (últimes 800 paraules):
+${ultimes800}
+
+Retorna EXCLUSIVAMENT JSON vàlid:
+{
+  "ubicacio": "Lloc físic exacte on acaba el personatge",
+  "hora_narrativa": "Hora/moment del dia aproximat",
+  "estat_emocional": "Estat psicològic en acabar el capítol",
+  "situacio_immediata": "Què està passant exactament al tancament",
+  "objectes_rellevants": ["objectes que porta o ha perdut"],
+  "ultimes_3_frases": "Les 3 últimes frases del capítol (literal)"
+}`
+    }];
+    const raw = await callLLMMulti(
+      msgs,
+      'Ets una analista de continuïtat narrativa. Respon només JSON.',
+      Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 600, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+    const parsed = parseJsonRobust(raw) || {};
+    snapshot = {
+      ubicacio:           String(parsed.ubicacio           || '').trim(),
+      hora_narrativa:     String(parsed.hora_narrativa     || '').trim(),
+      estat_emocional:    String(parsed.estat_emocional    || '').trim(),
+      situacio_immediata: String(parsed.situacio_immediata || '').trim(),
+      objectes_rellevants: Array.isArray(parsed.objectes_rellevants) ? parsed.objectes_rellevants.map(o => String(o || '').trim()).filter(Boolean) : [],
+      ultimes_3_frases:   String(parsed.ultimes_3_frases  || '').trim(),
+      protagonista:       protagonist
+    };
+  } catch (err) {
+    console.warn('generarSnapshotValidat: error LLM, aplicant fallback:', err.message);
+  }
+
+  // Fallback per camps buits: extreure les últimes 3 frases del text
+  if (campsBuids(snapshot)) {
+    const frases = textCapitol.split(/(?<=[.!?…])\s+/).filter(f => f.trim().length > 10);
+    const ultimes3 = frases.slice(-3).join(' ').trim();
+    snapshot = {
+      ubicacio:           snapshot?.ubicacio           || 'No determinat',
+      hora_narrativa:     snapshot?.hora_narrativa     || 'No determinat',
+      estat_emocional:    snapshot?.estat_emocional    || 'No determinat',
+      situacio_immediata: snapshot?.situacio_immediata || ultimes3.substring(0, 300) || 'No determinat',
+      objectes_rellevants: snapshot?.objectes_rellevants || [],
+      ultimes_3_frases:   snapshot?.ultimes_3_frases   || ultimes3,
+      protagonista:       protagonist,
+      _fallback:          true
+    };
+  }
+
+  ESTAT._snapshotsFinals[idx] = snapshot;
+  return snapshot;
+}
+
 function generarDirectivaContinuitat(capitolIdx) {
   if (capitolIdx <= 0) return '';
   if (!ESTAT._snapshotsFinals || typeof ESTAT._snapshotsFinals !== 'object') ESTAT._snapshotsFinals = {};
@@ -9067,10 +9144,10 @@ Escriu la sinopsi en prosa contínua, sense llistes ni títols. Ha de ser útil 
     Object.assign({}, userConfig, { maxTokens: 1200 }),
     'arquitectura'
   );
-  ESTAT._memoriasComprimides.push({
-    finsCap: finsCapitol,
-    text: res || ''
-  });
+  // Upsert: eliminar entrades del mateix rang o inferior per evitar acumulació infinita
+  ESTAT._memoriasComprimides = (ESTAT._memoriasComprimides || []).filter(m => m.finsCap > finsCapitol);
+  ESTAT._memoriasComprimides.push({ finsCap: finsCapitol, text: res || '' });
+  ESTAT._memoriasComprimides.sort((a, b) => a.finsCap - b.finsCap);
 }
 
 // ═══════════════════════════════════════════════════════════
