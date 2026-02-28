@@ -1152,12 +1152,12 @@
       <button class="btn btn-secondary" onclick="descarregarNovella()">📖 Descarregar Novel·la</button>
       <button class="btn btn-ghost" onclick="generarInformePostMortem()" style="color:var(--accent); border-color:var(--accent);">🧠 Informe Post-Mortem (Opus)</button>
     </div>
-    
+
     <div id="post-mortem-wrap" class="hidden" style="margin-top:30px; padding:20px; background:var(--surface2); border:1px solid var(--accent); border-radius:8px;">
       <h3 style="color:var(--accent); margin-top:0;">🧠 Informe Editorial i Tècnic (Post-Mortem)</h3>
       <div id="post-mortem-content" class="conte-reader" style="font-size:0.95rem;"></div>
     </div>
-    
+
   </div>
 </div>
 
@@ -1639,6 +1639,7 @@ const ESTAT = {
   _metaCapitols:            {},
   _revisionsOpus:           {},
   _revisionsOpusFinals:     {},
+  _revisionsSistema:        {},
   _modeManualCapitols:      false,
   _capitolPendentManual:    null,
   _controlArcs:             null,
@@ -3579,6 +3580,7 @@ function iniciarFase11() {
   ESTAT._metaCapitols       = {};
   ESTAT._revisionsOpus      = {};
   ESTAT._revisionsOpusFinals= {};
+  ESTAT._revisionsSistema   = {};
   ESTAT._capitolPendentManual= null;
   ESTAT.llibreRegistre      = { capitols: [], estat_personatges: [], fils_oberts: [], fils_tancats: [] };
   ESTAT._perfilsPersonatges = {};
@@ -3665,56 +3667,43 @@ function copiarTextIndependent(text, etiqueta = 'Text') {
 }
 
 function obrirDetallCapitol(idx) {
-  const textFinal = (ESTAT._capitols_generats && ESTAT._capitols_generats[idx]) || '';
-  if (!textFinal) return;
+  const textFinal = ESTAT._capitols_generats[idx] || '';
+  const dadesNKG = (ESTAT.llibreRegistre && ESTAT.llibreRegistre.capitols[idx]) || {};
+  const revSistema = (ESTAT._revisionsSistema && ESTAT._revisionsSistema[idx]) || null;
+  const titol = ESTAT._estructuraCapitols[idx]?.titol || `Capítol ${idx + 1}`;
 
-  ESTAT._capitolDetallIdx = idx;
-  const meta = (ESTAT._metaCapitols && ESTAT._metaCapitols[idx]) || {};
-  const revisio = (ESTAT._revisionsOpus && ESTAT._revisionsOpus[idx]) || null;
-  const revisioFinal = (ESTAT._revisionsOpusFinals && ESTAT._revisionsOpusFinals[idx]) || null;
-  const titol = (ESTAT._estructuraCapitols[idx] && ESTAT._estructuraCapitols[idx].titol) || `Capítol ${idx + 1}`;
+  let html = `<div style="font-weight:700;color:var(--accent2);margin-bottom:10px;">${escHtml(titol)}</div>`;
 
-  const revisioTxt = revisio
-    ? `Nota: ${revisio.puntuacio ?? '?'} / 10
-Observacions: ${(Array.isArray(revisio.problemes) && revisio.problemes.length > 0) ? revisio.problemes.join(' | ') : (revisio.comentari_editor_final || revisio.valoracio_general || 'Sense observacions.')}`
-    : 'Sense revisió Opus disponible encara.';
+  // 1. Text del capítol
+  html += `<div class="capitol-detall-box">
+    <h4>📖 Narració</h4>
+    <div style="white-space:pre-wrap;font-size:.9rem;line-height:1.6;">${escHtml(textFinal)}</div>
+  </div>`;
 
-  const revFinalTxt = revisioFinal
-    ? `Nota final reescriptura: ${revisioFinal.puntuacio ?? '?'} / 10
-Observacions: ${revisioFinal.observacions || ''}
-Feedback App: ${revisioFinal.feedback_app || 'Cap'}`
-    : "Encara no s'ha executat la segona revisió Opus.";
+  // 2. Dades extretes per al registre
+  const llistaPers = (dadesNKG.personatges || []).map(p => `${p.nom} (${p.ubicacio})`).join(' | ');
+  const llistaObj = (dadesNKG.objectes || []).map(o => `${o.nom}`).join(' | ');
 
-  const sections = [
-    { id:'inject-esbos', label:'Informació injectada per generar esbòs', text: meta.infoInjectadaEsbos || '(no disponible)' },
-    { id:'esbos', label:'Esbòs', text: meta.esbos || '(no disponible)' },
-    { id:'canvis-arq', label:"Canvis suggerits per l'Arquitecta", text: meta.correccionsArquitecta || '(no disponible)' },
-    { id:'inject-rev', label:'Informació injectada per generar revisió Opus', text: meta.infoInjectadaRevisioOpus || '(no disponible)' },
-    { id:'rev-opus', label:'Revisió Opus (indicacions + nota)', text: revisioTxt },
-    { id:'cap-final', label:'Capítol final', text: textFinal },
-    { id:'rev-final', label:'Revisió final Opus', text: revFinalTxt }
-  ];
+  html += `<div class="capitol-detall-box" style="border-left: 3px solid var(--success); margin-top: 15px;">
+    <h4 style="color: var(--success);">📊 Ingressat al Llibre de Registres</h4>
+    <p><strong>Resum:</strong> ${escHtml(dadesNKG.resum_capitol || 'Sense resum')}</p>
+    <p><strong>Personatges actualitzats:</strong> ${escHtml(llistaPers || 'Cap')}</p>
+    <p><strong>Objectes detectats:</strong> ${escHtml(llistaObj || 'Cap')}</p>
+  </div>`;
 
-  const html = `<div style="font-weight:700;color:var(--accent2);margin-bottom:10px;">${escHtml(titol)}</div>` +
-    sections.map(s => `<div class="capitol-detall-box">
-      <button class="capitol-detall-copy" data-copy-id="det-${s.id}" data-copy-label="${escHtml(s.label)}" title="Copiar secció">⎘</button>
-      <h4>${s.label}</h4>
-      <div id="det-${s.id}" style="white-space:pre-wrap;font-size:.86rem;line-height:1.6;">${escHtml(s.text)}</div>
-    </div>`).join('');
+  // 3. Revisió de sistema (només capítols 3, 6, 9...)
+  if (revSistema && (idx + 1) % 3 === 0) {
+    html += `<div class="review-panel" style="background: rgba(251, 191, 36, 0.1); border: 1px solid var(--warning); margin-top: 15px;">
+      <h4 style="color: var(--warning);">🛠️ Auditoria del Sistema (Arquitecta)</h4>
+      <p style="font-style: italic; font-size: 0.9rem; color: var(--text);">
+        ${escHtml(revSistema.millores_funcions_app || 'Cap millora requerida.')}
+      </p>
+    </div>`;
+  }
 
-  const wrap = document.getElementById('capitol-detall-wrap');
   const content = document.getElementById('capitol-detall-content');
   content.innerHTML = html;
-  content.querySelectorAll('.capitol-detall-copy').forEach(btn => {
-    btn.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      const id = btn.getAttribute('data-copy-id');
-      const label = btn.getAttribute('data-copy-label') || 'Secció';
-      const target = document.getElementById(id);
-      copiarTextIndependent(target ? target.innerText : '', label);
-    });
-  });
-
+  const wrap = document.getElementById('capitol-detall-wrap');
   wrap.classList.remove('hidden');
   wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -3848,6 +3837,7 @@ async function generarCapitol(idx, intents = 0) {
   if (idx >= ESTAT._estructuraCapitols.length) {
     document.getElementById('btn-control-arcs-wrap').classList.remove('hidden');
     await executarLoopCoherenciaFinal(USER_CONFIG);
+    try { await generarRevisioFinalApp(USER_CONFIG); } catch (err) { console.warn('Post-mortem app:', err.message); }
     iniciarRevisioGlobal();  // FASE 6: auto-trigger revisió global
     return;
   }
@@ -3875,13 +3865,6 @@ async function generarCapitol(idx, intents = 0) {
     ESTAT._capitols_generats[idx] = textNet;
     ESTAT._metaCapitols = ESTAT._metaCapitols || {};
     ESTAT._metaCapitols[idx] = Object.assign({}, ESTAT._metaCapitols[idx] || {}, { textFinal: textNet });
-    ESTAT._metaCapitols = ESTAT._metaCapitols || {};
-    ESTAT._metaCapitols[idx] = Object.assign({}, ESTAT._metaCapitols[idx] || {}, {
-      esbos: res.esborrany || '',
-      correccionsArquitecta: res.correccionsArquitecta || '',
-      infoInjectadaEsbos: res.infoInjectadaEsbos || '',
-      infoInjectadaRevisioOpus: res.infoInjectadaRevisioOpus || ''
-    });
     renderLlistaCapitols();
     hideLoader(11);
     mostrarCapitol(idx, textNet);
@@ -7301,7 +7284,7 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense markdown, sense text addicio
   if (!validacio) {
     throw new Error("L'API no ha retornat una estructura vàlida amb la clau 'capitols'. Cal reintentar.");
   }
-  
+
   // Guardem el títol generat a l'estat global perquè estigui disponible a l'exportació
   ESTAT.titol_novella = validacio.titol_novella || "Novel·la Sense Títol";
 
@@ -9480,40 +9463,147 @@ Retorna només la versió final del capítol, sense metadades ni notes.`
     'generacio'
   );
 }
+async function escriureCapitolDirecte(idx, contextCapitol, userConfig) {
+  const capitol = idx + 1;
+  const cap = ESTAT._estructuraCapitols[idx] || {};
+  const systemPrompt = buildSystemPromptCapitol();
+  const msgs = [{
+    role: 'user',
+    content: `Escriu directament la versió final del capítol ${capitol} sense fases intermèdies d'esborrany.
+
+TÍTOL: ${cap.titol || ''}
+CONTEXT COMPLET:
+${contextCapitol}
+
+INSTRUCCIONS:
+- Mantén coherència estricta amb el context i la continuïtat factual.
+- Prosa literària en català, sense metadades.
+- Mantén tensió i ritme segons el capítol.
+
+Retorna només el capítol final.`
+  }];
+
+  const models = getModelConfig(userConfig);
+  return await callLLMOneShotPlusCompletion(
+    msgs,
+    systemPrompt,
+    Object.assign({}, userConfig, { maxTokens: 14000, model: models.modelGeneracio }),
+    'generacio'
+  );
+}
+
+async function extreureDadesRegistreIAvaluarSistema(idx, textCapitol, esRevisioSistema, userConfig) {
+  const instruccioRevisio = esRevisioSistema
+    ? `
+
+TASCA B: AUDITORIA DE L'APP (Revisió de Sistema)
+Analitza la coherència tècnica d'aquest capítol respecte a com se li passa la informació al Generador. NO suggereixis canvis literaris. Suggereix una MILLORA DE DISSENY de les funcions de l'app (ex: "Cal afegir un camp de 'motivació' al prompt de personatges", "S'ha de millorar la injecció de memòria a la funció buildContext") per evitar incoherències futures.`
+    : '';
+
+  const msgs = [{
+    role: 'user',
+    content: `Ets l'Arquitecta del sistema. El teu objectiu NO és jutjar la qualitat de la prosa, sinó garantir la integritat del Llibre de Registre (NKG) i optimitzar el programari de generació.
+
+TASCA A: ACTUALITZACIÓ DE REGISTRE
+Extreu del següent capítol:
+1. OBJECTES: Nous objectes introduïts, canvis d'estat o de possessió.
+2. PERSONATGES: Ubicació exacta, estat actual, i nous fets canònics confirmats.
+3. ESCENES I TRAMES: Resum executiu i progrés dels fils narratius.${instruccioRevisio}
+
+CAPÍTOL ${idx + 1}:
+${textCapitol.substring(0, 12000)}
+
+Retorna EXCLUSIVAMENT JSON amb aquesta estructura:
+{
+  "actualitzacio_nkg": {
+    "resum_capitol": "Resum executiu...",
+    "personatges": [{"nom": "...", "ubicacio": "...", "estat": "..."}],
+    "objectes": [{"nom": "...", "estat": "...", "posseidor": "..."}],
+    "trames": {"fils_actualitzats": ["..."], "nous_fils": ["..."]}
+  }${esRevisioSistema ? `,
+  "revisio_sistema": {
+    "millores_funcions_app": "Proposta tècnica pel codi JS o disseny de prompts..."
+  }` : ''}
+}`
+  }];
+
+  const models = getModelConfig(userConfig);
+  const raw = await callLLMMulti(msgs, "Ets l'Arquitecta de Dades i Sistemes. Retorna només JSON.", Object.assign({}, userConfig, { maxTokens: 1500, model: models.modelArquitecte }), 'arquitectura');
+  return parseJsonRobust(raw) || { actualitzacio_nkg: {} };
+}
+
 async function generarCapitolNKG(idx, userConfig) {
   const capitol = idx + 1;
   const loaderEl = document.getElementById('loader-11-text');
   const contextCapitol = buildContextCapitol(idx);
 
-  if (loaderEl) loaderEl.textContent = '📝 Escrivint primer esborrany ràpid...';
-  const esborrany = await generarEsborranyCapitol(idx, userConfig);
+  if (loaderEl) loaderEl.textContent = `✨ Generant directament el capítol ${capitol} final...`;
 
-  const infoInjectadaEsbos = `CAPÍTOL ${capitol}
-CONTEXT CAPÍTOL:
-${contextCapitol}
-`;
+  // 1. Generació directa del capítol (sense esbòs)
+  const textComplet = await escriureCapitolDirecte(idx, contextCapitol, userConfig);
+  const textNet = netejarTabulacionsInicials(textComplet || '');
 
-  if (loaderEl) loaderEl.textContent = "🔍 Arquitecta revisant continuïtat d'objectes i veus...";
-  const correccionsArquitecta = await avaluarEsborranyAmbHistoric(idx, esborrany, userConfig);
-  const infoInjectadaRevisioOpus = `Novel·la fins ara (fragments):
-${(ESTAT._capitols_generats || []).slice(0, idx).filter(Boolean).map((t, i) => `--- CAPÍTOL ${i + 1} ---\n${String(t).slice(-1800)}`).join('\n\n') || '(encara no hi ha capítols previs)'}
+  if (loaderEl) loaderEl.textContent = "📊 Arquitecta extraient dades de registre i avaluant el sistema...";
 
-Esborrany a revisar:
-${String(esborrany || '').slice(0, 7000)}`;
+  // 2. L'Arquitecta extreu dades i, cada 3 capítols, avalua el codi de l'app
+  const esRevisioSistema = capitol % 3 === 0;
+  const dadesRegistre = await extreureDadesRegistreIAvaluarSistema(idx, textNet, esRevisioSistema, userConfig);
 
-  if (loaderEl) loaderEl.textContent = '✨ Polint i escrivint la prosa definitiva...';
-  let textComplet = await generarProsaDefinitiva(idx, esborrany, correccionsArquitecta, userConfig);
-  textComplet = netejarTabulacionsInicials(textComplet || '');
+  // 3. Persistència a l'estat global
+  ESTAT._capitols_generats[idx] = textNet;
+  ESTAT.llibreRegistre = ESTAT.llibreRegistre || { capitols: [] };
+  ESTAT.llibreRegistre.capitols[idx] = dadesRegistre.actualitzacio_nkg;
 
-  if (ESTAT._nkg) {
-    try {
-      await nkgActualitzarPostEscena(textComplet, capitol, 1, userConfig);
-    } catch (err) {
-      console.warn('NKG post-capítol: error no bloquejant:', err.message);
-    }
+  if (esRevisioSistema && dadesRegistre.revisio_sistema) {
+    ESTAT._revisionsSistema = ESTAT._revisionsSistema || {};
+    ESTAT._revisionsSistema[idx] = dadesRegistre.revisio_sistema;
   }
 
-  return { response: textComplet, esborrany, correccionsArquitecta, infoInjectadaEsbos, infoInjectadaRevisioOpus };
+  return { response: textNet };
+}
+
+async function generarRevisioFinalApp(userConfig) {
+  const resumsGlobals = (ESTAT.llibreRegistre.capitols || []).map((c, i) => `Cap ${i+1}: ${c ? c.resum_capitol : 'Buit'}`).join('\n');
+  const revisionsSistema = Object.values(ESTAT._revisionsSistema || {}).map(r => r.millores_funcions_app).join('\n');
+
+  const msgs = [{
+    role: 'user',
+    content: `La generació de la novel·la ha finalitzat. Ets l'Enginyera Cap de Desenvolupament (Lead Developer) de l'aplicació "Booki".
+Fes un post-mortem tècnic de com ha actuat el sistema. No avaluïs la literatura, avalua l'aplicació en si.
+
+RESUMS GENERATS PELS PROMPTS:
+${resumsGlobals}
+
+BOGUES / MILLORES SUGGERIDES DURANT L'EXECUCIÓ:
+${revisionsSistema || 'Sense incidències registrades.'}
+
+Retorna un JSON exclusivament amb:
+{
+  "puntuacio_sistema": 8,
+  "veredicte_tecnic": "Opinió sobre si el sistema de memòria (NKG) i els prompts han aguantat la coherència...",
+  "millores_globals_app": [
+    "1. Proposta de refactorització per al codi JavaScript...",
+    "2. Proposta de canvi d'estructura JSON per al NKG...",
+    "3. Nou paràmetre suggerit per a la UI de configuració..."
+  ]
+}`
+  }];
+
+  const models = getModelConfig(userConfig);
+  const raw = await callLLMMulti(msgs, "Ets l'Enginyera Cap. Retorna només JSON.", Object.assign({}, userConfig, { maxTokens: 1500, model: models.modelArquitecte }), 'arquitectura');
+  const result = parseJsonRobust(raw);
+
+  // Renderitzat del post-mortem a la UI
+  const wrap = document.getElementById('post-mortem-wrap');
+  if (wrap && result) {
+    document.getElementById('post-mortem-content').innerHTML = `
+      <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent);">Nota del Sistema: ${result.puntuacio_sistema}/10</div>
+      <p style="margin-top: 10px;"><strong>Veredicte Tècnic:</strong> ${escHtml(result.veredicte_tecnic)}</p>
+      <h4 style="margin-top: 15px; color: var(--warning);">Propostes per al codi:</h4>
+      <ul>${(result.millores_globals_app || []).map(m => `<li>${escHtml(m)}</li>`).join('')}</ul>
+    `;
+    wrap.classList.remove('hidden');
+  }
 }
 
 function renderitzarNKG() {
@@ -9563,7 +9653,7 @@ function detectarRepeticions() {
     const paraules = text.toLowerCase().replace(/[.,;:!?«»""''()\[\]]/g, ' ').split(/\s+/).filter(p => p.length > 2);
     const ngrams = {};
     for (let i = 0; i <= paraules.length - n; i++) {
-      const ng = paraules.slice(i, i + n).join('\n');
+      const ng = paraules.slice(i, i + n).join(' ');
       ngrams[ng] = (ngrams[ng] || 0) + 1;
     }
     return ngrams;
@@ -10405,7 +10495,7 @@ async function generarInformePostMortem() {
   const wrap = document.getElementById('post-mortem-wrap');
   const content = document.getElementById('post-mortem-content');
   const btn = document.querySelector('button[onclick="generarInformePostMortem()"]');
-  
+
   if (!ESTAT._capitols_generats || ESTAT._capitols_generats.length === 0) {
     toast("No hi ha cap novel·la generada per avaluar.");
     return;
@@ -10420,7 +10510,7 @@ async function generarInformePostMortem() {
   const numCaps = ESTAT._capitols_generats.length;
   const cap1 = ESTAT._capitols_generats[0] || '';
   const capFinal = ESTAT._capitols_generats[numCaps - 1] || '';
-  
+
   const dadesAnalisi = `
 TÍTOL: ${ESTAT.titol_novella || 'Sense títol'}
 ESTRUCTURA: ${JSON.stringify(ESTAT._estructuraCapitols)}
@@ -10454,7 +10544,7 @@ Sigues crític, directe i molt tècnic.`;
       Object.assign({}, USER_CONFIG, { maxTokens: 1500, model: models.modelArquitecte }),
       'arquitectura'
     );
-    
+
     if (typeof efecteEscripturaHTML === 'function') {
       const htmlConvertit = res.replace(/\n\n/g, '<br><br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
       efecteEscripturaHTML('post-mortem-content', htmlConvertit, 5);
