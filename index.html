@@ -1814,6 +1814,13 @@ function getModelConfig(userConfig) {
   };
 }
 
+// Retorna maxTokens capped al màxim de sortida del model seleccionat
+function capsMaxTokens(modelId, requested) {
+  const reg = MODEL_REGISTRY[modelId];
+  const maxOut = (reg && reg.max_output) ? reg.max_output : 4096;
+  return Math.min(requested, maxOut);
+}
+
 function setModelPerRol(rol, modelId) {
   if (!MODEL_REGISTRY[modelId]) { console.warn(`Model desconegut: ${modelId}`); return; }
   switch (rol) {
@@ -3696,29 +3703,32 @@ function obrirDetallCapitol(idx) {
   if (!textFinal) return;
 
   ESTAT._capitolDetallIdx = idx;
-  const meta = (ESTAT._metaCapitols && ESTAT._metaCapitols[idx]) || {};
-  const revisio = (ESTAT._revisionsOpus && ESTAT._revisionsOpus[idx]) || null;
-  const revisioFinal = (ESTAT._revisionsOpusFinals && ESTAT._revisionsOpusFinals[idx]) || null;
+  const meta  = (ESTAT._metaCapitols && ESTAT._metaCapitols[idx]) || {};
   const titol = (ESTAT._estructuraCapitols[idx] && ESTAT._estructuraCapitols[idx].titol) || `Capítol ${idx + 1}`;
 
-  const revisioTxt = revisio
-    ? `Nota: ${revisio.puntuacio ?? '?'} / 10
-Observacions: ${(Array.isArray(revisio.problemes) && revisio.problemes.length > 0) ? revisio.problemes.join(' | ') : (revisio.comentari_editor_final || revisio.valoracio_general || 'Sense observacions.')}`
-    : 'Sense revisió Opus disponible encara.';
-
-  const revFinalTxt = revisioFinal
-    ? `Nota final reescriptura: ${revisioFinal.puntuacio ?? '?'} / 10
-Observacions: ${revisioFinal.observacions || ''}`
-    : "Encara no s'ha executat la segona revisió Opus.";
+  // Revisió de coherència de l'Arquitecte per a aquest capítol
+  const revArq = (ESTAT._revisionsCodiSistema || []).find(r => r.capitol === idx + 1);
+  let revArqTxt = '(Cap revisió de coherència per a aquest capítol — es genera cada 3 capítols)';
+  if (revArq) {
+    try {
+      const r = JSON.parse(revArq.revisio);
+      const linies = [];
+      if (r.qualitat_coherencia) linies.push(`Coherència: ${r.qualitat_coherencia.puntuacio ?? '?'}/10 — ${r.qualitat_coherencia.diagnostic || ''}`);
+      const inconsis = (r.inconsistencies_cronologiques || []).filter(s => s && s !== 'Cap detectada');
+      if (inconsis.length) linies.push(`Inconsistències: ${inconsis.join(' | ')}`);
+      const puntsFebles = r.qualitat_coherencia && r.qualitat_coherencia.punts_febles || [];
+      if (puntsFebles.length) linies.push(`Punts febles: ${puntsFebles.join(' | ')}`);
+      const millores = (r.millores_proposades || []).map(m => `[${m.prioritat}] ${m.proposta || m.problema}`).join('\n');
+      if (millores) linies.push(`Millores proposades:\n${millores}`);
+      if (r.alerta_critica) linies.push(`⚠️ ${r.alerta_critica}`);
+      revArqTxt = linies.join('\n') || '(sense dades)';
+    } catch { revArqTxt = revArq.revisio; }
+  }
 
   const sections = [
-    { id:'inject-esbos', label:'Informació injectada per generar esbòs', text: meta.infoInjectadaEsbos || '(no disponible)' },
-    { id:'esbos', label:'Esbòs', text: meta.esbos || '(no disponible)' },
-    { id:'canvis-arq', label:"Canvis suggerits per l'Arquitecta", text: meta.correccionsArquitecta || '(no disponible)' },
-    { id:'inject-rev', label:'Informació injectada per generar revisió Opus', text: meta.infoInjectadaRevisioOpus || '(no disponible)' },
-    { id:'rev-opus', label:'Revisió Opus (indicacions + nota)', text: revisioTxt },
-    { id:'cap-final', label:'Capítol final', text: textFinal },
-    { id:'rev-final', label:'Revisió final Opus', text: revFinalTxt }
+    { id:'inject-ctx', label:'Context injectat al Generador', text: meta.infoInjectadaEsbos || '(no disponible)' },
+    { id:'cap-final',  label:'Capítol final',                 text: textFinal },
+    { id:'rev-arq',    label:'Revisió de coherència (Arquitecte)', text: revArqTxt }
   ];
 
   const html = `<div style="font-weight:700;color:var(--accent2);margin-bottom:10px;">${escHtml(titol)}</div>` +
@@ -4169,40 +4179,54 @@ function mostrarRevisioCapitol(revisat, idx, isLast) {
   actualitzarEstatCapitol(idx, 'fet');
 }
 
-function mostrarCheckpointIntermedi(checkpoint, capitolActual, totalCapitols) {
+function mostrarCheckpointIntermedi(idx) {
   const panel = document.getElementById('checkpoint-intermedi-panel');
   if (!panel) return;
 
-  const subtramesHtml = (checkpoint.estat_subtrames || []).map(st => {
-    const color = st.estat === 'activa' ? 'var(--success)' : st.urgent ? '#f87171' : 'var(--warning)';
-    return `<li style="color:${color};margin-bottom:4px;"><strong>${escHtml(st.nom)}</strong> (${escHtml(st.estat)}) — ${escHtml(st.nota || '')}</li>`;
-  }).join('\n');
+  const capitol = idx + 1;
+  const revArq = (ESTAT._revisionsCodiSistema || []).find(r => r.capitol === capitol);
+  if (!revArq) { panel.classList.add('hidden'); return; }
 
-  const absentsHtml = (checkpoint.personatges_absents || []).length > 0
-    ? `<p style="margin:8px 0 4px;font-size:.82rem;color:var(--text2);"><strong>Personatges a recuperar:</strong> ${escHtml((checkpoint.personatges_absents || []).join(', '))}</p>`
+  let r = {};
+  try { r = JSON.parse(revArq.revisio); } catch { /* dades crues */ }
+
+  const qualitat = r.qualitat_coherencia || {};
+  const punts = qualitat.puntuacio ?? '?';
+  const colorPunts = typeof punts === 'number'
+    ? (punts >= 8 ? 'var(--success)' : punts >= 6 ? 'var(--warning)' : '#f87171')
+    : 'var(--text2)';
+
+  const inconsis = (r.inconsistencies_cronologiques || []).filter(s => s && s !== 'Cap detectada');
+  const inconsHtml = inconsis.length
+    ? `<div style="margin-top:10px;"><div style="font-size:.8rem;font-weight:600;color:#f87171;margin-bottom:4px;">⏱ Inconsistències cronològiques</div><ul style="margin:0 0 0 14px;padding:0;font-size:.8rem;color:var(--text);">${inconsis.map(s => `<li style="margin-bottom:3px;">${escHtml(s)}</li>`).join('')}</ul></div>`
+    : `<div style="margin-top:8px;font-size:.8rem;color:var(--success);">✓ Sense inconsistències cronològiques detectades</div>`;
+
+  const puntsFebles = (qualitat.punts_febles || []);
+  const puntsFeblesHtml = puntsFebles.length
+    ? `<div style="margin-top:10px;"><div style="font-size:.8rem;font-weight:600;color:var(--text2);margin-bottom:4px;">Punts febles</div><ul style="margin:0 0 0 14px;padding:0;font-size:.8rem;color:var(--text);">${puntsFebles.map(s => `<li style="margin-bottom:3px;">${escHtml(s)}</li>`).join('')}</ul></div>`
     : '';
 
-  const prefUrgentsHtml = (checkpoint.prefiguracions_urgents || []).map(p =>
-    `<li style="font-size:.82rem;color:var(--text2);">Cap.${p.capitol_resolucio}: <strong>${escHtml(p.element || '')}</strong> — ${escHtml(p.nota || '')}</li>`
-  ).join('\n');
+  const millores = (r.millores_proposades || []);
+  const milloresHtml = millores.length
+    ? `<div style="margin-top:10px;"><div style="font-size:.8rem;font-weight:600;color:var(--accent2);margin-bottom:4px;">Millores proposades</div>${millores.map(m => {
+        const color = m.prioritat === 'alta' ? '#f87171' : m.prioritat === 'mitja' ? 'var(--warning)' : 'var(--text2)';
+        return `<div style="font-size:.78rem;padding:5px 10px;margin-bottom:4px;background:var(--surface);border-radius:5px;border-left:2px solid ${color};"><span style="color:${color};font-weight:600;">[${escHtml(m.prioritat || '?')}]</span> ${escHtml(m.proposta || m.problema || '')}</div>`;
+      }).join('')}</div>`
+    : '';
 
-  const derivaHtml = checkpoint.deriva_detectada
-    ? `<p style="margin:8px 0 4px;font-size:.82rem;color:#f87171;"><strong>Deriva detectada:</strong> ${escHtml(checkpoint.deriva_detectada)}</p>`
+  const alertaHtml = r.alerta_critica
+    ? `<div style="margin-top:10px;padding:8px 12px;background:#fef2f2;border-radius:6px;border-left:3px solid #f87171;font-size:.8rem;color:#b91c1c;"><strong>⚠️ Alerta crítica:</strong> ${escHtml(r.alerta_critica)}</div>`
     : '';
 
   panel.innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-      <span style="font-size:1.3rem;">🟡</span>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+      <div style="font-size:1.6rem;font-weight:700;color:${colorPunts};">${punts}<span style="font-size:.9rem;color:var(--text2);">/10</span></div>
       <div>
-        <div style="font-weight:700;color:#f59e0b;font-size:.95rem;">Checkpoint de coherència — meitat de novel·la</div>
-        <div style="font-size:.78rem;color:var(--text2);">Capítol ${capitolActual} de ${totalCapitols} — els ajustos de rumb s'aplicaran als capítols restants</div>
+        <div style="font-weight:700;color:var(--accent2);font-size:.95rem;">Revisió de coherència — Capítol ${capitol}</div>
+        <div style="font-size:.77rem;color:var(--text2);">${escHtml(qualitat.diagnostic || '')}</div>
       </div>
     </div>
-    ${subtramesHtml ? `<ul style="margin:0 0 8px 16px;padding:0;">${subtramesHtml}</ul>` : ''}
-    ${absentsHtml}
-    ${prefUrgentsHtml ? `<p style="margin:8px 0 4px;font-size:.82rem;color:var(--text2);"><strong>Prefiguracions urgents:</strong></p><ul style="margin:0 0 8px 16px;padding:0;">${prefUrgentsHtml}</ul>` : ''}
-    ${derivaHtml}
-    ${checkpoint.ajustos_rumb ? `<div style="margin-top:10px;padding:10px 14px;background:var(--surface);border-radius:6px;border-left:2px solid #f59e0b;font-size:.81rem;color:var(--text2);"><strong>Ajustos de rumb injectats als capítols restants:</strong><br>${escHtml(checkpoint.ajustos_rumb)}</div>` : ''}`;
+    ${alertaHtml}${inconsHtml}${puntsFeblesHtml}${milloresHtml}`;
 
   panel.classList.remove('hidden');
   panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -10359,10 +10383,11 @@ Retorna EXCLUSIVAMENT JSON amb aquesta estructura:
   }];
 
   const models = getModelConfig(userConfig);
+  const tokensDesitjats = esRevisioSistema ? 3200 : 1800;
   const raw = await callLLMMulti(
     msgs,
     "Ets l'Arquitecta de Dades i Sistemes. Retorna només JSON.",
-    Object.assign({}, userConfig, { maxTokens: esRevisioSistema ? 3200 : 1800, model: models.modelArquitecte }),
+    Object.assign({}, userConfig, { maxTokens: capsMaxTokens(models.modelArquitecte, tokensDesitjats), model: models.modelArquitecte }),
     'arquitectura'
   );
   const dades = parseJsonRobust(raw) || { actualitzacio_nkg: {} };
