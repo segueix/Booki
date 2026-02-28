@@ -6773,7 +6773,7 @@ ${veus}
 
 REGLA D'ESTIL OBLIGATÒRIA (SHOW, DON'T TELL): Tens totalment prohibit utilitzar etiquetes emocionals explícites per descriure com se sent un personatge (ex: prohibit dir \"estava trist\", \"se sentia enfadat\", \"estava nerviós\"). En comptes d'això, has de MOSTRAR l'emoció a través d'accions físiques, interaccions amb els objectes del seu inventari, la seva vestimenta, el llenguatge corporal o detalls de l'entorn (ex: \"jugava compulsivament amb el botó descosit de l'abric\", \"va prémer les claus fins que els artells se li van posar blancs\").
 
-REGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que és el final del capítol, NO resolguis la situació ni facis que els personatges abandonin l'escenari al final del text. Deixa l'acció fluint, oberta o en suspens dramàtic, de manera que la següent generació pugui recollir el testimoni de forma natural.`;
+REGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que és el final del capítol, NO tanquis artificialment l'energia narrativa. Mantén continuïtat orgànica segons el to de l'obra: suspens d'acció, ressonància lírica, o desplaçament perceptiu; la següent generació ha de poder recollir el testimoni de forma natural.`;
 
   if (ESTAT._goldenPassage) {
     base += `\n\nREFERÈNCIA DE VEU:\nEl següent passatge exemplifica la veu i l'estil que ha de tenir la novel·la. Usa'l com a referència de qualitat:\n\n${ESTAT._goldenPassage}`;
@@ -7195,15 +7195,22 @@ function buildSystemPromptCapitol() {
       if (m.vocabulari) linies.push(`• Vocabulari: ${m.vocabulari}`);
       if (linies.length > 0) parts.push('\nMANUAL D\'ESTIL DE REFERÈNCIA:\n' + linies.join('\n'));
     }
+    const autorRef = String((ESTAT.configProjecte && ESTAT.configProjecte.autor_referencia) || '').toLowerCase();
+    const modeTolkien = /tolkien/.test(autorRef);
+    const modeCastaneda = /castaneda/.test(autorRef);
     const tensioActiva = (ESTAT._corbaTensio || []).find(t => t.capitol === (Number(ESTAT._capitolActual || 0) + 1));
-    if (tensioActiva && Number(tensioActiva.nivell) > 7) {
+    if (modeTolkien) {
+      parts.push('\nINTENSITAT NARRATIVA (MODE TOLKIEN): Prioritza gravetat mítica, memòria del paisatge i pes moral de les decisions. La tensió no ha de ser sempre frenètica: alterna amplitud èpica, respiració lírica i conseqüència històrica.');
+    } else if (modeCastaneda) {
+      parts.push("\nINTENSITAT NARRATIVA (MODE CASTANEDA): Prioritza desplaçament perceptiu, ambigüitat ontològica i procés iniciàtic. La tensió pot ser interior i cognitiva: sostén silencis, paradoxes i fractures de percepció sense accelerar artificialment l'acció.");
+    } else if (tensioActiva && Number(tensioActiva.nivell) > 7) {
       parts.push("\nCONTROL DE CONTRAST SENSORIAL (NKG>7): Trenca qualsevol fredor comptable amb detalls viscerals o orgànics (olors, suor, brutícia, reaccions físiques involuntàries). Quan la tensió és alta, aquests detalls són OBLIGATORIS i han d'entrar dins l'acció.");
     } else {
       parts.push('\nCONTROL DE CONTRAST SENSORIAL: Evita la prosa asèptica. Integra textura física i sensorial (cos, entorn, fricció material) per humanitzar la tensió.');
     }
     parts.push("\nREGLA D'ESTIL OBLIGATÒRIA (SHOW, DON'T TELL): Tens totalment prohibit utilitzar etiquetes emocionals explícites per descriure com se sent un personatge (ex: prohibit dir \"estava trist\", \"se sentia enfadat\", \"estava nerviós\"). En comptes d'això, has de MOSTRAR l'emoció a través d'accions físiques, interaccions amb objectes, vestimenta, llenguatge corporal o detalls de l'entorn.");
-    parts.push("\nREGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que és el final del capítol, NO resolguis la situació ni facis que els personatges abandonin l'escenari al final del text. Deixa l'acció fluint, oberta o en suspens dramàtic, de manera que la següent generació pugui recollir el testimoni de forma natural.");
-    const blocBeatsProhibits = buildBlocBeatsNarratiusProhibits();
+    parts.push("\nREGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que és el final del capítol, NO tanquis artificialment l'energia narrativa. Mantén continuïtat orgànica segons el to de l'obra: suspens d'acció, ressonància lírica, o desplaçament perceptiu; la següent generació ha de poder recollir el testimoni de forma natural.");
+        const blocBeatsProhibits = buildBlocBeatsNarratiusProhibits();
     if (blocBeatsProhibits) parts.push('\n' + blocBeatsProhibits);
     const blocAlertesEstil = buildBlocAlertesEstil();
     if (blocAlertesEstil) parts.push('\n' + blocAlertesEstil);
@@ -8020,6 +8027,9 @@ CRÍTIC: Han de ser EXACTAMENT ${capsQueFalten} capítols. L'últim (${capsEsper
 // ═══════════════════════════════════════════════════════════
 function generarInstruccionsGanxoFinalCapitol(idx) {
   const esUltimCapitol = idx >= ((ESTAT._estructuraCapitols && ESTAT._estructuraCapitols.length) ? ESTAT._estructuraCapitols.length - 1 : 0);
+  const autorRef = String((ESTAT.configProjecte && ESTAT.configProjecte.autor_referencia) || '').toLowerCase();
+  const modeTolkien = /tolkien/.test(autorRef);
+  const modeCastaneda = /castaneda/.test(autorRef);
   const oberts = (ESTAT.llibreRegistre && Array.isArray(ESTAT.llibreRegistre.fils_oberts))
     ? ESTAT.llibreRegistre.fils_oberts.filter(Boolean)
     : [];
@@ -8030,12 +8040,20 @@ function generarInstruccionsGanxoFinalCapitol(idx) {
   const c2 = idx - 2 >= 0 ? capitolsRegistre[idx - 2] : null;
   const dosCliffhangersConsecutius = !!(c1 && c2 && c1.es_cliffhanger === true && c2.es_cliffhanger === true);
 
-  if (dosCliffhangersConsecutius) {
+  if (dosCliffhangersConsecutius && !modeTolkien && !modeCastaneda) {
     return "PROHIBIT acabar amb cliffhanger. Ja n'hi ha hagut dos consecutius. Aquest capítol HA d'acabar amb una resolució parcial o una reflexió interna.";
   }
 
   if (esUltimCapitol) {
     return `Com que és l'últim capítol, tanca els fils prioritaris i deixa una reverberació emocional final potent: una última imatge, una realització del personatge o una resolució que ressoni. Sense cliffhanger fort, però que la darrera frase es quedi gravada.`;
+  }
+
+  if (modeTolkien) {
+    return "TANCAMENT DE CAPÍTOL (MODE TOLKIEN): Evita cliffhangers mecànics. Acaba amb ressonància èpica o lírica: conseqüència moral, memòria del paisatge, jurament, pèrdua o esperança continguda. L'objectiu no és el xoc immediat, sinó la profunditat de món i destí.";
+  }
+
+  if (modeCastaneda) {
+    return "TANCAMENT DE CAPÍTOL (MODE CASTANEDA): Evita cliffhangers d'acció convencionals. Acaba amb desplaçament perceptiu, paradoxa o pregunta iniciàtica que desestabilitzi el marc del personatge. L'objectiu és una fractura de percepció, no un tall efectista.";
   }
 
   const tecniques = `Tria la tècnica que encaixi millor amb el moment narratiu — NO forçis una pregunta retòrica si no és la més efectiva:
