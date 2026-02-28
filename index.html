@@ -518,6 +518,40 @@
   .capitol-item.fet   .capitol-num   { color: var(--success); }
   .capitol-copy { background:none; border:none; color:var(--text2); cursor:pointer; padding:2px 6px; border-radius:4px; font-size:.85rem; opacity:.55; transition:opacity .15s; flex-shrink:0; }
   .capitol-copy:hover { opacity:1; color:var(--accent2); }
+  .capitol-delete { background:none; border:none; color:#fda4af; cursor:pointer; padding:2px 6px; border-radius:4px; font-size:.85rem; opacity:.6; transition:opacity .15s; flex-shrink:0; }
+  .capitol-delete:hover { opacity:1; color:#fb7185; }
+  .capitol-detall-wrap {
+    margin-top: 16px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    background: var(--surface2);
+  }
+  .capitol-detall-box {
+    position: relative;
+    margin-bottom: 12px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .capitol-detall-box h4 {
+    font-size: .88rem;
+    color: var(--accent2);
+    margin-bottom: 8px;
+    padding-right: 30px;
+  }
+  .capitol-detall-copy {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: transparent;
+    border: none;
+    color: var(--text2);
+    cursor: pointer;
+    font-size: .9rem;
+  }
+  .capitol-detall-copy:hover { color: var(--accent2); }
 
   /* ── Panel de revisió (Opus) ── */
   .review-panel {
@@ -1063,12 +1097,16 @@
     <div id="capitol-progress-text" style="color:var(--text2);font-size:.88rem;"></div>
     <div style="display:flex; gap:8px;">
       <button id="btn-pausa-flux" class="btn btn-ghost hidden" style="padding:7px 14px;font-size:.82rem;color:var(--warning);border-color:var(--warning);" onclick="togglePausaFlux()">⏸ Pausar Automàtic</button>
+      <button id="btn-mode-manual-capitols" class="btn btn-ghost hidden" style="padding:7px 14px;font-size:.82rem;" onclick="toggleModeManualCapitols()">🧭 Mode: Automàtic total</button>
       <button class="btn btn-ghost" style="padding:7px 14px;font-size:.82rem;" onclick="obrirLlibreRegistre()">📓 Llibre de Registre</button>
       <button class="btn btn-ghost" style="padding:7px 14px;font-size:.82rem;" onclick="obrirBiblia()">📚 Bíblia Narrativa</button>
     </div>
   </div>
 
   <div id="capitol-llista" style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px;max-height:260px;overflow-y:auto;"></div>
+  <div id="capitol-seguent-manual-wrap" class="hidden" style="margin-top:-8px;margin-bottom:16px;">
+    <button id="btn-capitol-seguent-manual" class="btn btn-primary" onclick="iniciarSeguentCapitolManual()">▶ Començar proper capítol</button>
+  </div>
 
   <div class="loader-wrap" id="loader-11">
     <div class="spinner"></div>
@@ -1082,6 +1120,14 @@
     <div id="revisio-panel" class="hidden review-panel"></div>
     <div id="checkpoint-intermedi-panel" class="hidden" style="margin-top:16px;padding:16px;background:var(--surface2);border-radius:10px;border-left:3px solid #f59e0b;"></div>
     <div class="btn-row" id="capitol-accions" style="margin-top:16px;"></div>
+  </div>
+
+  <div id="capitol-detall-wrap" class="hidden capitol-detall-wrap">
+    <div id="capitol-detall-content"></div>
+    <div class="btn-row" style="margin-top:8px;">
+      <button class="btn btn-secondary" onclick="executarSegonaRevisioOpusCapitol()">🔁 Segona Revisió Opus</button>
+      <button class="btn btn-primary" onclick="exportarDetallCapitolActualTxt()">📤 Exportar tot (.txt)</button>
+    </div>
   </div>
 
   <div id="btn-control-arcs-wrap" class="hidden" style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);">
@@ -1262,6 +1308,53 @@ const GestorFlux = {
 function togglePausaFlux() {
   if (GestorFlux.pausat) GestorFlux.reprendre();
   else GestorFlux.pausar();
+}
+
+
+function esModeManualEntreCapitols() {
+  return !!(USER_CONFIG && USER_CONFIG.fluxAutomatic && ESTAT._modeManualCapitols);
+}
+
+function actualitzarBotoModeManualCapitols() {
+  const btn = document.getElementById('btn-mode-manual-capitols');
+  if (!btn) return;
+  const visible = !!(USER_CONFIG && USER_CONFIG.fluxAutomatic);
+  btn.classList.toggle('hidden', !visible);
+  btn.textContent = esModeManualEntreCapitols() ? '🧭 Mode: Manual entre capítols' : '🧭 Mode: Automàtic total';
+}
+
+function toggleModeManualCapitols() {
+  ESTAT._modeManualCapitols = !ESTAT._modeManualCapitols;
+  if (!ESTAT._modeManualCapitols) {
+    amagarBotoSeguentCapitolManual();
+  }
+  actualitzarBotoModeManualCapitols();
+  toast(ESTAT._modeManualCapitols ? 'Mode manual entre capítols activat.' : 'Mode automàtic total activat.');
+}
+
+function mostrarBotoSeguentCapitolManual(nextIdx) {
+  const wrap = document.getElementById('capitol-seguent-manual-wrap');
+  const btn = document.getElementById('btn-capitol-seguent-manual');
+  if (!wrap || !btn) return;
+  ESTAT._capitolPendentManual = nextIdx;
+  btn.textContent = `▶ Començar Capítol ${nextIdx + 1}`;
+  wrap.classList.remove('hidden');
+}
+
+function amagarBotoSeguentCapitolManual() {
+  ESTAT._capitolPendentManual = null;
+  const wrap = document.getElementById('capitol-seguent-manual-wrap');
+  if (wrap) wrap.classList.add('hidden');
+}
+
+function iniciarSeguentCapitolManual() {
+  const idx = ESTAT._capitolPendentManual;
+  if (idx === null || idx === undefined) {
+    toast('No hi ha capítol pendent.');
+    return;
+  }
+  amagarBotoSeguentCapitolManual();
+  generarCapitol(idx);
 }
 
 // --- SISTEMA DE PERSISTÈNCIA ---
@@ -1543,6 +1636,11 @@ const ESTAT = {
   _capitolActual:           0,
   _capitols_generats:       [],
   _revisioInstruccions:     {},
+  _metaCapitols:            {},
+  _revisionsOpus:           {},
+  _revisionsOpusFinals:     {},
+  _modeManualCapitols:      false,
+  _capitolPendentManual:    null,
   _controlArcs:             null,
   _checkpointIntermedi:     null,
   epileg:                   null,
@@ -3478,6 +3576,10 @@ function iniciarFase11() {
   ESTAT._capitolActual      = 0;
   ESTAT._capitols_generats  = [];
   ESTAT._revisioInstruccions= {};
+  ESTAT._metaCapitols       = {};
+  ESTAT._revisionsOpus      = {};
+  ESTAT._revisionsOpusFinals= {};
+  ESTAT._capitolPendentManual= null;
   ESTAT.llibreRegistre      = { capitols: [], estat_personatges: [], fils_oberts: [], fils_tancats: [] };
   ESTAT._perfilsPersonatges = {};
 
@@ -3489,6 +3591,8 @@ function iniciarFase11() {
   } else {
     document.getElementById('btn-pausa-flux').classList.add('hidden');
   }
+  actualitzarBotoModeManualCapitols();
+  amagarBotoSeguentCapitolManual();
 
   renderLlistaCapitols();
   generarCapitol(0);
@@ -3505,13 +3609,32 @@ function renderLlistaCapitols() {
     const cls  = completat ? 'fet' : actiu ? 'actiu' : '';
     const ico  = completat ? '✓'  : actiu  ? '✍️'   : '○';
     const teText = !!(ESTAT._capitols_generats && ESTAT._capitols_generats[i]);
-    const btnCopia = teText ? `<button class="capitol-copy" onclick="copiarCapitol(${i})" title="Copiar capítol">⎘</button>` : '';
-    return `<div class="capitol-item ${cls}" id="cap-item-${i}">
+    const btnEsborrar = teText ? `<button class="capitol-delete" onclick="event.stopPropagation();esborrarIRegenerarCapitol(${i})" title="Esborrar i regenerar capítol">🗑</button>` : '';
+    const btnCopia = teText ? `<button class="capitol-copy" onclick="event.stopPropagation();copiarCapitol(${i})" title="Copiar capítol final">⎘</button>` : '';
+    const onClick = teText ? `onclick="obrirDetallCapitol(${i})"` : '';
+    return `<div class="capitol-item ${cls}" id="cap-item-${i}" ${onClick}>
       <span class="capitol-num">${ico}</span>
       <span class="capitol-titol">${escHtml(cap.titol || 'Capítol ' + (i + 1))}</span>
-      ${btnCopia}
+      ${btnEsborrar}${btnCopia}
     </div>`;
   }).join('\n');
+}
+
+async function esborrarIRegenerarCapitol(idx) {
+  const titol = (ESTAT._estructuraCapitols[idx] && ESTAT._estructuraCapitols[idx].titol) || `Capítol ${idx + 1}`;
+  const ok = confirm(`Vols esborrar totes les dades de "${titol}" i regenerar el capítol?`);
+  if (!ok) return;
+
+  if (ESTAT._capitols_generats) ESTAT._capitols_generats[idx] = '';
+  if (ESTAT._metaCapitols) delete ESTAT._metaCapitols[idx];
+  if (ESTAT._revisionsOpus) delete ESTAT._revisionsOpus[idx];
+  if (ESTAT._revisionsOpusFinals) delete ESTAT._revisionsOpusFinals[idx];
+  if (ESTAT._revisioInstruccions) delete ESTAT._revisioInstruccions[idx];
+  amagarBotoSeguentCapitolManual();
+  renderLlistaCapitols();
+
+  document.getElementById('capitol-detall-wrap').classList.add('hidden');
+  await generarCapitol(idx);
 }
 
 function copiarCapitol(idx) {
@@ -3525,6 +3648,165 @@ function copiarCapitol(idx) {
     document.execCommand('copy'); document.body.removeChild(ta);
     toast(`Capítol ${idx + 1} copiat.`);
   }
+}
+
+
+function copiarTextIndependent(text, etiqueta = 'Text') {
+  const net = netejarTabulacionsInicials(String(text || ''));
+  if (!net.trim()) { toast(`${etiqueta}: no hi ha contingut per copiar.`); return; }
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(net).then(() => toast(`${etiqueta} copiat.`)).catch(() => {});
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = net; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    toast(`${etiqueta} copiat.`);
+  }
+}
+
+function obrirDetallCapitol(idx) {
+  const textFinal = (ESTAT._capitols_generats && ESTAT._capitols_generats[idx]) || '';
+  if (!textFinal) return;
+
+  ESTAT._capitolDetallIdx = idx;
+  const meta = (ESTAT._metaCapitols && ESTAT._metaCapitols[idx]) || {};
+  const revisio = (ESTAT._revisionsOpus && ESTAT._revisionsOpus[idx]) || null;
+  const revisioFinal = (ESTAT._revisionsOpusFinals && ESTAT._revisionsOpusFinals[idx]) || null;
+  const titol = (ESTAT._estructuraCapitols[idx] && ESTAT._estructuraCapitols[idx].titol) || `Capítol ${idx + 1}`;
+
+  const revisioTxt = revisio
+    ? `Nota: ${revisio.puntuacio ?? '?'} / 10
+Observacions: ${(Array.isArray(revisio.problemes) && revisio.problemes.length > 0) ? revisio.problemes.join(' | ') : (revisio.comentari_editor_final || revisio.valoracio_general || 'Sense observacions.')}`
+    : 'Sense revisió Opus disponible encara.';
+
+  const revFinalTxt = revisioFinal
+    ? `Nota final reescriptura: ${revisioFinal.puntuacio ?? '?'} / 10
+Observacions: ${revisioFinal.observacions || ''}`
+    : "Encara no s'ha executat la segona revisió Opus.";
+
+  const sections = [
+    { id:'inject-esbos', label:'Informació injectada per generar esbòs', text: meta.infoInjectadaEsbos || '(no disponible)' },
+    { id:'esbos', label:'Esbòs', text: meta.esbos || '(no disponible)' },
+    { id:'canvis-arq', label:"Canvis suggerits per l'Arquitecta", text: meta.correccionsArquitecta || '(no disponible)' },
+    { id:'inject-rev', label:'Informació injectada per generar revisió Opus', text: meta.infoInjectadaRevisioOpus || '(no disponible)' },
+    { id:'rev-opus', label:'Revisió Opus (indicacions + nota)', text: revisioTxt },
+    { id:'cap-final', label:'Capítol final', text: textFinal },
+    { id:'rev-final', label:'Revisió final Opus', text: revFinalTxt }
+  ];
+
+  const html = `<div style="font-weight:700;color:var(--accent2);margin-bottom:10px;">${escHtml(titol)}</div>` +
+    sections.map(s => `<div class="capitol-detall-box">
+      <button class="capitol-detall-copy" data-copy-id="det-${s.id}" data-copy-label="${escHtml(s.label)}" title="Copiar secció">⎘</button>
+      <h4>${s.label}</h4>
+      <div id="det-${s.id}" style="white-space:pre-wrap;font-size:.86rem;line-height:1.6;">${escHtml(s.text)}</div>
+    </div>`).join('');
+
+  const wrap = document.getElementById('capitol-detall-wrap');
+  const content = document.getElementById('capitol-detall-content');
+  content.innerHTML = html;
+  content.querySelectorAll('.capitol-detall-copy').forEach(btn => {
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const id = btn.getAttribute('data-copy-id');
+      const label = btn.getAttribute('data-copy-label') || 'Secció';
+      const target = document.getElementById(id);
+      copiarTextIndependent(target ? target.innerText : '', label);
+    });
+  });
+
+  wrap.classList.remove('hidden');
+  wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function executarSegonaRevisioOpusCapitol() {
+  const idx = ESTAT._capitolDetallIdx;
+  if (idx === undefined || idx === null) { toast('Obre un capítol primer.'); return; }
+  const meta = (ESTAT._metaCapitols && ESTAT._metaCapitols[idx]) || {};
+  const revisio = (ESTAT._revisionsOpus && ESTAT._revisionsOpus[idx]) || {};
+  const capFinal = (ESTAT._capitols_generats && ESTAT._capitols_generats[idx]) || '';
+  if (!capFinal) { toast('No hi ha capítol final per revisar.'); return; }
+
+  try {
+    showLoader(11);
+    document.getElementById('loader-11-text').textContent = '🔵 Opus fent segona revisió de reescriptura...';
+    const msgs = [{ role: 'user', content: `Avalua la reescriptura final del capítol amb tota la informació disponible.
+
+INFORMACIÓ INJECTADA PER ESBÒS:
+${meta.infoInjectadaEsbos || ''}
+
+ESBÒS:
+${meta.esbos || ''}
+
+INFORMACIÓ INJECTADA PER REVISIÓ OPUS:
+${meta.infoInjectadaRevisioOpus || ''}
+
+REVISIÓ OPUS INICIAL:
+Nota: ${revisio.puntuacio ?? '?'}
+Problemes: ${Array.isArray(revisio.problemes) ? revisio.problemes.join(' | ') : ''}
+Instruccions: ${revisio.instruccions_correccio || ''}
+
+CAPÍTOL FINAL:
+${capFinal}
+
+Retorna NOMÉS JSON:
+{"puntuacio":8,"observacions":"Màxim 100 paraules. Digues si són bones, regulars o dolentes i per què."}` }];
+    const models = getModelConfig(USER_CONFIG);
+    const raw = await callLLMMulti(msgs, "Ets l'Arquitecta Opus. Retorna només JSON.", Object.assign({}, USER_CONFIG, { maxTokens: 500, model: models.modelArquitecte }), 'arquitectura');
+    const dades = parseJsonRobust(raw) || {};
+    ESTAT._revisionsOpusFinals = ESTAT._revisionsOpusFinals || {};
+    ESTAT._revisionsOpusFinals[idx] = { puntuacio: dades.puntuacio ?? '?', observacions: String(dades.observacions || '').slice(0, 650) };
+    toast('✅ Segona revisió Opus completada.');
+    obrirDetallCapitol(idx);
+  } catch (err) {
+    toast('Error segona revisió Opus: ' + err.message);
+  } finally {
+    hideLoader(11);
+  }
+}
+
+function exportarDetallCapitolActualTxt() {
+  const idx = ESTAT._capitolDetallIdx;
+  if (idx === undefined || idx === null) { toast('Obre un capítol primer.'); return; }
+  const cap = ESTAT._estructuraCapitols[idx] || {};
+  const meta = (ESTAT._metaCapitols && ESTAT._metaCapitols[idx]) || {};
+  const rev = (ESTAT._revisionsOpus && ESTAT._revisionsOpus[idx]) || {};
+  const revFinal = (ESTAT._revisionsOpusFinals && ESTAT._revisionsOpusFinals[idx]) || {};
+  const textFinal = (ESTAT._capitols_generats && ESTAT._capitols_generats[idx]) || '';
+  const txt = [
+    `Nom del capítol: ${cap.titol || ('Capítol ' + (idx + 1))}`,
+    '',
+    '=== Informació injectada per generar esbòs ===',
+    meta.infoInjectadaEsbos || '(no disponible)',
+    '',
+    '=== Esbòs ===',
+    meta.esbos || '(no disponible)',
+    '',
+    "=== Canvis suggerits per l'arquitecta ===",
+    meta.correccionsArquitecta || '(no disponible)',
+    '',
+    '=== Informació injectada per generar revisió opús ===',
+    meta.infoInjectadaRevisioOpus || '(no disponible)',
+    '',
+    '=== Revisió opus amb indicacions de millora text i nota ===',
+    `Nota: ${rev.puntuacio ?? '?'}/10`,
+    `Observacions: ${Array.isArray(rev.problemes) ? rev.problemes.join(' | ') : ''}`,
+    `Indicacions: ${rev.instruccions_correccio || ''}`,
+    '',
+    '=== Capítol final ===',
+    textFinal,
+    '',
+    '=== Revisió final opus indicant nota i observacions ===',
+    `Nota final: ${revFinal.puntuacio ?? '?'}/10`,
+    `Observacions: ${revFinal.observacions || '(pendent de segona revisió)'}`
+  ].join('\n');
+
+  const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `capitol-${idx + 1}-revisions.txt`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
 }
 
 function actualitzarEstatCapitol(idx, estat) {
@@ -3566,6 +3848,7 @@ async function generarCapitol(idx, intents = 0) {
   }
 
   ESTAT._capitolActual = idx;
+  amagarBotoSeguentCapitolManual();
   renderLlistaCapitols();  // refresca tota la llista
   actualitzarEstatCapitol(idx, 'actiu');
 
@@ -3585,6 +3868,15 @@ async function generarCapitol(idx, intents = 0) {
     const res = await generarCapitolNKG(idx, USER_CONFIG);
     const textNet = netejarTabulacionsInicials(res.response);
     ESTAT._capitols_generats[idx] = textNet;
+    ESTAT._metaCapitols = ESTAT._metaCapitols || {};
+    ESTAT._metaCapitols[idx] = Object.assign({}, ESTAT._metaCapitols[idx] || {}, { textFinal: textNet });
+    ESTAT._metaCapitols = ESTAT._metaCapitols || {};
+    ESTAT._metaCapitols[idx] = Object.assign({}, ESTAT._metaCapitols[idx] || {}, {
+      esbos: res.esborrany || '',
+      correccionsArquitecta: res.correccionsArquitecta || '',
+      infoInjectadaEsbos: res.infoInjectadaEsbos || '',
+      infoInjectadaRevisioOpus: res.infoInjectadaRevisioOpus || ''
+    });
     renderLlistaCapitols();
     hideLoader(11);
     mostrarCapitol(idx, textNet);
@@ -3708,6 +4000,9 @@ function mostrarRevisioCapitol(revisat, idx, isLast) {
 
   const comentariFinal = revisat.comentari_editor_final || revisat.valoracio_general || revisat.veredicte || '';
 
+  ESTAT._revisionsOpus = ESTAT._revisionsOpus || {};
+  ESTAT._revisionsOpus[idx] = revisat;
+
   panel.innerHTML = `
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;">
       <div style="font-size:1.8rem;font-weight:700;color:${color};">${puntuacio}<span style="font-size:1rem;color:var(--text2);">/10</span></div>
@@ -3769,11 +4064,17 @@ function mostrarRevisioCapitol(revisat, idx, isLast) {
       accions.innerHTML = `<span style="color:var(--text2);font-size:.85rem;">🔴 Opus demana correccions. Entrant a la cua per reescriure...</span>`;
       GestorFlux.afegirTasca(`Reescriure Cap. ${idx + 1}`, () => reescriureCapitol(idx), 15000);
     } else {
-      accions.innerHTML = `<span style="color:var(--success);font-size:.85rem;">✅ Capítol aprovat. Entrant a la cua pel següent...</span>`;
-      if (!isLast) {
-        GestorFlux.afegirTasca(`Generar Cap. ${idx + 2}`, () => generarCapitol(idx + 1), 15000);
+      if (!isLast && esModeManualEntreCapitols()) {
+        accions.innerHTML = `<span style="color:var(--success);font-size:.85rem;">✅ Capítol aprovat. Esperant inici manual del següent.</span>`;
+        mostrarBotoSeguentCapitolManual(idx + 1);
       } else {
-        GestorFlux.afegirTasca('Revisió/Epíleg Final', () => generarCapitol(ESTAT._estructuraCapitols.length), 2000);
+        amagarBotoSeguentCapitolManual();
+        accions.innerHTML = `<span style="color:var(--success);font-size:.85rem;">✅ Capítol aprovat. Entrant a la cua pel següent...</span>`;
+        if (!isLast) {
+          GestorFlux.afegirTasca(`Generar Cap. ${idx + 2}`, () => generarCapitol(idx + 1), 15000);
+        } else {
+          GestorFlux.afegirTasca('Revisió/Epíleg Final', () => generarCapitol(ESTAT._estructuraCapitols.length), 2000);
+        }
       }
     }
   } else {
@@ -3840,6 +4141,7 @@ function mostrarCheckpointIntermedi(checkpoint, capitolActual, totalCapitols) {
 
 function mostrarAccionsCapitolSimple(idx, isLast) {
   if (isLast) {
+    amagarBotoSeguentCapitolManual();
     document.getElementById('capitol-accions').innerHTML = '';
     if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
       GestorFlux.afegirTasca('Revisió/Epíleg Final', () => generarCapitol(ESTAT._estructuraCapitols.length), 2000);
@@ -3849,8 +4151,13 @@ function mostrarAccionsCapitolSimple(idx, isLast) {
   } else {
     // Si és automàtic, usem la cua de tasques
     if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
-      document.getElementById('capitol-accions').innerHTML = `<span style="color:var(--text2);font-size:.85rem;">Avançant automàticament al següent capítol...</span>`;
-      GestorFlux.afegirTasca(`Generar Cap. ${idx + 2}`, () => generarCapitol(idx + 1), 15000);
+      if (esModeManualEntreCapitols()) {
+        document.getElementById('capitol-accions').innerHTML = `<span style="color:var(--text2);font-size:.85rem;">Capítol llest. Inicia manualment el següent des del botó inferior.</span>`;
+        mostrarBotoSeguentCapitolManual(idx + 1);
+      } else {
+        document.getElementById('capitol-accions').innerHTML = `<span style="color:var(--text2);font-size:.85rem;">Avançant automàticament al següent capítol...</span>`;
+        GestorFlux.afegirTasca(`Generar Cap. ${idx + 2}`, () => generarCapitol(idx + 1), 15000);
+      }
     } else {
       document.getElementById('capitol-accions').innerHTML =
         `<button class="btn btn-primary" onclick="generarCapitol(${idx + 1})">➡️ Capítol ${idx + 2}</button>`;
@@ -3870,6 +4177,8 @@ async function reescriureCapitol(idx, intents = 0) {
     const res = await reescriureCapitolAmbInstruccions(idx, instruccions, USER_CONFIG);
     const textNet = netejarTabulacionsInicials(res.response);
     ESTAT._capitols_generats[idx] = textNet;
+    ESTAT._metaCapitols = ESTAT._metaCapitols || {};
+    ESTAT._metaCapitols[idx] = Object.assign({}, ESTAT._metaCapitols[idx] || {}, { textFinal: textNet });
     renderLlistaCapitols();
     hideLoader(11);
     mostrarCapitol(idx, textNet);
@@ -9087,12 +9396,23 @@ Retorna només la versió final del capítol, sense metadades ni notes.`
 async function generarCapitolNKG(idx, userConfig) {
   const capitol = idx + 1;
   const loaderEl = document.getElementById('loader-11-text');
+  const contextCapitol = buildContextCapitol(idx);
 
   if (loaderEl) loaderEl.textContent = '📝 Escrivint primer esborrany ràpid...';
   const esborrany = await generarEsborranyCapitol(idx, userConfig);
 
+  const infoInjectadaEsbos = `CAPÍTOL ${capitol}
+CONTEXT CAPÍTOL:
+${contextCapitol}
+`;
+
   if (loaderEl) loaderEl.textContent = "🔍 Arquitecta revisant continuïtat d'objectes i veus...";
   const correccionsArquitecta = await avaluarEsborranyAmbHistoric(idx, esborrany, userConfig);
+  const infoInjectadaRevisioOpus = `Novel·la fins ara (fragments):
+${(ESTAT._capitols_generats || []).slice(0, idx).filter(Boolean).map((t, i) => `--- CAPÍTOL ${i + 1} ---\n${String(t).slice(-1800)}`).join('\n\n') || '(encara no hi ha capítols previs)'}
+
+Esborrany a revisar:
+${String(esborrany || '').slice(0, 7000)}`;
 
   if (loaderEl) loaderEl.textContent = '✨ Polint i escrivint la prosa definitiva...';
   let textComplet = await generarProsaDefinitiva(idx, esborrany, correccionsArquitecta, userConfig);
@@ -9106,7 +9426,7 @@ async function generarCapitolNKG(idx, userConfig) {
     }
   }
 
-  return { response: textComplet, esborrany, correccionsArquitecta };
+  return { response: textComplet, esborrany, correccionsArquitecta, infoInjectadaEsbos, infoInjectadaRevisioOpus };
 }
 
 function renderitzarNKG() {
