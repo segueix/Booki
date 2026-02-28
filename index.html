@@ -3858,6 +3858,124 @@ function actualitzarEstatCapitol(idx, estat) {
 }
 
 
+// ─── CORRECCIÓ 7: Neteja NKG ──────────────────────────────────────────────────
+function netejarNKGSincronitzacions() {
+  if (!ESTAT._nkg) return;
+  const termesBrossa = ['sincronització inventari', '(sense dades)', 'sense dades'];
+  const esBrossa = (e) => termesBrossa.some(t => String(typeof e === 'string' ? e : JSON.stringify(e)).toLowerCase().includes(t));
+  if (Array.isArray(ESTAT._nkg.timeline_objectes)) {
+    const vists = new Set();
+    ESTAT._nkg.timeline_objectes = ESTAT._nkg.timeline_objectes.filter(e => {
+      const k = JSON.stringify(e);
+      if (vists.has(k) || esBrossa(e)) return false;
+      vists.add(k); return true;
+    });
+  }
+  if (Array.isArray(ESTAT._nkg.timeline_personatges)) {
+    const vists = new Set();
+    ESTAT._nkg.timeline_personatges = ESTAT._nkg.timeline_personatges.filter(e => {
+      const k = JSON.stringify(e);
+      if (vists.has(k) || esBrossa(e)) return false;
+      vists.add(k); return true;
+    });
+  }
+}
+
+// ─── CORRECCIÓ 6: Secció prohibicions ─────────────────────────────────────────
+function construirSeccioProhibicions(idx) {
+  const lines = [];
+  const beatsGastats = Array.isArray(ESTAT._nkg && ESTAT._nkg.beats_gastats) ? ESTAT._nkg.beats_gastats.slice(-15) : [];
+  if (beatsGastats.length > 0) {
+    lines.push('BEATS NARRATIUS JA CONSUMITS (NO repetir cap d\'aquests patrons dramàtics):');
+    beatsGastats.forEach(b => lines.push(`- ${b}`));
+  }
+  const filsTancats = Array.isArray(ESTAT.llibreRegistre && ESTAT.llibreRegistre.fils_tancats) ? ESTAT.llibreRegistre.fils_tancats.slice(-10) : [];
+  if (filsTancats.length > 0) {
+    lines.push('FILS NARRATIUS TANCATS (NO reobrir ni referenciar com a pendents):');
+    filsTancats.forEach(f => lines.push(`- ${f}`));
+  }
+  const accionsIrrev = Array.isArray(ESTAT._accionsIrreversibles) ? ESTAT._accionsIrreversibles.slice(-10) : [];
+  if (accionsIrrev.length > 0) {
+    lines.push('ACCIONS IRREVERSIBLES (NO contradir; assumeix que han passat i no es desfan):');
+    accionsIrrev.forEach(a => lines.push(`- [Cap.${a.capitol}] ${a.accio}`));
+  }
+  if (lines.length === 0) return '';
+  return '\n\n⛔ PROHIBICIONS ABSOLUTES — El model NO pot ignorar cap d\'aquests punts:\n' + lines.join('\n');
+}
+
+// ─── CORRECCIÓ 5: Revisió de continuïtat i reescriptura ───────────────────────
+async function revisioArquitectaAmbContinuitat(idx, textCapitol, userConfig) {
+  const reg = ESTAT.llibreRegistre || {};
+  const snapshotAnterior = idx > 0 ? (ESTAT._snapshotsFinals || {})[idx - 1] : null;
+  const accionsIrrev = (ESTAT._accionsIrreversibles || []).slice(-8).map(a => `- [Cap.${a.capitol}] ${a.accio}`).join('\n') || '(cap)';
+  const filsOberts   = (reg.fils_oberts || []).slice(-8).map(f => `- ${f}`).join('\n') || '(cap)';
+
+  const msgs = [{
+    role: 'user',
+    content: `Ets l'Arquitecta de continuïtat. Revisa EXCLUSIVAMENT errors de continuïtat factual al capítol ${idx + 1}.
+
+SNAPSHOT FINAL DEL CAPÍTOL ANTERIOR:
+${snapshotAnterior ? `Ubicació: ${snapshotAnterior.ubicacio}\nEstat: ${snapshotAnterior.estat_emocional}\nSituació: ${snapshotAnterior.situacio_immediata}` : '(primer capítol)'}
+
+FILS OBERTS PENDENTS:
+${filsOberts}
+
+ACCIONS IRREVERSIBLES QUE NO ES PODEN CONTRADIR:
+${accionsIrrev}
+
+CAPÍTOL A REVISAR (primers 6000 caràcters):
+${textCapitol.substring(0, 6000)}
+
+Busca EXCLUSIVAMENT:
+1. Events que ja van passar i es tornen a narrar com a nous.
+2. Fils narratius tancats que es reobren sense justificació.
+3. Objectes "fantasma" (apareixen sense haver estat introduïts).
+4. Ubicació impossible al principi del capítol.
+5. Accions irreversibles contradites.
+
+Si no n'hi ha, retorna veredicte APROVAT. Retorna EXCLUSIVAMENT JSON vàlid:
+{
+  "errors_continuitat": ["descripció breu de cada error"],
+  "veredicte": "APROVAT",
+  "resum_correccions": ""
+}`
+  }];
+
+  const models = getModelConfig(userConfig || USER_CONFIG);
+  const raw = await callLLMMulti(
+    msgs,
+    'Ets una revisora de continuïtat narrativa estricta. Respon EXCLUSIVAMENT JSON vàlid.',
+    Object.assign({}, userConfig || USER_CONFIG, { maxTokens: 800, model: models.modelArquitecte }),
+    'arquitectura'
+  );
+  return parseJsonRobust(raw) || { errors_continuitat: [], veredicte: 'APROVAT', resum_correccions: '' };
+}
+
+async function reescriureAmbCorreccions(textCapitol, resumCorreccions, idx, userConfig) {
+  const msgs = [{
+    role: 'user',
+    content: `Corregeix els errors de continuïtat del capítol ${idx + 1} sense afegir escenes noves ni canviar l'estructura narrativa.
+
+CORRECCIONS A APLICAR:
+${resumCorreccions}
+
+CAPÍTOL A CORREGIR:
+${textCapitol}
+
+Retorna el capítol corregit en text pla. PROHIBIT afegir escenes, personatges nous o canviar el fil principal.`
+  }];
+
+  const models = getModelConfig(userConfig || USER_CONFIG);
+  const systemPrompt = buildSystemPromptCapitol();
+  const raw = await callLLMOneShotPlusCompletion(
+    msgs,
+    systemPrompt,
+    Object.assign({}, userConfig || USER_CONFIG, { maxTokens: 14000, model: models.modelGeneracio }),
+    'generacio'
+  );
+  return raw || textCapitol; // fallback: retorna original si falla
+}
+
 function refrescarPlaPsicologicPerSeguentCapitol() {
   try {
     const t = calcularTermometreVeritatEmocional();
@@ -3912,15 +4030,19 @@ async function generarCapitol(idx, intents = 0) {
       await garantirTretsImmutablesPersonatge(nomPers, USER_CONFIG);
     }
 
-    // Compressió preventiva de memòria si cal (primer cop o cada 3 capítols)
+    // PAS 1: Netejar NKG de duplicats i entrades brossa
+    netejarNKGSincronitzacions();
+
+    // PAS 2: Comprimir memòria preventiva si cal
     if (idx > 0 && (idx % 3 === 0 || ESTAT._memoriasComprimides.length === 0)) {
       try { await comprimirMemoria(idx, USER_CONFIG); } catch (e) { console.warn('Compressió preventiva:', e.message); }
     }
 
-    // Validació i reompliment de l'escaleta si té escenes buides
+    // PAS 3: Validar i reomplir escaleta si té escenes buides
     try { await validarIReomplirEscaleta(idx, USER_CONFIG); } catch (e) { console.warn('Escaleta validació:', e.message); }
 
-    // GENERADOR: escriu el capítol
+    // PASSOS 4+5: Generar text (prohibicions injectades via buildContextCapitol → construirSeccioProhibicions)
+    document.getElementById('loader-11-text').textContent = `🟣 Sonnet escrivint el Capítol ${idx + 1} — "${titol}"…`;
     let res = await generarCapitolNKG(idx, USER_CONFIG);
     let textNet = netejarTabulacionsInicials(res.response);
 
@@ -3928,7 +4050,22 @@ async function generarCapitol(idx, intents = 0) {
     const ajust = await ajustarLongitud(idx, textNet, USER_CONFIG);
     textNet = ajust.text;
 
-    // Guardar capítol
+    // PAS 6: Bucle de revisió de continuïtat (màxim 2 intents)
+    for (let intent = 0; intent < 2; intent++) {
+      try {
+        document.getElementById('loader-11-text').textContent = `🔍 Revisió continuïtat cap. ${idx + 1} (intent ${intent + 1}/2)…`;
+        const revisio = await revisioArquitectaAmbContinuitat(idx, textNet, USER_CONFIG);
+        if (revisio && revisio.veredicte === 'REESCRIURE' && revisio.resum_correccions) {
+          document.getElementById('loader-11-text').textContent = `🔧 Corregint continuïtat cap. ${idx + 1} (intent ${intent + 1}/2)…`;
+          const corregit = await reescriureAmbCorreccions(textNet, revisio.resum_correccions, idx, USER_CONFIG);
+          textNet = netejarTabulacionsInicials(corregit || textNet);
+        } else {
+          break; // APROVAT
+        }
+      } catch (e) { console.warn('Revisió continuïtat:', e.message); break; }
+    }
+
+    // Guardar capítol definitiu
     ESTAT._capitols_generats[idx] = textNet;
     ESTAT._metaCapitols = ESTAT._metaCapitols || {};
     ESTAT._metaCapitols[idx] = {
@@ -3945,7 +4082,21 @@ async function generarCapitol(idx, intents = 0) {
     hideLoader(11);
     mostrarCapitol(idx, textNet);
 
-    // ARQUITECTE: recull totes les dades de seguiment
+    // PAS 7: Snapshot validat
+    try { await generarSnapshotValidat(idx, textNet, USER_CONFIG); } catch (e) { console.warn('Snapshot:', e.message); }
+
+    // PAS 8: Fils narratius (nous/tancats, beats, accions irreversibles)
+    try { await actualitzarFilsNarratius(idx, textNet, USER_CONFIG); } catch (e) { console.warn('Fils narratius:', e.message); }
+
+    // PAS 9: Actualitzar NKG amb el text definitiu post-correccions
+    if (ESTAT._nkg) {
+      try {
+        document.getElementById('loader-11-text').textContent = '🔵 Actualitzant NKG…';
+        await nkgActualitzarPostEscena(textNet, idx + 1, 1, USER_CONFIG);
+      } catch (e) { console.warn('NKG post-capítol:', e.message); }
+    }
+
+    // Post-processing: Bíblia, Registre, Beats, Estil, Checkpoint, Compressió
     await arxitectePostCapitol(idx, textNet, USER_CONFIG);
 
     // Recursió al capítol següent
@@ -3972,11 +4123,7 @@ async function arxitectePostCapitol(idx, textCapitol, userConfig) {
   // 2. Llibre de registre (+ revisió de codi JS cada 3 capítols)
   try { await actualitzarLlibreRegistreBackground(textCapitol, idx, esRevisioSistema, userConfig); } catch (e) { console.warn('Registre:', e.message); }
 
-  // 3. Snapshot de continuïtat (validat amb fallback si camps buits)
-  try { await generarSnapshotValidat(idx, textCapitol, userConfig); } catch (e) { console.warn('Snapshot:', e.message); }
-
-  // 3b. Fils narratius: nous/tancats, beats gastats i accions irreversibles
-  try { await actualitzarFilsNarratius(idx, textCapitol, userConfig); } catch (e) { console.warn('Fils narratius:', e.message); }
+  // (Snapshot i fils narratius es criden explícitament a generarCapitol, passos 7 i 8)
 
   // 4. Beats narratius gastats
   try { await actualitzarBeatsNarratiusGastats(textCapitol, idx + 1, userConfig); } catch (e) { console.warn('Beats:', e.message); }
@@ -7849,6 +7996,7 @@ function buildContextCapitol(idx) {
     if (prohibirIniciMeteorologic) {
       contextFinalNkg += "\n\nPROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg.";
     }
+    contextFinalNkg += construirSeccioProhibicions(idx);
     return contextFinalNkg;
   }
 
@@ -7862,6 +8010,7 @@ function buildContextCapitol(idx) {
   if (prohibirIniciMeteorologic) {
     contextFinal += "\n\nPROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg.";
   }
+  contextFinal += construirSeccioProhibicions(idx);
   return contextFinal;
 }
 
@@ -10668,14 +10817,7 @@ ${(ESTAT._capitols_generats || []).slice(0, idx).filter(Boolean).map((t, i) => `
     throw new Error(`No s'ha pogut generar el capítol ${capitol} en mode directe.`);
   }
 
-  if (ESTAT._nkg) {
-    try {
-      await nkgActualitzarPostEscena(textComplet, capitol, 1, userConfig);
-    } catch (err) {
-      console.warn('NKG post-capítol: error no bloquejant:', err.message);
-    }
-  }
-
+  // NKG s'actualitza explícitament a generarCapitol després del bucle de revisió
   return { response: textComplet, esborrany: textComplet, correccionsArquitecta, infoInjectadaEsbos, infoInjectadaRevisioOpus };
 }
 
