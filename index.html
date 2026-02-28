@@ -586,7 +586,6 @@
   /* ── Camps de config per proveïdor ── */
   .config-section { margin-top: 4px; }
 </style>
-<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
 </head>
 <body>
 
@@ -925,7 +924,7 @@
 
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="regenerarConte()">🔄 Regenerar</button>
-      <button class="btn btn-secondary" onclick="exportarDoc()">📄 Descarregar DOCX</button>
+      <button class="btn btn-secondary" onclick="exportarDoc()">📄 Exportar TXT + Google Docs</button>
       <button class="btn btn-primary"   onclick="iniciarFase7()">🌍 Expandir a novel·la</button>
     </div>
     <div id="export-link-wrap" class="hidden" style="margin-top:14px;"></div>
@@ -1438,7 +1437,7 @@ function exportarCopiaSeguretat() {
     const snapshot = construirSnapshotProjecte();
     const nom = `booki_backup_fase_${String(ESTAT.fase).replace('.', '_')}_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
     const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json;charset=utf-8' });
-    descarregarBlobDocx(blob, nom);
+    descarregarBlobFitxer(blob, nom);
     toast('Còpia exportada: ' + nom);
   } catch (err) {
     toast("No s'ha pogut exportar la còpia: " + err.message);
@@ -2307,7 +2306,7 @@ async function exportarDoc() {
 
   const btn = document.querySelector('[onclick="exportarDoc()"]');
   const origText = btn ? btn.textContent : '';
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Generant DOCX…'; }
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Generant TXT…'; }
   try {
     await exportarADoc(titol, ESTAT.conteText);
   } catch (error) {
@@ -6234,19 +6233,19 @@ Per assegurar que hi caben tots en la teva resposta, sigues molt concís: dedica
 // Substitueix l'antiga exportarADoc que usava DocumentApp/DriveApp
 // (APIs de Google no disponibles al navegador).
 //
-// Genera un document HTML semàntic amb <h1> i <p> i el descarrega
+// Genera un fitxer TXT i el descarrega
 // directament al navegador mitjançant Blob + URL.createObjectURL.
-// Genera un nom de fitxer segur i consistent per a descàrregues DOCX.
-function normalitzarNomFitxerDocx(base, fallback = 'document') {
+// Genera un nom de fitxer segur i consistent per a descàrregues TXT.
+function normalitzarNomFitxerTxt(base, fallback = 'document') {
   const net = String(base || '')
     .replace(/[<>:"/\\|?*]/g, ' ')
     .replace(/\s+/g, '_')
     .replace(/^_+|_+$/g, '')
     .substring(0, 80);
-  return `${net || fallback}.docx`;
+  return `${net || fallback}.txt`;
 }
 
-function descarregarBlobDocx(blob, nomFitxer) {
+function descarregarBlobFitxer(blob, nomFitxer) {
   if (window.navigator && typeof window.navigator.msSaveOrOpenBlob === 'function') {
     window.navigator.msSaveOrOpenBlob(blob, nomFitxer);
     return;
@@ -6265,148 +6264,42 @@ function descarregarBlobDocx(blob, nomFitxer) {
   setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
-async function assegurarLlibreriaDocx() {
-  if (typeof docx !== 'undefined' && docx && docx.Document && docx.Packer) return true;
-
-  const urls = [
-    'https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.js',
-    'https://unpkg.com/docx@8.5.0/build/index.js'
-  ];
-
-  const carregarScript = (src, timeoutMs = 8000) => new Promise((resolve) => {
-    let resolt = false;
-    const acabar = (ok) => {
-      if (resolt) return;
-      resolt = true;
-      resolve(!!ok);
-    };
-    const timeoutId = setTimeout(() => acabar(false), timeoutMs);
-
-    const existent = Array.from(document.scripts).find(s => s.src && s.src.includes(src));
-    if (existent) {
-      if (typeof docx !== 'undefined') {
-        clearTimeout(timeoutId);
-        return acabar(true);
-      }
-      const onLoad = () => {
-        clearTimeout(timeoutId);
-        acabar(typeof docx !== 'undefined');
-      };
-      const onError = () => {
-        clearTimeout(timeoutId);
-        acabar(false);
-      };
-      existent.addEventListener('load', onLoad, { once: true });
-      existent.addEventListener('error', onError, { once: true });
-      return;
-    }
-
-    const s = document.createElement('script');
-    s.src = src;
-    s.async = true;
-    s.onload = () => {
-      clearTimeout(timeoutId);
-      acabar(typeof docx !== 'undefined');
-    };
-    s.onerror = () => {
-      clearTimeout(timeoutId);
-      acabar(false);
-    };
-    document.head.appendChild(s);
-  });
-
-  for (const u of urls) {
-    const ok = await carregarScript(u);
-    if (ok && typeof docx !== 'undefined' && docx.Document && docx.Packer) return true;
-  }
-  return false;
-}
-
-async function ambTimeout(promise, ms, missatge = 'Operació excedida') {
-  let timeoutId;
-  const timeoutPromise = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error(missatge)), ms);
-  });
-  try {
-    return await Promise.race([promise, timeoutPromise]);
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
-  }
-}
-
 function descarregarTextFallback(titol, contingut, base = 'document') {
-  const nomTxt = normalitzarNomFitxerDocx(titol || base, base).replace(/\.docx$/i, '.txt');
+  const nomTxt = normalitzarNomFitxerTxt(titol || base, base);
   const blob = new Blob([String(contingut || '')], { type: 'text/plain;charset=utf-8' });
-  descarregarBlobDocx(blob, nomTxt);
-  toast(`⚠️ DOCX no disponible. S'ha descarregat TXT: ${nomTxt}`);
+  descarregarBlobFitxer(blob, nomTxt);
   return nomTxt;
 }
 
-function obrirGoogleDocsPerImportar(nomFitxer = '') {
-  window.open('https://docs.google.com/document/u/0/', '_blank', 'noopener');
+async function obrirGoogleDocsPerImportar(contingut = '', nomFitxer = '') {
+  let copiat = false;
+  const text = String(contingut || '');
+  if (text && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    try {
+      await navigator.clipboard.writeText(text);
+      copiat = true;
+    } catch (err) {
+      console.warn('[Google Docs] No s\'ha pogut copiar al porta-retalls:', err.message);
+    }
+  }
+  window.open('https://docs.new', '_blank', 'noopener');
   if (nomFitxer) {
-    toast(`Google Docs obert. Importa-hi el fitxer ${nomFitxer}.`);
+    toast(copiat
+      ? `TXT descarregat (${nomFitxer}) i text copiat. A Google Docs, fes Ctrl/Cmd+V per enganxar-lo.`
+      : `TXT descarregat (${nomFitxer}). S'ha obert Google Docs perquè l'enganxis manualment.`);
   }
 }
 
 async function exportarADoc(titol, contingut) {
-  const docxDisponible = await assegurarLlibreriaDocx();
-  if (!docxDisponible) {
-    const nomTxt = descarregarTextFallback(titol, contingut, 'conte');
-    obrirGoogleDocsPerImportar(nomTxt);
-    return;
-  }
-
-  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = docx;
-
-  const textNet = netejarTabulacionsInicials(contingut);
-  const paragrafsText = textNet.split(/\n\n+/).filter(p => p.trim().length > 0);
-  const fills = [
-    new Paragraph({
-      text: titol || 'Conte IA',
-      heading: HeadingLevel.HEADING_1,
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 400 }
-    }),
-    new Paragraph({
-      children: [new TextRun({ text: "Generat amb Conte IA", color: "888888" })],
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 800 }
-    })
-  ];
-
-  paragrafsText.forEach((p, i) => {
-    const pOptions = {
-      text: p.trim(),
-      spacing: { after: 200 }
-    };
-    if (i > 0) {
-      pOptions.indent = { firstLine: 720 };
-    }
-    fills.push(new Paragraph(pOptions));
-  });
-
-  const doc = new Document({
-    sections: [{
-      properties: {},
-      children: fills
-    }]
-  });
-
-  try {
-    const blob = await ambTimeout(
-      Packer.toBlob(doc),
-      15000,
-      'Temps d\'exportació DOCX excedit'
-    );
-    const nomFitxer = normalitzarNomFitxerDocx(titol || 'conte', 'conte');
-    descarregarBlobDocx(blob, nomFitxer);
-    toast('📄 Descarregat: ' + nomFitxer);
-  } catch (err) {
-    console.warn('[exportarADoc] Fallback TXT per error DOCX:', err.message);
-    const nomTxt = descarregarTextFallback(titol, contingut, 'conte');
-    toast(`⚠️ Exportació DOCX no disponible (${err.message}). S'ha descarregat ${nomTxt}.`);
-  }
+  const textNet = netejarTabulacionsInicials(contingut || '');
+  const txt = [
+    `Títol: ${titol || 'Conte IA'}`,
+    'Generat amb Booki',
+    '',
+    textNet
+  ].join('\n');
+  const nomTxt = descarregarTextFallback(titol, txt, 'conte');
+  await obrirGoogleDocsPerImportar(txt, nomTxt);
 }
 
 
@@ -6440,7 +6333,7 @@ async function descarregarNovella() {
 
   const btns = document.querySelectorAll('[onclick="descarregarNovella()"]');
   const origTexts = Array.from(btns).map(b => b.textContent);
-  btns.forEach(b => { b.disabled = true; b.textContent = '⏳ Generant DOCX…'; });
+  btns.forEach(b => { b.disabled = true; b.textContent = '⏳ Generant TXT…'; });
   try {
     await exportarNovella(titolDefinitiu, capsGenerats, ESTAT._estructuraCapitols || [], netejarTabulacionsInicials(textEpileg));
   } catch (err) {
@@ -6452,28 +6345,8 @@ async function descarregarNovella() {
 }
 
 async function exportarNovella(titol, caps, estructura, epileg) {
-  const docxDisponible = await assegurarLlibreriaDocx();
-  if (!docxDisponible) {
-    const capitolsFallback = caps
-      .map((c, i) => ({ text: c, titolCap: (estructura[i] && estructura[i].titol ? String(estructura[i].titol).trim() : '') || `Capítol ${i + 1}` }))
-      .filter(c => c.text);
-    const indexFallback = capitolsFallback.map((c, i) => `${i + 1}. ${c.titolCap}`).join('\n');
-    const contingutFallback = [
-      titol || 'Novel·la IA',
-      indexFallback ? `Índex de capítols\n${indexFallback}` : '',
-      ...capitolsFallback.map((c, i) => `Capítol ${i + 1} — ${c.titolCap}\n\n${netejarTabulacionsInicials(c.text)}`),
-      (epileg && String(epileg).trim()) ? `Epíleg\n\n${netejarTabulacionsInicials(epileg)}` : ''
-    ].filter(Boolean).join('\n\n');
-    const nomTxt = descarregarTextFallback(titol, contingutFallback, 'novella');
-    obrirGoogleDocsPerImportar(nomTxt);
-    return;
-  }
-
-  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, PageBreak } = docx;
-  const fills = [];
-
   const titolObra = titol || 'Novel·la IA';
-  const capitolsAmbText = caps
+  const capitolsAmbText = (caps || [])
     .map((text, i) => ({
       text,
       idx: i,
@@ -6481,116 +6354,18 @@ async function exportarNovella(titol, caps, estructura, epileg) {
       titolCap: (estructura[i] && estructura[i].titol ? String(estructura[i].titol).trim() : '') || `Capítol ${i + 1}`
     }))
     .filter(item => item.text);
+  const indexText = capitolsAmbText.map((item, pos) => `${pos + 1}. ${item.titolCap}`).join('\n');
+  const contingut = [
+    `Títol proposat per la IA: ${titolObra}`,
+    'Generat amb Booki',
+    '',
+    indexText ? `Índex de capítols\n${indexText}` : '',
+    ...capitolsAmbText.map((item, pos) => `Capítol ${pos + 1} — ${item.titolCap}\n\n${netejarTabulacionsInicials(item.text)}`),
+    (epileg && String(epileg).trim()) ? `Epíleg\n\n${netejarTabulacionsInicials(epileg)}` : ''
+  ].filter(Boolean).join('\n\n');
 
-  // Portada + índex
-  fills.push(new Paragraph({
-    text: titolObra,
-    heading: HeadingLevel.TITLE,
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 2400, after: 400 }
-  }));
-  fills.push(new Paragraph({
-    children: [new TextRun({ text: "Generat amb Booki", color: "888888" })],
-    alignment: AlignmentType.CENTER,
-    spacing: { after: 800 }
-  }));
-
-  fills.push(new Paragraph({
-    text: 'Índex de capítols',
-    heading: HeadingLevel.HEADING_2,
-    alignment: AlignmentType.LEFT,
-    spacing: { before: 600, after: 260 }
-  }));
-
-  capitolsAmbText.forEach((item, pos) => {
-    fills.push(new Paragraph({
-      text: `${pos + 1}. ${item.titolCap}`,
-      spacing: { after: 120 }
-    }));
-  });
-
-  fills.push(new Paragraph({ children: [new PageBreak()] })); // Salt de pàgina després de la portada + índex
-
-  // Capítols
-  capitolsAmbText.forEach((item, pos) => {
-    const text = item.text;
-    const i = item.idx;
-    const titolCap = item.titolCap;
-
-    fills.push(new Paragraph({
-      children: [new TextRun({ text: titolObra, color: "888888", size: 22 })],
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 600, after: 120 }
-    }));
-
-    fills.push(new Paragraph({
-      text: `Capítol ${pos + 1} — ${titolCap}`,
-      heading: HeadingLevel.HEADING_2,
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 600 }
-    }));
-
-    const paragrafsText = netejarTabulacionsInicials(text).split(/\n\n+/).filter(p => p.trim().length > 0);
-    paragrafsText.forEach((p, index) => {
-      fills.push(new Paragraph({
-        text: p.trim(),
-        spacing: { after: 200 }
-      }));
-    });
-    fills.push(new Paragraph({ children: [new PageBreak()] })); // Salt de pàgina al final de cada capítol
-  });
-
-  // Epíleg
-  if (epileg && epileg.trim()) {
-    fills.push(new Paragraph({
-      children: [new TextRun({ text: "—", color: "888888", size: 24 })],
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 800, after: 200 }
-    }));
-    fills.push(new Paragraph({
-      text: "Epíleg",
-      heading: HeadingLevel.HEADING_2,
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 600 }
-    }));
-
-    const paragrafsEpileg = netejarTabulacionsInicials(epileg).split(/\n\n+/).filter(p => p.trim().length > 0);
-    paragrafsEpileg.forEach((p, index) => {
-      fills.push(new Paragraph({
-        text: p.trim(),
-        spacing: { after: 200 }
-      }));
-    });
-  }
-
-  const doc = new Document({
-    sections: [{ properties: {}, children: fills }]
-  });
-
-  try {
-    const blob = await ambTimeout(
-      Packer.toBlob(doc),
-      25000,
-      'Temps d\'exportació de la novel·la excedit'
-    );
-    const nomFitxer = normalitzarNomFitxerDocx(titol || 'novella', 'novella');
-    descarregarBlobDocx(blob, nomFitxer);
-    toast('📖 Descarregat: ' + nomFitxer);
-  } catch (err) {
-    console.warn('[exportarNovella] Fallback TXT per error DOCX:', err.message);
-    const capitolsFallback = (caps || [])
-      .map((c, i) => ({ text: c, titolCap: (estructura[i] && estructura[i].titol ? String(estructura[i].titol).trim() : '') || `Capítol ${i + 1}` }))
-      .filter(c => c.text);
-    const indexFallback = capitolsFallback.map((c, i) => `${i + 1}. ${c.titolCap}`).join('\n');
-    const contingutFallback = [
-      titol || 'Novel·la IA',
-      indexFallback ? `Índex de capítols\n${indexFallback}` : '',
-      ...capitolsFallback.map((c, i) => `Capítol ${i + 1} — ${c.titolCap}\n\n${netejarTabulacionsInicials(c.text)}`),
-      (epileg && String(epileg).trim()) ? `Epíleg\n\n${netejarTabulacionsInicials(epileg)}` : ''
-    ].filter(Boolean).join('\n\n');
-    const nomTxt = descarregarTextFallback(titol, contingutFallback, 'novella');
-    toast(`⚠️ Exportació DOCX no disponible (${err.message}). S'ha descarregat ${nomTxt}.`);
-  }
+  const nomTxt = descarregarTextFallback(titol, contingut, 'novella');
+  await obrirGoogleDocsPerImportar(contingut, nomTxt);
 }
 
 
