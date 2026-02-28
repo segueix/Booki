@@ -6925,61 +6925,13 @@ CAPÍTOLS ANTERIORS (Context dinàmic per pressupost de tokens):
 ${parts.join('\n\n')}`;
 }
 
-function buildContextCapitolLegacy(idx) {
+function buildContextCapitolLegacy(idx, skipRegistre = false) {
   const parts = [];
 
-  // 1. Brief narratiu
-  parts.push(buildBriefNarratiu());
+  // 1) Fonaments globals: Brief + Bíblia + Trames
+  const brief = buildBriefNarratiu();
+  if (brief && brief.trim()) parts.push(brief);
 
-  // 2. Capítols anteriors literals (prioritari sobre resums)
-  const capsContext = buildContextCapitolsComplets(idx);
-  if (capsContext) parts.push(capsContext);
-
-  // 3. Últims 2 paràgrafs del capítol anterior (continuïtat de to)
-  if (idx > 0 && ESTAT._capitols_generats[idx - 1]) {
-    const parasAnterior = ESTAT._capitols_generats[idx - 1].split(/\n\n+/);
-    const ultims = parasAnterior.slice(-2).join('\n\n');
-    if (ultims.trim()) {
-      parts.push('\nFINAL DEL CAPÍTOL ANTERIOR (mantén la continuïtat de to i escena):\n' + ultims);
-    }
-  }
-
-  // 4. Registre actual (personatges, fils)
-  parts.push(buildRegistreContext(idx));
-
-  // 5. Prefiguracions actives per a aquest capítol
-  const { aPlantarAra, aRecollirAra, plantadesNoResoltes } = getPrefiguracionsActives(idx);
-
-  if (aPlantarAra.length > 0) {
-    parts.push('\nPREFIGURACIONS A PLANTAR EN AQUEST CAPÍTOL (integra-les subtilment, el lector no ha de notar-les en primera lectura):');
-    aPlantarAra.forEach(p => parts.push(`- ${p.element}`));
-  }
-
-  if (aRecollirAra.length > 0) {
-    parts.push('\nPREFIGURACIONS A RECOLLIR (elements plantats abans que ara es resolen):');
-    aRecollirAra.forEach(p => parts.push(`- ${p.element}`));
-  }
-
-  if (plantadesNoResoltes.length > 0) {
-    parts.push('\nPREFIGURACIONS ACTIVES (plantades i encara no resoltes — pots fer-hi referència subtil):');
-    plantadesNoResoltes.forEach(p => parts.push(`- ${p.element} (es resoldrà al cap. ${p.resolucio_capitol})`));
-  }
-
-  // 6. Instruccions de ritme i to específiques
-  const cap = ESTAT._estructuraCapitols[idx];
-  if (cap && cap.toRitme) {
-    parts.push(`\nTO I RITME D'AQUEST CAPÍTOL: ${cap.toRitme}`);
-  }
-
-  // 7. Corba de tensió
-  const tensio = (ESTAT._corbaTensio || []).find(t => t.capitol === idx + 1);
-  if (tensio) {
-    const instrRitme = getInstruccionsRitme(tensio.nivell, tensio.tipus);
-    parts.push(`\nNIVELL DE TENSIÓ OBJECTIU: ${tensio.nivell}/10 (${tensio.tipus || ''})`);
-    parts.push(`INSTRUCCIONS DE PROSA: ${instrRitme}`);
-  }
-
-  // 8. Context de la bíblia narrativa
   const biblia = ESTAT.bibliaNarrativa;
   if (biblia) {
     const bibliaLines = [];
@@ -6987,7 +6939,7 @@ function buildContextCapitolLegacy(idx) {
       bibliaLines.push('FETS CANÒNICS ESTABLERTS (NO CONTRADIR):');
       biblia.fets_canonics.slice(-8).forEach(f => bibliaLines.push('- ' + f));
     }
-    // Filtrem fitxes dels personatges que apareixen en aquest capítol
+
     const capEst = ESTAT._estructuraCapitols[idx];
     const personatgesCap = (capEst && capEst.personatges) ? capEst.personatges : [];
     const fitxesRellevants = (biblia.fitxes_personatges || []).filter(f =>
@@ -7003,19 +6955,20 @@ function buildContextCapitolLegacy(idx) {
         if (f.motivacions) bibliaLines.push(`  Motivació: ${f.motivacions}`);
       });
     }
+
     if (biblia.regles_mon && biblia.regles_mon.length > 0) {
       bibliaLines.push('REGLES DEL MÓN (respecta-les sempre):');
       biblia.regles_mon.forEach(r => bibliaLines.push('- ' + r));
     }
+
     if (bibliaLines.length > 0) {
-      parts.push('\n' + bibliaLines.join('\n'));
+      parts.push('\nBÍBLIA NARRATIVA:\n' + bibliaLines.join('\n'));
     }
   }
 
-  // 9. Context de trames actives en aquest capítol
   const trames = ESTAT.trames;
   if (trames && (trames.trama_principal || trames.subtrames.length > 0)) {
-    const tramesLines = ['\nTRAMES ACTIVES EN AQUEST CAPÍTOL:'];
+    const tramesLines = ['TRAMES ACTIVES EN AQUEST CAPÍTOL:'];
     if (trames.trama_principal) {
       const tp = trames.trama_principal;
       tramesLines.push('Trama principal: ' + (typeof tp === 'string' ? tp : (tp.descripcio || JSON.stringify(tp))));
@@ -7029,10 +6982,28 @@ function buildContextCapitolLegacy(idx) {
       );
       subActive.forEach(st => tramesLines.push(`Subtrama "${st.nom}": ${st.descripcio || ''}`));
     }
-    parts.push(tramesLines.join('\n'));
+    parts.push('\n' + tramesLines.join('\n'));
   }
 
-  // 10. Ajustos de rumb del darrer checkpoint
+  // 2) Context de capítols i continuïtat (memòria global textual)
+  const capsContext = buildContextCapitolsComplets(idx);
+  if (capsContext) parts.push(capsContext);
+
+  if (idx > 0 && ESTAT._capitols_generats[idx - 1]) {
+    const parasAnterior = ESTAT._capitols_generats[idx - 1].split(/\n\n+/);
+    const ultims = parasAnterior.slice(-2).join('\n\n');
+    if (ultims.trim()) {
+      parts.push('\nFINAL DEL CAPÍTOL ANTERIOR (mantén la continuïtat de to i escena):\n' + ultims);
+    }
+  }
+
+  // 3) Registre antic opcional (desacoblat quan NKG és actiu)
+  if (!skipRegistre) {
+    const registreCtx = buildRegistreContext(idx);
+    if (registreCtx && registreCtx.trim()) parts.push(registreCtx);
+  }
+
+  // 4) Ajustos globals de rumb
   if (ESTAT._ajustosRumb) {
     const ajustos = typeof ESTAT._ajustosRumb === 'string' ? ESTAT._ajustosRumb : JSON.stringify(ESTAT._ajustosRumb);
     if (ajustos && ajustos.trim()) {
@@ -7051,9 +7022,44 @@ function buildContextCapitol(idx) {
   const r2 = idx - 2 >= 0 ? capitolsRegistre[idx - 2] : null;
   const prohibirIniciMeteorologic = !!(r1 && r2 && r1.inici_meteorologic === true && r2.inici_meteorologic === true);
 
-  // PONT NKG: quan el NKG és actiu, delega a nkgGenerarContextMinim
+  const cap = ESTAT._estructuraCapitols ? ESTAT._estructuraCapitols[idx] : null;
+
+  // 1) TRAMES + BRIEF + BÍBLIA (+ memòria textual), mantenint context global sempre
+  const ctxGlobal = ESTAT._nkg
+    ? buildContextCapitolLegacy(idx, true)
+    : buildContextCapitolLegacy(idx, false);
+
+  // 2) ESCALETA I ESCENES DEL CAPÍTOL
+  const blocEscaleta = [];
+  if (cap) {
+    const capLines = [];
+    if (cap.titol) capLines.push(`Títol: ${cap.titol}`);
+    if (cap.fil || cap.fil_principal) capLines.push(`Fil principal: ${cap.fil || cap.fil_principal}`);
+    if (cap.resum) capLines.push(`Resum: ${cap.resum}`);
+    if (cap.personatges && cap.personatges.length > 0) capLines.push(`Personatges: ${cap.personatges.join(', ')}`);
+    if (cap.localitzacio) capLines.push(`Localització: ${cap.localitzacio}`);
+    if (cap.connexioAnterior) capLines.push(`Connexió anterior: ${cap.connexioAnterior}`);
+    if (cap.connexioSeguent) capLines.push(`Connexió següent: ${cap.connexioSeguent}`);
+    if (capLines.length > 0) blocEscaleta.push('PLANIFICACIÓ DEL CAPÍTOL ACTUAL:\n' + capLines.join('\n'));
+  }
+
+  const escaletaCap = (ESTAT._escaletes || []).find(e => e.capitol === idx + 1);
+  if (escaletaCap && Array.isArray(escaletaCap.escenes) && escaletaCap.escenes.length > 0) {
+    const escenes = escaletaCap.escenes.slice(0, 8).map((sc, i) => {
+      const p = [];
+      if (sc.nom) p.push(`Nom: ${sc.nom}`);
+      if (sc.funcio_narrativa) p.push(`Funció: ${sc.funcio_narrativa}`);
+      if (sc.personatges && sc.personatges.length > 0) p.push(`Personatges: ${sc.personatges.join(', ')}`);
+      if (sc.beat_narratiu) p.push(`Beat: ${sc.beat_narratiu}`);
+      if (sc.paraules_objectiu) p.push(`Paraules: ${sc.paraules_objectiu}`);
+      return `- Escena ${i + 1}: ${p.join(' | ')}`;
+    }).join('\n');
+    blocEscaleta.push('ESCALETA/ESCENES DEL CAPÍTOL:\n' + escenes);
+  }
+
+  // 3) ESTAT NKG (si actiu)
+  let blocNkg = '';
   if (ESTAT._nkg) {
-    const cap = ESTAT._estructuraCapitols ? ESTAT._estructuraCapitols[idx] : null;
     const escenaSpec = {
       capitol: idx + 1,
       escena: 1,
@@ -7061,17 +7067,45 @@ function buildContextCapitol(idx) {
       lloc: cap ? (cap.localitzacio || '') : '',
       escaleta: null
     };
-    const ctxNkg = nkgGenerarContextMinim(escenaSpec);
-    if (prohibirIniciMeteorologic) {
-      return ctxNkg + "\n\nPROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg.";
-    }
-    return ctxNkg;
+    blocNkg = nkgGenerarContextMinim(escenaSpec);
   }
-  const ctxLegacy = buildContextCapitolLegacy(idx);
+
+  // 4) PREFIGURACIONS + TO
+  const blocFinal = [];
+  const { aPlantarAra, aRecollirAra, plantadesNoResoltes } = getPrefiguracionsActives(idx);
+  if (aPlantarAra.length > 0) {
+    blocFinal.push('PREFIGURACIONS A PLANTAR EN AQUEST CAPÍTOL (integra-les subtilment):');
+    aPlantarAra.forEach(p => blocFinal.push(`- ${p.element}`));
+  }
+  if (aRecollirAra.length > 0) {
+    blocFinal.push('PREFIGURACIONS A RECOLLIR (elements plantats abans que ara es resolen):');
+    aRecollirAra.forEach(p => blocFinal.push(`- ${p.element}`));
+  }
+  if (plantadesNoResoltes.length > 0) {
+    blocFinal.push('PREFIGURACIONS ACTIVES (encara no resoltes):');
+    plantadesNoResoltes.forEach(p => blocFinal.push(`- ${p.element} (resolució prevista cap. ${p.resolucio_capitol})`));
+  }
+
+  if (cap && cap.toRitme) blocFinal.push(`TO I RITME D'AQUEST CAPÍTOL: ${cap.toRitme}`);
+  const tensio = (ESTAT._corbaTensio || []).find(t => t.capitol === idx + 1);
+  if (tensio) {
+    const instrRitme = getInstruccionsRitme(tensio.nivell, tensio.tipus);
+    blocFinal.push(`NIVELL DE TENSIÓ OBJECTIU: ${tensio.nivell}/10 (${tensio.tipus || ''})`);
+    blocFinal.push(`INSTRUCCIONS DE PROSA: ${instrRitme}`);
+  }
+
+  const seccions = [
+    ctxGlobal,
+    blocEscaleta.length > 0 ? blocEscaleta.join('\n\n') : '',
+    blocNkg,
+    blocFinal.length > 0 ? blocFinal.join('\n') : ''
+  ].filter(Boolean);
+
+  let contextFinal = seccions.join('\n\n');
   if (prohibirIniciMeteorologic) {
-    return ctxLegacy + "\n\nPROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg.";
+    contextFinal += "\n\nPROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg.";
   }
-  return ctxLegacy;
+  return contextFinal;
 }
 
 // ═══════════════════════════════════════════════════════════
