@@ -4311,10 +4311,34 @@ function normalitzarEntradaRegistre(dades, textCapitol, idx) {
     estat_personatges: estatPersonatges,
     fils_oberts: Array.isArray(base.fils_oberts) ? base.fils_oberts : [],
     fils_tancats: Array.isArray(base.fils_tancats) ? base.fils_tancats : [],
+    fils_nous_detectats: Array.isArray(base.fils_nous_detectats) ? base.fils_nous_detectats : [],
+    fils_resolts_detectats: Array.isArray(base.fils_resolts_detectats) ? base.fils_resolts_detectats : [],
     prefiguracions_detectades: Array.isArray(base.prefiguracions_detectades) ? base.prefiguracions_detectades : [],
     _fallback: !dades,
     _capitol_idx: idx
   };
+}
+
+
+function reconciliarFilsRegistre(dades) {
+  const reg = ESTAT.llibreRegistre || {};
+  const obertsActuals = new Set(Array.isArray(reg.fils_oberts) ? reg.fils_oberts : []);
+  const tancatsActuals = new Set(Array.isArray(reg.fils_tancats) ? reg.fils_tancats : []);
+
+  const obertsDeclarats = new Set(Array.isArray(dades.fils_oberts) ? dades.fils_oberts : []);
+  const tancatsDeclarats = new Set(Array.isArray(dades.fils_tancats) ? dades.fils_tancats : []);
+  const filsNous = new Set(Array.isArray(dades.fils_nous_detectats) ? dades.fils_nous_detectats : []);
+  const filsResolts = new Set(Array.isArray(dades.fils_resolts_detectats) ? dades.fils_resolts_detectats : []);
+
+  [...obertsDeclarats, ...filsNous].forEach(f => { if (f) obertsActuals.add(f); });
+  [...tancatsDeclarats, ...filsResolts].forEach(f => {
+    if (!f) return;
+    tancatsActuals.add(f);
+    obertsActuals.delete(f);
+  });
+
+  ESTAT.llibreRegistre.fils_oberts = [...obertsActuals];
+  ESTAT.llibreRegistre.fils_tancats = [...tancatsActuals];
 }
 
 // FASE 8: registre síncron amb retry — s'awaita des de generarCapitol
@@ -4332,16 +4356,7 @@ async function actualitzarLlibreRegistreBackgroundLegacy(textCapitol, idx) {
         if (Array.isArray(dades.estat_personatges) && dades.estat_personatges.length > 0)
           ESTAT.llibreRegistre.estat_personatges = dades.estat_personatges;
 
-        if (Array.isArray(dades.fils_tancats) && dades.fils_tancats.length > 0) {
-          const tancats = new Set(dades.fils_tancats);
-          ESTAT.llibreRegistre.fils_oberts  = (ESTAT.llibreRegistre.fils_oberts  || []).filter(f => !tancats.has(f));
-          ESTAT.llibreRegistre.fils_tancats = [...new Set([...(ESTAT.llibreRegistre.fils_tancats || []), ...dades.fils_tancats])];
-        }
-        if (Array.isArray(dades.fils_oberts) && dades.fils_oberts.length > 0) {
-          const existents = new Set(ESTAT.llibreRegistre.fils_oberts || []);
-          dades.fils_oberts.forEach(f => existents.add(f));
-          ESTAT.llibreRegistre.fils_oberts = [...existents];
-        }
+        reconciliarFilsRegistre(dades);
 
         await actualitzarEstatsAnimics(textCapitol, idx, USER_CONFIG);
         return;  // èxit
@@ -7044,9 +7059,94 @@ ${txt.slice(0, 14000)}`
   }
 }
 
+
+function calcularPressioDeTancament(capitolActualIdx) {
+  const totalCapitols = Number(ESTAT._nombreCapitols || (ESTAT._estructuraCapitols ? ESTAT._estructuraCapitols.length : 0) || 0);
+  const reg = ESTAT.llibreRegistre || {};
+  const filsObertsArr = Array.isArray(reg.fils_oberts) ? reg.fils_oberts : [];
+  const filsTancatsArr = Array.isArray(reg.fils_tancats) ? reg.fils_tancats : [];
+  const capitolsRestants = Math.max(0, totalCapitols - capitolActualIdx - 1);
+  const filsOberts = filsObertsArr.length;
+  const ratio = filsOberts / Math.max(capitolsRestants, 1);
+  const filsPerCapitol = Math.ceil(filsOberts / Math.max(capitolsRestants, 1));
+
+  let pressio = 'baixa';
+  if (capitolsRestants === 0) pressio = 'critica';
+  else if (capitolsRestants <= 2) pressio = 'alta';
+  else if (capitolsRestants <= 4) pressio = 'mitjana';
+
+  return {
+    totalCapitols,
+    capitolsRestants,
+    filsOberts,
+    filsTancats: filsTancatsArr.length,
+    ratio,
+    filsPerCapitol,
+    pressio,
+    filsObertsArr,
+    filsTancatsArr
+  };
+}
+
+function classificarPrioritatFil(filTxt) {
+  const f = String(filTxt || '').toLowerCase();
+  const nomsPrincipals = [ESTAT.protagonistaTriat]
+    .concat((ESTAT._personatgesSeleccionats || []).slice(0, 3))
+    .filter(Boolean)
+    .map(n => String(n).toLowerCase());
+  if (nomsPrincipals.some(n => n && f.includes(n))) return 'alta';
+  if (/(trama principal|protagon|antagon|climax|conflicte central|arc)/.test(f)) return 'alta';
+  if (/(subtrama|secundari|aliat|famili|amic|mentor)/.test(f)) return 'mitjana';
+  return 'baixa';
+}
+
+function generarDirectivaFils(capitolActualIdx) {
+  const d = calcularPressioDeTancament(capitolActualIdx);
+  const oberts = d.filsObertsArr || [];
+  if (oberts.length === 0) return "DIRECTIVA DE FILS: No hi ha fils oberts al registre. Mantén la coherència i evita obrir-ne de nous innecessaris.";
+
+  const alta = [];
+  const mitjana = [];
+  const baixa = [];
+  oberts.forEach(f => {
+    const p = classificarPrioritatFil(f);
+    if (p === 'alta') alta.push(f);
+    else if (p === 'mitjana') mitjana.push(f);
+    else baixa.push(f);
+  });
+
+  if (d.pressio === 'baixa') {
+    return `Fils narratius actius (referència): ${oberts.slice(0, 10).join(' | ')}. No cal tancar-los tots, però no els contradiguis.`;
+  }
+
+  if (d.pressio === 'mitjana') {
+    const minim = Math.max(2, d.filsPerCapitol);
+    return `DIRECTIVA DE FILS: Queden ${d.capitolsRestants} capítols. Fils oberts: ${d.filsOberts}. Aquest capítol HA DE tancar o avançar significativament un mínim de ${minim} dels fils següents (en ordre de prioritat):
+PRIORITAT ALTA: ${alta.length ? alta.join(' | ') : '(cap detectada)'}
+PRIORITAT MITJANA: ${mitjana.length ? mitjana.join(' | ') : '(cap detectada)'}
+Per tancar un fil, necessites: resolució explícita, menció del destí del personatge/situació, o tancament temàtic.`;
+  }
+
+  const prioritats = [...alta, ...mitjana].slice(0, Math.max(4, d.filsPerCapitol));
+  const menors = baixa.slice(0, 8);
+  return `URGÈNCIA NARRATIVA: Aquest és un dels ${Math.max(d.capitolsRestants, 1)} últims capítols. Hi ha ${d.filsOberts} fils sense resoldre. És IMPERATIU que aquest capítol resolgui o doni tancament a:
+${prioritats.length ? prioritats.map(f => `- ${f}`).join('\n') : '- (prioritats no detectades)'}
+
+Fils que es poden tancar amb una frase o menció breu:
+${menors.length ? menors.map(f => `- ${f}`).join('\n') : '- (cap fil menor)'}
+
+Cap fil de PRIORITAT ALTA pot quedar obert al final de la novel·la.`;
+}
+
 function buildSystemPromptCapitol() {
   const idxActual = Number(ESTAT._capitolActual || 0);
   const directivaContinuitat = generarDirectivaContinuitat(idxActual);
+  const directivaFils = generarDirectivaFils(idxActual);
+  const totalCapitolsPlanificats = Number(ESTAT._nombreCapitols || (ESTAT._estructuraCapitols ? ESTAT._estructuraCapitols.length : 0) || 0);
+  const capitolsRestants = Math.max(0, totalCapitolsPlanificats - idxActual - 1);
+  const blocAntiProliferacioFils = capitolsRestants <= 3
+    ? "PROHIBIT OBRIR FILS NOUS: A partir d'aquest punt, no introdueixis cap personatge nou, cap subtrama nova ni cap misteri nou. Només tanca i resol."
+    : '';
   const capitolsRegistre = (ESTAT.llibreRegistre && Array.isArray(ESTAT.llibreRegistre.capitols))
     ? ESTAT.llibreRegistre.capitols
     : [];
@@ -7109,6 +7209,8 @@ function buildSystemPromptCapitol() {
     if (blocAlertesEstil) parts.push('\n' + blocAlertesEstil);
     const blocLongitud = buildBlocAlertaLongitud();
     if (blocLongitud) parts.push('\n' + blocLongitud);
+    if (directivaFils) parts.push('\n' + directivaFils);
+    if (blocAntiProliferacioFils) parts.push('\n' + blocAntiProliferacioFils);
     if (directivaContinuitat) parts.push('\n' + directivaContinuitat);
     if (ESTAT._controlLongitud && ESTAT._controlLongitud.promptForcat) parts.push('\n' + ESTAT._controlLongitud.promptForcat);
     if (prohibirIniciMeteorologic) {
@@ -7124,6 +7226,8 @@ function buildSystemPromptCapitol() {
   if (blocAlertesEstil) legacyAmbContinuitat += `\n\n${blocAlertesEstil}`;
   const blocLongitud = buildBlocAlertaLongitud();
   if (blocLongitud) legacyAmbContinuitat += `\n\n${blocLongitud}`;
+  if (directivaFils) legacyAmbContinuitat += `\n\n${directivaFils}`;
+  if (blocAntiProliferacioFils) legacyAmbContinuitat += `\n\n${blocAntiProliferacioFils}`;
   if (directivaContinuitat) legacyAmbContinuitat += `\n\n${directivaContinuitat}`;
   if (ESTAT._controlLongitud && ESTAT._controlLongitud.promptForcat) legacyAmbContinuitat += `\n\n${ESTAT._controlLongitud.promptForcat}`;
   return prohibirIniciMeteorologic
@@ -8022,6 +8126,8 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense cap text addicional, sense m
   "estat_personatges": [{"nom": "nom", "ubicacio": "on és ara", "estat_actual": "situació emocional/física actual"}],
   "fils_oberts": ["fil narratiu que queda obert o s'ha introduït"],
   "fils_tancats": ["fil narratiu que s'ha resolt en aquest capítol"],
+  "fils_nous_detectats": ["fils que s'han obert explícitament en aquest capítol"],
+  "fils_resolts_detectats": ["fils preexistents que aquí es resolen"],
   "prefiguracions_detectades": ["element que apareix en aquest capítol i podria ser una prefiguració o referència a una"],
   "inici_meteorologic": true,
   "es_cliffhanger": false
