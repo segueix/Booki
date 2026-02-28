@@ -3918,6 +3918,12 @@ async function generarCapitol(idx, intents = 0) {
       console.warn('Continuity snapshot async:', err.message);
     }
 
+    try {
+      await actualitzarBeatsNarratiusGastats(textNet, idx + 1, USER_CONFIG);
+    } catch (err) {
+      console.warn('Beats gastats async:', err.message);
+    }
+
     const esCheckpoint = (idx + 1) % 3 === 0 && idx + 1 < ESTAT._estructuraCapitols.length;
     if (esCheckpoint) {
       await executarCheckpoint(idx, USER_CONFIG);
@@ -6730,6 +6736,76 @@ REGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que é
   return base;
 }
 
+function normalitzarBeatNarratiu(beat) {
+  const b = String(beat || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9_\s-]/g, ' ')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return b.slice(0, 60);
+}
+
+function esBeatNarratiuTrivial(beat) {
+  const b = String(beat || '').toLowerCase();
+  return /^(caminar|parlar|mirar|entrar|sortir|respirar|pensar)$/.test(b)
+    || /(^|[_\s-])(caminar|parlar|mirar)([_\s-]|$)/.test(b);
+}
+
+function buildBlocBeatsNarratiusProhibits() {
+  const beats = (ESTAT._nkg && Array.isArray(ESTAT._nkg.beats_gastats)) ? ESTAT._nkg.beats_gastats : [];
+  if (beats.length === 0) return '';
+  const lines = beats.slice(-30).map(b => `- ${b}`);
+  return `BEATS NARRATIUS PROHIBITS — Aquests recursos dramàtics ja s'han utilitzat en capítols anteriors. NO els repeteixis ni en variació. Troba alternatives originals:
+${lines.join('\n')}
+
+Si l'escaleta del capítol actual requereix una acció similar a un beat prohibit, REIMAGINA'L amb una mecànica diferent.`;
+}
+
+async function actualitzarBeatsNarratiusGastats(textCapitol, capitolNum, userConfig = USER_CONFIG) {
+  if (!ESTAT._nkg) return;
+  if (!Array.isArray(ESTAT._nkg.beats_gastats)) ESTAT._nkg.beats_gastats = [];
+  const txt = String(textCapitol || '').trim();
+  if (!txt) return;
+
+  const msgs = [{
+    role: 'user',
+    content: `Analitza el capítol següent i extreu els BEATS NARRATIUS CLAU: accions dramàtiques úniques, girs de guió, revelacions, confrontacions o moments climàtics que JA S'HAN CONSUMIT i que NO s'haurien de repetir en capítols futurs. Format: array JSON de strings curts i descriptius.
+Exemples: 'protagonista_prem_enviar_dades', 'descoberta_factura_pes', 'confrontacio_directa_antagonista_passadis', 'trucada_testament_exmarit'.
+Retorna NOMÉS el JSON array, res més.
+
+CAPÍTOL ${capitolNum}:
+${txt.slice(0, 14000)}`
+  }];
+
+  try {
+    const models = getModelConfig(userConfig || USER_CONFIG || {});
+    const raw = await callLLMMulti(
+      msgs,
+      'Ets una analista de beats narratius. Retorna exclusivament JSON array.',
+      Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 900, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+    let parsed = parseJsonRobust(raw);
+    if (!Array.isArray(parsed)) {
+      try { parsed = JSON.parse(String(raw || '').trim()); } catch { parsed = []; }
+    }
+    const nous = Array.isArray(parsed) ? parsed : [];
+    const filtrats = nous
+      .map(normalitzarBeatNarratiu)
+      .filter(Boolean)
+      .filter(b => b.length <= 60)
+      .filter(b => !esBeatNarratiuTrivial(b));
+
+    const set = new Set(ESTAT._nkg.beats_gastats);
+    filtrats.forEach(b => set.add(b));
+    ESTAT._nkg.beats_gastats = Array.from(set).slice(-30);
+  } catch (err) {
+    console.warn('Beats narratius: error no bloquejant:', err.message);
+  }
+}
+
 function buildSystemPromptCapitol() {
   const idxActual = Number(ESTAT._capitolActual || 0);
   const directivaContinuitat = generarDirectivaContinuitat(idxActual);
@@ -6789,6 +6865,8 @@ function buildSystemPromptCapitol() {
     }
     parts.push("\nREGLA D'ESTIL OBLIGATÒRIA (SHOW, DON'T TELL): Tens totalment prohibit utilitzar etiquetes emocionals explícites per descriure com se sent un personatge (ex: prohibit dir \"estava trist\", \"se sentia enfadat\", \"estava nerviós\"). En comptes d'això, has de MOSTRAR l'emoció a través d'accions físiques, interaccions amb objectes, vestimenta, llenguatge corporal o detalls de l'entorn.");
     parts.push("\nREGLA DE CONTINUITAT OBLIGATÒRIA: Llevat que se t'indiqui explícitament que és el final del capítol, NO resolguis la situació ni facis que els personatges abandonin l'escenari al final del text. Deixa l'acció fluint, oberta o en suspens dramàtic, de manera que la següent generació pugui recollir el testimoni de forma natural.");
+    const blocBeatsProhibits = buildBlocBeatsNarratiusProhibits();
+    if (blocBeatsProhibits) parts.push('\n' + blocBeatsProhibits);
     if (directivaContinuitat) parts.push('\n' + directivaContinuitat);
     if (prohibirIniciMeteorologic) {
       parts.push("PROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg.");
@@ -6796,7 +6874,10 @@ function buildSystemPromptCapitol() {
     return parts.join('\n');
   }
   const legacy = buildSystemPromptCapitolLegacy();
-  const legacyAmbContinuitat = directivaContinuitat ? `${legacy}\n\n${directivaContinuitat}` : legacy;
+  const blocBeatsProhibits = buildBlocBeatsNarratiusProhibits();
+  let legacyAmbContinuitat = legacy;
+  if (blocBeatsProhibits) legacyAmbContinuitat += `\n\n${blocBeatsProhibits}`;
+  if (directivaContinuitat) legacyAmbContinuitat += `\n\n${directivaContinuitat}`;
   return prohibirIniciMeteorologic
     ? legacyAmbContinuitat + "\n\nPROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg."
     : legacyAmbContinuitat;
@@ -8891,6 +8972,7 @@ function crearNKG() {
     timeline_accions: [], // Registre d'Accions Consumades (NKG CHRONOS): "C3E2: Maja entra al laboratori"
     timeline_objectes: [], // Registre de moviment d'objectes: C3E2: [Claus] Personatge A -> Personatge B (motiu)
     timeline_personatges: [], // Registre de canvis de personatge: ubicació/roba/estat per escena
+    beats_gastats: [], // Registre de beats narratius consumits (anti-repetició dramàtica)
     ultima_actualitzacio: { capitol: 0, escena: 0 },
     versio: 1
   };
@@ -9392,6 +9474,8 @@ function nkgInicialitzar() {
       categoria: 'estructura'
     });
   }
+
+  if (!Array.isArray(nkg.beats_gastats)) nkg.beats_gastats = [];
 
   // Inicialitzar emmagatzematge d'escenes
   ESTAT._escenes_generades = {};
