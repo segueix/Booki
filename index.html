@@ -1708,6 +1708,8 @@ const ESTAT = {
   _openaiApiKey:    '',
   _revisionsCodiSistema: [],
   _revisioFinalApp: null,
+  _clausPromptSeguent: [],
+  _alertaArquitecte: null,
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -4338,10 +4340,21 @@ async function actualitzarLlibreRegistreBackground(textCapitol, idx, esRevisioSi
     if (Array.isArray(entrada.personatges) && entrada.personatges.length > 0)
       ESTAT.llibreRegistre.estat_personatges = entrada.personatges;
     reconciliarFilsRegistre(ESTAT.llibreRegistre.capitols[idx]);
+    // Claus per al capítol següent (Fix 2)
+    if (Array.isArray(entrada.claus_prompt_seguent) && entrada.claus_prompt_seguent.length > 0)
+      ESTAT._clausPromptSeguent = entrada.claus_prompt_seguent;
   } else {
     if (!ESTAT.llibreRegistre.capitols) ESTAT.llibreRegistre.capitols = [];
     ESTAT.llibreRegistre.capitols[idx] = normalitzarEntradaRegistre(null, textCapitol, idx);
     console.warn('Registre: fallback local aplicat (entrada mínima) per al capítol', idx + 1);
+  }
+  // Alerta de l'Arquitecte per al capítol següent (Fix 3)
+  if (esRevisioSistema && dades && dades.revisio_sistema) {
+    const rev = dades.revisio_sistema;
+    const millores = (rev.millores_proposades || []).filter(m => m.prioritat === 'alta').slice(0, 3);
+    const alerta = rev.alerta_critica || '';
+    if (millores.length > 0 || alerta)
+      ESTAT._alertaArquitecte = { millores, alerta, capitol: idx + 1 };
   }
   await actualitzarEstatsAnimics(textCapitol, idx, cfg);
 }
@@ -6514,6 +6527,18 @@ function buildBriefNarratiu() {
   const pers = ESTAT._personatgesSeleccionats && ESTAT._personatgesSeleccionats.length > 0
     ? ESTAT._personatgesSeleccionats.join('; ')
     : '(No definits)';
+  const temes = Array.isArray(ESTAT._temesCentrals) && ESTAT._temesCentrals.length > 0
+    ? ESTAT._temesCentrals.slice(0, 4).join(' | ')
+    : '';
+  const arcGlobal = ESTAT._arcGlobal ? `\n- Arc global: ${ESTAT._arcGlobal.substring(0, 200)}` : '';
+  let arcMoral = '';
+  if (ESTAT._arcMoral && typeof ESTAT._arcMoral === 'object') {
+    const pnr = ESTAT._arcMoral.punt_no_retorn;
+    const cf  = ESTAT._arcMoral.cost_final;
+    const pnrDesc = pnr && typeof pnr === 'object' ? pnr.descripcio : (typeof pnr === 'string' ? pnr : '');
+    const cfDesc  = cf  && typeof cf  === 'object' ? cf.descripcio  : (typeof cf  === 'string' ? cf  : '');
+    if (pnrDesc || cfDesc) arcMoral = `\n- Arc moral: ${[pnrDesc, cfDesc].filter(Boolean).join(' → ').substring(0, 200)}`;
+  }
   return `DECISIONS NARRATIVES:
 - Gènere: ${ESTAT.tematica || '(No definit)'}
 - Premissa: ${ESTAT.premissaTriada || '(No definida)'}
@@ -6521,7 +6546,7 @@ function buildBriefNarratiu() {
 - Protagonista: ${ESTAT.protagonistaTriat || '(No definit)'}
 - Localització: ${ESTAT.localitzacioTriada || '(No definida)'}
 - Final planificat: ${ESTAT.finalTriat || '(No definit)'}
-- Personatges seleccionats: ${pers}`;
+- Personatges seleccionats: ${pers}${temes ? '\n- Temes centrals: ' + temes : ''}${arcGlobal}${arcMoral}`;
 }
 
 function buildResumConteBreu() {
@@ -6921,6 +6946,10 @@ function buildSystemPromptCapitol() {
     const parts = [];
     parts.push(getSystemPromptNovella(ESTAT.tematica));
     parts.push(buildBriefNarratiu());
+
+    if (ESTAT.worldbuilding) {
+      parts.push('\nBÍBLIA DE MÓN (regles, geografies i lleis de l\'univers — NO contradir):\n' + ESTAT.worldbuilding.substring(0, 1200) + (ESTAT.worldbuilding.length > 1200 ? '\n[…]' : ''));
+    }
 
     if (ESTAT.estilsParla) {
       parts.push('\nESTILS DE PARLA DELS PERSONATGES:\n' + ESTAT.estilsParla.substring(0, 2000));
@@ -7433,6 +7462,24 @@ function buildContextCapitolLegacy(idx, skipRegistre = false, estat = ESTAT) {
     if (ajustos && ajustos.trim()) {
       parts.push(`\nAJUSTOS DE RUMB (indicació del checkpoint de coherència): ${ajustos}`);
     }
+  }
+
+  // 5) Claus de l'Arquitecte per a aquest capítol (Fix 2)
+  if (Array.isArray(estat._clausPromptSeguent) && estat._clausPromptSeguent.length > 0) {
+    parts.push('\nCLAUS DE CONTINUÏTAT (extretes per l\'Arquitecte del capítol anterior):\n' +
+      estat._clausPromptSeguent.slice(0, 5).map(c => `- ${c}`).join('\n'));
+  }
+
+  // 6) Alerta i millores de l'Arquitecte (Fix 3)
+  if (estat._alertaArquitecte) {
+    const a = estat._alertaArquitecte;
+    const lines = [];
+    if (a.alerta) lines.push(`⚠️ ALERTA CRÍTICA (cap ${a.capitol}): ${a.alerta}`);
+    if (a.millores && a.millores.length > 0) {
+      lines.push('MILLORES PRIORITÀRIES DE L\'ARQUITECTE (aplica-les en aquest capítol):');
+      a.millores.forEach(m => lines.push(`- [${m.capitol_afectat || 'general'}] ${m.proposta || m.problema || ''}`));
+    }
+    if (lines.length > 0) parts.push('\n' + lines.join('\n'));
   }
 
   return parts.join('\n');
@@ -10211,6 +10258,7 @@ async function escriureCapitolDirecte(idx, contextCapitol, userConfig) {
   const capitol = idx + 1;
   const cap = ESTAT._estructuraCapitols[idx] || {};
   const systemPrompt = buildSystemPromptCapitol();
+  const blocPsico = construirBlocPlaPsicologicPerPrompt(capitol, 0);
   const msgs = [{
     role: 'user',
     content: `Escriu directament la versió final del capítol ${capitol} sense fases intermèdies d'esborrany.
@@ -10218,7 +10266,7 @@ async function escriureCapitolDirecte(idx, contextCapitol, userConfig) {
 TÍTOL: ${cap.titol || ''}
 CONTEXT COMPLET:
 ${contextCapitol}
-
+${blocPsico}
 INSTRUCCIONS:
 - Mantén coherència estricta amb el context i la continuïtat factual.
 - Prosa literària en català, sense metadades.
