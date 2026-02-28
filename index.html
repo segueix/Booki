@@ -3681,7 +3681,8 @@ Observacions: ${(Array.isArray(revisio.problemes) && revisio.problemes.length > 
 
   const revFinalTxt = revisioFinal
     ? `Nota final reescriptura: ${revisioFinal.puntuacio ?? '?'} / 10
-Observacions: ${revisioFinal.observacions || ''}`
+Observacions: ${revisioFinal.observacions || ''}
+Feedback App: ${revisioFinal.feedback_app || 'Cap'}`
     : "Encara no s'ha executat la segona revisió Opus.";
 
   const sections = [
@@ -3749,12 +3750,16 @@ CAPÍTOL FINAL:
 ${capFinal}
 
 Retorna NOMÉS JSON:
-{"puntuacio":8,"observacions":"Màxim 100 paraules. Digues si són bones, regulars o dolentes i per què."}` }];
+{"puntuacio":8,"observacions":"Màxim 100 paraules. Digues si són bones, regulars o dolentes i per què.","feedback_app":"Analitza per què l'esbòs original o la reescriptura han fallat a causa d'instruccions insuficients. Quina informació clau no li hem injectat al model Generador al context? Com podem millorar el prompt intern de l'aplicació per evitar-ho?"}` }];
     const models = getModelConfig(USER_CONFIG);
     const raw = await callLLMMulti(msgs, "Ets l'Arquitecta Opus. Retorna només JSON.", Object.assign({}, USER_CONFIG, { maxTokens: 500, model: models.modelArquitecte }), 'arquitectura');
     const dades = parseJsonRobust(raw) || {};
     ESTAT._revisionsOpusFinals = ESTAT._revisionsOpusFinals || {};
-    ESTAT._revisionsOpusFinals[idx] = { puntuacio: dades.puntuacio ?? '?', observacions: String(dades.observacions || '').slice(0, 650) };
+    ESTAT._revisionsOpusFinals[idx] = {
+      puntuacio: dades.puntuacio ?? '?',
+      observacions: String(dades.observacions || '').slice(0, 650),
+      feedback_app: String(dades.feedback_app || '').slice(0, 1200)
+    };
     toast('✅ Segona revisió Opus completada.');
     obrirDetallCapitol(idx);
   } catch (err) {
@@ -7033,12 +7038,12 @@ function buildContextCapitol(idx) {
 
   const cap = ESTAT._estructuraCapitols ? ESTAT._estructuraCapitols[idx] : null;
 
-  // 1) TRAMES + BRIEF + BÍBLIA (+ memòria textual), mantenint context global sempre
-  const ctxGlobal = ESTAT._nkg
+  // Context global (Brief, Bíblia, Trames, etc.) sempre present
+  const ctxGlobalBase = ESTAT._nkg
     ? buildContextCapitolLegacy(idx, true)
     : buildContextCapitolLegacy(idx, false);
 
-  // 2) ESCALETA I ESCENES DEL CAPÍTOL
+  // Bloc de planificació/escaleta (què passa en aquest capítol)
   const blocEscaleta = [];
   if (cap) {
     const capLines = [];
@@ -7066,20 +7071,7 @@ function buildContextCapitol(idx) {
     blocEscaleta.push('ESCALETA/ESCENES DEL CAPÍTOL:\n' + escenes);
   }
 
-  // 3) ESTAT NKG (si actiu)
-  let blocNkg = '';
-  if (ESTAT._nkg) {
-    const escenaSpec = {
-      capitol: idx + 1,
-      escena: 1,
-      personatges: cap ? (cap.personatges || []) : [],
-      lloc: cap ? (cap.localitzacio || '') : '',
-      escaleta: null
-    };
-    blocNkg = nkgGenerarContextMinim(escenaSpec);
-  }
-
-  // 4) PREFIGURACIONS + TO
+  // Prefiguracions + to/tensió
   const blocFinal = [];
   const { aPlantarAra, aRecollirAra, plantadesNoResoltes } = getPrefiguracionsActives(idx);
   if (aPlantarAra.length > 0) {
@@ -7103,10 +7095,34 @@ function buildContextCapitol(idx) {
     blocFinal.push(`INSTRUCCIONS DE PROSA: ${instrRitme}`);
   }
 
+  // Quan NKG és actiu, combina (no substitueix) ctxGlobal + ctxNkg
+  if (ESTAT._nkg) {
+    const escenaSpec = {
+      capitol: idx + 1,
+      escena: 1,
+      personatges: cap ? (cap.personatges || []) : [],
+      lloc: cap ? (cap.localitzacio || '') : '',
+      escaleta: null
+    };
+    const ctxNkg = nkgGenerarContextMinim(escenaSpec);
+
+    const seccionsNkg = [
+      ctxGlobalBase,
+      blocEscaleta.length > 0 ? blocEscaleta.join('\n\n') : '',
+      ctxNkg,
+      blocFinal.length > 0 ? blocFinal.join('\n') : ''
+    ].filter(Boolean);
+
+    let contextFinalNkg = seccionsNkg.join('\n\n');
+    if (prohibirIniciMeteorologic) {
+      contextFinalNkg += "\n\nPROHIBIT començar descrivint el temps atmosfèric. Comença 'in media res' o amb un diàleg.";
+    }
+    return contextFinalNkg;
+  }
+
   const seccions = [
-    ctxGlobal,
+    ctxGlobalBase,
     blocEscaleta.length > 0 ? blocEscaleta.join('\n\n') : '',
-    blocNkg,
     blocFinal.length > 0 ? blocFinal.join('\n') : ''
   ].filter(Boolean);
 
@@ -7116,6 +7132,7 @@ function buildContextCapitol(idx) {
   }
   return contextFinal;
 }
+
 
 // ═══════════════════════════════════════════════════════════
 //  FASE 10: Estructura de la novel·la (Opus) — JSON
@@ -7603,7 +7620,7 @@ IMPORTANT: Si detectes solapament de diàlegs entre personatges en un mateix par
 
   const response = await callLLMMulti(
     msgs,
-    'Ets un editor literari sènior. Has de retornar EXCLUSIVAMENT el JSON sense format Markdown de codi, ni cometes invertides ```, ni explicacions. Només l\'objecte JSON pur.',
+    'Ets un editor literari sènior. Has de retornar EXCLUSIVAMENT un objecte JSON pur. Està absolutament prohibit utilitzar Markdown, cometes invertides (`) o escriure text conversacional abans o després del JSON. Tota la teva sortida ha de ser parsejable directament per JSON.parse().',
     Object.assign({}, userConfig, { maxTokens: 1200 }),
     'arquitectura'
   );
@@ -9393,9 +9410,7 @@ PRIORITATS (ordre estricte):
 3) Arc de personatge (reaccions, decisions i conflictes interns versemblants).
 4) "Show, don't tell" (substitueix explicació plana per acció, imatge, gest o subtext quan calgui).
 
-INSTRUCCIÓ CRÍTICA:
-Si l'esborrany ja té bona atmosfera i ritme, ADVERTEIX explícitament al Generador que NO ho retalli.
-Les teves instruccions NO han de destruir les escenes que ja funcionen.
+INSTRUCCIÓ CRÍTICA: Si l'esborrany ja té una bona atmosfera, ritme pausat i tensió (propi del Nordic Noir), ADVERTEIX EXPLÍCITAMENT al model Generador que NO ho retalli ni ho sacrifiqui per complir les teves correccions. Les teves directrius han de protegir allò que ja funciona literàriament.
 
 CONTEXT DE PLANIFICACIÓ (resum/escaleta):
 ${resumEscaleta || '(no disponible)'}
