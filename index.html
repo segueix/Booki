@@ -3633,6 +3633,9 @@ function renderLlistaCapitols() {
     const cls  = completat ? 'fet' : actiu ? 'actiu' : '';
     const ico  = completat ? '✓'  : actiu  ? '✍️'   : '○';
     const teText = !!(ESTAT._capitols_generats && ESTAT._capitols_generats[i]);
+    const btnEsborrar = teText
+      ? `<button class="capitol-delete" onclick="event.stopPropagation();esborrarIRegenerarCapitol(${i})" title="Esborrar i regenerar capítol">🗑️</button>`
+      : '';
     const btnCopia = teText ? `<button class="capitol-copy" onclick="event.stopPropagation();copiarCapitol(${i})" title="Copiar capítol final">⎘</button>` : '';
     const onClick = teText ? `onclick="obrirDetallCapitol(${i})"` : '';
     return `<div class="capitol-item ${cls}" id="cap-item-${i}" ${onClick}>
