@@ -4022,7 +4022,16 @@ function mostrarRevisioCapitol(revisat, idx, isLast) {
       <strong>Comentari final de l'editor:</strong> ${escHtml(comentariFinal)}</div>` : ''}`;
 
   // Hook Review
-  const hook = revisat.hook_review;
+  const hook = revisat.hook_review || {
+    obertura_puntuacio: revisat.obertura_puntuacio,
+    obertura_comentari: revisat.obertura_comentari,
+    cliffhanger_puntuacio: revisat.cliffhanger_puntuacio,
+    cliffhanger_comentari: revisat.cliffhanger_comentari,
+    ritme_intern_puntuacio: revisat.ritme_intern_puntuacio ?? revisat.ritme_puntuacio,
+    ritme_comentari: revisat.ritme_comentari,
+    promesa_puntuacio: revisat.promesa_puntuacio,
+    promesa_narrativa: revisat.promesa_narrativa || revisat.promesa_comentari
+  };
   if (hook) {
     const cHook = (p) => p >= 7 ? 'var(--success)' : p >= 5 ? 'var(--warning)' : '#f87171';
     panel.innerHTML += `
@@ -7477,7 +7486,6 @@ async function revisarCapitol(textCapitol, idx, userConfig) {
       aRecollirAra.map(p => `- ${p.element}`).join('\n');
   }
 
-  // Planificació completa del capítol (tots els camps)
   const planificacioCompleta = (() => {
     if (!cap) return `Capítol ${idx + 1}`;
     const lines = [];
@@ -7493,12 +7501,10 @@ async function revisarCapitol(textCapitol, idx, userConfig) {
       lines.push(`\nPrefiguracions a plantar: ${cap.prefiguracionsPlantar.join(' | ')}`);
     if (cap.prefiguracionsRecollir && cap.prefiguracionsRecollir.length > 0)
       lines.push(`Prefiguracions a recollir: ${cap.prefiguracionsRecollir.join(' | ')}`);
-    // text = JSON original complet del planificador
     if (cap.text) lines.push(`\nPlanificació original (JSON complet):\n${cap.text}`);
     return lines.join('\n');
   })();
 
-  // Estat del NKG: personatges, últimes accions i fets canònics
   const nkgEstat = (() => {
     const nkg = ESTAT._nkg;
     if (!nkg) return '';
@@ -7511,11 +7517,11 @@ async function revisarCapitol(textCapitol, idx, userConfig) {
           const inv = Array.isArray(p.objectes_inventari) && p.objectes_inventari.length > 0
             ? p.objectes_inventari.join(', ') : '(sense objectes)';
           let line = `• ${p.nom}: emoció="${p.estat_emocional || 'neutre'}"`;
-          if (p.estat_fisic)        line += ` | físic="${p.estat_fisic}"`;
+          if (p.estat_fisic)         line += ` | físic="${p.estat_fisic}"`;
           if (p.indumentaria_actual) line += ` | roba="${p.indumentaria_actual}"`;
           line += ` | inventari=[${inv}]`;
-          if (p.ubicacio)           line += ` | ubicació="${p.ubicacio}"`;
-          if (p.viu === false)      line += ' | MORT';
+          if (p.ubicacio)            line += ` | ubicació="${p.ubicacio}"`;
+          if (p.viu === false)       line += ' | MORT';
           return line;
         }).join('\n'));
     }
@@ -7533,7 +7539,6 @@ async function revisarCapitol(textCapitol, idx, userConfig) {
     return parts.join('\n\n');
   })();
 
-  // Text complet de tots els capítols anteriors per detectar incongruències creuades
   const capitolsAnteriors = (ESTAT._capitols_generats || [])
     .slice(0, idx)
     .map((text, i) => text ? `═══ CAPÍTOL ${i + 1} ═══\n${text}` : null)
@@ -7552,7 +7557,9 @@ PLANIFICACIÓ COMPLETA D'AQUEST CAPÍTOL:
 ${planificacioCompleta}
 ${registreCtx}
 ${prefCtx}
-${nkgEstat ? `\nESTAT DEL NKG:\n${nkgEstat}` : ''}
+${nkgEstat ? `
+ESTAT DEL NKG:
+${nkgEstat}` : ''}
 
 CAPÍTOL ${idx + 1} GENERAT:
 ${textCapitol}
@@ -7571,7 +7578,7 @@ CRÍTIC PER ESTALVIAR TOKENS: Si aproves el capítol, les valoracions han de ser
 SELECCIÓ DE PASSATGE:
 A més de la revisió, selecciona el MILLOR passatge del capítol (entre 150 i 250 paraules) que millor exemplifiqui la veu narrativa. Copia'l literalment del text.
 
-Retorna ÚNICAMENT un objecte JSON amb la següent estructura:
+Retorna ÚNICAMENT un objecte JSON amb la següent estructura plana:
 IMPORTANT: Si detectes solapament de diàlegs entre personatges en un mateix paràgraf, "ok_per_continuar" HA DE ser false i has de donar "instruccions_correccio" explícites per reescriure separant els paràgrafs.
 {
   "puntuacio": 8,
@@ -7580,16 +7587,14 @@ IMPORTANT: Si detectes solapament de diàlegs entre personatges en un mateix par
   "ok_per_continuar": true,
   "prefiguracions_ok": true,
   "prefiguracions_problemes": ["descripció del problema de prefiguració si n'hi ha"],
-  "hook_review": {
-    "obertura_puntuacio": 7,
-    "obertura_comentari": "comentari breu sobre l'obertura",
-    "cliffhanger_puntuacio": 6,
-    "cliffhanger_comentari": "comentari breu sobre el cliffhanger",
-    "ritme_puntuacio": 8,
-    "ritme_comentari": "comentari breu sobre el ritme intern",
-    "promesa_puntuacio": 7,
-    "promesa_comentari": "comentari breu sobre la promesa narrativa"
-  },
+  "obertura_puntuacio": 7,
+  "obertura_comentari": "comentari breu sobre l'obertura",
+  "cliffhanger_puntuacio": 6,
+  "cliffhanger_comentari": "comentari breu sobre el cliffhanger",
+  "ritme_intern_puntuacio": 8,
+  "ritme_comentari": "comentari breu sobre el ritme intern",
+  "promesa_puntuacio": 7,
+  "promesa_narrativa": "promesa narrativa en una frase",
   "instruccions_cliffhanger": "instruccions concretes per millorar el cliffhanger si la puntuació és < 6 (buit si no cal)",
   "comentari_editor_final": "possible millora global de capítol (buit si no cal)",
   "golden_passage": "el text del millor passatge (150-250 paraules)"
@@ -7598,12 +7603,11 @@ IMPORTANT: Si detectes solapament de diàlegs entre personatges en un mateix par
 
   const response = await callLLMMulti(
     msgs,
-    'Ets un editor literari sènior especialitzat en narrativa de pàgina. Retornes EXCLUSIVAMENT un objecte JSON vàlid, sense cap altre text.',
+    'Ets un editor literari sènior. Has de retornar EXCLUSIVAMENT el JSON sense format Markdown de codi, ni cometes invertides ```, ni explicacions. Només l\'objecte JSON pur.',
     Object.assign({}, userConfig, { maxTokens: 1200 }),
     'arquitectura'
   );
 
-  // Desa les instruccions per si cal reescriure
   const revisat = parseJsonRobust(response);
   if (revisat && revisat.instruccions_correccio) {
     ESTAT._revisioInstruccions = ESTAT._revisioInstruccions || {};
@@ -7612,6 +7616,7 @@ IMPORTANT: Si detectes solapament de diàlegs entre personatges en un mateix par
 
   return { response };
 }
+
 
 // ═══════════════════════════════════════════════════════════
 //  FASE 6: Revisió Global Transversal (Opus)
@@ -9365,35 +9370,53 @@ INSTRUCCIONS ESTRICTES:
 
 async function avaluarEsborranyAmbHistoric(idx, esborrany, userConfig) {
   const capitol = idx + 1;
+  const cap = ESTAT._estructuraCapitols[idx] || {};
   const historic = (ESTAT._capitols_generats || [])
     .slice(0, idx)
     .filter(Boolean)
-    .map((t, i) => `--- CAPÍTOL ${i + 1} ---
-${String(t).slice(-1800)}`)
+    .map((t, i) => `--- CAPÍTOL ${i + 1} ---\n${String(t).slice(-1800)}`)
     .join('\n\n');
+
+  const resumEscaleta = [
+    cap.resum ? `Resum de capítol: ${cap.resum}` : '',
+    cap.text ? `Planificació original: ${String(cap.text).slice(0, 2200)}` : ''
+  ].filter(Boolean).join('\n\n');
 
   const msgs = [{
     role: 'user',
-    content: `Compara aquest esborrany amb la novel·la. Busca: 1) Objectes que canvien de mà o desapareixen. 2) Personatges secundaris que sonen genèrics. 3) Diàlegs on s'explica informació ja sabuda (As you know, Bob). 4) Repeticions innecessàries respecte al capítol anterior. Retorna una llista de correccions a aplicar.
+    content: `Analitza aquest esborrany com a Arquitecta narrativa amb prioritat literària i estructural.
+
+OBJECTIU: Dona instruccions de millora que preservin el que ja funciona.
+PRIORITATS (ordre estricte):
+1) Lògica de trama i causa-efecte (detecta forats de guió i salts no justificats).
+2) Ritme i tensió (atmosfera, progressió de misteri, densitat dramàtica coherent).
+3) Arc de personatge (reaccions, decisions i conflictes interns versemblants).
+4) "Show, don't tell" (substitueix explicació plana per acció, imatge, gest o subtext quan calgui).
+
+INSTRUCCIÓ CRÍTICA:
+Si l'esborrany ja té bona atmosfera i ritme, ADVERTEIX explícitament al Generador que NO ho retalli.
+Les teves instruccions NO han de destruir les escenes que ja funcionen.
+
+CONTEXT DE PLANIFICACIÓ (resum/escaleta):
+${resumEscaleta || '(no disponible)'}
 
 NOVEL·LA FINS ARA:
 ${historic || '(encara no hi ha capítols previs)'}
 
 ESBORRANY CAPÍTOL ${capitol}:
-${String(esborrany || '').slice(0, 7000)}
+${String(esborrany || '').slice(0, 9000)}
 
-Respon en bullets curts i accionables.`
+Retorna bullets curts, accionables i prioritzats. Evita soroll i repeticions.`
   }];
 
   const models = getModelConfig(userConfig);
   return await callLLMMulti(
     msgs,
-    'Ets una arquitecta narrativa obsessiva amb la micro-continuïtat. Respon de forma tècnica i accionable.',
-    Object.assign({}, userConfig, { maxTokens: 1200, model: models.modelArquitecte }),
+    'Ets una arquitecta narrativa experta en estructura, ritme i veu literària. Respon amb instruccions accionables i conservadores del que ja funciona.',
+    Object.assign({}, userConfig, { maxTokens: 1400, model: models.modelArquitecte }),
     'arquitectura'
   );
 }
-
 async function generarProsaDefinitiva(idx, esborrany, correccions, userConfig) {
   const capitol = idx + 1;
   const cap = ESTAT._estructuraCapitols[idx] || {};
@@ -9402,18 +9425,29 @@ async function generarProsaDefinitiva(idx, esborrany, correccions, userConfig) {
 
   const msgs = [{
     role: 'user',
-    content: `Aquest és el teu esborrany. Aquestes són les correccions obligatòries de l'Arquitecta. Reescriu el capítol sencer solucionant TOTS els errors. Aquesta és la versió final: aplica una qualitat literària superba, elimina adverbis en '-ment', i usa 'show, don't tell'.
+    content: `Aquest és el teu esborrany i aquestes són les correccions de l'Arquitecta.
+
+INSTRUCCIÓ PRINCIPAL (OBLIGATÒRIA):
+Utilitza aquest esborrany com a BASE FONAMENTAL. Has de mantenir la seva atmosfera, escenes i arc narratiu intactes.
+Aplica les CORRECCIONS de l'Arquitecta ÚNICAMENT per millorar-lo, arreglar incoherències o omplir forats,
+però no suprimeixis el que ja és bo. Mantén el to literari i el ritme pausat quan calgui.
 
 CAPÍTOL ${capitol}: ${cap.titol || ''}
 
 CONTEXT:
 ${contextCapitol}
 
-ESBORRANY:
-${String(esborrany || '').slice(0, 12000)}
+ESBORRANY BASE:
+${String(esborrany || '').slice(0, 13000)}
 
-CORRECCIONS OBLIGATÒRIES:
-${String(correccions || '').slice(0, 3500)}
+CORRECCIONS ARQUITECTA (aplica només les necessàries):
+${String(correccions || '').slice(0, 4200)}
+
+CRITERIS DE QUALITAT:
+- Conserva intactes les escenes que funcionen.
+- No retallis atmosfera ni tensió si ja són bones.
+- Millora transicions, coherència causal i precisió emocional.
+- Prioritza prosa viva, subtext i "show, don't tell".
 
 Retorna només la versió final del capítol, sense metadades ni notes.`
   }];
@@ -9426,7 +9460,6 @@ Retorna només la versió final del capítol, sense metadades ni notes.`
     'generacio'
   );
 }
-
 async function generarCapitolNKG(idx, userConfig) {
   const capitol = idx + 1;
   const loaderEl = document.getElementById('loader-11-text');
