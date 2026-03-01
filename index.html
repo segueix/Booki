@@ -1439,6 +1439,8 @@ function aplicarSnapshotProjecte(dades) {
   ESTAT._intervalsCongelats = Array.isArray(ESTAT._intervalsCongelats) ? ESTAT._intervalsCongelats : [];
   ESTAT._capitolsLocked = (ESTAT._capitolsLocked && typeof ESTAT._capitolsLocked === 'object') ? ESTAT._capitolsLocked : {};
   ESTAT._intervalLocks = (ESTAT._intervalLocks && typeof ESTAT._intervalLocks === 'object') ? ESTAT._intervalLocks : {};
+  ESTAT._chapterLocks = (ESTAT._chapterLocks && typeof ESTAT._chapterLocks === 'object') ? ESTAT._chapterLocks : {};
+  ESTAT._blockCanons = (ESTAT._blockCanons && typeof ESTAT._blockCanons === 'object') ? ESTAT._blockCanons : {};
   USER_CONFIG = dades.config || USER_CONFIG;
 
   if (ESTAT._anthropicApiKey) document.getElementById('anthropicApiKey').value = ESTAT._anthropicApiKey;
@@ -1935,6 +1937,8 @@ const ESTAT = {
   _intervalsCongelats:      [],
   _capitolsLocked:          {},
   _intervalLocks:           {},
+  _chapterLocks:            {},
+  _blockCanons:             {},
   _checkpoints:             {},
 };
 
@@ -3959,6 +3963,167 @@ function iniciarEscripturaCapitols() {
   generarCapitol(0);
 }
 
+function obtenirLockCapitol(idx) {
+  ESTAT._chapterLocks = (ESTAT._chapterLocks && typeof ESTAT._chapterLocks === 'object') ? ESTAT._chapterLocks : {};
+  return ESTAT._chapterLocks[idx] || { lockState: 'unlocked', lockScope: '', blockId: '', lockReason: '', notes: '', lockedAt: '', lockedBy: '' };
+}
+
+function textLockCapitol(idx) {
+  const l = obtenirLockCapitol(idx);
+  if (l.lockState === 'final') return '🔒 Final';
+  if (l.lockState === 'provisional') return `🟠 Provisional${l.blockId ? ` (${l.blockId})` : ''}`;
+  return '🟢 Unlocked';
+}
+
+function setProvisionalLock(chapterId, blockId, reason = 'system provisional lock') {
+  ESTAT._chapterLocks = (ESTAT._chapterLocks && typeof ESTAT._chapterLocks === 'object') ? ESTAT._chapterLocks : {};
+  const prev = ESTAT._chapterLocks[chapterId] || {};
+  if (prev.lockState === 'final') return prev;
+  const lock = {
+    lockState: 'provisional',
+    lockScope: 'block',
+    blockId: blockId || '',
+    lockReason: reason,
+    notes: prev.notes || '',
+    lockedAt: new Date().toISOString(),
+    lockedBy: 'system'
+  };
+  ESTAT._chapterLocks[chapterId] = lock;
+  return lock;
+}
+
+function setFinalLock(chapterId, reason = 'system final lock') {
+  ESTAT._chapterLocks = (ESTAT._chapterLocks && typeof ESTAT._chapterLocks === 'object') ? ESTAT._chapterLocks : {};
+  const lock = {
+    lockState: 'final',
+    lockScope: 'block',
+    blockId: (ESTAT._chapterLocks[chapterId] || {}).blockId || '',
+    lockReason: reason,
+    notes: '',
+    lockedAt: new Date().toISOString(),
+    lockedBy: 'system'
+  };
+  ESTAT._chapterLocks[chapterId] = lock;
+  return lock;
+}
+
+function canJudge(chapterId) {
+  const l = obtenirLockCapitol(chapterId);
+  return l.lockState === 'unlocked';
+}
+
+function obtenirBlockCanon58() {
+  ESTAT._blockCanons = (ESTAT._blockCanons && typeof ESTAT._blockCanons === 'object') ? ESTAT._blockCanons : {};
+  return ESTAT._blockCanons['5-8'] || null;
+}
+
+function canRewrite(chapterId, mode = 'full', patchSpec = null) {
+  const l = obtenirLockCapitol(chapterId);
+  if (l.lockState === 'final') return { ok: false, msg: 'Aquest capítol té bloqueig final i és immutable.' };
+  if (l.lockState === 'unlocked') return { ok: true, msg: '' };
+  if (mode !== 'patch') {
+    return { ok: false, msg: "Aquest capítol està en bloqueig provisional; només es permet patch dins el bloc 5–8 per alineació amb el canon congelat." };
+  }
+  const canon = obtenirBlockCanon58();
+  if (!canon || canon.frozen !== true) return { ok: false, msg: 'No hi ha BlockCanon frozen del bloc 5–8.' };
+  if (!patchSpec || !patchSpec.reason) return { ok: false, msg: 'Cal patchSpec amb justificació de canon.' };
+  return { ok: true, msg: '' };
+}
+
+function hashSimpleCanon(obj) {
+  const txt = JSON.stringify(obj || {});
+  let h = 0;
+  for (let i = 0; i < txt.length; i++) h = ((h << 5) - h) + txt.charCodeAt(i);
+  return String(h >>> 0);
+}
+
+function construirBlockCanon58() {
+  const fromIdx = 4, toIdx = 7;
+  const caps = ESTAT.llibreRegistre?.capitols || [];
+  const nkg = ESTAT._nkg || {};
+  const createdFrom = [];
+  const immutableFacts = { timeFacts: [], locations: [], objects: [], characterEndStates: [] };
+  const hooksAndThreads = [];
+
+  for (let i = fromIdx; i <= toIdx; i++) {
+    const reg = caps[i] || {};
+    createdFrom.push({ chapter: i + 1, resumHash: hashSimpleCanon({ rc: reg.resum_curt || '', rl: reg.resum_llarg || '' }) });
+    if (reg.resum_curt) immutableFacts.timeFacts.push(`Cap.${i + 1}: ${reg.resum_curt.substring(0, 140)}`);
+    (reg.estat_personatges || []).forEach(p => {
+      immutableFacts.characterEndStates.push({ cap: i + 1, nom: p.nom || '', ubicacio: p.ubicacio || '', estat: p.estat_actual || '' });
+      if (p.ubicacio) immutableFacts.locations.push(`Cap.${i + 1}: ${p.nom || 'Personatge'} @ ${p.ubicacio}`);
+    });
+    (reg.fils_oberts || []).slice(0, 3).forEach(f => hooksAndThreads.push(`Cap.${i + 1}: ${filTextVisible(f)}`));
+  }
+
+  const objMoves = Array.isArray(nkg.timeline_objectes) ? nkg.timeline_objectes : [];
+  objMoves.forEach(m => {
+    const txt = typeof m === 'string' ? m : JSON.stringify(m);
+    const match = txt.match(/C(\d{1,2})/i);
+    const c = match ? Number(match[1]) : null;
+    if (c && c >= 5 && c <= 8) immutableFacts.objects.push(txt);
+  });
+
+  const canonBase = {
+    blockId: '5-8',
+    createdAt: new Date().toISOString(),
+    createdFrom,
+    immutableFacts: {
+      timeFacts: immutableFacts.timeFacts.slice(0, 24),
+      locations: immutableFacts.locations.slice(0, 24),
+      objects: immutableFacts.objects.slice(0, 24),
+      characterEndStates: immutableFacts.characterEndStates.slice(0, 30)
+    },
+    hooksAndThreads: Array.from(new Set(hooksAndThreads)).slice(0, 15),
+    chapter5Constraints: [
+      'No alterar ordre temporal ni causalitat establerta per caps 6–8.',
+      'No introduir personatges, objectes clau o fets canònics nous.',
+      'No canviar estats finals de personatges que impactin 6–8.'
+    ],
+    allowedChapter5Edits: ['exposicio', 'ritme', 'formulacio', 'aclariments_sense_nous_fets'],
+    frozen: true
+  };
+  const version = hashSimpleCanon(canonBase);
+  return { ...canonBase, version, hash: version };
+}
+
+function generarICongeleBlockCanon58() {
+  ESTAT._blockCanons = (ESTAT._blockCanons && typeof ESTAT._blockCanons === 'object') ? ESTAT._blockCanons : {};
+  const canon = construirBlockCanon58();
+  ESTAT._blockCanons['5-8'] = canon;
+  for (let idx = 4; idx <= 7; idx++) setProvisionalLock(idx, '5-8', 'Canon congelat abans de reescriure bloc 5-8');
+  return canon;
+}
+
+function validarCapitol5ContraCanon(text, canon) {
+  const txt = String(text || '');
+  const base = `${(canon?.immutableFacts?.timeFacts || []).join(' ')} ${(canon?.immutableFacts?.objects || []).join(' ')} ${(canon?.hooksAndThreads || []).join(' ')}`.toLowerCase();
+  const propis = txt.match(/[A-ZÀ-Ú][a-zà-ú]{2,}/g) || [];
+  const nous = Array.from(new Set(propis)).filter(n => !base.includes(n.toLowerCase())).slice(0, 8);
+  const dates = txt.match(/\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?/g) || [];
+  const novesDates = dates.filter(d => !base.includes(d));
+  if (nous.length > 0 || novesDates.length > 0) {
+    return { ok: false, msg: `Validació canon bloc 5-8 fallida. Nous noms/dates detectats: ${[...nous, ...novesDates].slice(0, 6).join(', ')}` };
+  }
+  return { ok: true, msg: '' };
+}
+
+async function applyPatch(chapterId, patchSpec, blockCanon) {
+  const perm = canRewrite(chapterId, 'patch', patchSpec);
+  if (!perm.ok) throw new Error(perm.msg);
+  const allowed = Array.isArray(patchSpec.allowedEdits) ? patchSpec.allowedEdits : [];
+  const forbidden = Array.isArray(patchSpec.forbidden) ? patchSpec.forbidden : ['introduir fets nous'];
+  const instr = `PATCH CONTROLAT
+Reason canon: ${patchSpec.reason}
+Target: ${patchSpec.target || 'fragment'}
+Allowed edits: ${allowed.join(', ') || 'refrasejar, reordenar, aclarir'}
+Forbidden: ${forbidden.join(', ')}`;
+  const original = ESTAT._capitols_generats[chapterId] || '';
+  const corregit = await reescriureAmbCorreccions(original, instr, chapterId, USER_CONFIG);
+  ESTAT._capitols_generats[chapterId] = netejarTabulacionsInicials(corregit || original);
+  return ESTAT._capitols_generats[chapterId];
+}
+
 function renderLlistaCapitols() {
   const wrap  = document.getElementById('capitol-llista');
   const total = ESTAT._estructuraCapitols.length;
@@ -3970,17 +4135,23 @@ function renderLlistaCapitols() {
     const cls  = completat ? 'fet' : actiu ? 'actiu' : '';
     const ico  = completat ? '✓'  : actiu  ? '✍️'   : '○';
     const teText = !!(ESTAT._capitols_generats && ESTAT._capitols_generats[i]);
+    const lockTxt = textLockCapitol(i);
+    const lock = obtenirLockCapitol(i);
     const btnCopia = teText ? `<button class="capitol-copy" onclick="event.stopPropagation();copiarCapitol(${i})" title="Copiar capítol final">⎘</button>` : '';
     const onClick = teText ? `onclick="obrirDetallCapitol(${i})"` : '';
+    const potRegenerar = canRewrite(i, 'full').ok;
+    const regenBtn = teText ? `<button class="capitol-delete" ${potRegenerar ? `onclick=\"event.stopPropagation();esborrarIRegenerarCapitol(${i})\"` : ''} ${potRegenerar ? '' : 'disabled'} title="${potRegenerar ? 'Esborrar i regenerar capítol' : 'Bloquejat per lock state'}">🗑️</button>` : '';
     return `<div class="capitol-item ${cls}" id="cap-item-${i}" ${onClick}>
       <span class="capitol-num">${ico}</span>
-      <span class="capitol-titol">${escHtml(cap.titol || 'Capítol ' + (i + 1))}</span>
-      ${teText ? `<button class="capitol-delete" onclick="event.stopPropagation();esborrarIRegenerarCapitol(${i})" title="Esborrar i regenerar capítol">🗑️</button>` : ''}${btnCopia}
+      <span class="capitol-titol">${escHtml(cap.titol || 'Capítol ' + (i + 1))}<small style="margin-left:8px;color:var(--text2);font-size:.72rem;">${escHtml(lockTxt)}</small></span>
+      ${regenBtn}${btnCopia}
     </div>`;
   }).join('\n');
 }
 
 async function esborrarIRegenerarCapitol(idx) {
+  const perm = canRewrite(idx, 'full');
+  if (!perm.ok) { toast(perm.msg); return; }
   const titol = (ESTAT._estructuraCapitols[idx] && ESTAT._estructuraCapitols[idx].titol) || `Capítol ${idx + 1}`;
   const ok = confirm(`Vols esborrar totes les dades de "${titol}" i regenerar el capítol?`);
   if (!ok) return;
@@ -4321,6 +4492,8 @@ ${top}
 }
 
 async function generarCapitol(idx, intents = 0) {
+  const permGenerate = canRewrite(idx, 'full');
+  if (idx < (ESTAT._estructuraCapitols || []).length && !permGenerate.ok) { toast(permGenerate.msg); return; }
   // Fi: revisió final
   if (idx >= ESTAT._estructuraCapitols.length) {
     document.getElementById('btn-control-arcs-wrap').classList.remove('hidden');
@@ -4534,6 +4707,7 @@ function mostrarAccionsCapitol(idx, text) {
 }
 
 function iniciarRevisioManual(idx) {
+  if (!canJudge(idx)) { toast("Aquest capítol està bloquejat; no es pot tornar a jutjar."); return; }
   const text = ESTAT._capitols_generats[idx];
   if (!text) return;
   const isLast = idx >= ESTAT._estructuraCapitols.length - 1;
@@ -4765,7 +4939,17 @@ function mostrarAccionsCapitolSimple(idx, isLast) {
 }
 
 async function reescriureCapitol(idx, intents = 0) {
-  const instruccions = ESTAT._revisioInstruccions[idx] || '';
+  const perm = canRewrite(idx, 'full');
+  if (!perm.ok) { toast(perm.msg); return; }
+  if (idx >= 4 && idx <= 7) {
+    const canon = obtenirBlockCanon58();
+    if (!canon || canon.frozen !== true) { toast('Cal generar i congelar el BlockCanon 5-8 abans de reescriure aquest bloc.'); return; }
+  }
+  let instruccions = ESTAT._revisioInstruccions[idx] || '';
+  if (idx === 4) {
+    const canon = obtenirBlockCanon58();
+    instruccions += `\n\nRESTRICCIONS CANON BLOC 5-8:\n- No introdueixis fets nous.\n- No alteris time/location/object/character states.\n- Només exposició/ritme/formulació/aclariments.\nCANON:${JSON.stringify(canon).slice(0,5000)}`;
+  }
   document.getElementById('capitol-actual-wrap').classList.add('hidden');
   document.getElementById('revisio-panel').classList.add('hidden');
   showLoader(11);
@@ -4774,6 +4958,10 @@ async function reescriureCapitol(idx, intents = 0) {
   try {
     const res = await reescriureCapitolAmbInstruccions(idx, instruccions, USER_CONFIG);
     const textNet = netejarTabulacionsInicials(res.response);
+    if (idx === 4) {
+      const val = validarCapitol5ContraCanon(textNet, obtenirBlockCanon58());
+      if (!val.ok) throw new Error(val.msg);
+    }
     ESTAT._capitols_generats[idx] = textNet;
     ESTAT._metaCapitols = ESTAT._metaCapitols || {};
     ESTAT._metaCapitols[idx] = Object.assign({}, ESTAT._metaCapitols[idx] || {}, { textFinal: textNet });
@@ -9991,12 +10179,31 @@ async function aplicarCorreccionsJutge(fromIdx, toIdx, instruccions, userConfig)
       jutgePanelLog(`  🔒 Cap. ${idx + 1} bloquejat. No es reescriu.`);
       continue;
     }
+    const lockPerm = canRewrite(idx, 'patch', { reason: 'alineació canon jutge' });
+    if (!lockPerm.ok && obtenirLockCapitol(idx).lockState !== 'unlocked') {
+      jutgePanelLog(`  🔒 ${lockPerm.msg}`);
+      continue;
+    }
     const textOriginal = ESTAT._capitols_generats[idx];
     if (!textOriginal) continue;
     try {
       jutgePanelLog(`  ✏️ Reescrivint cap. ${idx + 1}…`);
-      const textCorregit = await reescriureAmbCorreccions(textOriginal, instruccions[k], idx, cfg);
+      let instr = instruccions[k];
+      if (idx >= 4 && idx <= 7) {
+        const c58 = obtenirBlockCanon58();
+        if (!c58 || c58.frozen !== true) throw new Error('Cal BlockCanon frozen per al bloc 5-8 abans de reescriptures.');
+      }
+      if (idx === 4) {
+        const canon = obtenirBlockCanon58();
+        if (!canon || canon.frozen !== true) throw new Error('Falta BlockCanon frozen 5-8 per reescriure capítol 5.');
+        instr = `${instr}\n\nRESTRICCIONS CANON BLOC 5-8 (OBLIGATÒRIES):\n- No introdueixis fets nous.\n- No alteris time/location/object/character states.\n- Només canvia exposició/ritme/formulació/aclariments sense nous fets.\nCANON:${JSON.stringify(canon).slice(0,5000)}`;
+      }
+      const textCorregit = await reescriureAmbCorreccions(textOriginal, instr, idx, cfg);
       if (!textCorregit) continue;
+      if (idx === 4) {
+        const val = validarCapitol5ContraCanon(textCorregit, obtenirBlockCanon58());
+        if (!val.ok) throw new Error(val.msg);
+      }
       ESTAT._capitols_generats[idx] = textCorregit;
       jutgePanelLog(`  🔄 Resincronitzant seguiment cap. ${idx + 1}…`);
       await actualitzarLlibreRegistreBackground(textCorregit, idx, false, cfg);
@@ -10031,6 +10238,14 @@ function aplicarCorreccionsPerfilsJutge(correccions) {
 
 async function executarJutgeInterval(fromIdx, toIdx, userConfig) {
   const cfg = userConfig || USER_CONFIG;
+  for (let c = fromIdx; c <= toIdx; c++) {
+    if (!canJudge(c)) {
+      jutgePanelIniciar(`🔒 Jutge omès per lock state (cap. ${c + 1})`);
+      jutgePanelLog('Aquest capítol té bloqueig provisional/final.');
+      jutgePanelFinalitzar(true, 1);
+      return;
+    }
+  }
   ESTAT._intervalLocks = (ESTAT._intervalLocks && typeof ESTAT._intervalLocks === 'object') ? ESTAT._intervalLocks : {};
   ESTAT._capitolsLocked = (ESTAT._capitolsLocked && typeof ESTAT._capitolsLocked === 'object') ? ESTAT._capitolsLocked : {};
   ESTAT._intervalsCongelats = Array.isArray(ESTAT._intervalsCongelats) ? ESTAT._intervalsCongelats : [];
@@ -10052,6 +10267,12 @@ async function executarJutgeInterval(fromIdx, toIdx, userConfig) {
 
   let resultat = { net: false };
   let iter = 0;
+  const esBloc58 = fromIdx === 4 && toIdx === 7;
+  let blockCanon = null;
+  if (esBloc58) {
+    blockCanon = generarICongeleBlockCanon58();
+    jutgePanelLog(`📦 BlockCanon 5-8 congelat (v ${blockCanon.version}).`);
+  }
   const MAX_ITER = 1;
   while (iter < MAX_ITER) {
     iter++;
@@ -10106,6 +10327,7 @@ async function executarJutgeInterval(fromIdx, toIdx, userConfig) {
 
   for (let i = fromIdx; i <= toIdx; i++) {
     ESTAT._capitolsLocked[i] = true;
+    setFinalLock(i, 'Jutge interval completat');
   }
 
   const jaCongelat = ESTAT._intervalsCongelats.some(iv => iv && iv.fromIdx === fromIdx && iv.toIdx === toIdx);
