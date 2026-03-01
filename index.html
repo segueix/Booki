@@ -1436,6 +1436,9 @@ function aplicarSnapshotProjecte(dades) {
   if (!dades || !dades.estat) throw new Error('Format de còpia no vàlid');
 
   Object.assign(ESTAT, dades.estat);
+  ESTAT._intervalsCongelats = Array.isArray(ESTAT._intervalsCongelats) ? ESTAT._intervalsCongelats : [];
+  ESTAT._capitolsLocked = (ESTAT._capitolsLocked && typeof ESTAT._capitolsLocked === 'object') ? ESTAT._capitolsLocked : {};
+  ESTAT._intervalLocks = (ESTAT._intervalLocks && typeof ESTAT._intervalLocks === 'object') ? ESTAT._intervalLocks : {};
   USER_CONFIG = dades.config || USER_CONFIG;
 
   if (ESTAT._anthropicApiKey) document.getElementById('anthropicApiKey').value = ESTAT._anthropicApiKey;
@@ -1606,12 +1609,37 @@ function exportarDiagnosticResums() {
   }
 
   // Intervals congelats (jutge)
-  const intervalsCongelats = ESTAT._intervalsCongelats || [];
-  lines.push(`INTERVALS CONGELATS (jutge) (${intervalsCongelats.length}):`);
-  if (intervalsCongelats.length) {
-    intervalsCongelats.forEach(iv => {
-      lines.push(`  [Caps ${iv.fromIdx + 1}-${iv.toIdx + 1}] net: ${iv.net} | iteracions: ${iv.iteracions}`);
+  const intervalsCongelats = Array.isArray(ESTAT._intervalsCongelats) ? ESTAT._intervalsCongelats : [];
+  const intervalLocks = (ESTAT._intervalLocks && typeof ESTAT._intervalLocks === 'object') ? ESTAT._intervalLocks : {};
+  const intervalsSenseDuplicats = [];
+  const keysVistes = new Set();
+  intervalsCongelats.forEach(iv => {
+    if (!iv || typeof iv.fromIdx !== 'number' || typeof iv.toIdx !== 'number') return;
+    const key = `${iv.fromIdx}-${iv.toIdx}`;
+    if (keysVistes.has(key)) return;
+    keysVistes.add(key);
+    intervalsSenseDuplicats.push(iv);
+  });
+  Object.entries(intervalLocks).forEach(([key, lock]) => {
+    if (keysVistes.has(key)) return;
+    if (!lock || typeof lock.fromIdx !== 'number' || typeof lock.toIdx !== 'number') return;
+    keysVistes.add(key);
+    intervalsSenseDuplicats.push({
+      fromIdx: lock.fromIdx,
+      toIdx: lock.toIdx,
+      net: lock.net === true,
+      iteracions: lock.iteracions || 1,
+      lockedAt: lock.lockedAt || ''
     });
+  });
+
+  lines.push(`INTERVALS CONGELATS (jutge) (${intervalsSenseDuplicats.length}):`);
+  if (intervalsSenseDuplicats.length) {
+    intervalsSenseDuplicats
+      .sort((a, b) => a.fromIdx - b.fromIdx)
+      .forEach(iv => {
+        lines.push(`  [Caps ${iv.fromIdx + 1}-${iv.toIdx + 1}] net: ${iv.net} | iteracions: ${iv.iteracions}`);
+      });
   } else {
     lines.push('  (cap)');
   }
@@ -1898,6 +1926,8 @@ const ESTAT = {
   _alertaArquitecte: null,
   _accionsIrreversibles: [],
   _intervalsCongelats:      [],
+  _capitolsLocked:          {},
+  _intervalLocks:           {},
   _checkpoints:             {},
 };
 
@@ -9702,9 +9732,15 @@ Les claus de instruccions_correccio han de ser índexs en string (0-based) dins 
 
 async function aplicarCorreccionsJutge(fromIdx, toIdx, instruccions, userConfig) {
   const cfg = userConfig || USER_CONFIG;
+  const capitolsLocked = (ESTAT._capitolsLocked && typeof ESTAT._capitolsLocked === 'object') ? ESTAT._capitolsLocked : {};
+  ESTAT._capitolsLocked = capitolsLocked;
   for (const k of Object.keys(instruccions)) {
     const idx = parseInt(k, 10);
     if (isNaN(idx) || idx < fromIdx || idx > toIdx) continue; // guard: no tocar congelats
+    if (capitolsLocked[idx] === true) {
+      jutgePanelLog(`  🔒 Cap. ${idx + 1} bloquejat. No es reescriu.`);
+      continue;
+    }
     const textOriginal = ESTAT._capitols_generats[idx];
     if (!textOriginal) continue;
     try {
@@ -9745,6 +9781,20 @@ function aplicarCorreccionsPerfilsJutge(correccions) {
 
 async function executarJutgeInterval(fromIdx, toIdx, userConfig) {
   const cfg = userConfig || USER_CONFIG;
+  ESTAT._intervalLocks = (ESTAT._intervalLocks && typeof ESTAT._intervalLocks === 'object') ? ESTAT._intervalLocks : {};
+  ESTAT._capitolsLocked = (ESTAT._capitolsLocked && typeof ESTAT._capitolsLocked === 'object') ? ESTAT._capitolsLocked : {};
+  ESTAT._intervalsCongelats = Array.isArray(ESTAT._intervalsCongelats) ? ESTAT._intervalsCongelats : [];
+
+  const intervalKey = `${fromIdx}-${toIdx}`;
+  if (ESTAT._intervalLocks[intervalKey]) {
+    const lock = ESTAT._intervalLocks[intervalKey];
+    jutgePanelIniciar(`🔒 Interval bloquejat (caps. ${fromIdx + 1}–${toIdx + 1})`);
+    jutgePanelLog(`Interval: caps. ${fromIdx + 1}–${toIdx + 1}`);
+    jutgePanelLog(`Ja estava bloquejat a: ${lock.lockedAt || 'desconegut'}`);
+    jutgePanelLog("S'omet nova execució del jutge.");
+    jutgePanelFinalitzar(lock.net === true, lock.iteracions || 1);
+    return;
+  }
 
   jutgePanelIniciar(`⚖️ Jutge analitzant caps. ${fromIdx + 1}–${toIdx + 1}…`);
   jutgePanelLog(`Interval: caps. ${fromIdx + 1}–${toIdx + 1}`);
@@ -9752,7 +9802,7 @@ async function executarJutgeInterval(fromIdx, toIdx, userConfig) {
 
   let resultat = { net: false };
   let iter = 0;
-  const MAX_ITER = 3;
+  const MAX_ITER = 1;
   while (iter < MAX_ITER) {
     iter++;
     jutgePanelLog(`\n── Iteració ${iter}/${MAX_ITER} ──`);
@@ -9773,7 +9823,7 @@ async function executarJutgeInterval(fromIdx, toIdx, userConfig) {
     const fetsNous        = (cp && cp.fets_canonics)           ? cp.fets_canonics.filter(Boolean) : [];
     const clausSeguent    = (cp && cp.claus_seguent)           ? cp.claus_seguent.filter(Boolean) : [];
     if (persActualitzats.length > 0 || fetsNous.length > 0 || clausSeguent.length > 0) {
-      jutgePanelLog(`📋 Actualitzant bíblia (sense reescriptura):`);
+      jutgePanelLog('📋 Actualitzant bíblia (sense reescriptura):');
       persActualitzats.forEach(p => jutgePanelLog(`  👤 ${p.nom}: ${p.nou_estat || p.motivacions || '(actualitzat)'}`));
       fetsNous.forEach(f => jutgePanelLog(`  📌 Fet canònic: ${f}`));
       clausSeguent.forEach(c => jutgePanelLog(`  🔮 Guia futura: ${c}`));
@@ -9788,21 +9838,30 @@ async function executarJutgeInterval(fromIdx, toIdx, userConfig) {
     } else if (persActualitzats.length === 0 && fetsNous.length === 0 && clausSeguent.length === 0) {
       jutgePanelLog('Inconsistències detectades però sense correccions aplicables.');
       break;
-    } else {
-      // Perfils actualitzats, no cal reescriure — sortim del loop
-      break;
     }
   }
 
-  ESTAT._intervalsCongelats.push({
-    fromIdx, toIdx,
-    net: resultat.net,
-    iteracions: iter,
-  });
+  const lock = {
+    fromIdx,
+    toIdx,
+    net: resultat.net === true,
+    iteracions: Math.max(1, iter),
+    lockedAt: new Date().toISOString(),
+  };
+  ESTAT._intervalLocks[intervalKey] = lock;
 
-  jutgePanelLog(`\nFinalitzat. Net: ${resultat.net} | Iteracions: ${iter}`);
-  jutgePanelFinalitzar(resultat.net, iter);
+  for (let i = fromIdx; i <= toIdx; i++) {
+    ESTAT._capitolsLocked[i] = true;
+  }
+
+  const jaCongelat = ESTAT._intervalsCongelats.some(iv => iv && iv.fromIdx === fromIdx && iv.toIdx === toIdx);
+  if (!jaCongelat) ESTAT._intervalsCongelats.push(lock);
+
+  jutgePanelLog(`\n🔒 Interval bloquejat: caps. ${fromIdx + 1}–${toIdx + 1}`);
+  jutgePanelLog(`Finalitzat. Net: ${lock.net} | Iteracions: ${lock.iteracions}`);
+  jutgePanelFinalitzar(lock.net, lock.iteracions);
 }
+
 
 // ═══════════════════════════════════════════════════════════
 //  FASE 10.5: Generar Escaleta per Bloc de Capítols (Opus)
