@@ -1531,6 +1531,13 @@ function exportarDiagnosticResums() {
       lines.push('');
     }
 
+    const ksnCap = reg.ksn || construirKSN(i);
+    if (ksnCap) {
+      lines.push('  KSN (Kernel de Seguiment Narratiu):');
+      lines.push('  ' + JSON.stringify(ksnCap, null, 2).replace(/\n/g, '\n  '));
+      lines.push('');
+    }
+
     // Estat personatges per capítol
     if (Array.isArray(reg.estat_personatges) && reg.estat_personatges.length > 0) {
       lines.push(`  ESTAT PERSONATGES AL FINAL DEL CAPÍTOL:`);
@@ -4832,6 +4839,78 @@ function normalitzarEntradaRegistre(dades, textCapitol, idx) {
 }
 
 
+
+function extreureCapitolDeLiniaKSN(entry) {
+  if (entry == null) return null;
+  if (typeof entry === 'object') {
+    const direct = Number(entry.capitol || entry.capitol_origen || entry.cap || entry.chapter || entry.idx || entry.capitol_idx || NaN);
+    if (!isNaN(direct) && direct > 0) return direct;
+    const serialitzat = JSON.stringify(entry);
+    const matchObj = serialitzat.match(/(?:cap\.?|capitol|chapter)\s*[:#-]?\s*(\d{1,3})/i);
+    if (matchObj) return parseInt(matchObj[1], 10);
+    return null;
+  }
+  const text = String(entry);
+  const match = text.match(/(?:cap\.?|capitol|chapter)\s*[:#-]?\s*(\d{1,3})/i) || text.match(/\bC(\d{1,3})\b/);
+  return match ? parseInt(match[1], 10) : null;
+}
+
+function construirKSN(idx) {
+  const capNum = idx + 1;
+  ESTAT.llibreRegistre = ESTAT.llibreRegistre || { capitols: [] };
+  ESTAT.llibreRegistre.capitols = Array.isArray(ESTAT.llibreRegistre.capitols) ? ESTAT.llibreRegistre.capitols : [];
+  const reg = ESTAT.llibreRegistre.capitols[idx] || {};
+  const nkg = ESTAT._nkg || {};
+
+  const estatPersonatges = Array.isArray(reg.estat_personatges)
+    ? reg.estat_personatges
+      .filter(p => p && p.nom)
+      .map(p => ({
+        nom: p.nom,
+        ubicacio: p.ubicacio || '',
+        estat_actual: p.estat_actual || '',
+        estat_animic_actual: p.estat_animic_actual || ''
+      }))
+    : [];
+
+  const accionsIrreversibles = Array.isArray(ESTAT._accionsIrreversibles)
+    ? ESTAT._accionsIrreversibles
+      .filter(a => a && Number(a.capitol) === capNum)
+      .map(a => a.accio || a.descripcio || String(a))
+      .filter(Boolean)
+    : [];
+
+  const fetsCanonics = Array.isArray(nkg.fets_canonics)
+    ? nkg.fets_canonics
+      .filter(fc => extreureCapitolDeLiniaKSN(fc) === capNum)
+      .map(fc => typeof fc === 'string' ? fc : (fc.descripcio || JSON.stringify(fc)))
+      .filter(Boolean)
+    : [];
+
+  const movimentsObjectes = Array.isArray(nkg.timeline_objectes)
+    ? nkg.timeline_objectes
+      .filter(mo => extreureCapitolDeLiniaKSN(mo) === capNum)
+      .map(mo => typeof mo === 'string' ? mo : JSON.stringify(mo))
+      .filter(Boolean)
+    : [];
+
+  const ksn = {
+    versio: 1,
+    capitol: capNum,
+    resum_curt: String(reg.resum_curt || '').trim(),
+    estat_personatges: estatPersonatges,
+    accions_irreversibles: accionsIrreversibles,
+    fets_canonics: fetsCanonics.slice(-8),
+    moviments_objectes: movimentsObjectes.slice(-8)
+  };
+
+  if (!ESTAT.llibreRegistre.capitols[idx] || typeof ESTAT.llibreRegistre.capitols[idx] !== 'object') {
+    ESTAT.llibreRegistre.capitols[idx] = reg;
+  }
+  ESTAT.llibreRegistre.capitols[idx].ksn = ksn;
+  return ksn;
+}
+
 function reconciliarFilsRegistre(dades) {
   const reg = ESTAT.llibreRegistre || {};
   const obertsActuals = new Set(Array.isArray(reg.fils_oberts) ? reg.fils_oberts : []);
@@ -4972,6 +5051,7 @@ async function actualitzarLlibreRegistreBackground(textCapitol, idx, esRevisioSi
     generarResumLlarg(idx, textCapitol, cfg),
     generarResumCurt(idx, textCapitol, cfg)
   ]);
+  construirKSN(idx);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -8316,7 +8396,20 @@ function buildContextCapitolLegacy(idx, skipRegistre = false, estat = ESTAT) {
     if (registreCtx && registreCtx.trim()) parts.push(registreCtx);
   }
 
-  // 4) Ajustos globals de rumb
+  // 4) KSN dels darrers capítols per preservar continuïtat compacta
+  const capitolsReg = (estat.llibreRegistre && Array.isArray(estat.llibreRegistre.capitols)) ? estat.llibreRegistre.capitols : [];
+  const ksnRecents = [];
+  for (let i = Math.max(0, idx - 3); i < idx; i++) {
+    const regCap = capitolsReg[i] || {};
+    const ksn = regCap.ksn || construirKSN(i);
+    if (!ksn) continue;
+    ksnRecents.push(`Cap.${i + 1}: ${JSON.stringify(ksn)}`);
+  }
+  if (ksnRecents.length > 0) {
+    parts.push('\nKSN (Kernel de Seguiment Narratiu) — darrers capítols:\n' + ksnRecents.join('\n'));
+  }
+
+  // 5) Ajustos globals de rumb
   if (estat._ajustosRumb) {
     const ajustos = typeof estat._ajustosRumb === 'string' ? estat._ajustosRumb : JSON.stringify(estat._ajustosRumb);
     if (ajustos && ajustos.trim()) {
@@ -9641,28 +9734,33 @@ async function jutgeIntervalInconsistencies(fromIdx, toIdx, userConfig) {
   const cfg = userConfig || USER_CONFIG;
   const models = getModelConfig(cfg);
   const capitols = ESTAT.llibreRegistre?.capitols || [];
-  const capsGenerats = ESTAT._capitols_generats || [];
   const nkg = ESTAT._nkg || {};
 
-  // Anteriors congelats: resum_curt de cada capítol 0..fromIdx-1
+  // Anteriors bloquejats: KSN + resum_curt (sense text complet)
   const anteriorLines = [];
   for (let i = 0; i < fromIdx; i++) {
     const reg = capitols[i] || {};
-    const rc = (reg.resum_curt || '').trim();
-    if (rc) anteriorLines.push(`[Cap.${i + 1} — resum]: ${rc}`);
+    const ksn = reg.ksn || construirKSN(i);
+    const rc = (reg.resum_curt || ksn?.resum_curt || '').trim();
+    if (!ksn && !rc) continue;
+    anteriorLines.push(`[Cap.${i + 1} — KSN]: ${JSON.stringify(ksn || {})}`);
+    if (rc) anteriorLines.push(`[Cap.${i + 1} — resum_curt]: ${rc}`);
   }
   const contextAnteriors = anteriorLines.length
-    ? 'CAPÍTOLS ANTERIORS (congelats, resum):\n' + anteriorLines.join('\n')
+    ? 'CAPÍTOLS ANTERIORS BLOQUEJATS (KSN + resum_curt, sense text complet):\n' + anteriorLines.join('\n')
     : '';
 
-  // Interval actiu: text sencer de cada capítol fromIdx..toIdx
+  // Interval actiu: KSN + resum_llarg opcional (sense text complet)
   const actualLines = [];
   for (let i = fromIdx; i <= toIdx; i++) {
-    const text = (capsGenerats[i] || '').trim();
-    if (text) actualLines.push(`[Cap.${i + 1} — text complet]:\n${text}`);
+    const reg = capitols[i] || {};
+    const ksn = reg.ksn || construirKSN(i);
+    const resumLlarg = (reg.resum_llarg || '').trim();
+    actualLines.push(`[Cap.${i + 1} — KSN]: ${JSON.stringify(ksn || {})}`);
+    if (resumLlarg) actualLines.push(`[Cap.${i + 1} — resum_llarg]: ${resumLlarg}`);
   }
   const contextActual = actualLines.length
-    ? 'CAPÍTOLS DE L\'INTERVAL ACTIU (text sencer):\n' + actualLines.join('\n\n')
+    ? "CAPÍTOLS DE L'INTERVAL ACTIU (KSN + resum_llarg opcional, sense text complet):\n" + actualLines.join('\n\n')
     : '';
 
   // NKG: últimes 15 entrades de cada timeline
