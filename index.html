@@ -1572,6 +1572,18 @@ function exportarDiagnosticResums() {
     lines.push('');
   }
 
+  // Intervals congelats (jutge)
+  const intervalsCongelats = ESTAT._intervalsCongelats || [];
+  lines.push(`INTERVALS CONGELATS (jutge) (${intervalsCongelats.length}):`);
+  if (intervalsCongelats.length) {
+    intervalsCongelats.forEach(iv => {
+      lines.push(`  [Caps ${iv.fromIdx + 1}-${iv.toIdx + 1}] net: ${iv.net} | iteracions: ${iv.iteracions}`);
+    });
+  } else {
+    lines.push('  (cap)');
+  }
+  lines.push('');
+
   const contingut = lines.join('\n');
   const nom = `booki_diagnostic_${new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19)}.txt`;
   const blob = new Blob([contingut], { type: 'text/plain;charset=utf-8' });
@@ -1846,6 +1858,7 @@ const ESTAT = {
   _clausPromptSeguent: [],
   _alertaArquitecte: null,
   _accionsIrreversibles: [],
+  _intervalsCongelats:      [],
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -4267,6 +4280,21 @@ async function arxitectePostCapitol(idx, textCapitol, userConfig) {
   const esCheckpoint = (idx + 1) % 3 === 0 && idx + 1 < ESTAT._estructuraCapitols.length;
   if (esCheckpoint) {
     try { await executarCheckpoint(idx, userConfig); } catch (e) { console.warn('Checkpoint:', e.message); }
+  }
+
+  // Jutge d'interval cada 4 capítols
+  const totalCaps = ESTAT._estructuraCapitols.length;
+  const esJutgeComplet = (idx + 1) % 4 === 0 && idx + 1 < totalCaps;
+  const esJutgeFinal   = idx === totalCaps - 1 && (idx + 1) % 4 !== 0;
+  if (esJutgeComplet || esJutgeFinal) {
+    const fromJutge = esJutgeComplet
+      ? idx - 3
+      : Math.floor(idx / 4) * 4;
+    try {
+      const loaderEl = document.getElementById('loader-11-text');
+      if (loaderEl) loaderEl.textContent = `⚖️ Jutge d'interval (caps. ${fromJutge + 1}–${idx + 1})…`;
+      await executarJutgeInterval(fromJutge, idx, userConfig);
+    } catch (e) { console.warn('Jutge interval:', e.message); }
   }
 
   // Compressió de memòria cada 5 capítols
@@ -9317,6 +9345,130 @@ async function executarLoopCoherenciaFinal(userConfig) {
   }
 
   toast("ℹ️ Revisió final completada amb marge de millora. Revisa control d'arcs per ajustos addicionals.");
+}
+
+// ═══════════════════════════════════════════════════════════
+//  JUTGE D'INTERVAL — Revisió d'inconsistències cada 4 caps
+// ═══════════════════════════════════════════════════════════
+
+async function jutgeIntervalInconsistencies(fromIdx, toIdx, userConfig) {
+  const cfg = userConfig || USER_CONFIG;
+  const models = getModelConfig(cfg);
+  const capitols = ESTAT.llibreRegistre?.capitols || [];
+  const capsGenerats = ESTAT._capitols_generats || [];
+  const nkg = ESTAT._nkg || {};
+
+  // Anteriors congelats: resum_curt de cada capítol 0..fromIdx-1
+  const anteriorLines = [];
+  for (let i = 0; i < fromIdx; i++) {
+    const reg = capitols[i] || {};
+    const rc = (reg.resum_curt || '').trim();
+    if (rc) anteriorLines.push(`[Cap.${i + 1} — resum]: ${rc}`);
+  }
+  const contextAnteriors = anteriorLines.length
+    ? 'CAPÍTOLS ANTERIORS (congelats, resum):\n' + anteriorLines.join('\n')
+    : '';
+
+  // Interval actiu: text sencer de cada capítol fromIdx..toIdx
+  const actualLines = [];
+  for (let i = fromIdx; i <= toIdx; i++) {
+    const text = (capsGenerats[i] || '').trim();
+    if (text) actualLines.push(`[Cap.${i + 1} — text complet]:\n${text}`);
+  }
+  const contextActual = actualLines.length
+    ? 'CAPÍTOLS DE L\'INTERVAL ACTIU (text sencer):\n' + actualLines.join('\n\n')
+    : '';
+
+  // NKG: últimes 15 entrades de cada timeline
+  const sliceLast = (arr, n) => Array.isArray(arr) ? arr.slice(-n) : [];
+  const nkgCtx = [
+    'NKG — TIMELINE ACCIONS (darreres 15):\n' + (sliceLast(nkg.timeline_accions, 15).map(e => typeof e === 'object' ? JSON.stringify(e) : e).join('\n') || '(cap)'),
+    'NKG — TIMELINE PERSONATGES (darreres 15):\n' + (sliceLast(nkg.timeline_personatges, 15).map(e => typeof e === 'object' ? JSON.stringify(e) : e).join('\n') || '(cap)'),
+    'NKG — TIMELINE OBJECTES (darreres 15):\n' + (sliceLast(nkg.timeline_objectes, 15).map(e => typeof e === 'object' ? JSON.stringify(e) : e).join('\n') || '(cap)'),
+  ].join('\n\n');
+
+  const prompt = `Ets un jutge narratiu expert en coherència i continuïtat novel·lística.
+
+${contextAnteriors}
+
+${contextActual}
+
+${nkgCtx}
+
+Analitza els capítols de l'interval actiu (caps. ${fromIdx + 1}–${toIdx + 1}) i detecta inconsistències internes o respecte als capítols anteriors: contradiccions de fets, errors de continuïtat de personatges, objectes o localitzacions, anacronismes, inconsistències de to o veu narrativa, i salts de lògica.
+
+Retorna ÚNICAMENT un JSON vàlid amb aquest format (sense text addicional):
+{
+  "inconsistencies": ["descripció breu de cada inconsistència detectada"],
+  "instruccions_correccio": {
+    "N": "instruccions concretes per corregir el capítol d'índex N (0-based)"
+  },
+  "net": false
+}
+
+Si no hi ha inconsistències rellevants, retorna:
+{ "inconsistencies": [], "instruccions_correccio": {}, "net": true }
+
+Les claus de instruccions_correccio han de ser índexs numèrics en string (0-based) dels capítols a corregir, i han d'estar dins del rang ${fromIdx}–${toIdx}. NO incloguis correccions de capítols fora d'aquest rang.`;
+
+  const msgs = [{ role: 'user', content: prompt }];
+  const modelId = models.modelArquitecte;
+  const maxTok = capsMaxTokens(modelId, 1200);
+  let rawText = '';
+  try {
+    rawText = await callLLMMulti(msgs, '', { model: modelId, max_tokens: maxTok, apiKey: cfg.apiKey }, 'jutge-interval');
+  } catch (err) {
+    console.warn('jutgeIntervalInconsistencies LLM error:', err.message);
+    return { inconsistencies: [], instruccions_correccio: {}, net: true };
+  }
+
+  const resultat = parseJsonRobust(rawText, ['inconsistencies', 'instruccions_correccio', 'net']);
+  if (!resultat || typeof resultat !== 'object') return { inconsistencies: [], instruccions_correccio: {}, net: true };
+  return {
+    inconsistencies: Array.isArray(resultat.inconsistencies) ? resultat.inconsistencies : [],
+    instruccions_correccio: (resultat.instruccions_correccio && typeof resultat.instruccions_correccio === 'object') ? resultat.instruccions_correccio : {},
+    net: !!resultat.net,
+  };
+}
+
+async function aplicarCorreccionsJutge(fromIdx, toIdx, instruccions, userConfig) {
+  const cfg = userConfig || USER_CONFIG;
+  for (const k of Object.keys(instruccions)) {
+    const idx = parseInt(k, 10);
+    if (isNaN(idx) || idx < fromIdx || idx > toIdx) continue; // guard: no tocar congelats
+    const textOriginal = ESTAT._capitols_generats[idx];
+    if (!textOriginal) continue;
+    try {
+      const textCorregit = await reescriureAmbCorreccions(textOriginal, instruccions[k], idx, cfg);
+      if (!textCorregit) continue;
+      ESTAT._capitols_generats[idx] = textCorregit;
+      await actualitzarLlibreRegistreBackground(textCorregit, idx, false, cfg);
+      await nkgActualitzarPostEscena(textCorregit, idx + 1, 1, cfg);
+      await actualitzarFilsNarratius(idx, textCorregit, cfg);
+    } catch (err) {
+      console.warn(`aplicarCorreccionsJutge cap.${idx + 1}:`, err.message);
+    }
+  }
+}
+
+async function executarJutgeInterval(fromIdx, toIdx, userConfig) {
+  const cfg = userConfig || USER_CONFIG;
+  let resultat = { net: false };
+  let iter = 0;
+  const MAX_ITER = 3;
+  while (iter < MAX_ITER) {
+    iter++;
+    resultat = await jutgeIntervalInconsistencies(fromIdx, toIdx, cfg);
+    if (resultat.net) break;
+    const teCorreccions = Object.keys(resultat.instruccions_correccio || {}).length > 0;
+    if (!teCorreccions) break;
+    await aplicarCorreccionsJutge(fromIdx, toIdx, resultat.instruccions_correccio, cfg);
+  }
+  ESTAT._intervalsCongelats.push({
+    fromIdx, toIdx,
+    net: resultat.net,
+    iteracions: iter,
+  });
 }
 
 // ═══════════════════════════════════════════════════════════
