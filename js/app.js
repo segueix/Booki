@@ -145,6 +145,7 @@ let cachedChannels = {};
 let cachedAPIVideos = [];
 let activeFollowTab = 'all';
 let channelCategoryPickerCleanup = null;
+let suppressNextPopstateNavigation = false;
 
 function mergeChannelCategories(channel, categories) {
     if (!channel || !Array.isArray(categories) || categories.length === 0) {
@@ -2052,7 +2053,11 @@ function hideExpandedButtonColorPicker() {
 
 function openBackgroundModal() {
     if (!backgroundModal) return;
+    const wasActive = backgroundModal.classList.contains('active');
     backgroundModal.classList.add('active');
+    if (!wasActive) {
+        history.pushState({ ...(history.state || {}), modal: 'background' }, '', window.location.href);
+    }
     hideExpandedColorPicker();
     hideExpandedButtonColorPicker();
     if (typeof lucide !== 'undefined') {
@@ -2061,9 +2066,14 @@ function openBackgroundModal() {
     setupVideoCardActionButtons();
 }
 
-function closeBackgroundModal() {
+function closeBackgroundModal(fromPopstate = false) {
     if (!backgroundModal) return;
+    const wasActive = backgroundModal.classList.contains('active');
     backgroundModal.classList.remove('active');
+    if (wasActive && !fromPopstate && history.state && history.state.modal === 'background') {
+        suppressNextPopstateNavigation = true;
+        history.back();
+    }
 }
 
 function openCustomCategoryModal() {
@@ -7505,15 +7515,24 @@ function initAddYoutuberModal() {
 
 function openAddYoutuberModal() {
     if (!addYoutuberModal) return;
+    const wasActive = addYoutuberModal.classList.contains('active');
     addYoutuberModal.classList.add('active');
+    if (!wasActive) {
+        history.pushState({ ...(history.state || {}), modal: 'add-youtuber' }, '', window.location.href);
+    }
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
     }
 }
 
-function closeAddYoutuberModal() {
+function closeAddYoutuberModal(fromPopstate = false) {
     if (!addYoutuberModal) return;
+    const wasActive = addYoutuberModal.classList.contains('active');
     addYoutuberModal.classList.remove('active');
+    if (wasActive && !fromPopstate && history.state && history.state.modal === 'add-youtuber') {
+        suppressNextPopstateNavigation = true;
+        history.back();
+    }
 }
 
 async function submitYoutuber() {
@@ -7806,6 +7825,21 @@ function escapeHtml(text) {
 
 // Gestionar navegació del navegador (back/forward)
 window.addEventListener('popstate', (e) => {
+    if (suppressNextPopstateNavigation) {
+        suppressNextPopstateNavigation = false;
+        return;
+    }
+
+    if (backgroundModal?.classList.contains('active')) {
+        closeBackgroundModal(true);
+        return;
+    }
+
+    if (addYoutuberModal?.classList.contains('active')) {
+        closeAddYoutuberModal(true);
+        return;
+    }
+
     if (e.state && e.state.videoId) {
         if (useYouTubeAPI) {
             showVideoFromAPI(e.state.videoId);
