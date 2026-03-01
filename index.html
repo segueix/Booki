@@ -9734,8 +9734,12 @@ async function aplicarCorreccionsJutge(fromIdx, toIdx, instruccions, userConfig)
   const cfg = userConfig || USER_CONFIG;
   const capitolsLocked = (ESTAT._capitolsLocked && typeof ESTAT._capitolsLocked === 'object') ? ESTAT._capitolsLocked : {};
   ESTAT._capitolsLocked = capitolsLocked;
-  for (const k of Object.keys(instruccions)) {
-    const idx = parseInt(k, 10);
+  const clausOrdenades = Object.keys(instruccions)
+    .map(k => ({ k, idx: parseInt(k, 10) }))
+    .filter(it => !isNaN(it.idx))
+    .sort((a, b) => b.idx - a.idx);
+
+  for (const { k, idx } of clausOrdenades) {
     if (isNaN(idx) || idx < fromIdx || idx > toIdx) continue; // guard: no tocar congelats
     if (capitolsLocked[idx] === true) {
       jutgePanelLog(`  🔒 Cap. ${idx + 1} bloquejat. No es reescriu.`);
@@ -9831,7 +9835,11 @@ async function executarJutgeInterval(fromIdx, toIdx, userConfig) {
     }
 
     // Correccions de text (cares — reescriuen capítols)
-    const claus = Object.keys(resultat.instruccions_correccio || {});
+    const claus = Object.keys(resultat.instruccions_correccio || {})
+      .map(k => ({ k, idx: parseInt(k, 10) }))
+      .filter(it => !isNaN(it.idx))
+      .sort((a, b) => b.idx - a.idx)
+      .map(it => it.k);
     if (claus.length > 0) {
       jutgePanelLog(`✏️ Reescriptures necessàries: ${claus.map(k => `cap.${parseInt(k, 10) + 1}`).join(', ')}`);
       await aplicarCorreccionsJutge(fromIdx, toIdx, resultat.instruccions_correccio, cfg);
