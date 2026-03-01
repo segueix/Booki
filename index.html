@@ -9451,12 +9451,29 @@ ${nkgCtx}
 
 Analitza els capítols de l'interval actiu (caps. ${fromIdx + 1}–${toIdx + 1}) i detecta inconsistències internes o respecte als capítols anteriors: contradiccions de fets, errors de continuïtat de personatges, objectes o localitzacions, anacronismes, inconsistències de to o veu narrativa, i salts de lògica.
 
-IMPORTANT: Respon EXCLUSIVAMENT amb un objecte JSON pur, sense cap text addicional, sense blocs de codi markdown, sense cap caràcter fora del JSON.
+Per cada problema detectat tria LA SOLUCIÓ MÉS BARATA:
+- Si es pot solucionar actualitzant el perfil/bíblia d'un personatge o afegint un fet canònic → usa "correccions_perfils" (GRATIS, sense reescriptura)
+- Només si el text del capítol conté una contradicció factual directa que no es pot resoldre d'altra manera → usa "instruccions_correccio" (car, reescriu el capítol)
+
+IMPORTANT: Respon EXCLUSIVAMENT amb JSON pur, sense markdown, sense text addicional.
 
 Format obligatori:
-{"inconsistencies":["desc1"],"instruccions_correccio":{"N":"instruccions cap N (0-based)"},"net":false}
+{
+  "inconsistencies": ["desc breu de cada problema"],
+  "instruccions_correccio": {
+    "N": "instruccions de reescriptura per al capítol d'índex N (0-based) — NOMÉS si imprescindible"
+  },
+  "correccions_perfils": {
+    "actualitzar_personatges": [
+      {"nom": "Nom Personatge", "nou_estat": "...", "motivacions": "...", "nous_secrets": "..."}
+    ],
+    "fets_canonics": ["nou fet canònic a afegir a la bíblia"],
+    "claus_seguent": ["instrucció de coherència per als capítols futurs"]
+  },
+  "net": false
+}
 
-Si no hi ha inconsistències: {"inconsistencies":[],"instruccions_correccio":{},"net":true}
+Si no hi ha res: {"inconsistencies":[],"instruccions_correccio":{},"correccions_perfils":{},"net":true}
 
 Les claus de instruccions_correccio han de ser índexs en string (0-based) dins del rang ${fromIdx}–${toIdx}.`;
 
@@ -9473,12 +9490,12 @@ Les claus de instruccions_correccio han de ser índexs en string (0-based) dins 
   }
 
   const resultat = parseJsonRobust(rawText);
-  if (!resultat || typeof resultat !== 'object') return { inconsistencies: [], instruccions_correccio: {}, net: true };
-  return {
-    inconsistencies: Array.isArray(resultat.inconsistencies) ? resultat.inconsistencies : [],
-    instruccions_correccio: (resultat.instruccions_correccio && typeof resultat.instruccions_correccio === 'object') ? resultat.instruccions_correccio : {},
-    net: resultat.net === true || (!resultat.inconsistencies?.length && !Object.keys(resultat.instruccions_correccio || {}).length),
-  };
+  if (!resultat || typeof resultat !== 'object') return { inconsistencies: [], instruccions_correccio: {}, correccions_perfils: {}, net: true };
+  const instruccions = (resultat.instruccions_correccio && typeof resultat.instruccions_correccio === 'object') ? resultat.instruccions_correccio : {};
+  const perfils = (resultat.correccions_perfils && typeof resultat.correccions_perfils === 'object') ? resultat.correccions_perfils : {};
+  const inconsistencies = Array.isArray(resultat.inconsistencies) ? resultat.inconsistencies : [];
+  const net = resultat.net === true || (inconsistencies.length === 0 && Object.keys(instruccions).length === 0 && Object.keys(perfils).length === 0);
+  return { inconsistencies, instruccions_correccio: instruccions, correccions_perfils: perfils, net };
 }
 
 async function aplicarCorreccionsJutge(fromIdx, toIdx, instruccions, userConfig) {
@@ -9505,6 +9522,25 @@ async function aplicarCorreccionsJutge(fromIdx, toIdx, instruccions, userConfig)
   }
 }
 
+function aplicarCorreccionsPerfilsJutge(correccions) {
+  if (!correccions || typeof correccions !== 'object') return;
+
+  // Reutilitza aplicarCanvisBiblia per actualitzar personatges i fets canònics
+  const canvisBiblia = {
+    actualitzar_personatges: correccions.actualitzar_personatges || [],
+    fets_canonics:           correccions.fets_canonics           || [],
+  };
+  aplicarCanvisBiblia(canvisBiblia);
+
+  // Afegeix les claus de coherència per als capítols futurs
+  const claus = correccions.claus_seguent;
+  if (Array.isArray(claus) && claus.length > 0) {
+    ESTAT._clausPromptSeguent = Array.isArray(ESTAT._clausPromptSeguent)
+      ? [...ESTAT._clausPromptSeguent, ...claus]
+      : claus;
+  }
+}
+
 async function executarJutgeInterval(fromIdx, toIdx, userConfig) {
   const cfg = userConfig || USER_CONFIG;
 
@@ -9526,17 +9562,34 @@ async function executarJutgeInterval(fromIdx, toIdx, userConfig) {
       break;
     }
 
-    const claus = Object.keys(resultat.instruccions_correccio || {});
-    if (claus.length === 0) {
-      jutgePanelLog('Inconsistències detectades però sense correccions aplicables.');
-      break;
-    }
-
     jutgePanelLog(`Inconsistències (${resultat.inconsistencies.length}):`);
     (resultat.inconsistencies || []).forEach(inc => jutgePanelLog(`  · ${inc}`));
-    jutgePanelLog(`Capítols a corregir: ${claus.map(k => `cap.${parseInt(k, 10) + 1}`).join(', ')}`);
 
-    await aplicarCorreccionsJutge(fromIdx, toIdx, resultat.instruccions_correccio, cfg);
+    // Correccions de perfils (gratuïtes — sense reescriptura de capítols)
+    const cp = resultat.correccions_perfils;
+    const persActualitzats = (cp && cp.actualitzar_personatges) ? cp.actualitzar_personatges.filter(p => p && p.nom) : [];
+    const fetsNous        = (cp && cp.fets_canonics)           ? cp.fets_canonics.filter(Boolean) : [];
+    const clausSeguent    = (cp && cp.claus_seguent)           ? cp.claus_seguent.filter(Boolean) : [];
+    if (persActualitzats.length > 0 || fetsNous.length > 0 || clausSeguent.length > 0) {
+      jutgePanelLog(`📋 Actualitzant bíblia (sense reescriptura):`);
+      persActualitzats.forEach(p => jutgePanelLog(`  👤 ${p.nom}: ${p.nou_estat || p.motivacions || '(actualitzat)'}`));
+      fetsNous.forEach(f => jutgePanelLog(`  📌 Fet canònic: ${f}`));
+      clausSeguent.forEach(c => jutgePanelLog(`  🔮 Guia futura: ${c}`));
+      aplicarCorreccionsPerfilsJutge(cp);
+    }
+
+    // Correccions de text (cares — reescriuen capítols)
+    const claus = Object.keys(resultat.instruccions_correccio || {});
+    if (claus.length > 0) {
+      jutgePanelLog(`✏️ Reescriptures necessàries: ${claus.map(k => `cap.${parseInt(k, 10) + 1}`).join(', ')}`);
+      await aplicarCorreccionsJutge(fromIdx, toIdx, resultat.instruccions_correccio, cfg);
+    } else if (persActualitzats.length === 0 && fetsNous.length === 0 && clausSeguent.length === 0) {
+      jutgePanelLog('Inconsistències detectades però sense correccions aplicables.');
+      break;
+    } else {
+      // Perfils actualitzats, no cal reescriure — sortim del loop
+      break;
+    }
   }
 
   ESTAT._intervalsCongelats.push({
@@ -11290,10 +11343,10 @@ Retorna EXCLUSIVAMENT JSON amb aquesta estructura:
   }];
 
   const models = getModelConfig(userConfig);
-  const tokensDesitjats = esRevisioSistema ? 3200 : 1800;
-  const raw = await callLLMMulti(
+  const tokensDesitjats = esRevisioSistema ? 4000 : 2400;
+  const raw = await callLLMWithContinuation(
     msgs,
-    "Ets l'Arquitecta de Dades i Sistemes. Retorna només JSON.",
+    "Ets l'Arquitecta de Dades i Sistemes. Retorna EXCLUSIVAMENT JSON vàlid i complet, sense markdown ni text addicional.",
     Object.assign({}, userConfig, { maxTokens: capsMaxTokens(models.modelArquitecte, tokensDesitjats), model: models.modelArquitecte }),
     'arquitectura'
   );
