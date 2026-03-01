@@ -5612,13 +5612,13 @@ async function parseJsonResponse(rawResponse, providerName) {
 // ─── fetchSegur: fetch amb backoff exponencial ───────────────
 // Substitueix fetch() directe per a totes les crides LLM.
 // Reintenta automàticament si l'API retorna 429, 503 o 529.
-async function fetchSegur(url, options, maxIntents = 4) {
+async function fetchSegur(url, options, maxIntents = 5) {
   const RETRYABLE = new Set([429, 503, 529]);
   for (let intent = 0; intent < maxIntents; intent++) {
     const response = await fetch(url, options);
     if (!RETRYABLE.has(response.status)) return response;
     if (intent === maxIntents - 1) return response; // últim intent: retorna per deixar parseJsonResponse gestionar l'error
-    const delayMs = Math.pow(2, intent) * 10000; // 10s → 20s → 40s → 80s
+    const delayMs = Math.pow(2, intent) * 3000; // 3s → 6s → 12s → 24s
     console.warn(`[fetchSegur] HTTP ${response.status} — reintent ${intent + 1}/${maxIntents - 1} en ${delayMs / 1000}s...`);
     await new Promise(resolve => setTimeout(resolve, delayMs));
   }
@@ -5733,7 +5733,7 @@ async function callLLMMulti(messages, systemPrompt, config, tag) {
 
   // Enrutem directament al proveïdor triat amb el text lliure del model
   if (proveidor === 'anthropic') return await callAnthropic(messages, systemPrompt, apiKey, modelId, maxTokens);
-  if (proveidor === 'google' || proveidor === 'gemini') return await callGemini(messages, systemPrompt, apiKey, modelId, maxTokens);
+  if (proveidor === 'google' || proveidor === 'gemini') return await callGemini(messages, systemPrompt, apiKey, modelId, maxTokens, safeConfig);
   if (proveidor === 'openai') return await callOpenAI(messages, systemPrompt, apiKey, modelId, maxTokens);
 
   throw new Error(`Proveïdor desconegut: ${proveidor}`);
@@ -6078,14 +6078,17 @@ async function callOpenAIWithFinishReason(messages, systemPrompt, apiKey, model,
 // ─── Google Gemini ──────────────────────────────────────────
 // La clau API va com a paràmetre de query string a la URL,
 // no cal capçalera d'autenticació addicional.
-async function callGemini(messages, systemPrompt, apiKey, model, maxTokens) {
+async function callGemini(messages, systemPrompt, apiKey, model, maxTokens, extraConfig) {
   const finalModel = model || PROVIDER_DEFAULTS.gemini.model;
   const endpoint   = PROVIDER_DEFAULTS.gemini.apiUrlBase + '/' +
     encodeURIComponent(finalModel) + ':generateContent?key=' + encodeURIComponent(apiKey);
 
+  const genConfig = { maxOutputTokens: maxTokens };
+  if (extraConfig && extraConfig.responseMimeType) genConfig.responseMimeType = extraConfig.responseMimeType;
+
   const payload = {
     contents:         buildGeminiContents(messages),
-    generationConfig: { maxOutputTokens: maxTokens },
+    generationConfig: genConfig,
     // CORRECCIÓ: Desactivem els filtres per permetre textos literaris
     safetySettings: [
       { category: "HARM_CATEGORY_HARASSMENT",        threshold: "BLOCK_NONE" },
@@ -6928,8 +6931,7 @@ function parseJsonRobust(text, expectedKeys = []) {
     if (expectedKeys && expectedKeys.length > 0) {
       const missing = expectedKeys.filter(k => !(k in resultat));
       if (missing.length > 0) {
-        console.warn(`⚠️ [parseJsonRobust] JSON recuperat via ${metode}, però falten claus estructurals: ${missing.join(', ')}`);
-        return null;
+        console.warn(`⚠️ [parseJsonRobust] JSON recuperat via ${metode}, però falten claus: ${missing.join(', ')} — es retorna igualment.`);
       }
     }
     if (metode !== 'Directe') {
@@ -9449,37 +9451,33 @@ ${nkgCtx}
 
 Analitza els capítols de l'interval actiu (caps. ${fromIdx + 1}–${toIdx + 1}) i detecta inconsistències internes o respecte als capítols anteriors: contradiccions de fets, errors de continuïtat de personatges, objectes o localitzacions, anacronismes, inconsistències de to o veu narrativa, i salts de lògica.
 
-Retorna ÚNICAMENT un JSON vàlid amb aquest format (sense text addicional):
-{
-  "inconsistencies": ["descripció breu de cada inconsistència detectada"],
-  "instruccions_correccio": {
-    "N": "instruccions concretes per corregir el capítol d'índex N (0-based)"
-  },
-  "net": false
-}
+IMPORTANT: Respon EXCLUSIVAMENT amb un objecte JSON pur, sense cap text addicional, sense blocs de codi markdown, sense cap caràcter fora del JSON.
 
-Si no hi ha inconsistències rellevants, retorna:
-{ "inconsistencies": [], "instruccions_correccio": {}, "net": true }
+Format obligatori:
+{"inconsistencies":["desc1"],"instruccions_correccio":{"N":"instruccions cap N (0-based)"},"net":false}
 
-Les claus de instruccions_correccio han de ser índexs numèrics en string (0-based) dels capítols a corregir, i han d'estar dins del rang ${fromIdx}–${toIdx}. NO incloguis correccions de capítols fora d'aquest rang.`;
+Si no hi ha inconsistències: {"inconsistencies":[],"instruccions_correccio":{},"net":true}
 
+Les claus de instruccions_correccio han de ser índexs en string (0-based) dins del rang ${fromIdx}–${toIdx}.`;
+
+  const systemPromptJutge = 'Ets un jutge narratiu. Respon EXCLUSIVAMENT amb JSON pur vàlid, sense markdown, sense text addicional, sense cap caràcter fora del JSON.';
   const msgs = [{ role: 'user', content: prompt }];
   const modelId = models.modelArquitecte;
   const maxTok = capsMaxTokens(modelId, 1200);
   let rawText = '';
   try {
-    rawText = await callLLMMulti(msgs, '', { model: modelId, max_tokens: maxTok, apiKey: cfg.apiKey }, 'jutge-interval');
+    rawText = await callLLMMulti(msgs, systemPromptJutge, { model: modelId, max_tokens: maxTok, apiKey: cfg.apiKey, responseMimeType: 'application/json' }, 'jutge-interval');
   } catch (err) {
     console.warn('jutgeIntervalInconsistencies LLM error:', err.message);
     return { inconsistencies: [], instruccions_correccio: {}, net: true };
   }
 
-  const resultat = parseJsonRobust(rawText, ['inconsistencies', 'instruccions_correccio', 'net']);
+  const resultat = parseJsonRobust(rawText);
   if (!resultat || typeof resultat !== 'object') return { inconsistencies: [], instruccions_correccio: {}, net: true };
   return {
     inconsistencies: Array.isArray(resultat.inconsistencies) ? resultat.inconsistencies : [],
     instruccions_correccio: (resultat.instruccions_correccio && typeof resultat.instruccions_correccio === 'object') ? resultat.instruccions_correccio : {},
-    net: !!resultat.net,
+    net: resultat.net === true || (!resultat.inconsistencies?.length && !Object.keys(resultat.instruccions_correccio || {}).length),
   };
 }
 
