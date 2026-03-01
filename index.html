@@ -5778,11 +5778,19 @@ async function parseJsonResponse(rawResponse, providerName) {
 const GeminiRL = {
   _ultimaTs: 0,
   _gap: 6000,
+  _cua: Promise.resolve(),
   async esperar() {
-    const ara = Date.now();
-    const restant = this._gap - (ara - this._ultimaTs);
-    if (restant > 0) await new Promise(r => setTimeout(r, restant));
-    this._ultimaTs = Date.now();
+    // Serialitzem totes les crides perquè no es puguin escapar en paral·lel.
+    const torn = this._cua.then(async () => {
+      const ara = Date.now();
+      const restant = this._gap - (ara - this._ultimaTs);
+      if (restant > 0) await new Promise(r => setTimeout(r, restant));
+      this._ultimaTs = Date.now();
+    });
+
+    // Evitem que un error trenqui la cua global.
+    this._cua = torn.catch(() => {});
+    return torn;
   },
   // Quan fetchSegur detecta un 429, avisa el rate limiter perquè
   // totes les crides concurrents pendents esperin el temps correcte.
