@@ -145,6 +145,29 @@ let cachedChannels = {};
 let cachedAPIVideos = [];
 let activeFollowTab = 'all';
 let channelCategoryPickerCleanup = null;
+let suppressNextPopstateNavigation = false;
+
+function isAuxiliaryPageVisible() {
+    return Boolean(
+        historyPage && !historyPage.classList.contains('hidden')
+        || playlistsPage && !playlistsPage.classList.contains('hidden')
+        || followPage && !followPage.classList.contains('hidden')
+    );
+}
+
+function showHomeNovetats() {
+    historyFilterLiked = false;
+    selectedCategory = 'Novetats';
+    localStorage.setItem(LAST_CATEGORY_STORAGE_KEY, selectedCategory);
+    renderCategories();
+    setActiveNavItem('home');
+    showHome();
+    if (useYouTubeAPI) {
+        loadVideosFromAPI();
+    } else {
+        loadVideos();
+    }
+}
 
 function mergeChannelCategories(channel, categories) {
     if (!channel || !Array.isArray(categories) || categories.length === 0) {
@@ -1459,16 +1482,7 @@ function initEventListeners() {
 
             const page = item.dataset.page;
             if (page === 'home') {
-                historyFilterLiked = false;
-                selectedCategory = 'Novetats';
-                localStorage.setItem(LAST_CATEGORY_STORAGE_KEY, selectedCategory);
-                renderCategories();
-                showHome();
-                if (useYouTubeAPI) {
-                    loadVideosFromAPI();
-                } else {
-                    loadVideos();
-                }
+                showHomeNovetats();
             } else if (page === 'history') {
                 showHistory();
             } else if (page === 'follow') {
@@ -1491,15 +1505,7 @@ function initEventListeners() {
             if (page === 'history') {
                 showHistory();
             } else if (page === 'home') {
-                selectedCategory = 'Novetats';
-                localStorage.setItem(LAST_CATEGORY_STORAGE_KEY, selectedCategory);
-                renderCategories();
-                showHome();
-                if (useYouTubeAPI) {
-                    loadVideosFromAPI();
-                } else {
-                    loadVideos();
-                }
+                showHomeNovetats();
             } else if (page === 'playlists') {
                 showPlaylists();
             } else if (page === 'follow') {
@@ -1541,20 +1547,12 @@ function initEventListeners() {
             if (homeNav) {
                 homeNav.classList.add('active');
             }
-            selectedCategory = 'Novetats';
-            localStorage.setItem(LAST_CATEGORY_STORAGE_KEY, selectedCategory);
-            renderCategories();
             const basePath = window.location.pathname.replace(/\/index\.html$/, '/');
             history.pushState({}, '', basePath);
             if (!isMiniPlayerActive()) {
                 stopVideoPlayback();
             }
-            showHome();
-            if (useYouTubeAPI) {
-                loadVideosFromAPI();
-            } else {
-                loadVideos();
-            }
+            showHomeNovetats();
         });
     }
 
@@ -2052,7 +2050,11 @@ function hideExpandedButtonColorPicker() {
 
 function openBackgroundModal() {
     if (!backgroundModal) return;
+    const wasActive = backgroundModal.classList.contains('active');
     backgroundModal.classList.add('active');
+    if (!wasActive) {
+        history.pushState({ ...(history.state || {}), modal: 'background' }, '', window.location.href);
+    }
     hideExpandedColorPicker();
     hideExpandedButtonColorPicker();
     if (typeof lucide !== 'undefined') {
@@ -2061,9 +2063,14 @@ function openBackgroundModal() {
     setupVideoCardActionButtons();
 }
 
-function closeBackgroundModal() {
+function closeBackgroundModal(fromPopstate = false) {
     if (!backgroundModal) return;
+    const wasActive = backgroundModal.classList.contains('active');
     backgroundModal.classList.remove('active');
+    if (wasActive && !fromPopstate && history.state && history.state.modal === 'background') {
+        suppressNextPopstateNavigation = true;
+        history.back();
+    }
 }
 
 function openCustomCategoryModal() {
@@ -7339,6 +7346,7 @@ function showHistory() {
     }
     updateHistoryFilterUI();
     renderHistory();
+    history.pushState({ ...(history.state || {}), appPage: 'history' }, '', window.location.href);
     window.scrollTo(0, 0);
 }
 
@@ -7458,6 +7466,7 @@ function showPlaylists() {
         chipsBar.classList.add('hidden');
     }
     setActiveLibraryTab(activeLibraryTab);
+    history.pushState({ ...(history.state || {}), appPage: 'playlists' }, '', window.location.href);
     window.scrollTo(0, 0);
 }
 
@@ -7483,6 +7492,7 @@ function showFollow(tab = 'all') {
         chipsBar.classList.add('hidden');
     }
     setActiveFollowTab(tab);
+    history.pushState({ ...(history.state || {}), appPage: 'follow' }, '', window.location.href);
     window.scrollTo(0, 0);
 }
 
@@ -7505,15 +7515,24 @@ function initAddYoutuberModal() {
 
 function openAddYoutuberModal() {
     if (!addYoutuberModal) return;
+    const wasActive = addYoutuberModal.classList.contains('active');
     addYoutuberModal.classList.add('active');
+    if (!wasActive) {
+        history.pushState({ ...(history.state || {}), modal: 'add-youtuber' }, '', window.location.href);
+    }
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
     }
 }
 
-function closeAddYoutuberModal() {
+function closeAddYoutuberModal(fromPopstate = false) {
     if (!addYoutuberModal) return;
+    const wasActive = addYoutuberModal.classList.contains('active');
     addYoutuberModal.classList.remove('active');
+    if (wasActive && !fromPopstate && history.state && history.state.modal === 'add-youtuber') {
+        suppressNextPopstateNavigation = true;
+        history.back();
+    }
 }
 
 async function submitYoutuber() {
@@ -7806,6 +7825,26 @@ function escapeHtml(text) {
 
 // Gestionar navegació del navegador (back/forward)
 window.addEventListener('popstate', (e) => {
+    if (suppressNextPopstateNavigation) {
+        suppressNextPopstateNavigation = false;
+        return;
+    }
+
+    if (backgroundModal?.classList.contains('active')) {
+        closeBackgroundModal(true);
+        return;
+    }
+
+    if (addYoutuberModal?.classList.contains('active')) {
+        closeAddYoutuberModal(true);
+        return;
+    }
+
+    if (isAuxiliaryPageVisible()) {
+        showHomeNovetats();
+        return;
+    }
+
     if (e.state && e.state.videoId) {
         if (useYouTubeAPI) {
             showVideoFromAPI(e.state.videoId);
