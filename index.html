@@ -738,7 +738,8 @@
   </div>
 
   <div class="btn-row">
-    <button class="btn btn-primary" onclick="guardarIComencar()">Guardar i Començar Nou</button>
+    <button id="btn-guardar-nou" class="btn btn-primary" onclick="guardarIComencar()">Guardar i Començar Nou</button>
+    <button id="btn-actualitzar-models" class="btn btn-secondary hidden" onclick="actualitzarConfiguracioActiva()">🔄 Aplicar canvis i continuar</button>
     <button id="btn-reprendre" class="btn btn-secondary hidden" onclick="reprendreProjecteLocal()">📂 Reprendre projecte anterior</button>
     <button class="btn btn-ghost" onclick="exportarCopiaSeguretat()">💾 Exportar còpia (.json)</button>
     <button class="btn btn-ghost" onclick="obrirImportarCopiaSeguretat()">📥 Importar còpia</button>
@@ -1649,6 +1650,7 @@ function importarCopiaSeguretat(event) {
 function restaurarInterficieDesDeEstat() {
   hideCard('card-config');
   document.getElementById('progress-wrap').classList.remove('hidden');
+  actualitzarVisibilitatBotonsConfig();
 
   const fase = ESTAT.fase;
   updateProgress(fase);
@@ -2183,6 +2185,101 @@ function guardarIComencar() {
   } catch (err) {
     console.error('Error guardant configuració:', err);
     toast("No s'ha pogut guardar la configuració. Mira la consola (F12).");
+  }
+}
+
+function actualitzarConfiguracioActiva() {
+  try {
+    const provider = document.getElementById('config-provider').value;
+    if (!provider) { toast('Selecciona un proveïdor.'); return; }
+
+    const providerGeneracio    = (document.getElementById('config-provider-generacio')?.value || provider).trim();
+    const providerArquitectura = (document.getElementById('config-provider-arquitectura')?.value || provider).trim();
+
+    const anthropicKey = document.getElementById('anthropicApiKey')?.value?.trim() || '';
+    const geminiKey    = document.getElementById('geminiApiKey')?.value?.trim()    || '';
+    const openaiKey    = document.getElementById('openaiApiKey')?.value?.trim()    || '';
+
+    const getKeyForProvider = (prov) => {
+      if (prov === 'anthropic') return anthropicKey;
+      if (prov === 'gemini' || prov === 'google') return geminiKey;
+      if (prov === 'openai') return openaiKey;
+      return '';
+    };
+
+    const providersNecessaris = Array.from(new Set([providerGeneracio, providerArquitectura]));
+    const senseKey = providersNecessaris.find(p => !getKeyForProvider(p));
+    if (senseKey) { toast(`Introdueix una API key per al proveïdor seleccionat (${senseKey}).`); return; }
+
+    const apiKey = getKeyForProvider(providerGeneracio);
+
+    if (anthropicKey) ESTAT._anthropicApiKey = anthropicKey;
+    if (geminiKey)    ESTAT._geminiApiKey    = geminiKey;
+    if (openaiKey)    ESTAT._openaiApiKey    = openaiKey;
+
+    const modelGeneracioInput    = document.getElementById('config-model-generacio').value.trim();
+    const modelArquitecturaInput = document.getElementById('config-model-arquitectura').value.trim();
+    const fluxAutomatic     = document.getElementById('config-flux-automatic').checked;
+    const targetQualitatEl  = document.getElementById('config-target-qualitat');
+    const targetQualitatRaw = targetQualitatEl ? Number(targetQualitatEl.value) : 85;
+    const targetQualitat    = Math.max(60, Math.min(98, Number.isFinite(targetQualitatRaw) ? targetQualitatRaw : 85));
+
+    const selectDraft = document.getElementById('selectModelDraft');
+    const selectGen   = document.getElementById('selectModelGen');
+    const selectArq   = document.getElementById('selectModelArq');
+
+    const modelDraft        = (selectDraft && selectDraft.value.trim()) || ESTAT._modelDraft      || modelGeneracioInput;
+    const modelGeneracio    = modelGeneracioInput || (selectGen && selectGen.value.trim())         || ESTAT._modelGeneracio;
+    const modelArquitectura = modelArquitecturaInput || (selectArq && selectArq.value.trim())     || ESTAT._modelArquitecte;
+
+    if (!modelGeneracio)    { toast('Introdueix el model de generació.'); return; }
+    if (!modelArquitectura) { toast("Introdueix el model d'arquitectura."); return; }
+
+    ESTAT._modelGeneracio  = modelGeneracio;
+    ESTAT._modelArquitecte = modelArquitectura;
+    ESTAT._modelDraft      = modelDraft;
+    sincronitzarCampsConfigModels();
+
+    const genere     = document.getElementById('config-genere')?.value      || '';
+    const autor      = document.getElementById('config-autor')?.value        || '';
+    const focusClimax = document.getElementById('config-focus-climax')?.value || '';
+    ESTAT.configProjecte = { genere, autor_referencia: autor, focus_climax: focusClimax };
+
+    USER_CONFIG = {
+      provider, providerGeneracio, providerArquitectura, apiKey,
+      modelGeneracio, modelArquitectura, modelDraft,
+      modelArquitecte: modelArquitectura,
+      models: { draft: modelDraft, generacio: modelGeneracio, arquitecte: modelArquitectura },
+      fluxAutomatic, targetQualitat
+    };
+
+    if (typeof poblarSelectorsModels === 'function') poblarSelectorsModels();
+    if (typeof actualitzarModelsDisponibles === 'function') actualitzarModelsDisponibles();
+
+    guardarProjecteLocal();
+    hideCard('card-config');
+    toast('Models actualitzats. Pots continuar.');
+  } catch (err) {
+    console.error('Error actualitzant configuració:', err);
+    toast("No s'ha pogut actualitzar la configuració. Mira la consola (F12).");
+  }
+}
+
+function actualitzarVisibilitatBotonsConfig() {
+  const projecteActiu = ESTAT && ESTAT.fase > 0;
+  const btnNou        = document.getElementById('btn-guardar-nou');
+  const btnActualitzar = document.getElementById('btn-actualitzar-models');
+  if (!btnNou || !btnActualitzar) return;
+  if (projecteActiu) {
+    btnActualitzar.classList.remove('hidden');
+    btnActualitzar.classList.add('btn-primary');
+    btnActualitzar.classList.remove('btn-secondary');
+    btnNou.classList.remove('btn-primary');
+    btnNou.classList.add('btn-secondary');
+  } else {
+    btnActualitzar.classList.add('hidden');
+    btnNou.classList.add('btn-primary');
+    btnNou.classList.remove('btn-secondary');
   }
 }
 
@@ -12346,6 +12443,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Comprovar si hi ha algun projecte guardat a localStorage
   comprovarProjecteGuardat();
+  // Actualitzar visibilitat dels botons de config segons si hi ha projecte actiu
+  actualitzarVisibilitatBotonsConfig();
 });
 
 </script>
