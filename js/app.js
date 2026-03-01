@@ -147,6 +147,28 @@ let activeFollowTab = 'all';
 let channelCategoryPickerCleanup = null;
 let suppressNextPopstateNavigation = false;
 
+function isAuxiliaryPageVisible() {
+    return Boolean(
+        historyPage && !historyPage.classList.contains('hidden')
+        || playlistsPage && !playlistsPage.classList.contains('hidden')
+        || followPage && !followPage.classList.contains('hidden')
+    );
+}
+
+function showHomeNovetats() {
+    historyFilterLiked = false;
+    selectedCategory = 'Novetats';
+    localStorage.setItem(LAST_CATEGORY_STORAGE_KEY, selectedCategory);
+    renderCategories();
+    setActiveNavItem('home');
+    showHome();
+    if (useYouTubeAPI) {
+        loadVideosFromAPI();
+    } else {
+        loadVideos();
+    }
+}
+
 function mergeChannelCategories(channel, categories) {
     if (!channel || !Array.isArray(categories) || categories.length === 0) {
         return;
@@ -1460,16 +1482,7 @@ function initEventListeners() {
 
             const page = item.dataset.page;
             if (page === 'home') {
-                historyFilterLiked = false;
-                selectedCategory = 'Novetats';
-                localStorage.setItem(LAST_CATEGORY_STORAGE_KEY, selectedCategory);
-                renderCategories();
-                showHome();
-                if (useYouTubeAPI) {
-                    loadVideosFromAPI();
-                } else {
-                    loadVideos();
-                }
+                showHomeNovetats();
             } else if (page === 'history') {
                 showHistory();
             } else if (page === 'follow') {
@@ -1492,15 +1505,7 @@ function initEventListeners() {
             if (page === 'history') {
                 showHistory();
             } else if (page === 'home') {
-                selectedCategory = 'Novetats';
-                localStorage.setItem(LAST_CATEGORY_STORAGE_KEY, selectedCategory);
-                renderCategories();
-                showHome();
-                if (useYouTubeAPI) {
-                    loadVideosFromAPI();
-                } else {
-                    loadVideos();
-                }
+                showHomeNovetats();
             } else if (page === 'playlists') {
                 showPlaylists();
             } else if (page === 'follow') {
@@ -1542,20 +1547,12 @@ function initEventListeners() {
             if (homeNav) {
                 homeNav.classList.add('active');
             }
-            selectedCategory = 'Novetats';
-            localStorage.setItem(LAST_CATEGORY_STORAGE_KEY, selectedCategory);
-            renderCategories();
             const basePath = window.location.pathname.replace(/\/index\.html$/, '/');
             history.pushState({}, '', basePath);
             if (!isMiniPlayerActive()) {
                 stopVideoPlayback();
             }
-            showHome();
-            if (useYouTubeAPI) {
-                loadVideosFromAPI();
-            } else {
-                loadVideos();
-            }
+            showHomeNovetats();
         });
     }
 
@@ -7349,6 +7346,7 @@ function showHistory() {
     }
     updateHistoryFilterUI();
     renderHistory();
+    history.pushState({ ...(history.state || {}), appPage: 'history' }, '', window.location.href);
     window.scrollTo(0, 0);
 }
 
@@ -7468,6 +7466,7 @@ function showPlaylists() {
         chipsBar.classList.add('hidden');
     }
     setActiveLibraryTab(activeLibraryTab);
+    history.pushState({ ...(history.state || {}), appPage: 'playlists' }, '', window.location.href);
     window.scrollTo(0, 0);
 }
 
@@ -7493,6 +7492,7 @@ function showFollow(tab = 'all') {
         chipsBar.classList.add('hidden');
     }
     setActiveFollowTab(tab);
+    history.pushState({ ...(history.state || {}), appPage: 'follow' }, '', window.location.href);
     window.scrollTo(0, 0);
 }
 
@@ -7837,6 +7837,11 @@ window.addEventListener('popstate', (e) => {
 
     if (addYoutuberModal?.classList.contains('active')) {
         closeAddYoutuberModal(true);
+        return;
+    }
+
+    if (isAuxiliaryPageVisible()) {
+        showHomeNovetats();
         return;
     }
 
