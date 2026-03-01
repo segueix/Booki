@@ -1200,7 +1200,7 @@
 <!-- FASE 12: Control d'Arcs Narratius (Opus - light) -->
 <div class="card hidden" id="fase-12">
   <h2><span class="icon">📋</span> Control d'Arcs Narratius <span class="badge-model badge-opus">Opus</span></h2>
-  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Opus avalua la novel·la a partir dels resums — sense llegir el text complet — per estalviar tokens.</p>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Opus avalua la novel·la a partir dels resums — sense llegir el cos íntegre — per estalviar tokens.</p>
   <div class="loader-wrap" id="loader-12">
     <div class="spinner" style="border-top-color:#60a5fa;"></div>
     <span>🔵 Opus analitzant els arcs narratius…</span>
@@ -4012,6 +4012,24 @@ function canJudge(chapterId) {
   return l.lockState === 'unlocked';
 }
 
+function selfCheckLockingInvariants() {
+  try {
+    const src = String(document.documentElement && document.documentElement.outerHTML || '');
+    console.assert((src.match(/function executarJutgeInterval\s*\(/g) || []).length === 1, 'Invariant: executarJutgeInterval ha de tenir 1 definició');
+    console.assert(src.includes('const MAX_ITER = 1;'), 'Invariant: MAX_ITER=1 requerit al jutge');
+    const jiStart = src.indexOf('function jutgeIntervalInconsistencies');
+    if (jiStart >= 0) {
+      const jiEnd = src.indexOf('function aplicarCorreccionsJutge', jiStart);
+      const jiSrc = jiEnd > jiStart ? src.slice(jiStart, jiEnd) : src.slice(jiStart, jiStart + 8000);
+      console.assert(!/cos íntegre/i.test(jiSrc), "Invariant: jutgeIntervalInconsistencies no ha d'incloure cos íntegre");
+    }
+  } catch (err) {
+    console.warn('selfCheckLockingInvariants:', err.message);
+  }
+}
+
+selfCheckLockingInvariants();
+
 function obtenirBlockCanon58() {
   ESTAT._blockCanons = (ESTAT._blockCanons && typeof ESTAT._blockCanons === 'object') ? ESTAT._blockCanons : {};
   return ESTAT._blockCanons['5-8'] || null;
@@ -5832,10 +5850,17 @@ Retorna EXCLUSIVAMENT el text del prompt llest per copiar i enganxar, escrit en 
 }
 
 async function reescriureCapitolGlobal(idx) {
+  const perm = canRewrite(idx, 'full');
+  if (!perm.ok) { toast(perm.msg); return; }
   if (!ESTAT._capitols_generats[idx]) { toast('Capítol no disponible.'); return; }
 
   // Llegim les instruccions del mapa guardat per Opus (pot ser buit si Opus no les va donar)
-  const instruccions = (ESTAT._instruccionsReescripturaGlobal && ESTAT._instruccionsReescripturaGlobal[String(idx + 1)]) || '';
+  let instruccions = (ESTAT._instruccionsReescripturaGlobal && ESTAT._instruccionsReescripturaGlobal[String(idx + 1)]) || '';
+  if (idx >= 4 && idx <= 7) {
+    const canon58 = obtenirBlockCanon58();
+    if (!canon58 || canon58.frozen !== true) { toast('Cal BlockCanon 5-8 frozen abans de reescriure aquest bloc.'); return; }
+    instruccions += `\n\nRESTRICCIONS CANON BLOC 5-8:\n- No introdueixis fets nous.\n- No alteris time/location/object/character states.\n- Només exposició/ritme/formulació/aclariments.\nCANON:${JSON.stringify(canon58).slice(0,5000)}`;
+  }
 
   // Deshabilitem el botó que s'ha premut
   const reescrEl = document.getElementById('revisio-global-reescriptures');
@@ -5852,6 +5877,10 @@ async function reescriureCapitolGlobal(idx) {
   try {
     const res = await reescriureCapitolAmbInstruccions(idx, instruccions, USER_CONFIG);
     const textNet = netejarTabulacionsInicials(res.response);
+    if (idx >= 4 && idx <= 7) {
+      const val = validarCapitol5ContraCanon(textNet, obtenirBlockCanon58());
+      if (!val.ok) throw new Error(val.msg);
+    }
     ESTAT._capitols_generats[idx] = textNet;
     renderLlistaCapitols();
     hideLoader(11);
@@ -8576,7 +8605,7 @@ function filtrarContextFutur(capitolActualIdx) {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 3: Context complet per a cada capítol
+//  FASE 3: Concos íntegre per a cada capítol
 // ═══════════════════════════════════════════════════════════
 
 function buildContextCapitolsComplets(idx, opts = {}, estat = ESTAT) {
@@ -9110,7 +9139,7 @@ CRÍTIC: Han de ser EXACTAMENT ${capsQueFalten} capítols. L'últim (${capsEsper
 }
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 11: Escriure capítol (Sonnet) — FASE 3: Context complet
+//  FASE 11: Escriure capítol (Sonnet) — FASE 3: Concos íntegre
 // ═══════════════════════════════════════════════════════════
 function generarInstruccionsGanxoFinalCapitol(idx) {
   const esUltimCapitol = idx >= ((ESTAT._estructuraCapitols && ESTAT._estructuraCapitols.length) ? ESTAT._estructuraCapitols.length - 1 : 0);
@@ -9284,7 +9313,7 @@ async function revisarCapitol(textCapitol, idx, userConfig) {
     role: 'user',
     content: `Revisa aquest capítol i comprova la coherència amb tots els capítols anteriors i amb la planificació narrativa.
 ${capitolsAnteriors ? `
-CAPÍTOLS ANTERIORS (text complet — usa'ls per detectar incongruències, repeticions, contradiccions de fets, objectes, roba o emocions):
+CAPÍTOLS ANTERIORS (cos íntegre — usa'ls per detectar incongruències, repeticions, contradiccions de fets, objectes, roba o emocions):
 ${capitolsAnteriors}
 
 ` : ''}
@@ -9462,7 +9491,7 @@ Reescriu el capítol complet incorporant les correccions. Mantén la mateixa veu
 }
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 12: Control d'Arcs Narratius (Opus) — FASE 9: context complet
+//  FASE 12: Control d'Arcs Narratius (Opus) — FASE 9: concos íntegre
 // ═══════════════════════════════════════════════════════════
 async function controlArcsNovella(userConfig) {
   const reg = ESTAT.llibreRegistre;
@@ -10072,7 +10101,7 @@ async function jutgeIntervalInconsistencies(fromIdx, toIdx, userConfig) {
   const capitols = ESTAT.llibreRegistre?.capitols || [];
   const nkg = ESTAT._nkg || {};
 
-  // Anteriors bloquejats: KSN + resum_curt (sense text complet)
+  // Anteriors bloquejats: KSN + resum_curt (sense cos íntegre)
   const anteriorLines = [];
   for (let i = 0; i < fromIdx; i++) {
     const reg = capitols[i] || {};
@@ -10083,10 +10112,10 @@ async function jutgeIntervalInconsistencies(fromIdx, toIdx, userConfig) {
     if (rc) anteriorLines.push(`[Cap.${i + 1} — resum_curt]: ${rc}`);
   }
   const contextAnteriors = anteriorLines.length
-    ? 'CAPÍTOLS ANTERIORS BLOQUEJATS (KSN + resum_curt, sense text complet):\n' + anteriorLines.join('\n')
+    ? 'CAPÍTOLS ANTERIORS BLOQUEJATS (KSN + resum_curt, sense cos íntegre):\n' + anteriorLines.join('\n')
     : '';
 
-  // Interval actiu: KSN + resum_llarg opcional (sense text complet)
+  // Interval actiu: KSN + resum_llarg opcional (sense cos íntegre)
   const actualLines = [];
   for (let i = fromIdx; i <= toIdx; i++) {
     const reg = capitols[i] || {};
@@ -10096,7 +10125,7 @@ async function jutgeIntervalInconsistencies(fromIdx, toIdx, userConfig) {
     if (resumLlarg) actualLines.push(`[Cap.${i + 1} — resum_llarg]: ${resumLlarg}`);
   }
   const contextActual = actualLines.length
-    ? "CAPÍTOLS DE L'INTERVAL ACTIU (KSN + resum_llarg opcional, sense text complet):\n" + actualLines.join('\n\n')
+    ? "CAPÍTOLS DE L'INTERVAL ACTIU (KSN + resum_llarg opcional, sense cos íntegre):\n" + actualLines.join('\n\n')
     : '';
 
   // NKG: últimes 15 entrades de cada timeline
@@ -12574,6 +12603,9 @@ function renderitzarAnalisiVeu(capitolIdx) {
 async function microReescripturaBlocOpus(blocIniciIdx, blocFinalIdx, userConfig) {
   const capitolsBloc = [];
   for (let i = blocIniciIdx; i <= blocFinalIdx; i++) {
+    const lock = obtenirLockCapitol(i);
+    const permPatch = canRewrite(i, 'patch', { reason: 'micro' });
+    if (lock.lockState !== 'unlocked' && !permPatch.ok) continue;
     if (ESTAT._capitols_generats && ESTAT._capitols_generats[i]) {
       capitolsBloc.push({ idx: i, text: ESTAT._capitols_generats[i] });
     }
@@ -12622,6 +12654,9 @@ Retorna EXCLUSIVAMENT JSON:
   let goldenActualitzat = false;
   for (const passatge of diagnosi.passatges) {
     const capIdx = passatge.capitol_idx;
+    const lock = obtenirLockCapitol(capIdx);
+    const permPatch = canRewrite(capIdx, 'patch', { reason: 'micro' });
+    if (lock.lockState !== 'unlocked' && !permPatch.ok) continue;
     if (!ESTAT._capitols_generats || !ESTAT._capitols_generats[capIdx] || !passatge.text_original) continue;
 
     const promptReescriptura = [{
