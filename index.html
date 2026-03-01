@@ -4482,6 +4482,8 @@ function normalitzarEntradaRegistre(dades, textCapitol, idx) {
   })) : [];
   return {
     resum_capitol: resum,
+    resum_curt: String(base.resum_curt || '').trim(),
+    resum_llarg: String(base.resum_llarg || '').trim(),
     estat_personatges: estatPersonatges,
     fils_oberts: Array.isArray(base.fils_oberts) ? base.fils_oberts : [],
     fils_tancats: Array.isArray(base.fils_tancats) ? base.fils_tancats : [],
@@ -4620,6 +4622,10 @@ async function actualitzarLlibreRegistreBackground(textCapitol, idx, esRevisioSi
       ESTAT._alertaArquitecte = { millores, alerta, capitol: idx + 1 };
   }
   await actualitzarEstatsAnimics(textCapitol, idx, cfg);
+  await Promise.all([
+    generarResumLlarg(idx, textCapitol, cfg),
+    generarResumCurt(idx, textCapitol, cfg)
+  ]);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -7766,7 +7772,14 @@ ${textComplet}`);
     } else {
       // TIER 2: Si ja no hi cap el text sencer, usem el resum del llibre de registre
       const reg = estat.llibreRegistre?.capitols?.[e.idx];
-      let resum = reg?.resum_capitol || textComplet.slice(0, 1000) + '...';
+      const esElMesRecent = (i === entrades.length - 1);
+      let resum;
+      if (esElMesRecent) {
+        resum = reg?.resum_llarg || reg?.resum_capitol || reg?.resum_curt || '';
+      } else {
+        resum = reg?.resum_curt || reg?.resum_capitol || '';
+      }
+      if (!resum) resum = textComplet.split(/\s+/).slice(0, 500).join(' ') + '...';
       const paraulesResum = resum.split(/\s+/).length;
 
       if (paraulesAcumulades + paraulesResum <= MAX_PARAULES_CONTEXT) {
@@ -9460,6 +9473,69 @@ Escriu la sinopsi en prosa contínua, sense llistes ni títols. Ha de ser útil 
   ESTAT._memoriasComprimides = (ESTAT._memoriasComprimides || []).filter(m => m.finsCap > finsCapitol);
   ESTAT._memoriasComprimides.push({ finsCap: finsCapitol, text: res || '' });
   ESTAT._memoriasComprimides.sort((a, b) => a.finsCap - b.finsCap);
+}
+
+async function generarResumLlarg(idx, textCapitol, userConfig) {
+  const models = getModelConfig(userConfig);
+  const msgs = [{
+    role: 'user',
+    content: `Ets un editor literari expert. Genera un resum narratiu complet i equilibrat del capítol següent.
+
+CAPÍTOL ${idx + 1}:
+${textCapitol}
+
+INSTRUCCIONS:
+- Entre 1100 i 1250 paraules (ESTRICTE)
+- Cobreix el capítol de forma EQUILIBRADA: inici, cos i desenllaç amb igual pes
+- Inclou: accions principals, decisions dels personatges, diàlegs clau, girs, estat emocional
+- Escriu en prosa fluïda, no en llista
+- Usa el mateix temps verbal que l'original (present o passat)
+- Escriu en català`
+  }];
+  try {
+    const res = await callLLMMulti(
+      msgs,
+      'Ets un editor literari. Genera resums narratius precisos i equilibrats.',
+      Object.assign({}, userConfig, { maxTokens: 1800, model: models.modelDraft }),
+      'arquitectura'
+    );
+    if (res && res.trim()) {
+      ESTAT.llibreRegistre.capitols[idx].resum_llarg = res.trim();
+    }
+  } catch (err) {
+    console.warn(`Resum llarg cap.${idx + 1} fallat:`, err.message);
+  }
+}
+
+async function generarResumCurt(idx, textCapitol, userConfig) {
+  const models = getModelConfig(userConfig);
+  const msgs = [{
+    role: 'user',
+    content: `Ets un editor literari expert. Genera un resum narratiu compacte del capítol següent.
+
+CAPÍTOL ${idx + 1}:
+${textCapitol}
+
+INSTRUCCIONS:
+- Entre 320 i 380 paraules (ESTRICTE)
+- Màxima densitat informativa: fets clau, decisions, girs, canvis d'estat dels personatges
+- Escriu en prosa fluïda, sense llistes ni títols
+- Usa el mateix temps verbal que l'original
+- Escriu en català`
+  }];
+  try {
+    const res = await callLLMMulti(
+      msgs,
+      'Ets un editor literari. Genera resums narratius compactes i densos.',
+      Object.assign({}, userConfig, { maxTokens: 600, model: models.modelDraft }),
+      'arquitectura'
+    );
+    if (res && res.trim()) {
+      ESTAT.llibreRegistre.capitols[idx].resum_curt = res.trim();
+    }
+  } catch (err) {
+    console.warn(`Resum curt cap.${idx + 1} fallat:`, err.message);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
