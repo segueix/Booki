@@ -3798,8 +3798,18 @@ async function iniciarFaseEscaleta() {
     let totsResultats = [];
     for (let offset = 0; offset < caps.length; offset += BLOC) {
       const bloc = caps.slice(offset, offset + BLOC);
+      const capsInfo = `${offset + 1}-${Math.min(offset + BLOC, caps.length)} de ${caps.length}`;
       document.getElementById('loader-10-5-text').textContent =
-        `Generant escaleta: capítols ${offset + 1}-${Math.min(offset + BLOC, caps.length)} de ${caps.length}…`;
+        `Generant escaleta: capítols ${capsInfo}…`;
+
+      // Pausa entre blocs (no el primer) per no saturar el rate limit de Gemini
+      if (offset > 0) {
+        document.getElementById('loader-10-5-text').textContent =
+          `⏳ Esperant per al rate limit de Gemini… (caps. ${capsInfo})`;
+        await new Promise(r => setTimeout(r, 8000));
+        document.getElementById('loader-10-5-text').textContent =
+          `Generant escaleta: capítols ${capsInfo}…`;
+      }
 
       const res = await generarEscaletaBloc(bloc, offset, USER_CONFIG);
       const parsed = parseJsonRobust(res.response);
@@ -5764,15 +5774,21 @@ async function parseJsonResponse(rawResponse, providerName) {
 
 // ─── Rate limiter global per a Gemini ────────────────────────
 // Evita ràfegues de crides que disparen el 429 de Gemini Flash.
-// Gap mínim de 3s entre crides (≈ 20 RPM màxim segur).
+// Gap mínim de 6s entre crides (≈ 10 RPM màxim segur, límit del free tier).
 const GeminiRL = {
   _ultimaTs: 0,
-  _gap: 3000,
+  _gap: 6000,
   async esperar() {
     const ara = Date.now();
     const restant = this._gap - (ara - this._ultimaTs);
     if (restant > 0) await new Promise(r => setTimeout(r, restant));
     this._ultimaTs = Date.now();
+  },
+  // Quan fetchSegur detecta un 429, avisa el rate limiter perquè
+  // totes les crides concurrents pendents esperin el temps correcte.
+  penalitzar(msDesDAra = 30000) {
+    const nouTs = Date.now() + msDesDAra - this._gap;
+    if (nouTs > this._ultimaTs) this._ultimaTs = nouTs;
   }
 };
 
@@ -5793,11 +5809,15 @@ async function fetchSegur(url, options, maxIntents = 7) {
     if (retryAfter && !isNaN(Number(retryAfter))) {
       delayMs = Number(retryAfter) * 1000 + 1500; // marge extra d'1.5s
     } else {
-      // 429 → base 15s (els límits de Gemini solen ser per minut)
+      // 429 → base 20s (els límits de Gemini solen ser per minut)
       // 503/529 → base 5s (sobrecàrrega transitòria)
-      const base = response.status === 429 ? 15000 : 5000;
+      const base = response.status === 429 ? 20000 : 5000;
       delayMs = Math.min(base * Math.pow(2, intent), 120000); // cap a 2 min
-      delayMs += Math.random() * 2000; // jitter per evitar thundering herd
+      delayMs += Math.random() * 3000; // jitter per evitar thundering herd
+    }
+    // Avisar el rate limiter global perquè crides concurrents esperin
+    if (response.status === 429 && typeof GeminiRL !== 'undefined') {
+      GeminiRL.penalitzar(delayMs);
     }
     console.warn(`[fetchSegur] HTTP ${response.status} — reintent ${intent + 1}/${maxIntents - 1} en ${(delayMs / 1000).toFixed(1)}s...`);
     await new Promise(resolve => setTimeout(resolve, delayMs));
@@ -9867,7 +9887,7 @@ Retorna EXCLUSIVAMENT JSON vàlid:
   const response = await callLLMMulti(
     msgs,
     'Ets un dramaturg expert en narrativa i estructura d\'escenes.',
-    Object.assign({}, userConfig, { maxTokens: 8192, model: models.modelArquitecte }),
+    Object.assign({}, userConfig, { maxTokens: capsMaxTokens(models.modelArquitecte, 5000), model: models.modelArquitecte }),
     'arquitectura'
   );
   return { response };
