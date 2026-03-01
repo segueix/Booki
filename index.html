@@ -1551,7 +1551,7 @@ function exportarDiagnosticResums() {
     // Fils narratius per capítol
     if (Array.isArray(reg.fils_oberts) && reg.fils_oberts.length > 0) {
       lines.push(`  FILS OBERTS DECLARATS EN AQUEST CAPÍTOL:`);
-      reg.fils_oberts.forEach(f => lines.push(`    · ${f}`));
+      reg.fils_oberts.forEach(f => lines.push(`    · ${filTextVisible(f)}`));
       lines.push('');
     }
     if (Array.isArray(reg.fils_tancats) && reg.fils_tancats.length > 0) {
@@ -1575,7 +1575,7 @@ function exportarDiagnosticResums() {
   const filsOberts  = Array.isArray(reg.fils_oberts)  ? reg.fils_oberts  : [];
   const filsTancats = Array.isArray(reg.fils_tancats)  ? reg.fils_tancats : [];
   lines.push(`FILS OBERTS ACTIUS (${filsOberts.length}):`);
-  filsOberts.length ? filsOberts.forEach(f => lines.push(`  · ${f}`)) : lines.push('  (cap)');
+  filsOberts.length ? filsOberts.forEach(f => lines.push(`  · ${filTextVisible(f)}`)) : lines.push('  (cap)');
   lines.push('');
   lines.push(`FILS TANCATS ACUMULATS (${filsTancats.length}):`);
   filsTancats.length ? filsTancats.forEach(f => lines.push(`  · ${f}`)) : lines.push('  (cap)');
@@ -4230,7 +4230,7 @@ async function revisioArquitectaAmbContinuitat(idx, textCapitol, userConfig) {
   const reg = ESTAT.llibreRegistre || {};
   const snapshotAnterior = idx > 0 ? (ESTAT._snapshotsFinals || {})[idx - 1] : null;
   const accionsIrrev = (ESTAT._accionsIrreversibles || []).slice(-8).map(a => `- [Cap.${a.capitol}] ${a.accio}`).join('\n') || '(cap)';
-  const filsOberts   = (reg.fils_oberts || []).slice(-8).map(f => `- ${f}`).join('\n') || '(cap)';
+  const filsOberts   = (reg.fils_oberts || []).slice(-8).map(f => `- ${filTextVisible(f)}`).join('\n') || '(cap)';
 
   const msgs = [{
     role: 'user',
@@ -4911,32 +4911,177 @@ function construirKSN(idx) {
   return ksn;
 }
 
-function reconciliarFilsRegistre(dades) {
-  const reg = ESTAT.llibreRegistre || {};
-  const obertsActuals = new Set(Array.isArray(reg.fils_oberts) ? reg.fils_oberts : []);
-  const tancatsActuals = new Set(Array.isArray(reg.fils_tancats) ? reg.fils_tancats : []);
+const FILS_OBERTS_MAX = 30;
 
-  const obertsDeclarats = new Set(Array.isArray(dades.fils_oberts) ? dades.fils_oberts : []);
-  const tancatsDeclarats = new Set(Array.isArray(dades.fils_tancats) ? dades.fils_tancats : []);
-  const filsNous = new Set(Array.isArray(dades.fils_nous_detectats) ? dades.fils_nous_detectats : []);
-  const filsResolts = new Set(Array.isArray(dades.fils_resolts_detectats) ? dades.fils_resolts_detectats : []);
+function filTextVisible(fil) {
+  if (!fil) return '';
+  if (typeof fil === 'string') return fil.trim();
+  return String(fil.titol || fil.resum || fil.id || '').trim();
+}
 
-  [...obertsDeclarats, ...filsNous].forEach(f => { if (f) obertsActuals.add(f); });
-  [...tancatsDeclarats, ...filsResolts].forEach(f => {
-    if (!f) return;
-    tancatsActuals.add(f);
-    obertsActuals.delete(f);
+function slugFil(txt) {
+  return String(txt || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
+
+function construirAliasMapTrames() {
+  const alias = {};
+  const tr = ESTAT.trames || {};
+  const addAlias = (k, v) => {
+    const key = slugFil(k);
+    if (!key) return;
+    alias[key] = v;
+  };
+
+  const tp = tr.trama_principal;
+  if (tp) {
+    const nom = typeof tp === 'string' ? tp : (tp.nom || tp.descripcio || 'trama_principal');
+    addAlias(nom, 'trama_principal');
+    addAlias('trama principal', 'trama_principal');
+    addAlias('conflicte central', 'trama_principal');
+  }
+
+  (tr.subtrames || []).forEach((st, i) => {
+    const nom = st && (st.nom || st.titol || st.descripcio) ? (st.nom || st.titol || st.descripcio) : `subtrama_${i + 1}`;
+    const canon = slugFil(nom) || `subtrama_${i + 1}`;
+    addAlias(nom, canon);
+    addAlias(`subtrama ${i + 1}`, canon);
   });
 
-  ESTAT.llibreRegistre.fils_oberts = [...obertsActuals];
-  ESTAT.llibreRegistre.fils_tancats = [...tancatsActuals];
+  return alias;
 }
+
+function categoriaFilPerText(txt) {
+  const text = String(txt || '').toLowerCase();
+  const aliasMap = construirAliasMapTrames();
+  const slug = slugFil(txt);
+  if (slug && aliasMap[slug]) return aliasMap[slug];
+
+  for (const [ak, canon] of Object.entries(aliasMap)) {
+    const spaced = ak.replace(/-/g, ' ');
+    if (spaced.length > 4 && text.includes(spaced)) return canon;
+  }
+  return 'general';
+}
+
+function normalitzarFilNarratiu(fil, origem = 'legacy') {
+  const rawTxt = filTextVisible(fil);
+  if (!rawTxt) return null;
+  if (typeof fil === 'object' && fil.id && fil.estat) {
+    return {
+      id: slugFil(fil.id) || slugFil(rawTxt),
+      titol: rawTxt,
+      categoria: fil.categoria || categoriaFilPerText(rawTxt),
+      prioritat: fil.prioritat || classificarPrioritatFil(rawTxt),
+      estat: fil.estat || 'obert',
+      aliases: Array.isArray(fil.aliases) ? fil.aliases.map(a => slugFil(a)).filter(Boolean) : [slugFil(rawTxt)],
+      ultimaActualitzacioCapitol: Number(fil.ultimaActualitzacioCapitol || ESTAT._capitolActual || 0) + 1,
+      origen
+    };
+  }
+
+  const categoria = categoriaFilPerText(rawTxt);
+  return {
+    id: slugFil(rawTxt),
+    titol: rawTxt,
+    categoria,
+    prioritat: classificarPrioritatFil(rawTxt),
+    estat: 'obert',
+    aliases: [slugFil(rawTxt)],
+    ultimaActualitzacioCapitol: Number(ESTAT._capitolActual || 0) + 1,
+    origen
+  };
+}
+
+function deduplicarFilsNarratius(fils, aliasMapExtern = null) {
+  const aliasMap = aliasMapExtern || construirAliasMapTrames();
+  const byId = new Map();
+  const byAlias = new Map();
+
+  fils.forEach(f => {
+    const n = normalitzarFilNarratiu(f);
+    if (!n || !n.id) return;
+
+    const aliases = Array.from(new Set([n.id, ...(n.aliases || [])].filter(Boolean)));
+    let key = n.id;
+    for (const a of aliases) {
+      if (byAlias.has(a)) { key = byAlias.get(a); break; }
+      if (aliasMap[a] && byId.has(aliasMap[a])) { key = aliasMap[a]; break; }
+    }
+    if (aliasMap[key]) key = aliasMap[key];
+
+    if (!byId.has(key)) {
+      byId.set(key, { ...n, id: key, aliases });
+    } else {
+      const cur = byId.get(key);
+      const titol = cur.titol.length >= n.titol.length ? cur.titol : n.titol;
+      const prioritat = cur.prioritat === 'alta' || n.prioritat === 'alta'
+        ? 'alta'
+        : (cur.prioritat === 'mitjana' || n.prioritat === 'mitjana' ? 'mitjana' : 'baixa');
+      byId.set(key, {
+        ...cur,
+        titol,
+        categoria: cur.categoria !== 'general' ? cur.categoria : n.categoria,
+        prioritat,
+        aliases: Array.from(new Set([...(cur.aliases || []), ...aliases])),
+        ultimaActualitzacioCapitol: Math.max(cur.ultimaActualitzacioCapitol || 0, n.ultimaActualitzacioCapitol || 0)
+      });
+    }
+    aliases.forEach(a => byAlias.set(a, key));
+  });
+
+  return Array.from(byId.values());
+}
+
+function aplicarLimitFilsOberts(fils) {
+  if (!Array.isArray(fils)) return [];
+  const score = f => (f.prioritat === 'alta' ? 3 : f.prioritat === 'mitjana' ? 2 : 1) * 100000 + Number(f.ultimaActualitzacioCapitol || 0);
+  const ordenats = [...fils].sort((a, b) => score(b) - score(a));
+  const vius = ordenats.slice(0, FILS_OBERTS_MAX);
+  const excedents = ordenats.slice(FILS_OBERTS_MAX).map(f => ({ ...f, estat: 'aparcat' }));
+  return { vius, excedents };
+}
+
+function reconciliarFilsRegistre(dades) {
+  const reg = ESTAT.llibreRegistre || {};
+  const aliasMap = construirAliasMapTrames();
+
+  const obertsActuals = deduplicarFilsNarratius(Array.isArray(reg.fils_oberts) ? reg.fils_oberts : [], aliasMap);
+  const tancatsActuals = deduplicarFilsNarratius(Array.isArray(reg.fils_tancats) ? reg.fils_tancats : [], aliasMap)
+    .map(f => ({ ...f, estat: 'tancat' }));
+
+  const obertsDeclarats = deduplicarFilsNarratius(Array.isArray(dades.fils_oberts) ? dades.fils_oberts : [], aliasMap);
+  const filsNous = deduplicarFilsNarratius(Array.isArray(dades.fils_nous_detectats) ? dades.fils_nous_detectats : [], aliasMap);
+  const tancatsDeclarats = deduplicarFilsNarratius(Array.isArray(dades.fils_tancats) ? dades.fils_tancats : [], aliasMap)
+    .concat(deduplicarFilsNarratius(Array.isArray(dades.fils_resolts_detectats) ? dades.fils_resolts_detectats : [], aliasMap))
+    .map(f => ({ ...f, estat: 'tancat' }));
+
+  const obertsMap = new Map([...obertsActuals, ...obertsDeclarats, ...filsNous].map(f => [f.id, f]));
+  const tancatsMap = new Map(tancatsActuals.map(f => [f.id, f]));
+
+  tancatsDeclarats.forEach(f => {
+    tancatsMap.set(f.id, f);
+    obertsMap.delete(f.id);
+  });
+
+  const obertsDedup = deduplicarFilsNarratius(Array.from(obertsMap.values()), aliasMap);
+  const limitat = aplicarLimitFilsOberts(obertsDedup);
+  limitat.excedents.forEach(f => tancatsMap.set(f.id, { ...f, estat: 'aparcat' }));
+
+  ESTAT.llibreRegistre.fils_oberts = limitat.vius;
+  ESTAT.llibreRegistre.fils_tancats = deduplicarFilsNarratius(Array.from(tancatsMap.values()), aliasMap);
+}
+
 
 async function actualitzarFilsNarratius(idx, textCapitol, userConfig) {
   const nkg = ESTAT._nkg || {};
   const reg = ESTAT.llibreRegistre || {};
-  const filsOberts   = Array.isArray(reg.fils_oberts)      ? reg.fils_oberts      : [];
-  const filsTancats  = Array.isArray(reg.fils_tancats)     ? reg.fils_tancats     : [];
+  const filsOberts   = deduplicarFilsNarratius(Array.isArray(reg.fils_oberts) ? reg.fils_oberts : []);
+  const filsTancats  = deduplicarFilsNarratius(Array.isArray(reg.fils_tancats) ? reg.fils_tancats : []);
   const beatsGastats = Array.isArray(nkg.beats_gastats)    ? nkg.beats_gastats    : [];
 
   const msgs = [{
@@ -4944,10 +5089,10 @@ async function actualitzarFilsNarratius(idx, textCapitol, userConfig) {
     content: `Analitza aquest capítol de novel·la des del punt de vista dels fils narratius.
 
 FILS OBERTS ACUMULATS FINS ARA:
-${filsOberts.slice(-10).map(f => `- ${f}`).join('\n') || '(cap)'}
+${filsOberts.slice(-10).map(f => `- ${filTextVisible(f)}`).join('\n') || '(cap)'}
 
 FILS TANCATS ACUMULATS FINS ARA:
-${filsTancats.slice(-5).map(f => `- ${f}`).join('\n') || '(cap)'}
+${filsTancats.slice(-5).map(f => `- ${filTextVisible(f)}`).join('\n') || '(cap)'}
 
 BEATS NARRATIUS JA GASTATS:
 ${beatsGastats.slice(-8).map(b => `- ${b}`).join('\n') || '(cap)'}
@@ -4975,25 +5120,27 @@ Retorna EXCLUSIVAMENT JSON vàlid:
   const dades = parseJsonRobust(raw);
   if (!dades) return;
 
-  // Actualitzar fils oberts/tancats
-  const obertsSet  = new Set(filsOberts);
-  const tancatsSet = new Set(filsTancats);
-  (dades.nous_fils_oberts || []).forEach(f => { if (f && f.trim()) obertsSet.add(f.trim()); });
-  (dades.fils_tancats_en_aquest_capitol || []).forEach(f => {
-    if (!f || !f.trim()) return;
-    const ft = f.trim();
-    tancatsSet.add(ft);
-    obertsSet.delete(ft);
-    // eliminació per inclusió parcial (variants de redacció)
-    for (const obert of [...obertsSet]) {
-      if (obert.toLowerCase().includes(ft.toLowerCase()) || ft.toLowerCase().includes(obert.toLowerCase())) {
-        tancatsSet.add(obert);
-        obertsSet.delete(obert);
-      }
-    }
+  // Actualitzar fils oberts/tancats (estructura tipada + deduplicació robusta)
+  const aliasMap = construirAliasMapTrames();
+  const obertsMap = new Map(filsOberts.map(f => [f.id, f]));
+  const tancatsMap = new Map(filsTancats.map(f => [f.id, { ...f, estat: 'tancat' }]));
+
+  deduplicarFilsNarratius(dades.nous_fils_oberts || [], aliasMap).forEach(f => {
+    obertsMap.set(f.id, { ...f, estat: 'obert', ultimaActualitzacioCapitol: idx + 1 });
   });
-  ESTAT.llibreRegistre.fils_oberts  = [...obertsSet];
-  ESTAT.llibreRegistre.fils_tancats = [...tancatsSet];
+
+  deduplicarFilsNarratius(dades.fils_tancats_en_aquest_capitol || [], aliasMap).forEach(f => {
+    tancatsMap.set(f.id, { ...f, estat: 'tancat', ultimaActualitzacioCapitol: idx + 1 });
+    obertsMap.delete(f.id);
+  });
+
+  const limitat = aplicarLimitFilsOberts(deduplicarFilsNarratius(Array.from(obertsMap.values()), aliasMap));
+  limitat.excedents.forEach(f => {
+    tancatsMap.set(f.id, { ...f, estat: 'aparcat', ultimaActualitzacioCapitol: idx + 1 });
+  });
+
+  ESTAT.llibreRegistre.fils_oberts  = limitat.vius;
+  ESTAT.llibreRegistre.fils_tancats = deduplicarFilsNarratius(Array.from(tancatsMap.values()), aliasMap);
 
   // Actualitzar beats_gastats al NKG
   if (!Array.isArray(ESTAT._nkg.beats_gastats)) ESTAT._nkg.beats_gastats = [];
@@ -5250,11 +5397,11 @@ function obrirLlibreRegistre() {
       </div>
       ${filsOberts.length > 0 ? `<div style="margin-bottom:18px;">
         <div class="world-bloc-titol" style="margin-bottom:8px;">Fils oberts</div>
-        ${filsOberts.map(f => `<div style="padding:5px 12px;border-left:2px solid var(--warning);margin-bottom:5px;font-size:.84rem;">${escHtml(f)}</div>`).join('\n')}
+        ${filsOberts.map(f => `<div style="padding:5px 12px;border-left:2px solid var(--warning);margin-bottom:5px;font-size:.84rem;">${escHtml(filTextVisible(f))}</div>`).join('\n')}
       </div>` : ''}
       ${filsTancat.length > 0 ? `<div style="margin-bottom:18px;">
         <div class="world-bloc-titol" style="margin-bottom:8px;">Fils tancats</div>
-        ${filsTancat.map(f => `<div style="padding:5px 12px;border-left:2px solid var(--success);margin-bottom:5px;font-size:.84rem;">${escHtml(f)}</div>`).join('\n')}
+        ${filsTancat.map(f => `<div style="padding:5px 12px;border-left:2px solid var(--success);margin-bottom:5px;font-size:.84rem;">${escHtml(filTextVisible(f))}</div>`).join('\n')}
       </div>` : ''}
       <div>
         <div class="world-bloc-titol" style="margin-bottom:10px;">Resums per capítol</div>
@@ -7667,7 +7814,7 @@ function calcularPressioDeTancament(capitolActualIdx) {
 }
 
 function classificarPrioritatFil(filTxt) {
-  const f = String(filTxt || '').toLowerCase();
+  const f = filTextVisible(filTxt).toLowerCase();
   const nomsPrincipals = [ESTAT.protagonistaTriat]
     .concat((ESTAT._personatgesSeleccionats || []).slice(0, 3))
     .filter(Boolean)
@@ -7688,13 +7835,14 @@ function generarDirectivaFils(capitolActualIdx) {
   const baixa = [];
   oberts.forEach(f => {
     const p = classificarPrioritatFil(f);
-    if (p === 'alta') alta.push(f);
-    else if (p === 'mitjana') mitjana.push(f);
-    else baixa.push(f);
+    const label = filTextVisible(f);
+    if (p === 'alta') alta.push(label);
+    else if (p === 'mitjana') mitjana.push(label);
+    else baixa.push(label);
   });
 
   if (d.pressio === 'baixa') {
-    return `Fils narratius actius (referència): ${oberts.slice(0, 10).join(' | ')}. No cal tancar-los tots, però no els contradiguis.`;
+    return `Fils narratius actius (referència): ${oberts.slice(0, 10).map(f => filTextVisible(f)).join(' | ')}. No cal tancar-los tots, però no els contradiguis.`;
   }
 
   if (d.pressio === 'mitjana') {
@@ -7824,7 +7972,7 @@ function buildRegistreContextLegacy(idx) {
 
   if (reg.fils_oberts && reg.fils_oberts.length > 0) {
     parts.push('\nFils narratius oberts (OBLIGATORI tractar en aquest capítol o deixar explícitament obert):');
-    reg.fils_oberts.forEach(f => parts.push(`- ${f}`));
+    reg.fils_oberts.forEach(f => parts.push(`- ${filTextVisible(f)}`));
   }
 
   // Últims 2 resums de capítol
@@ -9135,7 +9283,7 @@ async function controlArcsNovella(userConfig) {
     .filter(Boolean)
     .join('\n');
 
-  const filsOberts  = (reg.fils_oberts  || []).map(f => `- ${f}`).join('\n') || '(Cap registrat)';
+  const filsOberts  = (reg.fils_oberts  || []).map(f => `- ${filTextVisible(f)}`).join('\n') || '(Cap registrat)';
   const filsTancats = (reg.fils_tancats || []).map(f => `- ${f}`).join('\n') || '(Cap registrat)';
 
   // Estructura completa (JSON si disponible, text si legacy)
@@ -9205,7 +9353,7 @@ async function controlArcsIntermedi(capitolActual, userConfig) {
     .filter(Boolean)
     .join('\n');
 
-  const filsOberts = (reg.fils_oberts || []).map(f => `- ${f}`).join('\n') || '(Cap registrat)';
+  const filsOberts = (reg.fils_oberts || []).map(f => `- ${filTextVisible(f)}`).join('\n') || '(Cap registrat)';
 
   const prefCtx = llistarPrefiguracions();
 
@@ -11646,7 +11794,7 @@ async function extreureDadesRegistreIAvaluarSistema(idx, textCapitol, esRevisioS
         const pers = Array.isArray(c.estat_personatges)
           ? c.estat_personatges.map(p => `${p.nom} (${p.ubicacio || '?'}, ${p.estat_actual || '?'})`).join(', ')
           : (Array.isArray(c.personatges) ? c.personatges.map(p => `${p.nom} (${p.ubicacio || '?'}, ${p.estat || '?'})`).join(', ') : '');
-        const fils = Array.isArray(c.fils_oberts) ? c.fils_oberts.slice(0, 3).join(' | ') : '';
+        const fils = Array.isArray(c.fils_oberts) ? c.fils_oberts.slice(0, 3).map(f => filTextVisible(f)).join(' | ') : '';
         return `Cap.${i + 1}: ${c.resum_capitol || '(sense resum)'} | Personatges: ${pers || '—'} | Fils oberts: ${fils || '—'}`;
       })
       .filter(Boolean)
