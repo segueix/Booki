@@ -592,6 +592,7 @@
 <div class="project-actions-top">
   <button class="btn btn-ghost" onclick="exportarCopiaSeguretat()">💾 Exportar projecte</button>
   <button class="btn btn-ghost" onclick="obrirImportarCopiaSeguretat()">📥 Importar projecte</button>
+  <button class="btn btn-ghost" onclick="exportarDiagnosticResums()">🔍 Diagnòstic resums</button>
 </div>
 
 <header>
@@ -728,6 +729,7 @@
     <button id="btn-reprendre" class="btn btn-secondary hidden" onclick="reprendreProjecteLocal()">📂 Reprendre projecte anterior</button>
     <button class="btn btn-ghost" onclick="exportarCopiaSeguretat()">💾 Exportar còpia (.json)</button>
     <button class="btn btn-ghost" onclick="obrirImportarCopiaSeguretat()">📥 Importar còpia</button>
+    <button class="btn btn-ghost" onclick="exportarDiagnosticResums()">🔍 Diagnòstic resums</button>
     <input type="file" id="input-copia-seguretat" accept="application/json,.json" class="hidden" onchange="importarCopiaSeguretat(event)">
   </div>
 </div>
@@ -1445,6 +1447,136 @@ function exportarCopiaSeguretat() {
   } catch (err) {
     toast("No s'ha pogut exportar la còpia: " + err.message);
   }
+}
+
+function exportarDiagnosticResums() {
+  if (ESTAT.fase === 0) { toast('Encara no hi ha cap projecte per exportar.'); return; }
+  const capitols = ESTAT.llibreRegistre?.capitols || [];
+  const capsGenerats = ESTAT._capitols_generats || [];
+  const nkg = ESTAT._nkg || {};
+  const reg = ESTAT.llibreRegistre || {};
+  const lines = [];
+
+  lines.push('═══════════════════════════════════════════════════════════');
+  lines.push('  DIAGNÒSTIC DE RESUMS I SEGUIMENT NARRATIU — Booki');
+  lines.push(`  Generat: ${new Date().toLocaleString('ca-ES')}`);
+  lines.push(`  Fase: ${ESTAT.fase} | Capítols generats: ${capsGenerats.filter(Boolean).length}`);
+  lines.push('═══════════════════════════════════════════════════════════');
+  lines.push('');
+
+  // ── PER CAPÍTOL ──────────────────────────────────────────
+  capsGenerats.forEach((text, i) => {
+    if (!text) return;
+    const reg = capitols[i] || {};
+    const paraules = text.split(/\s+/).length;
+    lines.push(`───────────────────────────────────────────────────────────`);
+    lines.push(`  CAPÍTOL ${i + 1}  (${paraules} paraules al text original)`);
+    lines.push(`───────────────────────────────────────────────────────────`);
+    lines.push('');
+
+    // Estat dels resums
+    const teResumLlarg = !!(reg.resum_llarg && reg.resum_llarg.trim());
+    const teResumCurt  = !!(reg.resum_curt  && reg.resum_curt.trim());
+    const teResumCap   = !!(reg.resum_capitol && reg.resum_capitol.trim());
+    lines.push(`  ESTAT RESUMS:`);
+    lines.push(`    resum_llarg   : ${teResumLlarg ? `✓ (${reg.resum_llarg.split(/\s+/).length} paraules)` : '✗ no generat'}`);
+    lines.push(`    resum_curt    : ${teResumCurt  ? `✓ (${reg.resum_curt.split(/\s+/).length} paraules)` : '✗ no generat'}`);
+    lines.push(`    resum_capitol : ${teResumCap   ? `✓ (${reg.resum_capitol.split(/\s+/).length} paraules)` : '✗ no generat'}`);
+    lines.push('');
+
+    if (teResumLlarg) {
+      lines.push(`  RESUM LLARG (orientat al futur):`);
+      lines.push('  ' + reg.resum_llarg.replace(/\n/g, '\n  '));
+      lines.push('');
+    }
+    if (teResumCurt) {
+      lines.push(`  RESUM CURT (orientat al futur):`);
+      lines.push('  ' + reg.resum_curt.replace(/\n/g, '\n  '));
+      lines.push('');
+    }
+
+    // Estat personatges per capítol
+    if (Array.isArray(reg.estat_personatges) && reg.estat_personatges.length > 0) {
+      lines.push(`  ESTAT PERSONATGES AL FINAL DEL CAPÍTOL:`);
+      reg.estat_personatges.forEach(p => {
+        lines.push(`    · ${p.nom || '?'} — ${p.ubicacio || ''} | ${p.estat_actual || ''} | Ànim: ${p.estat_animic_actual || '?'}`);
+        if (p.perfil_psicologic) lines.push(`      Perfil: ${p.perfil_psicologic}`);
+      });
+      lines.push('');
+    }
+
+    // Fils narratius per capítol
+    if (Array.isArray(reg.fils_oberts) && reg.fils_oberts.length > 0) {
+      lines.push(`  FILS OBERTS DECLARATS EN AQUEST CAPÍTOL:`);
+      reg.fils_oberts.forEach(f => lines.push(`    · ${f}`));
+      lines.push('');
+    }
+    if (Array.isArray(reg.fils_tancats) && reg.fils_tancats.length > 0) {
+      lines.push(`  FILS TANCATS EN AQUEST CAPÍTOL:`);
+      reg.fils_tancats.forEach(f => lines.push(`    · ${f}`));
+      lines.push('');
+    }
+    if (Array.isArray(reg.prefiguracions_detectades) && reg.prefiguracions_detectades.length > 0) {
+      lines.push(`  PREFIGURACIONS DETECTADES:`);
+      reg.prefiguracions_detectades.forEach(f => lines.push(`    · ${f}`));
+      lines.push('');
+    }
+  });
+
+  // ── ACUMULAT GLOBAL ──────────────────────────────────────
+  lines.push('═══════════════════════════════════════════════════════════');
+  lines.push('  ESTAT GLOBAL ACUMULAT');
+  lines.push('═══════════════════════════════════════════════════════════');
+  lines.push('');
+
+  const filsOberts  = Array.isArray(reg.fils_oberts)  ? reg.fils_oberts  : [];
+  const filsTancats = Array.isArray(reg.fils_tancats)  ? reg.fils_tancats : [];
+  lines.push(`FILS OBERTS ACTIUS (${filsOberts.length}):`);
+  filsOberts.length ? filsOberts.forEach(f => lines.push(`  · ${f}`)) : lines.push('  (cap)');
+  lines.push('');
+  lines.push(`FILS TANCATS ACUMULATS (${filsTancats.length}):`);
+  filsTancats.length ? filsTancats.forEach(f => lines.push(`  · ${f}`)) : lines.push('  (cap)');
+  lines.push('');
+
+  // NKG
+  const beats = Array.isArray(nkg.beats_gastats) ? nkg.beats_gastats : [];
+  lines.push(`BEATS NARRATIUS GASTATS — NKG (${beats.length}):`);
+  beats.length ? beats.forEach(b => lines.push(`  · ${b}`)) : lines.push('  (cap)');
+  lines.push('');
+
+  const timelineAccions = Array.isArray(nkg.timeline_accions) ? nkg.timeline_accions : [];
+  lines.push(`TIMELINE D'ACCIONS — NKG (${timelineAccions.length}):`);
+  timelineAccions.length ? timelineAccions.forEach(a => lines.push(`  · ${typeof a === 'object' ? JSON.stringify(a) : a}`)) : lines.push('  (cap)');
+  lines.push('');
+
+  const timelinePersonatges = Array.isArray(nkg.timeline_personatges) ? nkg.timeline_personatges : [];
+  lines.push(`TIMELINE PERSONATGES — NKG (${timelinePersonatges.length}):`);
+  timelinePersonatges.length ? timelinePersonatges.forEach(p => lines.push(`  · ${typeof p === 'object' ? JSON.stringify(p) : p}`)) : lines.push('  (cap)');
+  lines.push('');
+
+  // Memòries comprimides
+  const mems = ESTAT._memoriasComprimides || [];
+  lines.push(`MEMÒRIES COMPRIMIDES (${mems.length}):`);
+  mems.forEach(m => {
+    lines.push(`  [Fins cap.${m.finsCap}] ${(m.text || '').substring(0, 300)}${(m.text || '').length > 300 ? '...' : ''}`);
+  });
+  if (!mems.length) lines.push('  (cap)');
+  lines.push('');
+
+  // Alerta arquitecte
+  if (ESTAT._alertaArquitecte) {
+    const al = ESTAT._alertaArquitecte;
+    lines.push(`ALERTA ARQUITECTE (cap.${al.capitol || '?'}):`);
+    if (al.alerta) lines.push(`  CRÍTICA: ${al.alerta}`);
+    (al.millores || []).forEach(m => lines.push(`  · [${m.prioritat}] ${m.descripcio || m}`));
+    lines.push('');
+  }
+
+  const contingut = lines.join('\n');
+  const nom = `booki_diagnostic_${new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19)}.txt`;
+  const blob = new Blob([contingut], { type: 'text/plain;charset=utf-8' });
+  descarregarBlobFitxer(blob, nom);
+  toast('Diagnòstic exportat: ' + nom);
 }
 
 function obrirImportarCopiaSeguretat() {
