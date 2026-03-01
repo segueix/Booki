@@ -277,6 +277,19 @@
     animation: spin .8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner-sm {
+    display: inline-block;
+    width: 13px; height: 13px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+    flex-shrink: 0;
+    vertical-align: middle;
+  }
+  /* ── Jutge panel ── */
+  #jutge-panel details > summary { list-style: none; }
+  #jutge-panel details > summary::-webkit-details-marker { display: none; }
 
   /* ── Toast ── */
   #toast {
@@ -1113,6 +1126,18 @@
   <div id="capitol-llista" style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px;max-height:260px;overflow-y:auto;"></div>
   <div id="capitol-seguent-manual-wrap" class="hidden" style="margin-top:-8px;margin-bottom:16px;">
     <button id="btn-capitol-seguent-manual" class="btn btn-primary" onclick="iniciarSeguentCapitolManual()">▶ Començar proper capítol</button>
+  </div>
+
+  <!-- Panel desplegable del Jutge d'interval -->
+  <div id="jutge-panel" class="hidden" style="margin-bottom:16px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+    <details id="jutge-details">
+      <summary style="display:flex;align-items:center;gap:10px;padding:11px 16px;cursor:pointer;background:var(--surface2);user-select:none;">
+        <span id="jutge-spinner-sm" class="spinner-sm" style="display:none;"></span>
+        <span id="jutge-status-text" style="font-size:.88rem;font-weight:600;flex:1;">⚖️ Jutge d'interval</span>
+        <span style="font-size:.72rem;color:var(--text2);">▼</span>
+      </summary>
+      <div id="jutge-log" style="padding:12px 16px;font-family:monospace;font-size:.78rem;max-height:240px;overflow-y:auto;white-space:pre-wrap;color:var(--text2);line-height:1.6;border-top:1px solid var(--border);"></div>
+    </details>
   </div>
 
   <div class="loader-wrap" id="loader-11">
@@ -9350,6 +9375,34 @@ async function executarLoopCoherenciaFinal(userConfig) {
 //  JUTGE D'INTERVAL — Revisió d'inconsistències cada 4 caps
 // ═══════════════════════════════════════════════════════════
 
+// ── Helpers UI del Jutge ───────────────────────────────────
+function jutgePanelIniciar(titol) {
+  const panel = document.getElementById('jutge-panel');
+  if (!panel) return;
+  panel.classList.remove('hidden');
+  document.getElementById('jutge-status-text').textContent = titol;
+  document.getElementById('jutge-log').textContent = '';
+  document.getElementById('jutge-spinner-sm').style.display = 'inline-block';
+  document.getElementById('jutge-details').open = false;
+}
+
+function jutgePanelLog(linia) {
+  const log = document.getElementById('jutge-log');
+  if (!log) return;
+  log.textContent += linia + '\n';
+  log.scrollTop = log.scrollHeight;
+}
+
+function jutgePanelFinalitzar(net, iteracions) {
+  const spinner = document.getElementById('jutge-spinner-sm');
+  const status = document.getElementById('jutge-status-text');
+  if (spinner) spinner.style.display = 'none';
+  if (status) status.textContent = net
+    ? `⚖️ Jutge completat — sense inconsistències (${iteracions} iter.)`
+    : `⚖️ Jutge completat — correccions aplicades (${iteracions} iter.)`;
+}
+// ──────────────────────────────────────────────────────────
+
 async function jutgeIntervalInconsistencies(fromIdx, toIdx, userConfig) {
   const cfg = userConfig || USER_CONFIG;
   const models = getModelConfig(cfg);
@@ -9438,13 +9491,17 @@ async function aplicarCorreccionsJutge(fromIdx, toIdx, instruccions, userConfig)
     const textOriginal = ESTAT._capitols_generats[idx];
     if (!textOriginal) continue;
     try {
+      jutgePanelLog(`  ✏️ Reescrivint cap. ${idx + 1}…`);
       const textCorregit = await reescriureAmbCorreccions(textOriginal, instruccions[k], idx, cfg);
       if (!textCorregit) continue;
       ESTAT._capitols_generats[idx] = textCorregit;
+      jutgePanelLog(`  🔄 Resincronitzant seguiment cap. ${idx + 1}…`);
       await actualitzarLlibreRegistreBackground(textCorregit, idx, false, cfg);
       await nkgActualitzarPostEscena(textCorregit, idx + 1, 1, cfg);
       await actualitzarFilsNarratius(idx, textCorregit, cfg);
+      jutgePanelLog(`  ✅ Cap. ${idx + 1} corregit i resincronitzat.`);
     } catch (err) {
+      jutgePanelLog(`  ⚠️ Error cap. ${idx + 1}: ${err.message}`);
       console.warn(`aplicarCorreccionsJutge cap.${idx + 1}:`, err.message);
     }
   }
@@ -9452,22 +9509,46 @@ async function aplicarCorreccionsJutge(fromIdx, toIdx, instruccions, userConfig)
 
 async function executarJutgeInterval(fromIdx, toIdx, userConfig) {
   const cfg = userConfig || USER_CONFIG;
+
+  jutgePanelIniciar(`⚖️ Jutge analitzant caps. ${fromIdx + 1}–${toIdx + 1}…`);
+  jutgePanelLog(`Interval: caps. ${fromIdx + 1}–${toIdx + 1}`);
+  jutgePanelLog(`Caps. congelats anteriors: ${fromIdx}`);
+
   let resultat = { net: false };
   let iter = 0;
   const MAX_ITER = 3;
   while (iter < MAX_ITER) {
     iter++;
+    jutgePanelLog(`\n── Iteració ${iter}/${MAX_ITER} ──`);
+    jutgePanelLog('Detectant inconsistències…');
     resultat = await jutgeIntervalInconsistencies(fromIdx, toIdx, cfg);
-    if (resultat.net) break;
-    const teCorreccions = Object.keys(resultat.instruccions_correccio || {}).length > 0;
-    if (!teCorreccions) break;
+
+    if (resultat.net) {
+      jutgePanelLog('Cap inconsistència rellevant detectada.');
+      break;
+    }
+
+    const claus = Object.keys(resultat.instruccions_correccio || {});
+    if (claus.length === 0) {
+      jutgePanelLog('Inconsistències detectades però sense correccions aplicables.');
+      break;
+    }
+
+    jutgePanelLog(`Inconsistències (${resultat.inconsistencies.length}):`);
+    (resultat.inconsistencies || []).forEach(inc => jutgePanelLog(`  · ${inc}`));
+    jutgePanelLog(`Capítols a corregir: ${claus.map(k => `cap.${parseInt(k, 10) + 1}`).join(', ')}`);
+
     await aplicarCorreccionsJutge(fromIdx, toIdx, resultat.instruccions_correccio, cfg);
   }
+
   ESTAT._intervalsCongelats.push({
     fromIdx, toIdx,
     net: resultat.net,
     iteracions: iter,
   });
+
+  jutgePanelLog(`\nFinalitzat. Net: ${resultat.net} | Iteracions: ${iter}`);
+  jutgePanelFinalitzar(resultat.net, iter);
 }
 
 // ═══════════════════════════════════════════════════════════
