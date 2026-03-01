@@ -1096,6 +1096,10 @@
 <div class="card hidden" id="fase-11">
   <h2><span class="icon">📖</span> Escriptura de capítols</h2>
 
+  <div id="btn-iniciar-escriptura-wrap" class="hidden" style="margin-bottom:20px;text-align:center;">
+    <button class="btn btn-primary" style="font-size:1.05rem;padding:12px 32px;" onclick="iniciarEscripturaCapitols()">▶ Iniciar escriptura dels capítols</button>
+  </div>
+
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
     <div id="capitol-progress-text" style="color:var(--text2);font-size:.88rem;"></div>
     <div style="display:flex; gap:8px;">
@@ -3705,16 +3709,6 @@ async function iniciarFaseEscaleta() {
     hideLoader('10-5');
     mostrarEscaleta(totsResultats);
     document.getElementById('btn-fase11').classList.remove('hidden');
-
-    if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
-      document.getElementById('btn-fase11').classList.add('hidden');
-      showLoader('10-5');
-      document.getElementById('loader-10-5-text').textContent = '🔵 Escaleta completada. Iniciant escriptura autònoma en 3 segons...';
-      setTimeout(() => {
-        hideLoader('10-5');
-        iniciarFase11();
-      }, 3000);
-    }
   } catch (e) {
     hideLoader('10-5');
     toast('Error generant escaleta: ' + e.message);
@@ -3779,6 +3773,11 @@ async function iniciarFase11() {
   } catch (err) {
     console.warn('Inicialització trets immutables:', err.message);
   }
+  document.getElementById('btn-iniciar-escriptura-wrap').classList.remove('hidden');
+}
+
+function iniciarEscripturaCapitols() {
+  document.getElementById('btn-iniciar-escriptura-wrap').classList.add('hidden');
   generarCapitol(0);
 }
 
