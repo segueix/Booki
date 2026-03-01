@@ -9479,23 +9479,31 @@ async function generarResumLlarg(idx, textCapitol, userConfig) {
   const models = getModelConfig(userConfig);
   const msgs = [{
     role: 'user',
-    content: `Ets un editor literari expert. Genera un resum narratiu complet i equilibrat del capítol següent.
+    content: `Ets un editor literari expert especialitzat en continuïtat narrativa. El teu objectiu és crear un resum orientat al futur: el que els capítols següents necessiten saber per mantenir coherència i continuïtat.
 
 CAPÍTOL ${idx + 1}:
 ${textCapitol}
 
 INSTRUCCIONS:
 - Entre 1100 i 1250 paraules (ESTRICTE)
-- Cobreix el capítol de forma EQUILIBRADA: inici, cos i desenllaç amb igual pes
-- Inclou: accions principals, decisions dels personatges, diàlegs clau, girs, estat emocional
 - Escriu en prosa fluïda, no en llista
 - Usa el mateix temps verbal que l'original (present o passat)
-- Escriu en català`
+- Escriu en català
+- Centra't EXCLUSIVAMENT en el que és rellevant per als capítols FUTURS:
+
+  1. ESTAT FINAL DELS PERSONATGES (prioritat màxima): on és cadascú al final del capítol, amb qui, en quin estat emocional i físic, amb quines intencions o objectius actius
+  2. FILS OBERTS I PREGUNTES SENSE RESPOSTA: conflictes no resolts, tensions latents, secrets revelats parcialment, decisions ajornades
+  3. PROMESES NARRATIVES PENDENTS: foreshadowing explícit o implícit que exigeix payoff futur, amenaces no consumades, esperances plantejades
+  4. DECISIONS IRREVERSIBLES: accions que tanquen opcions o obren nous camins de forma permanent
+  5. ELEMENTS ACTIUS: objectes, llocs, personatges secundaris o informació introduïda que pot tornar a ser rellevant
+  6. TO I TENSIÓ: el nivell de tensió dramàtica i to emocional en el qual acaba el capítol (punt d'entrada per al capítol següent)
+
+NO resumeixis l'inici ni el desenvolupament llevat que siguin indispensables per entendre l'estat final.`
   }];
   try {
     const res = await callLLMMulti(
       msgs,
-      'Ets un editor literari. Genera resums narratius precisos i equilibrats.',
+      'Ets un editor literari especialitzat en continuïtat narrativa. Generes resums orientats al futur: el que els capítols següents necessiten saber.',
       Object.assign({}, userConfig, { maxTokens: 1800, model: models.modelDraft }),
       'arquitectura'
     );
@@ -9511,22 +9519,27 @@ async function generarResumCurt(idx, textCapitol, userConfig) {
   const models = getModelConfig(userConfig);
   const msgs = [{
     role: 'user',
-    content: `Ets un editor literari expert. Genera un resum narratiu compacte del capítol següent.
+    content: `Ets un editor literari expert especialitzat en continuïtat narrativa. Genera un resum compacte orientat al futur: el mínim indispensable que els capítols següents necessiten saber d'aquest capítol.
 
 CAPÍTOL ${idx + 1}:
 ${textCapitol}
 
 INSTRUCCIONS:
 - Entre 320 i 380 paraules (ESTRICTE)
-- Màxima densitat informativa: fets clau, decisions, girs, canvis d'estat dels personatges
 - Escriu en prosa fluïda, sense llistes ni títols
 - Usa el mateix temps verbal que l'original
-- Escriu en català`
+- Escriu en català
+- Prioritza en aquest ordre:
+  1. Estat final de cada personatge actiu (ubicació, intenció, estat emocional)
+  2. Fils oberts i tensions no resoltes
+  3. Decisions irreversibles preses
+  4. Promeses narratives o foreshadowing pendent de payoff
+- Oblida l'inici i el desenvolupament si no aporten res als capítols futurs`
   }];
   try {
     const res = await callLLMMulti(
       msgs,
-      'Ets un editor literari. Genera resums narratius compactes i densos.',
+      'Ets un editor literari especialitzat en continuïtat narrativa. Generes resums compactes orientats al futur.',
       Object.assign({}, userConfig, { maxTokens: 600, model: models.modelDraft }),
       'arquitectura'
     );
