@@ -1141,6 +1141,9 @@
     </details>
   </div>
 
+  <!-- Historial persistent de checkpoints de coherència -->
+  <div id="checkpoints-historia" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;"></div>
+
   <div class="loader-wrap" id="loader-11">
     <div class="spinner"></div>
     <span id="loader-11-text">🟣 Sonnet escrivint el capítol…</span>
@@ -1687,6 +1690,11 @@ function restaurarInterficieDesDeEstat() {
     if (ESTAT._nkg) nkgInicialitzar(); // Re-assigna objectes de memòria
     ESTAT._nkg = ESTAT._nkg; // Manté el reference si ja hi era
 
+    // Restaurar historial de checkpoints
+    if (ESTAT._checkpoints && Object.keys(ESTAT._checkpoints).length > 0) {
+      renderCheckpointsHistoria();
+    }
+
     // Si estem a meitat d'escriure
     const capActual = ESTAT._capitolActual || 0;
     if (ESTAT._capitols_generats[capActual]) {
@@ -1890,6 +1898,7 @@ const ESTAT = {
   _alertaArquitecte: null,
   _accionsIrreversibles: [],
   _intervalsCongelats:      [],
+  _checkpoints:             {},
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -4627,14 +4636,20 @@ function mostrarCheckpointIntermedi(idx) {
   if (!panel) return;
 
   const capitol = idx + 1;
+  // Prioritat: _checkpoints (dades fusionades) → _revisionsCodiSistema (retro-compatibilitat)
+  const ck = ESTAT._checkpoints && ESTAT._checkpoints[idx];
   const revArq = (ESTAT._revisionsCodiSistema || []).find(r => r.capitol === capitol);
-  if (!revArq) { panel.classList.add('hidden'); return; }
-
   let r = {};
-  try { r = JSON.parse(revArq.revisio); } catch { /* dades crues */ }
+  if (ck && (ck.qualitat_coherencia || ck.inconsistencies_cronologiques)) {
+    r = ck;
+  } else if (revArq) {
+    try { r = JSON.parse(revArq.revisio); } catch { /* dades crues */ }
+  } else {
+    panel.classList.add('hidden'); return;
+  }
 
   const qualitat = r.qualitat_coherencia || {};
-  const punts = qualitat.puntuacio ?? '?';
+  const punts = qualitat.puntuacio ?? r.puntuacio_coherencia ?? '?';
   const colorPunts = typeof punts === 'number'
     ? (punts >= 8 ? 'var(--success)' : punts >= 6 ? 'var(--warning)' : '#f87171')
     : 'var(--text2)';
@@ -4666,7 +4681,7 @@ function mostrarCheckpointIntermedi(idx) {
       <div style="font-size:1.6rem;font-weight:700;color:${colorPunts};">${punts}<span style="font-size:.9rem;color:var(--text2);">/10</span></div>
       <div>
         <div style="font-weight:700;color:var(--accent2);font-size:.95rem;">Revisió de coherència — Capítol ${capitol}</div>
-        <div style="font-size:.77rem;color:var(--text2);">${escHtml(qualitat.diagnostic || '')}</div>
+        <div style="font-size:.77rem;color:var(--text2);">${escHtml(qualitat.diagnostic || r.valoracio_general || '')}</div>
       </div>
     </div>
     ${alertaHtml}${inconsHtml}${puntsFeblesHtml}${milloresHtml}`;
@@ -4901,6 +4916,16 @@ async function actualitzarLlibreRegistreBackground(textCapitol, idx, esRevisioSi
     const alerta = rev.alerta_critica || '';
     if (millores.length > 0 || alerta)
       ESTAT._alertaArquitecte = { millores, alerta, capitol: idx + 1 };
+    // Fusionar revisió de l'arquitecte al historial persistent de checkpoints
+    ESTAT._checkpoints = ESTAT._checkpoints || {};
+    if (!ESTAT._checkpoints[idx]) ESTAT._checkpoints[idx] = {};
+    Object.assign(ESTAT._checkpoints[idx], {
+      inconsistencies_cronologiques: rev.inconsistencies_cronologiques,
+      qualitat_coherencia:           rev.qualitat_coherencia,
+      millores_proposades:           rev.millores_proposades,
+      alerta_critica:                rev.alerta_critica
+    });
+    renderCheckpointsHistoria();
   }
   await actualitzarEstatsAnimics(textCapitol, idx, cfg);
   await Promise.all([
@@ -5585,31 +5610,62 @@ function mostrarTrames(textOriginal, dades) {
 // ─── SISTEMA 4: Checkpoint de coherència ─────────────────────────────────────
 function mostrarCheckpoint(dades, idx) {
   if (!dades) return;
-  const listId   = 'capitols-list';
-  const container = document.getElementById(listId) || document.body;
-  const panel    = document.createElement('div');
-  panel.style.cssText = 'background:var(--surface2);border:2px solid var(--warning);border-radius:12px;padding:18px;margin:16px 0';
-  const punts  = dades.puntuacio_coherencia;
-  const color  = punts >= 7 ? 'var(--success)' : (punts >= 5 ? 'var(--warning)' : '#f87171');
-  panel.innerHTML = `
-    <div style="font-weight:700;color:var(--warning);margin-bottom:10px">🔍 Checkpoint de Coherència — Cap. ${idx + 1}</div>
-    <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px">
-      <div style="font-size:2rem;font-weight:700;color:${color}">${punts || '?'}/10</div>
-      <div style="font-size:.9rem;color:var(--text2)">${dades.valoracio_general || ''}</div>
-    </div>
-    ${dades.problemes_detectats && dades.problemes_detectats.length > 0
-      ? `<div style="font-weight:600;color:#f87171;margin-bottom:6px">⚠️ Problemes detectats</div>
-         <ul style="padding-left:18px;font-size:.88rem;color:var(--text2)">${dades.problemes_detectats.map(p => `<li style="margin-bottom:4px">${p}</li>`).join('\n')}</ul>`
-      : '<div style="color:var(--success);font-size:.9rem">✓ Coherència correcta fins ara</div>'}
-    ${dades.recomanacions && dades.recomanacions.length > 0
-      ? `<div style="font-weight:600;color:var(--accent2);margin:10px 0 6px">💡 Recomanacions per als pròxims capítols</div>
-         <ul style="padding-left:18px;font-size:.88rem">${dades.recomanacions.map(r => `<li style="margin-bottom:4px">${r}</li>`).join('\n')}</ul>`
-      : ''}
-  `;
-  container.appendChild(panel);
-  if (dades.ajustos_rumb) {
-    ESTAT._ajustosRumb = dades.ajustos_rumb;
-  }
+  ESTAT._checkpoints = ESTAT._checkpoints || {};
+  if (!ESTAT._checkpoints[idx]) ESTAT._checkpoints[idx] = {};
+  Object.assign(ESTAT._checkpoints[idx], {
+    puntuacio_coherencia: dades.puntuacio_coherencia,
+    valoracio_general:    dades.valoracio_general,
+    problemes_detectats:  dades.problemes_detectats,
+    recomanacions:        dades.recomanacions,
+    secundaris_estancats: dades.secundaris_estancats,
+    ajustos_rumb:         dades.ajustos_rumb
+  });
+  if (dades.ajustos_rumb) ESTAT._ajustosRumb = dades.ajustos_rumb;
+  renderCheckpointsHistoria();
+}
+
+function renderCheckpointsHistoria() {
+  const container = document.getElementById('checkpoints-historia');
+  if (!container) return;
+  const checkpoints = ESTAT._checkpoints || {};
+  const idxs = Object.keys(checkpoints).map(Number).sort((a, b) => a - b);
+  if (idxs.length === 0) { container.innerHTML = ''; return; }
+  container.innerHTML = idxs.map(idx => {
+    const d = checkpoints[idx];
+    const cap = idx + 1;
+    const punts = d.puntuacio_coherencia ?? d.qualitat_coherencia?.puntuacio ?? '?';
+    const colorPunts = typeof punts === 'number'
+      ? (punts >= 7 ? 'var(--success)' : punts >= 5 ? 'var(--warning)' : '#f87171')
+      : 'var(--text2)';
+    const problemes = (d.problemes_detectats || []).filter(Boolean);
+    const inconsis  = (d.inconsistencies_cronologiques || []).filter(s => s && s !== 'Cap detectada');
+    const tots_problemes = [...problemes, ...inconsis];
+    const alerta = d.alerta_critica || '';
+    const valoracio = d.valoracio_general || d.qualitat_coherencia?.diagnostic || '';
+    const recoms = d.recomanacions || [];
+    const millores = (d.millores_proposades || []).map(m => m.proposta || m.problema || '').filter(Boolean);
+    const tots_recoms = [...recoms, ...millores];
+
+    const problemesHtml = tots_problemes.length > 0
+      ? `<ul style="margin:6px 0 0 14px;padding:0;font-size:.8rem;color:#f87171;">${tots_problemes.map(p => `<li style="margin-bottom:3px;">${escHtml(p)}</li>`).join('')}</ul>`
+      : `<div style="font-size:.8rem;color:var(--success);margin-top:6px;">✓ Sense problemes detectats</div>`;
+    const alertaHtml = alerta
+      ? `<div style="font-size:.78rem;color:#b91c1c;margin-top:6px;">⚠️ ${escHtml(alerta)}</div>` : '';
+    const recomsHtml = tots_recoms.length > 0
+      ? `<div style="margin-top:8px;font-size:.78rem;color:var(--text2);">${tots_recoms.map(r => `<div>→ ${escHtml(r)}</div>`).join('')}</div>` : '';
+
+    return `<details style="background:var(--surface2);border-radius:8px;border-left:3px solid ${colorPunts};overflow:hidden;">
+      <summary style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;user-select:none;list-style:none;">
+        <span style="font-size:1.1rem;font-weight:700;color:${colorPunts};">${punts}<span style="font-size:.78rem;color:var(--text2);">/10</span></span>
+        <span style="font-size:.85rem;font-weight:600;flex:1;">🔍 Checkpoint — Capítol ${cap}</span>
+        <span style="font-size:.72rem;color:var(--text2);">▼</span>
+      </summary>
+      <div style="padding:10px 14px;border-top:1px solid var(--border);">
+        ${valoracio ? `<div style="font-size:.82rem;color:var(--text2);margin-bottom:4px;">${escHtml(valoracio)}</div>` : ''}
+        ${alertaHtml}${problemesHtml}${recomsHtml}
+      </div>
+    </details>`;
+  }).join('');
 }
 
 // ─── SISTEMA 3: Millorar Cliffhanger ─────────────────────────────────────────
