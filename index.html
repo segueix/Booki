@@ -8752,6 +8752,36 @@ CAPÍTOLS ANTERIORS (Context dinàmic per pressupost de tokens):
 ${parts.join('\n\n')}`;
 }
 
+
+function buildContextTransicioBloc(idx, estat = ESTAT) {
+  if (!(idx > 0 && idx % 4 === 0)) return '';
+
+  const prevIdx = idx - 1;
+  const capPrev = String((estat._capitols_generats && estat._capitols_generats[prevIdx]) || '').trim();
+  if (!capPrev) return '';
+
+  const lines = [];
+  lines.push(`### CAPÍTOL ${prevIdx + 1} (COMPLET — OBLIGATORI EN TRANSICIÓ DE BLOC)`);
+  lines.push(capPrev);
+
+  const regCaps = (estat.llibreRegistre && Array.isArray(estat.llibreRegistre.capitols))
+    ? estat.llibreRegistre.capitols
+    : [];
+
+  for (let i = prevIdx - 1; i >= 0; i--) {
+    const reg = regCaps[i] || {};
+    const resum = String(reg.resum_curt || reg.resum_capitol || reg.resum_llarg || '').trim();
+    if (!resum) continue;
+    lines.push(`### CAPÍTOL ${i + 1} (Resum curt)`);
+    lines.push(resum);
+  }
+
+  return `
+
+TRANSICIÓ DE BLOC (regla 4-en-4):
+${lines.join('\n\n')}`;
+}
+
 function buildContextCapitolLegacy(idx, skipRegistre = false, estat = ESTAT) {
   const parts = [];
 
@@ -8883,10 +8913,7 @@ function buildContextCapitol(idx) {
   const prohibirIniciMeteorologic = !!(r1 && r2 && r1.inici_meteorologic === true && r2.inici_meteorologic === true);
 
   const cap = estatContext._estructuraCapitols ? estatContext._estructuraCapitols[idx] : null;
-  const forcarCapsCompletsBlocInicial = idx < 8; // caps 1-4 i 5-8
-  const ctxCapsComplets = forcarCapsCompletsBlocInicial
-    ? buildContextCapitolsComplets(idx, { maxParaules: 12000 }, estatContext)
-    : '';
+  const ctxTransicioBloc = buildContextTransicioBloc(idx, estatContext);
 
   // Context global (Brief, Bíblia, Trames, etc.) sempre present
   const ctxGlobalBase = ESTAT._nkg
@@ -8959,7 +8986,7 @@ function buildContextCapitol(idx) {
     const seccionsNkg = [
       ctxGlobalBase,
       blocEscaleta.length > 0 ? blocEscaleta.join('\n\n') : '',
-      ctxCapsComplets,
+      ctxTransicioBloc,
       ctxNkg,
       blocFinal.length > 0 ? blocFinal.join('\n') : ''
     ].filter(Boolean);
@@ -8975,7 +9002,7 @@ function buildContextCapitol(idx) {
   const seccions = [
     ctxGlobalBase,
     blocEscaleta.length > 0 ? blocEscaleta.join('\n\n') : '',
-    ctxCapsComplets,
+    ctxTransicioBloc,
     blocFinal.length > 0 ? blocFinal.join('\n') : ''
   ].filter(Boolean);
 
