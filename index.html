@@ -663,6 +663,14 @@
       </label>
     </div>
 
+    <div class="checkbox-row" onclick="document.getElementById('config-mode-eficient').click()">
+      <input type="checkbox" id="config-mode-eficient" onclick="event.stopPropagation()">
+      <label for="config-mode-eficient">
+        <strong>Mode eficient de crides</strong> — minimitza crides API (més barat)
+        <small style="display:block;color:var(--text2);font-size:.78rem;margin-top:2px;">Fa validacions i sincronitzacions pesades cada 2 capítols i redueix passades de tancament.</small>
+      </label>
+    </div>
+
     <label class="field-label" for="config-target-qualitat" style="margin-top:10px;">Qualitat objectiu del jutge (0-100)</label>
     <input type="number" id="config-target-qualitat" min="60" max="98" step="1" value="85" placeholder="85">
     <small style="display:block;color:var(--text2);font-size:.78rem;margin-top:4px;">El generador iterarà fins assolir aquest llindar (amb límit de seguretat d'intents).</small>
@@ -1200,7 +1208,7 @@
 <!-- FASE 12: Control d'Arcs Narratius (Opus - light) -->
 <div class="card hidden" id="fase-12">
   <h2><span class="icon">📋</span> Control d'Arcs Narratius <span class="badge-model badge-opus">Opus</span></h2>
-  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Opus avalua la novel·la a partir dels resums — sense llegir el text complet — per estalviar tokens.</p>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Opus avalua la novel·la a partir dels resums — sense llegir el cos íntegre — per estalviar tokens.</p>
   <div class="loader-wrap" id="loader-12">
     <div class="spinner" style="border-top-color:#60a5fa;"></div>
     <span>🔵 Opus analitzant els arcs narratius…</span>
@@ -1436,6 +1444,11 @@ function aplicarSnapshotProjecte(dades) {
   if (!dades || !dades.estat) throw new Error('Format de còpia no vàlid');
 
   Object.assign(ESTAT, dades.estat);
+  ESTAT._intervalsCongelats = Array.isArray(ESTAT._intervalsCongelats) ? ESTAT._intervalsCongelats : [];
+  ESTAT._capitolsLocked = (ESTAT._capitolsLocked && typeof ESTAT._capitolsLocked === 'object') ? ESTAT._capitolsLocked : {};
+  ESTAT._intervalLocks = (ESTAT._intervalLocks && typeof ESTAT._intervalLocks === 'object') ? ESTAT._intervalLocks : {};
+  ESTAT._chapterLocks = (ESTAT._chapterLocks && typeof ESTAT._chapterLocks === 'object') ? ESTAT._chapterLocks : {};
+  ESTAT._blockCanons = (ESTAT._blockCanons && typeof ESTAT._blockCanons === 'object') ? ESTAT._blockCanons : {};
   USER_CONFIG = dades.config || USER_CONFIG;
 
   if (ESTAT._anthropicApiKey) document.getElementById('anthropicApiKey').value = ESTAT._anthropicApiKey;
@@ -1450,6 +1463,9 @@ function aplicarSnapshotProjecte(dades) {
   if (targetQualitatInput && USER_CONFIG && USER_CONFIG.targetQualitat != null) {
     targetQualitatInput.value = USER_CONFIG.targetQualitat;
   }
+
+  const modeEficientInput = document.getElementById('config-mode-eficient');
+  if (modeEficientInput) modeEficientInput.checked = !!(USER_CONFIG && USER_CONFIG.modeEficient);
 
   restaurarInterficieDesDeEstat();
 }
@@ -1480,6 +1496,68 @@ function exportarCopiaSeguretat() {
   } catch (err) {
     toast("No s'ha pogut exportar la còpia: " + err.message);
   }
+}
+
+
+function calcularEstudiDebilitatsLocal(estat = ESTAT) {
+  const caps = Array.isArray(estat._capitols_generats) ? estat._capitols_generats : [];
+  const regCaps = Array.isArray(estat.llibreRegistre && estat.llibreRegistre.capitols) ? estat.llibreRegistre.capitols : [];
+  const nkg = estat._nkg || {};
+  const checkpoints = estat._checkpoints && typeof estat._checkpoints === 'object' ? Object.values(estat._checkpoints) : [];
+  const noBuits = caps.map((t, i) => ({ i, t: String(t || '').trim() })).filter(x => x.t);
+
+  const totalCaps = noBuits.length;
+  const paraulesPerCap = noBuits.map(x => x.t.split(/\s+/).length);
+  const mitjaParaules = paraulesPerCap.length ? Math.round(paraulesPerCap.reduce((a, b) => a + b, 0) / paraulesPerCap.length) : 0;
+
+  const ambResumCurt = noBuits.filter(x => String(regCaps[x.i]?.resum_curt || '').trim()).length;
+  const ambResumLlarg = noBuits.filter(x => String(regCaps[x.i]?.resum_llarg || '').trim()).length;
+  const coberturaResums = totalCaps > 0 ? Math.round((Math.min(ambResumCurt, ambResumLlarg) / totalCaps) * 100) : 0;
+
+  const ambSnapshot = noBuits.filter(x => estat._snapshotsFinals && estat._snapshotsFinals[x.i]).length;
+  const coberturaSnapshots = totalCaps > 0 ? Math.round((ambSnapshot / totalCaps) * 100) : 0;
+
+  const filsOberts = Array.isArray(estat.llibreRegistre && estat.llibreRegistre.fils_oberts) ? estat.llibreRegistre.fils_oberts.length : 0;
+  const filsTancats = Array.isArray(estat.llibreRegistre && estat.llibreRegistre.fils_tancats) ? estat.llibreRegistre.fils_tancats.length : 0;
+  const beats = Array.isArray(nkg.beats_gastats) ? nkg.beats_gastats.length : 0;
+
+  const puntuacionsCheckpoint = checkpoints
+    .map(c => Number((c.qualitat_coherencia && c.qualitat_coherencia.puntuacio) || c.puntuacio_coherencia))
+    .filter(n => Number.isFinite(n));
+  const qualitatMitja = puntuacionsCheckpoint.length
+    ? (puntuacionsCheckpoint.reduce((a, b) => a + b, 0) / puntuacionsCheckpoint.length)
+    : null;
+
+  const debilitats = [];
+  if (coberturaResums < 100) debilitats.push({ id: 'resums_incomplets', severitat: 'alta', detall: `Cobertura resums completa ${coberturaResums}%` });
+  if (coberturaSnapshots < 100) debilitats.push({ id: 'snapshots_incomplets', severitat: 'mitjana', detall: `Cobertura snapshots ${coberturaSnapshots}%` });
+  if (mitjaParaules > 0 && mitjaParaules < 450) debilitats.push({ id: 'capitols_curts', severitat: 'mitjana', detall: `Mitjana ${mitjaParaules} paraules/capítol` });
+  if (filsOberts > 24) debilitats.push({ id: 'massa_fils_oberts', severitat: 'mitjana', detall: `${filsOberts} fils oberts actius` });
+  if (beats < Math.max(1, Math.floor(totalCaps * 0.8))) debilitats.push({ id: 'poca_diversitat_beats', severitat: 'baixa', detall: `${beats} beats per ${totalCaps} capítols` });
+  if (qualitatMitja != null && qualitatMitja < 7) debilitats.push({ id: 'qualitat_checkpoint_baixa', severitat: 'alta', detall: `Mitjana checkpoint ${qualitatMitja.toFixed(1)}/10` });
+
+  const millores = [];
+  if (debilitats.some(d => d.id === 'resums_incomplets')) millores.push({ prioritat: 'alta', proposta: 'Forçar generació de resums de bloc immediatament després de cada jutge i validar cobertura 100%.' });
+  if (debilitats.some(d => d.id === 'snapshots_incomplets')) millores.push({ prioritat: 'mitjana', proposta: 'Afegir fallback local de snapshot quan falli el parseig JSON del model.' });
+  if (debilitats.some(d => d.id === 'capitols_curts')) millores.push({ prioritat: 'mitjana', proposta: "Augmentar l'objectiu mínim de longitud i consolidar una única expansió post-capítol." });
+  if (debilitats.some(d => d.id === 'massa_fils_oberts')) millores.push({ prioritat: 'alta', proposta: 'Incrementar tancament assistit de fils al final de cada bloc i limitar fils vius crítics.' });
+  if (debilitats.some(d => d.id === 'qualitat_checkpoint_baixa')) millores.push({ prioritat: 'alta', proposta: 'Executar micro-reescriptura guiada només als capítols amb pitjor score, no a tot el bloc.' });
+  if (millores.length === 0) millores.push({ prioritat: 'baixa', proposta: 'Sistema estable: mantenir cadència actual i monitoritzar cobertura de resums/snapshots.' });
+
+  return {
+    metriques: {
+      totalCaps,
+      mitjaParaules,
+      coberturaResums,
+      coberturaSnapshots,
+      filsOberts,
+      filsTancats,
+      beats,
+      qualitatMitja: qualitatMitja != null ? Number(qualitatMitja.toFixed(2)) : null
+    },
+    debilitats,
+    millores
+  };
 }
 
 function exportarDiagnosticResums() {
@@ -1528,6 +1606,13 @@ function exportarDiagnosticResums() {
       lines.push('');
     }
 
+    const ksnCap = reg.ksn || construirKSN(i);
+    if (ksnCap) {
+      lines.push('  KSN (Kernel de Seguiment Narratiu):');
+      lines.push('  ' + JSON.stringify(ksnCap, null, 2).replace(/\n/g, '\n  '));
+      lines.push('');
+    }
+
     // Estat personatges per capítol
     if (Array.isArray(reg.estat_personatges) && reg.estat_personatges.length > 0) {
       lines.push(`  ESTAT PERSONATGES AL FINAL DEL CAPÍTOL:`);
@@ -1541,7 +1626,7 @@ function exportarDiagnosticResums() {
     // Fils narratius per capítol
     if (Array.isArray(reg.fils_oberts) && reg.fils_oberts.length > 0) {
       lines.push(`  FILS OBERTS DECLARATS EN AQUEST CAPÍTOL:`);
-      reg.fils_oberts.forEach(f => lines.push(`    · ${f}`));
+      reg.fils_oberts.forEach(f => lines.push(`    · ${filTextVisible(f)}`));
       lines.push('');
     }
     if (Array.isArray(reg.fils_tancats) && reg.fils_tancats.length > 0) {
@@ -1565,7 +1650,7 @@ function exportarDiagnosticResums() {
   const filsOberts  = Array.isArray(reg.fils_oberts)  ? reg.fils_oberts  : [];
   const filsTancats = Array.isArray(reg.fils_tancats)  ? reg.fils_tancats : [];
   lines.push(`FILS OBERTS ACTIUS (${filsOberts.length}):`);
-  filsOberts.length ? filsOberts.forEach(f => lines.push(`  · ${f}`)) : lines.push('  (cap)');
+  filsOberts.length ? filsOberts.forEach(f => lines.push(`  · ${filTextVisible(f)}`)) : lines.push('  (cap)');
   lines.push('');
   lines.push(`FILS TANCATS ACUMULATS (${filsTancats.length}):`);
   filsTancats.length ? filsTancats.forEach(f => lines.push(`  · ${f}`)) : lines.push('  (cap)');
@@ -1606,15 +1691,69 @@ function exportarDiagnosticResums() {
   }
 
   // Intervals congelats (jutge)
-  const intervalsCongelats = ESTAT._intervalsCongelats || [];
-  lines.push(`INTERVALS CONGELATS (jutge) (${intervalsCongelats.length}):`);
-  if (intervalsCongelats.length) {
-    intervalsCongelats.forEach(iv => {
-      lines.push(`  [Caps ${iv.fromIdx + 1}-${iv.toIdx + 1}] net: ${iv.net} | iteracions: ${iv.iteracions}`);
+  const intervalsCongelats = Array.isArray(ESTAT._intervalsCongelats) ? ESTAT._intervalsCongelats : [];
+  const intervalLocks = (ESTAT._intervalLocks && typeof ESTAT._intervalLocks === 'object') ? ESTAT._intervalLocks : {};
+  const intervalsSenseDuplicats = [];
+  const keysVistes = new Set();
+  intervalsCongelats.forEach(iv => {
+    if (!iv || typeof iv.fromIdx !== 'number' || typeof iv.toIdx !== 'number') return;
+    const key = `${iv.fromIdx}-${iv.toIdx}`;
+    if (keysVistes.has(key)) return;
+    keysVistes.add(key);
+    intervalsSenseDuplicats.push(iv);
+  });
+  Object.entries(intervalLocks).forEach(([key, lock]) => {
+    if (keysVistes.has(key)) return;
+    if (!lock || typeof lock.fromIdx !== 'number' || typeof lock.toIdx !== 'number') return;
+    keysVistes.add(key);
+    intervalsSenseDuplicats.push({
+      fromIdx: lock.fromIdx,
+      toIdx: lock.toIdx,
+      net: lock.net === true,
+      iteracions: lock.iteracions || 1,
+      lockedAt: lock.lockedAt || ''
     });
+  });
+
+  lines.push(`INTERVALS CONGELATS (jutge) (${intervalsSenseDuplicats.length}):`);
+  if (intervalsSenseDuplicats.length) {
+    intervalsSenseDuplicats
+      .sort((a, b) => a.fromIdx - b.fromIdx)
+      .forEach(iv => {
+        lines.push(`  [Caps ${iv.fromIdx + 1}-${iv.toIdx + 1}] net: ${iv.net} | iteracions: ${iv.iteracions}`);
+      });
   } else {
     lines.push('  (cap)');
   }
+  lines.push('');
+
+
+  // ── ESTUDI DE DEBILITATS (local, 0 crides LLM) ──────────
+  const estudi = calcularEstudiDebilitatsLocal(ESTAT);
+  lines.push('═══════════════════════════════════════════════════════════');
+  lines.push('  ESTUDI LOCAL DE DEBILITATS DEL SISTEMA (0 TOKENS API)');
+  lines.push('═══════════════════════════════════════════════════════════');
+  lines.push('');
+  lines.push(`MÈTRIQUES CLAU:`);
+  lines.push(`  · Capítols analitzats: ${estudi.metriques.totalCaps}`);
+  lines.push(`  · Mitjana paraules/capítol: ${estudi.metriques.mitjaParaules}`);
+  lines.push(`  · Cobertura resums (curt+llarg): ${estudi.metriques.coberturaResums}%`);
+  lines.push(`  · Cobertura snapshots: ${estudi.metriques.coberturaSnapshots}%`);
+  lines.push(`  · Fils oberts / tancats: ${estudi.metriques.filsOberts} / ${estudi.metriques.filsTancats}`);
+  lines.push(`  · Beats registrats: ${estudi.metriques.beats}`);
+  lines.push(`  · Qualitat checkpoint mitjana: ${estudi.metriques.qualitatMitja != null ? estudi.metriques.qualitatMitja + '/10' : 'N/D'}`);
+  lines.push('');
+
+  lines.push('DEBILITATS DETECTADES:');
+  if (estudi.debilitats.length === 0) {
+    lines.push("  (No s'han detectat debilitats crítiques amb les mètriques locals)");
+  } else {
+    estudi.debilitats.forEach(d => lines.push(`  · [${d.severitat}] ${d.id}: ${d.detall}`));
+  }
+  lines.push('');
+
+  lines.push('MILLORA RECOMANADA (prioritzada):');
+  estudi.millores.forEach(m => lines.push(`  · [${m.prioritat}] ${m.proposta}`));
   lines.push('');
 
   const contingut = lines.join('\n');
@@ -1898,6 +2037,10 @@ const ESTAT = {
   _alertaArquitecte: null,
   _accionsIrreversibles: [],
   _intervalsCongelats:      [],
+  _capitolsLocked:          {},
+  _intervalLocks:           {},
+  _chapterLocks:            {},
+  _blockCanons:             {},
   _checkpoints:             {},
 };
 
@@ -2131,6 +2274,7 @@ function guardarIComencar() {
     const modelGeneracioInput    = document.getElementById('config-model-generacio').value.trim();
     const modelArquitecturaInput = document.getElementById('config-model-arquitectura').value.trim();
     const fluxAutomatic     = document.getElementById('config-flux-automatic').checked;
+    const modeEficient      = !!document.getElementById('config-mode-eficient')?.checked;
     const targetQualitatEl  = document.getElementById('config-target-qualitat');
     const targetQualitatRaw = targetQualitatEl ? Number(targetQualitatEl.value) : 85;
     const targetQualitat    = Math.max(60, Math.min(98, Number.isFinite(targetQualitatRaw) ? targetQualitatRaw : 85));
@@ -2174,6 +2318,7 @@ function guardarIComencar() {
         arquitecte: modelArquitectura
       },
       fluxAutomatic,
+      modeEficient,
       targetQualitat
     };
 
@@ -2229,6 +2374,7 @@ function actualitzarConfiguracioActiva() {
     const modelGeneracioInput    = document.getElementById('config-model-generacio').value.trim();
     const modelArquitecturaInput = document.getElementById('config-model-arquitectura').value.trim();
     const fluxAutomatic     = document.getElementById('config-flux-automatic').checked;
+    const modeEficient      = !!document.getElementById('config-mode-eficient')?.checked;
     const targetQualitatEl  = document.getElementById('config-target-qualitat');
     const targetQualitatRaw = targetQualitatEl ? Number(targetQualitatEl.value) : 85;
     const targetQualitat    = Math.max(60, Math.min(98, Number.isFinite(targetQualitatRaw) ? targetQualitatRaw : 85));
@@ -2259,7 +2405,7 @@ function actualitzarConfiguracioActiva() {
       modelGeneracio, modelArquitectura, modelDraft,
       modelArquitecte: modelArquitectura,
       models: { draft: modelDraft, generacio: modelGeneracio, arquitecte: modelArquitectura },
-      fluxAutomatic, targetQualitat
+      fluxAutomatic, modeEficient, targetQualitat
     };
 
     if (typeof poblarSelectorsModels === 'function') poblarSelectorsModels();
@@ -2924,6 +3070,41 @@ function extreureEstilsPerPersonatge(text) {
     mapa[nom] = bloc;
   });
   return mapa;
+}
+
+function filtrarEstilsParlaPerSeleccionats(text, nomsEsperats = []) {
+  const esperats = Array.isArray(nomsEsperats) ? nomsEsperats.filter(Boolean) : [];
+  if (!text || esperats.length === 0) return String(text || '').trim();
+
+  const keyOf = (nom = '') => normalitzarNomPersonatge(extreureNomPersonatge(nom) || nom);
+  const esperatsPerKey = {};
+  esperats.forEach(nom => {
+    const key = keyOf(nom);
+    if (key && !esperatsPerKey[key]) esperatsPerKey[key] = nom;
+  });
+
+  const blocs = String(text || '').split(/\n\n+/).map(b => b.trim()).filter(Boolean);
+  const trobats = {};
+
+  blocs.forEach(bloc => {
+    const m = bloc.match(/^\*\*(.+?)\*\*/m);
+    if (!m) return;
+    const nomBlocRaw = m[1].trim();
+    const key = keyOf(nomBlocRaw);
+    const nomOriginal = key ? esperatsPerKey[key] : null;
+    if (!nomOriginal || trobats[nomOriginal]) return;
+
+    // Força capçalera canònica per evitar duplicats per variants de nom
+    const blocCanon = bloc.replace(/^\*\*.+?\*\*/m, `**${nomOriginal}**`).trim();
+    trobats[nomOriginal] = blocCanon;
+  });
+
+  const sortida = esperats.map(nom => {
+    if (trobats[nom]) return trobats[nom];
+    return `**${nom}**\nVocabulari: pendent de generar\nFrases: pendent de generar\nTics: pendent de generar\nRegistre: pendent de generar\nExemple: «pend…»`;
+  });
+
+  return sortida.join('\n\n').trim();
 }
 
 function construirContextPsicologicPersonatges(limit = 8) {
@@ -3922,6 +4103,188 @@ function iniciarEscripturaCapitols() {
   generarCapitol(0);
 }
 
+function obtenirLockCapitol(idx) {
+  ESTAT._chapterLocks = (ESTAT._chapterLocks && typeof ESTAT._chapterLocks === 'object') ? ESTAT._chapterLocks : {};
+  return ESTAT._chapterLocks[idx] || { lockState: 'unlocked', lockScope: '', blockId: '', lockReason: '', notes: '', lockedAt: '', lockedBy: '' };
+}
+
+function textLockCapitol(idx) {
+  const l = obtenirLockCapitol(idx);
+  if (l.lockState === 'final') return '🔒 Final';
+  if (l.lockState === 'provisional') return `🟠 Provisional${l.blockId ? ` (${l.blockId})` : ''}`;
+  return '🟢 Unlocked';
+}
+
+function setProvisionalLock(chapterId, blockId, reason = 'system provisional lock') {
+  ESTAT._chapterLocks = (ESTAT._chapterLocks && typeof ESTAT._chapterLocks === 'object') ? ESTAT._chapterLocks : {};
+  const prev = ESTAT._chapterLocks[chapterId] || {};
+  if (prev.lockState === 'final') return prev;
+  const lock = {
+    lockState: 'provisional',
+    lockScope: 'block',
+    blockId: blockId || '',
+    lockReason: reason,
+    notes: prev.notes || '',
+    lockedAt: new Date().toISOString(),
+    lockedBy: 'system'
+  };
+  ESTAT._chapterLocks[chapterId] = lock;
+  return lock;
+}
+
+function setFinalLock(chapterId, reason = 'system final lock') {
+  ESTAT._chapterLocks = (ESTAT._chapterLocks && typeof ESTAT._chapterLocks === 'object') ? ESTAT._chapterLocks : {};
+  const lock = {
+    lockState: 'final',
+    lockScope: 'block',
+    blockId: (ESTAT._chapterLocks[chapterId] || {}).blockId || '',
+    lockReason: reason,
+    notes: '',
+    lockedAt: new Date().toISOString(),
+    lockedBy: 'system'
+  };
+  ESTAT._chapterLocks[chapterId] = lock;
+  return lock;
+}
+
+function canJudge(chapterId) {
+  const l = obtenirLockCapitol(chapterId);
+  return l.lockState === 'unlocked';
+}
+
+function selfCheckLockingInvariants() {
+  try {
+    // Evitem inspeccionar tot l'outerHTML (pot donar falsos positius per scripts duplicats del navegador).
+    console.assert(typeof executarJutgeInterval === 'function', 'Invariant: executarJutgeInterval ha d\'estar definit');
+    const fnSrc = String(executarJutgeInterval || '');
+    console.assert(fnSrc.includes('const MAX_ITER = 1;'), 'Invariant: MAX_ITER=1 requerit al jutge');
+
+    const src = String(document.documentElement && document.documentElement.outerHTML || '');
+    const jiStart = src.indexOf('function jutgeIntervalInconsistencies');
+    if (jiStart >= 0) {
+      const jiEnd = src.indexOf('function aplicarCorreccionsJutge', jiStart);
+      const jiSrc = jiEnd > jiStart ? src.slice(jiStart, jiEnd) : src.slice(jiStart, jiStart + 8000);
+      console.assert(!/cos íntegre/i.test(jiSrc), "Invariant: jutgeIntervalInconsistencies no ha d'incloure cos íntegre");
+    }
+  } catch (err) {
+    console.warn('selfCheckLockingInvariants:', err.message);
+  }
+}
+
+selfCheckLockingInvariants();
+
+function obtenirBlockCanon58() {
+  ESTAT._blockCanons = (ESTAT._blockCanons && typeof ESTAT._blockCanons === 'object') ? ESTAT._blockCanons : {};
+  return ESTAT._blockCanons['5-8'] || null;
+}
+
+function canRewrite(chapterId, mode = 'full', patchSpec = null) {
+  const l = obtenirLockCapitol(chapterId);
+  if (l.lockState === 'final') return { ok: false, msg: 'Aquest capítol té bloqueig final i és immutable.' };
+  if (l.lockState === 'unlocked') return { ok: true, msg: '' };
+  if (mode !== 'patch') {
+    return { ok: false, msg: "Aquest capítol està en bloqueig provisional; només es permet patch dins el bloc 5–8 per alineació amb el canon congelat." };
+  }
+  const canon = obtenirBlockCanon58();
+  if (!canon || canon.frozen !== true) return { ok: false, msg: 'No hi ha BlockCanon frozen del bloc 5–8.' };
+  if (!patchSpec || !patchSpec.reason) return { ok: false, msg: 'Cal patchSpec amb justificació de canon.' };
+  return { ok: true, msg: '' };
+}
+
+function hashSimpleCanon(obj) {
+  const txt = JSON.stringify(obj || {});
+  let h = 0;
+  for (let i = 0; i < txt.length; i++) h = ((h << 5) - h) + txt.charCodeAt(i);
+  return String(h >>> 0);
+}
+
+function construirBlockCanon58() {
+  const fromIdx = 4, toIdx = 7;
+  const caps = ESTAT.llibreRegistre?.capitols || [];
+  const nkg = ESTAT._nkg || {};
+  const createdFrom = [];
+  const immutableFacts = { timeFacts: [], locations: [], objects: [], characterEndStates: [] };
+  const hooksAndThreads = [];
+
+  for (let i = fromIdx; i <= toIdx; i++) {
+    const reg = caps[i] || {};
+    createdFrom.push({ chapter: i + 1, resumHash: hashSimpleCanon({ rc: reg.resum_curt || '', rl: reg.resum_llarg || '' }) });
+    if (reg.resum_curt) immutableFacts.timeFacts.push(`Cap.${i + 1}: ${reg.resum_curt.substring(0, 140)}`);
+    (reg.estat_personatges || []).forEach(p => {
+      immutableFacts.characterEndStates.push({ cap: i + 1, nom: p.nom || '', ubicacio: p.ubicacio || '', estat: p.estat_actual || '' });
+      if (p.ubicacio) immutableFacts.locations.push(`Cap.${i + 1}: ${p.nom || 'Personatge'} @ ${p.ubicacio}`);
+    });
+    (reg.fils_oberts || []).slice(0, 3).forEach(f => hooksAndThreads.push(`Cap.${i + 1}: ${filTextVisible(f)}`));
+  }
+
+  const objMoves = Array.isArray(nkg.timeline_objectes) ? nkg.timeline_objectes : [];
+  objMoves.forEach(m => {
+    const txt = typeof m === 'string' ? m : JSON.stringify(m);
+    const match = txt.match(/C(\d{1,2})/i);
+    const c = match ? Number(match[1]) : null;
+    if (c && c >= 5 && c <= 8) immutableFacts.objects.push(txt);
+  });
+
+  const canonBase = {
+    blockId: '5-8',
+    createdAt: new Date().toISOString(),
+    createdFrom,
+    immutableFacts: {
+      timeFacts: immutableFacts.timeFacts.slice(0, 24),
+      locations: immutableFacts.locations.slice(0, 24),
+      objects: immutableFacts.objects.slice(0, 24),
+      characterEndStates: immutableFacts.characterEndStates.slice(0, 30)
+    },
+    hooksAndThreads: Array.from(new Set(hooksAndThreads)).slice(0, 15),
+    chapter5Constraints: [
+      'No alterar ordre temporal ni causalitat establerta per caps 6–8.',
+      'No introduir personatges, objectes clau o fets canònics nous.',
+      'No canviar estats finals de personatges que impactin 6–8.'
+    ],
+    allowedChapter5Edits: ['exposicio', 'ritme', 'formulacio', 'aclariments_sense_nous_fets'],
+    frozen: true
+  };
+  const version = hashSimpleCanon(canonBase);
+  return { ...canonBase, version, hash: version };
+}
+
+function generarICongeleBlockCanon58() {
+  ESTAT._blockCanons = (ESTAT._blockCanons && typeof ESTAT._blockCanons === 'object') ? ESTAT._blockCanons : {};
+  const canon = construirBlockCanon58();
+  ESTAT._blockCanons['5-8'] = canon;
+  for (let idx = 4; idx <= 7; idx++) setProvisionalLock(idx, '5-8', 'Canon congelat abans de reescriure bloc 5-8');
+  return canon;
+}
+
+function validarCapitol5ContraCanon(text, canon) {
+  const txt = String(text || '');
+  const base = `${(canon?.immutableFacts?.timeFacts || []).join(' ')} ${(canon?.immutableFacts?.objects || []).join(' ')} ${(canon?.hooksAndThreads || []).join(' ')}`.toLowerCase();
+  const propis = txt.match(/[A-ZÀ-Ú][a-zà-ú]{2,}/g) || [];
+  const nous = Array.from(new Set(propis)).filter(n => !base.includes(n.toLowerCase())).slice(0, 8);
+  const dates = txt.match(/\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?/g) || [];
+  const novesDates = dates.filter(d => !base.includes(d));
+  if (nous.length > 0 || novesDates.length > 0) {
+    return { ok: false, msg: `Validació canon bloc 5-8 fallida. Nous noms/dates detectats: ${[...nous, ...novesDates].slice(0, 6).join(', ')}` };
+  }
+  return { ok: true, msg: '' };
+}
+
+async function applyPatch(chapterId, patchSpec, blockCanon) {
+  const perm = canRewrite(chapterId, 'patch', patchSpec);
+  if (!perm.ok) throw new Error(perm.msg);
+  const allowed = Array.isArray(patchSpec.allowedEdits) ? patchSpec.allowedEdits : [];
+  const forbidden = Array.isArray(patchSpec.forbidden) ? patchSpec.forbidden : ['introduir fets nous'];
+  const instr = `PATCH CONTROLAT
+Reason canon: ${patchSpec.reason}
+Target: ${patchSpec.target || 'fragment'}
+Allowed edits: ${allowed.join(', ') || 'refrasejar, reordenar, aclarir'}
+Forbidden: ${forbidden.join(', ')}`;
+  const original = ESTAT._capitols_generats[chapterId] || '';
+  const corregit = await reescriureAmbCorreccions(original, instr, chapterId, USER_CONFIG);
+  ESTAT._capitols_generats[chapterId] = netejarTabulacionsInicials(corregit || original);
+  return ESTAT._capitols_generats[chapterId];
+}
+
 function renderLlistaCapitols() {
   const wrap  = document.getElementById('capitol-llista');
   const total = ESTAT._estructuraCapitols.length;
@@ -3933,17 +4296,23 @@ function renderLlistaCapitols() {
     const cls  = completat ? 'fet' : actiu ? 'actiu' : '';
     const ico  = completat ? '✓'  : actiu  ? '✍️'   : '○';
     const teText = !!(ESTAT._capitols_generats && ESTAT._capitols_generats[i]);
+    const lockTxt = textLockCapitol(i);
+    const lock = obtenirLockCapitol(i);
     const btnCopia = teText ? `<button class="capitol-copy" onclick="event.stopPropagation();copiarCapitol(${i})" title="Copiar capítol final">⎘</button>` : '';
     const onClick = teText ? `onclick="obrirDetallCapitol(${i})"` : '';
+    const potRegenerar = canRewrite(i, 'full').ok;
+    const regenBtn = teText ? `<button class="capitol-delete" ${potRegenerar ? `onclick=\"event.stopPropagation();esborrarIRegenerarCapitol(${i})\"` : ''} ${potRegenerar ? '' : 'disabled'} title="${potRegenerar ? 'Esborrar i regenerar capítol' : 'Bloquejat per lock state'}">🗑️</button>` : '';
     return `<div class="capitol-item ${cls}" id="cap-item-${i}" ${onClick}>
       <span class="capitol-num">${ico}</span>
-      <span class="capitol-titol">${escHtml(cap.titol || 'Capítol ' + (i + 1))}</span>
-      ${teText ? `<button class="capitol-delete" onclick="event.stopPropagation();esborrarIRegenerarCapitol(${i})" title="Esborrar i regenerar capítol">🗑️</button>` : ''}${btnCopia}
+      <span class="capitol-titol">${escHtml(cap.titol || 'Capítol ' + (i + 1))}<small style="margin-left:8px;color:var(--text2);font-size:.72rem;">${escHtml(lockTxt)}</small></span>
+      ${regenBtn}${btnCopia}
     </div>`;
   }).join('\n');
 }
 
 async function esborrarIRegenerarCapitol(idx) {
+  const perm = canRewrite(idx, 'full');
+  if (!perm.ok) { toast(perm.msg); return; }
   const titol = (ESTAT._estructuraCapitols[idx] && ESTAT._estructuraCapitols[idx].titol) || `Capítol ${idx + 1}`;
   const ok = confirm(`Vols esborrar totes les dades de "${titol}" i regenerar el capítol?`);
   if (!ok) return;
@@ -4193,7 +4562,7 @@ async function revisioArquitectaAmbContinuitat(idx, textCapitol, userConfig) {
   const reg = ESTAT.llibreRegistre || {};
   const snapshotAnterior = idx > 0 ? (ESTAT._snapshotsFinals || {})[idx - 1] : null;
   const accionsIrrev = (ESTAT._accionsIrreversibles || []).slice(-8).map(a => `- [Cap.${a.capitol}] ${a.accio}`).join('\n') || '(cap)';
-  const filsOberts   = (reg.fils_oberts || []).slice(-8).map(f => `- ${f}`).join('\n') || '(cap)';
+  const filsOberts   = (reg.fils_oberts || []).slice(-8).map(f => `- ${filTextVisible(f)}`).join('\n') || '(cap)';
 
   const msgs = [{
     role: 'user',
@@ -4283,7 +4652,40 @@ ${top}
 `;
 }
 
+function obtenirRangBlocPerCapitol(idx, totalCaps) {
+  const start = Math.floor(idx / 4) * 4;
+  const end = Math.min(start + 3, Math.max(0, totalCaps - 1));
+  return { fromIdx: start, toIdx: end };
+}
+
+function esTancamentBloc(idx, totalCaps) {
+  if (idx >= totalCaps - 1) return true;
+  return (idx + 1) % 4 === 0;
+}
+
+async function processarDerivatsBlocAbansJutge(fromIdx, toIdx, userConfig) {
+  const cfg = userConfig || USER_CONFIG;
+  for (let i = fromIdx; i <= toIdx; i++) {
+    const txt = String((ESTAT._capitols_generats && ESTAT._capitols_generats[i]) || '').trim();
+    if (!txt) continue;
+    try { await generarSnapshotValidat(i, txt, cfg); } catch (e) { console.warn('Bloc snapshot:', e.message); }
+    try { await actualitzarFilsNarratius(i, txt, cfg); } catch (e) { console.warn('Bloc fils:', e.message); }
+    if (ESTAT._nkg) {
+      try { await nkgActualitzarPostEscena(txt, i + 1, 1, cfg); } catch (e) { console.warn('Bloc NKG:', e.message); }
+    }
+    try { await actualitzarBiblia(txt, i, cfg); } catch (e) { console.warn('Bloc bíblia:', e.message); }
+    try { await actualitzarBeatsNarratiusGastats(txt, i + 1, cfg); } catch (e) { console.warn('Bloc beats:', e.message); }
+    try { await actualitzarLlibreRegistreBackground(txt, i, false, cfg, { saltResumsIEstats: true }); } catch (e) { console.warn('Bloc registre:', e.message); }
+  }
+}
+
+function esModeEficient(userConfig = USER_CONFIG) {
+  return !!(userConfig && userConfig.modeEficient);
+}
+
 async function generarCapitol(idx, intents = 0) {
+  const permGenerate = canRewrite(idx, 'full');
+  if (idx < (ESTAT._estructuraCapitols || []).length && !permGenerate.ok) { toast(permGenerate.msg); return; }
   // Fi: revisió final
   if (idx >= ESTAT._estructuraCapitols.length) {
     document.getElementById('btn-control-arcs-wrap').classList.remove('hidden');
@@ -4335,13 +4737,14 @@ async function generarCapitol(idx, intents = 0) {
     const ajust = await ajustarLongitud(idx, textNet, USER_CONFIG);
     textNet = ajust.text;
 
-    // PAS 6: Bucle de revisió de continuïtat (màxim 2 intents)
-    for (let intent = 0; intent < 2; intent++) {
+    // PAS 6: Bucle de revisió de continuïtat (màxim 2 intents; 1 en mode eficient)
+    const intentsRevisioContinu = esModeEficient(USER_CONFIG) ? 1 : 2;
+    for (let intent = 0; intent < intentsRevisioContinu; intent++) {
       try {
-        document.getElementById('loader-11-text').textContent = `🔍 Revisió continuïtat cap. ${idx + 1} (intent ${intent + 1}/2)…`;
+        document.getElementById('loader-11-text').textContent = `🔍 Revisió continuïtat cap. ${idx + 1} (intent ${intent + 1}/${intentsRevisioContinu})…`;
         const revisio = await revisioArquitectaAmbContinuitat(idx, textNet, USER_CONFIG);
         if (revisio && revisio.veredicte === 'REESCRIURE' && revisio.resum_correccions) {
-          document.getElementById('loader-11-text').textContent = `🔧 Corregint continuïtat cap. ${idx + 1} (intent ${intent + 1}/2)…`;
+          document.getElementById('loader-11-text').textContent = `🔧 Corregint continuïtat cap. ${idx + 1} (intent ${intent + 1}/${intentsRevisioContinu})…`;
           const corregit = await reescriureAmbCorreccions(textNet, revisio.resum_correccions, idx, USER_CONFIG);
           textNet = netejarTabulacionsInicials(corregit || textNet);
         } else {
@@ -4367,25 +4770,18 @@ async function generarCapitol(idx, intents = 0) {
     hideLoader(11);
     mostrarCapitol(idx, textNet);
 
-    // PAS 7: Snapshot validat
-    try { await generarSnapshotValidat(idx, textNet, USER_CONFIG); } catch (e) { console.warn('Snapshot:', e.message); }
-
-    // PAS 8: Fils narratius (nous/tancats, beats, accions irreversibles)
-    try { await actualitzarFilsNarratius(idx, textNet, USER_CONFIG); } catch (e) { console.warn('Fils narratius:', e.message); }
-
-    // PAS 9: Actualitzar NKG amb el text definitiu post-correccions
-    if (ESTAT._nkg) {
-      try {
-        document.getElementById('loader-11-text').textContent = '🔵 Actualitzant NKG…';
-        await nkgActualitzarPostEscena(textNet, idx + 1, 1, USER_CONFIG);
-      } catch (e) { console.warn('NKG post-capítol:', e.message); }
+    const totalCaps = ESTAT._estructuraCapitols.length;
+    const tancamentBloc = esTancamentBloc(idx, totalCaps);
+    if (tancamentBloc) {
+      const bloc = obtenirRangBlocPerCapitol(idx, totalCaps);
+      document.getElementById('loader-11-text').textContent = `🧠 Preparant derivats del bloc (caps. ${bloc.fromIdx + 1}–${bloc.toIdx + 1})…`;
+      await processarDerivatsBlocAbansJutge(bloc.fromIdx, bloc.toIdx, USER_CONFIG);
+      await generarResumsBloc(bloc.fromIdx, bloc.toIdx, USER_CONFIG);
+      await arxitectePostCapitol(idx, textNet, USER_CONFIG, { derivatsJaProcessats: true, bloc });
+    } else {
+      // Evitem duplicar derivats abans de la passada del jutge del bloc.
+      generarCapitol(idx + 1);
     }
-
-    // Post-processing: Bíblia, Registre, Beats, Estil, Checkpoint, Compressió
-    await arxitectePostCapitol(idx, textNet, USER_CONFIG);
-
-    // Recursió al capítol següent
-    generarCapitol(idx + 1);
 
   } catch (err) {
     if (USER_CONFIG && USER_CONFIG.fluxAutomatic && intents < 3) {
@@ -4399,32 +4795,42 @@ async function generarCapitol(idx, intents = 0) {
   }
 }
 
-async function arxitectePostCapitol(idx, textCapitol, userConfig) {
-  const esRevisioSistema = idx > 0 && idx % 3 === 2; // cada 3 capítols (cap 3, 6, 9, 12...)
+async function arxitectePostCapitol(idx, textCapitol, userConfig, opts = {}) {
+  const modeEficient = esModeEficient(userConfig);
+  const esRevisioSistema = idx > 0 && idx % 3 === 2 && (!modeEficient || (idx + 1) % 6 === 0); // en mode eficient, cada 6 capítols
+
+  const capitolNum = idx + 1;
+  const haDeSincronitzarPesat = !modeEficient || (capitolNum % 2 === 0) || capitolNum === ESTAT._estructuraCapitols.length;
 
   // 1. Bíblia narrativa
-  try { await actualitzarBiblia(textCapitol, idx, userConfig); } catch (e) { console.warn('Bíblia:', e.message); }
+  if (!opts.derivatsJaProcessats && haDeSincronitzarPesat) {
+    try { await actualitzarBiblia(textCapitol, idx, userConfig); } catch (e) { console.warn('Bíblia:', e.message); }
+  }
 
   // 2. Llibre de registre (+ revisió de codi JS cada 3 capítols)
-  try { await actualitzarLlibreRegistreBackground(textCapitol, idx, esRevisioSistema, userConfig); } catch (e) { console.warn('Registre:', e.message); }
+  if (!opts.derivatsJaProcessats) {
+    try { await actualitzarLlibreRegistreBackground(textCapitol, idx, esRevisioSistema, userConfig); } catch (e) { console.warn('Registre:', e.message); }
+  }
 
   // (Snapshot i fils narratius es criden explícitament a generarCapitol, passos 7 i 8)
 
   // 4. Beats narratius gastats
-  try { await actualitzarBeatsNarratiusGastats(textCapitol, idx + 1, userConfig); } catch (e) { console.warn('Beats:', e.message); }
+  if (!opts.derivatsJaProcessats && haDeSincronitzarPesat) {
+    try { await actualitzarBeatsNarratiusGastats(textCapitol, idx + 1, userConfig); } catch (e) { console.warn('Beats:', e.message); }
+  }
 
   // 5. Registre d'estil (sincrò, sense crida LLM)
   try { actualitzarRegistreEstil(idx, textCapitol); generarAlertesEstil(); } catch (e) { console.warn('Estil:', e.message); }
 
   // Checkpoint de coherència narrativa cada 3 capítols
-  const esCheckpoint = (idx + 1) % 3 === 0 && idx + 1 < ESTAT._estructuraCapitols.length;
+  const esCheckpoint = false; // desactivat: fem control de qualitat al tancament de bloc/post-jutge
   if (esCheckpoint) {
     try { await executarCheckpoint(idx, userConfig); } catch (e) { console.warn('Checkpoint:', e.message); }
   }
 
   // Jutge d'interval cada 4 capítols
   const totalCaps = ESTAT._estructuraCapitols.length;
-  const esJutgeComplet = (idx + 1) % 4 === 0 && idx + 1 < totalCaps;
+  const esJutgeComplet = (!modeEficient || (idx + 1) % 8 === 0) && (idx + 1) % 4 === 0 && idx + 1 < totalCaps;
   const esJutgeFinal   = idx === totalCaps - 1 && (idx + 1) % 4 !== 0;
   if (esJutgeComplet || esJutgeFinal) {
     const fromJutge = esJutgeComplet
@@ -4438,7 +4844,7 @@ async function arxitectePostCapitol(idx, textCapitol, userConfig) {
   }
 
   // Compressió de memòria cada 5 capítols
-  const esCompressio = (idx + 1) % 5 === 0 && idx + 1 < ESTAT._estructuraCapitols.length;
+  const esCompressio = (!modeEficient || (idx + 1) % 10 === 0) && (idx + 1) % 5 === 0 && idx + 1 < ESTAT._estructuraCapitols.length;
   if (esCompressio) {
     const loaderEl = document.getElementById('loader-11-text');
     if (loaderEl) loaderEl.textContent = '🔵 Opus comprimint memòria narrativa…';
@@ -4497,6 +4903,7 @@ function mostrarAccionsCapitol(idx, text) {
 }
 
 function iniciarRevisioManual(idx) {
+  if (!canJudge(idx)) { toast("Aquest capítol està bloquejat; no es pot tornar a jutjar."); return; }
   const text = ESTAT._capitols_generats[idx];
   if (!text) return;
   const isLast = idx >= ESTAT._estructuraCapitols.length - 1;
@@ -4728,7 +5135,17 @@ function mostrarAccionsCapitolSimple(idx, isLast) {
 }
 
 async function reescriureCapitol(idx, intents = 0) {
-  const instruccions = ESTAT._revisioInstruccions[idx] || '';
+  const perm = canRewrite(idx, 'full');
+  if (!perm.ok) { toast(perm.msg); return; }
+  if (idx >= 4 && idx <= 7) {
+    const canon = obtenirBlockCanon58();
+    if (!canon || canon.frozen !== true) { toast('Cal generar i congelar el BlockCanon 5-8 abans de reescriure aquest bloc.'); return; }
+  }
+  let instruccions = ESTAT._revisioInstruccions[idx] || '';
+  if (idx === 4) {
+    const canon = obtenirBlockCanon58();
+    instruccions += `\n\nRESTRICCIONS CANON BLOC 5-8:\n- No introdueixis fets nous.\n- No alteris time/location/object/character states.\n- Només exposició/ritme/formulació/aclariments.\nCANON:${JSON.stringify(canon).slice(0,5000)}`;
+  }
   document.getElementById('capitol-actual-wrap').classList.add('hidden');
   document.getElementById('revisio-panel').classList.add('hidden');
   showLoader(11);
@@ -4737,6 +5154,10 @@ async function reescriureCapitol(idx, intents = 0) {
   try {
     const res = await reescriureCapitolAmbInstruccions(idx, instruccions, USER_CONFIG);
     const textNet = netejarTabulacionsInicials(res.response);
+    if (idx === 4) {
+      const val = validarCapitol5ContraCanon(textNet, obtenirBlockCanon58());
+      if (!val.ok) throw new Error(val.msg);
+    }
     ESTAT._capitols_generats[idx] = textNet;
     ESTAT._metaCapitols = ESTAT._metaCapitols || {};
     ESTAT._metaCapitols[idx] = Object.assign({}, ESTAT._metaCapitols[idx] || {}, { textFinal: textNet });
@@ -4802,32 +5223,249 @@ function normalitzarEntradaRegistre(dades, textCapitol, idx) {
 }
 
 
-function reconciliarFilsRegistre(dades) {
-  const reg = ESTAT.llibreRegistre || {};
-  const obertsActuals = new Set(Array.isArray(reg.fils_oberts) ? reg.fils_oberts : []);
-  const tancatsActuals = new Set(Array.isArray(reg.fils_tancats) ? reg.fils_tancats : []);
 
-  const obertsDeclarats = new Set(Array.isArray(dades.fils_oberts) ? dades.fils_oberts : []);
-  const tancatsDeclarats = new Set(Array.isArray(dades.fils_tancats) ? dades.fils_tancats : []);
-  const filsNous = new Set(Array.isArray(dades.fils_nous_detectats) ? dades.fils_nous_detectats : []);
-  const filsResolts = new Set(Array.isArray(dades.fils_resolts_detectats) ? dades.fils_resolts_detectats : []);
+function extreureCapitolDeLiniaKSN(entry) {
+  if (entry == null) return null;
+  if (typeof entry === 'object') {
+    const direct = Number(entry.capitol || entry.capitol_origen || entry.cap || entry.chapter || entry.idx || entry.capitol_idx || NaN);
+    if (!isNaN(direct) && direct > 0) return direct;
+    const serialitzat = JSON.stringify(entry);
+    const matchObj = serialitzat.match(/(?:cap\.?|capitol|chapter)\s*[:#-]?\s*(\d{1,3})/i);
+    if (matchObj) return parseInt(matchObj[1], 10);
+    return null;
+  }
+  const text = String(entry);
+  const match = text.match(/(?:cap\.?|capitol|chapter)\s*[:#-]?\s*(\d{1,3})/i) || text.match(/\bC(\d{1,3})\b/);
+  return match ? parseInt(match[1], 10) : null;
+}
 
-  [...obertsDeclarats, ...filsNous].forEach(f => { if (f) obertsActuals.add(f); });
-  [...tancatsDeclarats, ...filsResolts].forEach(f => {
-    if (!f) return;
-    tancatsActuals.add(f);
-    obertsActuals.delete(f);
+function construirKSN(idx) {
+  const capNum = idx + 1;
+  ESTAT.llibreRegistre = ESTAT.llibreRegistre || { capitols: [] };
+  ESTAT.llibreRegistre.capitols = Array.isArray(ESTAT.llibreRegistre.capitols) ? ESTAT.llibreRegistre.capitols : [];
+  const reg = ESTAT.llibreRegistre.capitols[idx] || {};
+  const nkg = ESTAT._nkg || {};
+
+  const estatPersonatges = Array.isArray(reg.estat_personatges)
+    ? reg.estat_personatges
+      .filter(p => p && p.nom)
+      .map(p => ({
+        nom: p.nom,
+        ubicacio: p.ubicacio || '',
+        estat_actual: p.estat_actual || '',
+        estat_animic_actual: p.estat_animic_actual || ''
+      }))
+    : [];
+
+  const accionsIrreversibles = Array.isArray(ESTAT._accionsIrreversibles)
+    ? ESTAT._accionsIrreversibles
+      .filter(a => a && Number(a.capitol) === capNum)
+      .map(a => a.accio || a.descripcio || String(a))
+      .filter(Boolean)
+    : [];
+
+  const fetsCanonics = Array.isArray(nkg.fets_canonics)
+    ? nkg.fets_canonics
+      .filter(fc => extreureCapitolDeLiniaKSN(fc) === capNum)
+      .map(fc => typeof fc === 'string' ? fc : (fc.descripcio || JSON.stringify(fc)))
+      .filter(Boolean)
+    : [];
+
+  const movimentsObjectes = Array.isArray(nkg.timeline_objectes)
+    ? nkg.timeline_objectes
+      .filter(mo => extreureCapitolDeLiniaKSN(mo) === capNum)
+      .map(mo => typeof mo === 'string' ? mo : JSON.stringify(mo))
+      .filter(Boolean)
+    : [];
+
+  const ksn = {
+    versio: 1,
+    capitol: capNum,
+    resum_curt: String(reg.resum_curt || '').trim(),
+    estat_personatges: estatPersonatges,
+    accions_irreversibles: accionsIrreversibles,
+    fets_canonics: fetsCanonics.slice(-8),
+    moviments_objectes: movimentsObjectes.slice(-8)
+  };
+
+  if (!ESTAT.llibreRegistre.capitols[idx] || typeof ESTAT.llibreRegistre.capitols[idx] !== 'object') {
+    ESTAT.llibreRegistre.capitols[idx] = reg;
+  }
+  ESTAT.llibreRegistre.capitols[idx].ksn = ksn;
+  return ksn;
+}
+
+const FILS_OBERTS_MAX = 30;
+
+function filTextVisible(fil) {
+  if (!fil) return '';
+  if (typeof fil === 'string') return fil.trim();
+  return String(fil.titol || fil.resum || fil.id || '').trim();
+}
+
+function slugFil(txt) {
+  return String(txt || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
+
+function construirAliasMapTrames() {
+  const alias = {};
+  const tr = ESTAT.trames || {};
+  const addAlias = (k, v) => {
+    const key = slugFil(k);
+    if (!key) return;
+    alias[key] = v;
+  };
+
+  const tp = tr.trama_principal;
+  if (tp) {
+    const nom = typeof tp === 'string' ? tp : (tp.nom || tp.descripcio || 'trama_principal');
+    addAlias(nom, 'trama_principal');
+    addAlias('trama principal', 'trama_principal');
+    addAlias('conflicte central', 'trama_principal');
+  }
+
+  (tr.subtrames || []).forEach((st, i) => {
+    const nom = st && (st.nom || st.titol || st.descripcio) ? (st.nom || st.titol || st.descripcio) : `subtrama_${i + 1}`;
+    const canon = slugFil(nom) || `subtrama_${i + 1}`;
+    addAlias(nom, canon);
+    addAlias(`subtrama ${i + 1}`, canon);
   });
 
-  ESTAT.llibreRegistre.fils_oberts = [...obertsActuals];
-  ESTAT.llibreRegistre.fils_tancats = [...tancatsActuals];
+  return alias;
 }
+
+function categoriaFilPerText(txt) {
+  const text = String(txt || '').toLowerCase();
+  const aliasMap = construirAliasMapTrames();
+  const slug = slugFil(txt);
+  if (slug && aliasMap[slug]) return aliasMap[slug];
+
+  for (const [ak, canon] of Object.entries(aliasMap)) {
+    const spaced = ak.replace(/-/g, ' ');
+    if (spaced.length > 4 && text.includes(spaced)) return canon;
+  }
+  return 'general';
+}
+
+function normalitzarFilNarratiu(fil, origem = 'legacy') {
+  const rawTxt = filTextVisible(fil);
+  if (!rawTxt) return null;
+  if (typeof fil === 'object' && fil.id && fil.estat) {
+    return {
+      id: slugFil(fil.id) || slugFil(rawTxt),
+      titol: rawTxt,
+      categoria: fil.categoria || categoriaFilPerText(rawTxt),
+      prioritat: fil.prioritat || classificarPrioritatFil(rawTxt),
+      estat: fil.estat || 'obert',
+      aliases: Array.isArray(fil.aliases) ? fil.aliases.map(a => slugFil(a)).filter(Boolean) : [slugFil(rawTxt)],
+      ultimaActualitzacioCapitol: Number(fil.ultimaActualitzacioCapitol || ESTAT._capitolActual || 0) + 1,
+      origen
+    };
+  }
+
+  const categoria = categoriaFilPerText(rawTxt);
+  return {
+    id: slugFil(rawTxt),
+    titol: rawTxt,
+    categoria,
+    prioritat: classificarPrioritatFil(rawTxt),
+    estat: 'obert',
+    aliases: [slugFil(rawTxt)],
+    ultimaActualitzacioCapitol: Number(ESTAT._capitolActual || 0) + 1,
+    origen
+  };
+}
+
+function deduplicarFilsNarratius(fils, aliasMapExtern = null) {
+  const aliasMap = aliasMapExtern || construirAliasMapTrames();
+  const byId = new Map();
+  const byAlias = new Map();
+
+  fils.forEach(f => {
+    const n = normalitzarFilNarratiu(f);
+    if (!n || !n.id) return;
+
+    const aliases = Array.from(new Set([n.id, ...(n.aliases || [])].filter(Boolean)));
+    let key = n.id;
+    for (const a of aliases) {
+      if (byAlias.has(a)) { key = byAlias.get(a); break; }
+      if (aliasMap[a] && byId.has(aliasMap[a])) { key = aliasMap[a]; break; }
+    }
+    if (aliasMap[key]) key = aliasMap[key];
+
+    if (!byId.has(key)) {
+      byId.set(key, { ...n, id: key, aliases });
+    } else {
+      const cur = byId.get(key);
+      const titol = cur.titol.length >= n.titol.length ? cur.titol : n.titol;
+      const prioritat = cur.prioritat === 'alta' || n.prioritat === 'alta'
+        ? 'alta'
+        : (cur.prioritat === 'mitjana' || n.prioritat === 'mitjana' ? 'mitjana' : 'baixa');
+      byId.set(key, {
+        ...cur,
+        titol,
+        categoria: cur.categoria !== 'general' ? cur.categoria : n.categoria,
+        prioritat,
+        aliases: Array.from(new Set([...(cur.aliases || []), ...aliases])),
+        ultimaActualitzacioCapitol: Math.max(cur.ultimaActualitzacioCapitol || 0, n.ultimaActualitzacioCapitol || 0)
+      });
+    }
+    aliases.forEach(a => byAlias.set(a, key));
+  });
+
+  return Array.from(byId.values());
+}
+
+function aplicarLimitFilsOberts(fils) {
+  if (!Array.isArray(fils)) return [];
+  const score = f => (f.prioritat === 'alta' ? 3 : f.prioritat === 'mitjana' ? 2 : 1) * 100000 + Number(f.ultimaActualitzacioCapitol || 0);
+  const ordenats = [...fils].sort((a, b) => score(b) - score(a));
+  const vius = ordenats.slice(0, FILS_OBERTS_MAX);
+  const excedents = ordenats.slice(FILS_OBERTS_MAX).map(f => ({ ...f, estat: 'aparcat' }));
+  return { vius, excedents };
+}
+
+function reconciliarFilsRegistre(dades) {
+  const reg = ESTAT.llibreRegistre || {};
+  const aliasMap = construirAliasMapTrames();
+
+  const obertsActuals = deduplicarFilsNarratius(Array.isArray(reg.fils_oberts) ? reg.fils_oberts : [], aliasMap);
+  const tancatsActuals = deduplicarFilsNarratius(Array.isArray(reg.fils_tancats) ? reg.fils_tancats : [], aliasMap)
+    .map(f => ({ ...f, estat: 'tancat' }));
+
+  const obertsDeclarats = deduplicarFilsNarratius(Array.isArray(dades.fils_oberts) ? dades.fils_oberts : [], aliasMap);
+  const filsNous = deduplicarFilsNarratius(Array.isArray(dades.fils_nous_detectats) ? dades.fils_nous_detectats : [], aliasMap);
+  const tancatsDeclarats = deduplicarFilsNarratius(Array.isArray(dades.fils_tancats) ? dades.fils_tancats : [], aliasMap)
+    .concat(deduplicarFilsNarratius(Array.isArray(dades.fils_resolts_detectats) ? dades.fils_resolts_detectats : [], aliasMap))
+    .map(f => ({ ...f, estat: 'tancat' }));
+
+  const obertsMap = new Map([...obertsActuals, ...obertsDeclarats, ...filsNous].map(f => [f.id, f]));
+  const tancatsMap = new Map(tancatsActuals.map(f => [f.id, f]));
+
+  tancatsDeclarats.forEach(f => {
+    tancatsMap.set(f.id, f);
+    obertsMap.delete(f.id);
+  });
+
+  const obertsDedup = deduplicarFilsNarratius(Array.from(obertsMap.values()), aliasMap);
+  const limitat = aplicarLimitFilsOberts(obertsDedup);
+  limitat.excedents.forEach(f => tancatsMap.set(f.id, { ...f, estat: 'aparcat' }));
+
+  ESTAT.llibreRegistre.fils_oberts = limitat.vius;
+  ESTAT.llibreRegistre.fils_tancats = deduplicarFilsNarratius(Array.from(tancatsMap.values()), aliasMap);
+}
+
 
 async function actualitzarFilsNarratius(idx, textCapitol, userConfig) {
   const nkg = ESTAT._nkg || {};
   const reg = ESTAT.llibreRegistre || {};
-  const filsOberts   = Array.isArray(reg.fils_oberts)      ? reg.fils_oberts      : [];
-  const filsTancats  = Array.isArray(reg.fils_tancats)     ? reg.fils_tancats     : [];
+  const filsOberts   = deduplicarFilsNarratius(Array.isArray(reg.fils_oberts) ? reg.fils_oberts : []);
+  const filsTancats  = deduplicarFilsNarratius(Array.isArray(reg.fils_tancats) ? reg.fils_tancats : []);
   const beatsGastats = Array.isArray(nkg.beats_gastats)    ? nkg.beats_gastats    : [];
 
   const msgs = [{
@@ -4835,10 +5473,10 @@ async function actualitzarFilsNarratius(idx, textCapitol, userConfig) {
     content: `Analitza aquest capítol de novel·la des del punt de vista dels fils narratius.
 
 FILS OBERTS ACUMULATS FINS ARA:
-${filsOberts.slice(-10).map(f => `- ${f}`).join('\n') || '(cap)'}
+${filsOberts.slice(-10).map(f => `- ${filTextVisible(f)}`).join('\n') || '(cap)'}
 
 FILS TANCATS ACUMULATS FINS ARA:
-${filsTancats.slice(-5).map(f => `- ${f}`).join('\n') || '(cap)'}
+${filsTancats.slice(-5).map(f => `- ${filTextVisible(f)}`).join('\n') || '(cap)'}
 
 BEATS NARRATIUS JA GASTATS:
 ${beatsGastats.slice(-8).map(b => `- ${b}`).join('\n') || '(cap)'}
@@ -4866,25 +5504,27 @@ Retorna EXCLUSIVAMENT JSON vàlid:
   const dades = parseJsonRobust(raw);
   if (!dades) return;
 
-  // Actualitzar fils oberts/tancats
-  const obertsSet  = new Set(filsOberts);
-  const tancatsSet = new Set(filsTancats);
-  (dades.nous_fils_oberts || []).forEach(f => { if (f && f.trim()) obertsSet.add(f.trim()); });
-  (dades.fils_tancats_en_aquest_capitol || []).forEach(f => {
-    if (!f || !f.trim()) return;
-    const ft = f.trim();
-    tancatsSet.add(ft);
-    obertsSet.delete(ft);
-    // eliminació per inclusió parcial (variants de redacció)
-    for (const obert of [...obertsSet]) {
-      if (obert.toLowerCase().includes(ft.toLowerCase()) || ft.toLowerCase().includes(obert.toLowerCase())) {
-        tancatsSet.add(obert);
-        obertsSet.delete(obert);
-      }
-    }
+  // Actualitzar fils oberts/tancats (estructura tipada + deduplicació robusta)
+  const aliasMap = construirAliasMapTrames();
+  const obertsMap = new Map(filsOberts.map(f => [f.id, f]));
+  const tancatsMap = new Map(filsTancats.map(f => [f.id, { ...f, estat: 'tancat' }]));
+
+  deduplicarFilsNarratius(dades.nous_fils_oberts || [], aliasMap).forEach(f => {
+    obertsMap.set(f.id, { ...f, estat: 'obert', ultimaActualitzacioCapitol: idx + 1 });
   });
-  ESTAT.llibreRegistre.fils_oberts  = [...obertsSet];
-  ESTAT.llibreRegistre.fils_tancats = [...tancatsSet];
+
+  deduplicarFilsNarratius(dades.fils_tancats_en_aquest_capitol || [], aliasMap).forEach(f => {
+    tancatsMap.set(f.id, { ...f, estat: 'tancat', ultimaActualitzacioCapitol: idx + 1 });
+    obertsMap.delete(f.id);
+  });
+
+  const limitat = aplicarLimitFilsOberts(deduplicarFilsNarratius(Array.from(obertsMap.values()), aliasMap));
+  limitat.excedents.forEach(f => {
+    tancatsMap.set(f.id, { ...f, estat: 'aparcat', ultimaActualitzacioCapitol: idx + 1 });
+  });
+
+  ESTAT.llibreRegistre.fils_oberts  = limitat.vius;
+  ESTAT.llibreRegistre.fils_tancats = deduplicarFilsNarratius(Array.from(tancatsMap.values()), aliasMap);
 
   // Actualitzar beats_gastats al NKG
   if (!Array.isArray(ESTAT._nkg.beats_gastats)) ESTAT._nkg.beats_gastats = [];
@@ -4901,7 +5541,7 @@ Retorna EXCLUSIVAMENT JSON vàlid:
 }
 
 // FASE 8: registre síncron amb retry — s'awaita des de generarCapitol
-async function actualitzarLlibreRegistreBackground(textCapitol, idx, esRevisioSistema = false, userConfig) {
+async function actualitzarLlibreRegistreBackground(textCapitol, idx, esRevisioSistema = false, userConfig, opts = {}) {
   const cfg = userConfig || USER_CONFIG;
   const dades = await extreureDadesRegistreIAvaluarSistema(idx, textCapitol, esRevisioSistema, cfg);
   if (dades && dades.actualitzacio_nkg) {
@@ -4937,12 +5577,32 @@ async function actualitzarLlibreRegistreBackground(textCapitol, idx, esRevisioSi
     });
     renderCheckpointsHistoria();
   }
-  await actualitzarEstatsAnimics(textCapitol, idx, cfg);
-  await Promise.all([
-    generarResumLlarg(idx, textCapitol, cfg),
-    generarResumCurt(idx, textCapitol, cfg)
-  ]);
+  if (!opts.saltResumsIEstats) {
+    await actualitzarEstatsAnimics(textCapitol, idx, cfg);
+    await Promise.all([
+      generarResumLlarg(idx, textCapitol, cfg),
+      generarResumCurt(idx, textCapitol, cfg)
+    ]);
+  }
+  construirKSN(idx);
 }
+
+
+async function recalcularDerivatsDespresJutge(capitolsIdx, userConfig) {
+  const cfg = userConfig || USER_CONFIG;
+  const llista = Array.from(new Set((capitolsIdx || []).map(n => Number(n)).filter(n => Number.isInteger(n) && n >= 0))).sort((a, b) => a - b);
+  if (llista.length === 0) return;
+
+  for (const idx of llista) {
+    const text = String((ESTAT._capitols_generats && ESTAT._capitols_generats[idx]) || '').trim();
+    if (!text) continue;
+    try { await generarSnapshotValidat(idx, text, cfg); } catch (e) { console.warn('Post-jutge snapshot:', e.message); }
+    try { await actualitzarBiblia(text, idx, cfg); } catch (e) { console.warn('Post-jutge bíblia:', e.message); }
+    try { await actualitzarBeatsNarratiusGastats(text, idx + 1, cfg); } catch (e) { console.warn('Post-jutge beats:', e.message); }
+    try { await actualitzarLlibreRegistreBackground(text, idx, false, cfg, { saltResumsIEstats: true }); } catch (e) { console.warn('Post-jutge registre:', e.message); }
+  }
+}
+
 
 // ═══════════════════════════════════════════════════════════
 //  FASE 12: Control d'Arcs (Opus) + Epíleg (Sonnet)
@@ -5140,11 +5800,11 @@ function obrirLlibreRegistre() {
       </div>
       ${filsOberts.length > 0 ? `<div style="margin-bottom:18px;">
         <div class="world-bloc-titol" style="margin-bottom:8px;">Fils oberts</div>
-        ${filsOberts.map(f => `<div style="padding:5px 12px;border-left:2px solid var(--warning);margin-bottom:5px;font-size:.84rem;">${escHtml(f)}</div>`).join('\n')}
+        ${filsOberts.map(f => `<div style="padding:5px 12px;border-left:2px solid var(--warning);margin-bottom:5px;font-size:.84rem;">${escHtml(filTextVisible(f))}</div>`).join('\n')}
       </div>` : ''}
       ${filsTancat.length > 0 ? `<div style="margin-bottom:18px;">
         <div class="world-bloc-titol" style="margin-bottom:8px;">Fils tancats</div>
-        ${filsTancat.map(f => `<div style="padding:5px 12px;border-left:2px solid var(--success);margin-bottom:5px;font-size:.84rem;">${escHtml(f)}</div>`).join('\n')}
+        ${filsTancat.map(f => `<div style="padding:5px 12px;border-left:2px solid var(--success);margin-bottom:5px;font-size:.84rem;">${escHtml(filTextVisible(f))}</div>`).join('\n')}
       </div>` : ''}
       <div>
         <div class="world-bloc-titol" style="margin-bottom:10px;">Resums per capítol</div>
@@ -5387,10 +6047,17 @@ Retorna EXCLUSIVAMENT el text del prompt llest per copiar i enganxar, escrit en 
 }
 
 async function reescriureCapitolGlobal(idx) {
+  const perm = canRewrite(idx, 'full');
+  if (!perm.ok) { toast(perm.msg); return; }
   if (!ESTAT._capitols_generats[idx]) { toast('Capítol no disponible.'); return; }
 
   // Llegim les instruccions del mapa guardat per Opus (pot ser buit si Opus no les va donar)
-  const instruccions = (ESTAT._instruccionsReescripturaGlobal && ESTAT._instruccionsReescripturaGlobal[String(idx + 1)]) || '';
+  let instruccions = (ESTAT._instruccionsReescripturaGlobal && ESTAT._instruccionsReescripturaGlobal[String(idx + 1)]) || '';
+  if (idx >= 4 && idx <= 7) {
+    const canon58 = obtenirBlockCanon58();
+    if (!canon58 || canon58.frozen !== true) { toast('Cal BlockCanon 5-8 frozen abans de reescriure aquest bloc.'); return; }
+    instruccions += `\n\nRESTRICCIONS CANON BLOC 5-8:\n- No introdueixis fets nous.\n- No alteris time/location/object/character states.\n- Només exposició/ritme/formulació/aclariments.\nCANON:${JSON.stringify(canon58).slice(0,5000)}`;
+  }
 
   // Deshabilitem el botó que s'ha premut
   const reescrEl = document.getElementById('revisio-global-reescriptures');
@@ -5407,6 +6074,10 @@ async function reescriureCapitolGlobal(idx) {
   try {
     const res = await reescriureCapitolAmbInstruccions(idx, instruccions, USER_CONFIG);
     const textNet = netejarTabulacionsInicials(res.response);
+    if (idx >= 4 && idx <= 7) {
+      const val = validarCapitol5ContraCanon(textNet, obtenirBlockCanon58());
+      if (!val.ok) throw new Error(val.msg);
+    }
     ESTAT._capitols_generats[idx] = textNet;
     renderLlistaCapitols();
     hideLoader(11);
@@ -5545,14 +6216,22 @@ async function iniciarFaseTrames() {
   document.getElementById('trames-result').classList.add('hidden');
   try {
     const res   = await generarTrames(USER_CONFIG);
-    const dades = parseJsonRobust(res.response);
+    let dades = parseJsonRobust(res.response, ['nombre_capitols', 'trama_principal', 'subtrames', 'mapa_entrellacat']);
+    if (!dades) {
+      const reparada = await repararRespostaTrames(res.response, USER_CONFIG);
+      if (reparada && reparada.trim()) dades = parseJsonRobust(reparada, ['nombre_capitols', 'trama_principal', 'subtrames', 'mapa_entrellacat']);
+    }
     if (dades) {
       ESTAT.trames.trama_principal  = dades.trama_principal  || null;
       ESTAT.trames.subtrames        = dades.subtrames        || [];
       ESTAT.trames.mapa_entrellacat = dades.mapa_entrellacat || [];
 
       // Retry: si el mapa està incomplet, completar-lo per separat
-      const capsEsperats = ESTAT._nombreCapitols || 12;
+      const capsModel = Number(dades && dades.nombre_capitols);
+      const capsEsperats = (Number.isFinite(capsModel) && capsModel >= 12 && capsModel <= 14)
+        ? Math.round(capsModel)
+        : (ESTAT._nombreCapitols || 12);
+      if (Number.isFinite(capsModel) && capsModel >= 12 && capsModel <= 14) ESTAT._nombreCapitols = Math.round(capsModel);
       if (!dades.mapa_entrellacat || dades.mapa_entrellacat.length < capsEsperats) {
         console.warn(`Mapa entrellaçat incomplet: ${(dades.mapa_entrellacat||[]).length}/${capsEsperats}. Regenerant...`);
         document.getElementById('loader-9-5-text').textContent = '🔵 Completant mapa de trames…';
@@ -5572,6 +6251,31 @@ async function iniciarFaseTrames() {
   } catch (err) {
     hideLoader('9-5');
     alert('Error generant les trames: ' + err.message);
+  }
+}
+
+async function repararRespostaTrames(rawText, userConfig) {
+  const text = String(rawText || '').trim();
+  if (!text) return '';
+  const msgs = [{
+    role: 'user',
+    content: `Converteix aquesta sortida en JSON vàlid i estricte per al sistema de trames.
+No inventis camps ni contingut nou: només neteja format i retorna EXCLUSIVAMENT un objecte JSON.
+
+Sortida original:
+${text.substring(0, 12000)}`
+  }];
+
+  try {
+    return await callLLMMulti(
+      msgs,
+      'Ets un normalitzador de JSON. Retorna només JSON vàlid, sense markdown, sense explicacions.',
+      Object.assign({}, userConfig, { maxTokens: 2500, model: getModelConfig(userConfig).modelArquitecte }),
+      'arquitectura'
+    );
+  } catch (err) {
+    console.warn('No s\'ha pogut reparar la resposta de trames:', err.message);
+    return '';
   }
 }
 
@@ -5609,7 +6313,9 @@ function mostrarTrames(textOriginal, dades) {
     html += `<div style="font-weight:600;color:var(--accent2);margin:12px 0 8px">🗺️ Mapa d'Entrellaçat</div>
     <div style="font-size:.85rem;color:var(--text2)">`;
     dades.mapa_entrellacat.forEach(m => {
-      html += `<div style="margin-bottom:4px">Cap. ${m.capitol}: ${m.trames_actives ? m.trames_actives.join(' + ') : (m.notes || '')}</div>`;
+      const tramesActives = m.trames_actives ? m.trames_actives.join(' + ') : (m.notes || '');
+      const decisio = m.decisio_o_prova ? ` — <span style="color:var(--accent2)">Decisió/Prova:</span> ${escHtml(String(m.decisio_o_prova))}` : '';
+      html += `<div style="margin-bottom:6px">Cap. ${m.capitol}: ${escHtml(String(tramesActives))}${decisio}</div>`;
     });
     html += '</div>';
   }
@@ -6020,6 +6726,10 @@ async function callLLMOneShotPlusCompletion(messages, systemPrompt, config, tag)
 
   let text = primera.text || '';
 
+  if (safeConfig.modeEficient) {
+    return text;
+  }
+
   // Segona crida: només verificació de tancament (i, si cal, micro-completat).
   console.log('[callLLMOneShotPlusCompletion] Segona crida de validació final.');
   const missatgesTancament = [
@@ -6233,44 +6943,67 @@ async function callAnthropicWithFinishReason(messages, systemPrompt, apiKey, mod
 // ─── OpenAI (GPT) ───────────────────────────────────────────
 // OpenAI permet CORS des del navegador amb la seva API pública,
 // de manera que no cal proxy.
-async function callOpenAI(messages, systemPrompt, apiKey, model, maxTokens) {
+function isGPT5Model(modelId) {
+  return typeof modelId === 'string' && modelId.toLowerCase().startsWith('gpt-5');
+}
+
+function buildOpenAIPayload(messages, systemPrompt, model, maxTokens) {
+  const finalModel = model || PROVIDER_DEFAULTS.openai.model;
   const payload = {
-    model:      model || PROVIDER_DEFAULTS.openai.model,
-    messages:   buildOpenAIMessages(messages, systemPrompt),
-    max_tokens: maxTokens
+    model:    finalModel,
+    messages: buildOpenAIMessages(messages, systemPrompt)
   };
 
-  const raw = await fetchSegur(PROVIDER_DEFAULTS.openai.apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': 'Bearer ' + apiKey
-    },
-    body: JSON.stringify(payload)
-  });
+  if (typeof maxTokens === 'number' && Number.isFinite(maxTokens)) {
+    if (isGPT5Model(finalModel)) payload.max_completion_tokens = maxTokens;
+    else payload.max_tokens = maxTokens;
+  }
 
-  const result = await parseJsonResponse(raw, 'OpenAI');
+  return payload;
+}
+
+function removeOpenAITokenLimits(payload) {
+  const nextPayload = Object.assign({}, payload);
+  delete nextPayload.max_tokens;
+  delete nextPayload.max_completion_tokens;
+  return nextPayload;
+}
+
+async function fetchOpenAIWithFallback(payload, apiKey) {
+  const request = async (requestPayload) => {
+    const raw = await fetchSegur(PROVIDER_DEFAULTS.openai.apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': 'Bearer ' + apiKey
+      },
+      body: JSON.stringify(requestPayload)
+    });
+    return await parseJsonResponse(raw, 'OpenAI');
+  };
+
+  let result = await request(payload);
+  if (result.error && (payload.max_tokens || payload.max_completion_tokens)) {
+    const message = String(result.error.message || '').toLowerCase();
+    const tokenFieldUnsupported = message.includes('max_tokens') || message.includes('max_completion_tokens');
+    if (tokenFieldUnsupported) {
+      result = await request(removeOpenAITokenLimits(payload));
+    }
+  }
+
+  return result;
+}
+
+async function callOpenAI(messages, systemPrompt, apiKey, model, maxTokens) {
+  const payload = buildOpenAIPayload(messages, systemPrompt, model, maxTokens);
+  const result = await fetchOpenAIWithFallback(payload, apiKey);
   if (result.error) throw new Error(result.error.message || "Error desconegut d'OpenAI.");
   return analitzarRespostaGenerica(result, 'openai').text;
 }
 
 async function callOpenAIWithFinishReason(messages, systemPrompt, apiKey, model, maxTokens) {
-  const payload = {
-    model:      model || PROVIDER_DEFAULTS.openai.model,
-    messages:   buildOpenAIMessages(messages, systemPrompt),
-    max_tokens: maxTokens
-  };
-
-  const raw = await fetchSegur(PROVIDER_DEFAULTS.openai.apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': 'Bearer ' + apiKey
-    },
-    body: JSON.stringify(payload)
-  });
-
-  const result = await parseJsonResponse(raw, 'OpenAI');
+  const payload = buildOpenAIPayload(messages, systemPrompt, model, maxTokens);
+  const result = await fetchOpenAIWithFallback(payload, apiKey);
   if (result.error) throw new Error(result.error.message || "Error desconegut d'OpenAI.");
   return analitzarRespostaGenerica(result, 'openai');
 }
@@ -6394,7 +7127,9 @@ Apliques el principi d'unitat d'efecte de Poe: cada paraula serveix un únic imp
 Escrius amb economia de paraules, primera frase magnètica, tensió creixent i finals memorables que ressonen.
 Mai desperdicies una frase. Prioritzes mostrar sobre explicar.
 DIÀLEGS — SEPARACIÓ DE PARÀGRAFS: És OBLIGATORI fer un punt i a part (nova línia) cada vegada que canvia el personatge que parla o hi ha un canvi d'acció important. MAI barregis intervencions de dos personatges diferents en el mateix paràgraf.
-Escrius EXCLUSIVAMENT en català. Mai inclous paraules, frases ni comentaris en anglès o cap altra llengua. Mai afegeixes notes meta, indicacions de número de part ni cap text fora de la narració literària. Escriu directament el text.`;
+Escrius EXCLUSIVAMENT en català. Mai inclous paraules, frases ni comentaris en anglès o cap altra llengua. Mai afegeixes notes meta, indicacions de número de part ni cap text fora de la narració literària.
+ONOMÀSTICA I MÓN D'AUTOR: Conserva els noms propis, topònims, institucions, codis culturals i atmosfera del món particular de l'autor/gènere de referència. No facis 'adaptació catalana' de noms, llocs o contextos si no és una decisió narrativa explícita de l'usuari.
+Escriu directament el text.`;
 
 // ─── Extensió d'estil per autor (reutilitzable per conte i novel·la) ───
 function getGenreStyle(tematica) {
@@ -6920,7 +7655,7 @@ Per assegurar que hi caben tots en la teva resposta, sigues molt concís: dedica
     partsResposta.push(respostaBloc.trim());
   }
 
-  const response = partsResposta.join('\n\n');
+  const response = filtrarEstilsParlaPerSeleccionats(partsResposta.join('\n\n'), totsPersonatges);
   const newHistory = [...history, { role: 'assistant', content: response }];
   return { response, history: newHistory };
 }
@@ -7128,6 +7863,41 @@ function parseJsonRobust(text, expectedKeys = []) {
     try { return JSON.parse(repaired); } catch (e) { return null; }
   }
 
+  function extreureObjectesJSONTopLevel(candidate = '') {
+    const txt = String(candidate || '');
+    const spans = [];
+    let inString = false;
+    let escaped = false;
+    let depth = 0;
+    let start = -1;
+
+    for (let i = 0; i < txt.length; i++) {
+      const ch = txt[i];
+      if (inString) {
+        if (escaped) { escaped = false; continue; }
+        if (ch === '\\') { escaped = true; continue; }
+        if (ch === '"') inString = false;
+        continue;
+      }
+
+      if (ch === '"') { inString = true; continue; }
+      if (ch === '{') {
+        if (depth === 0) start = i;
+        depth += 1;
+        continue;
+      }
+      if (ch === '}') {
+        if (depth > 0) depth -= 1;
+        if (depth === 0 && start >= 0) {
+          spans.push(txt.slice(start, i + 1));
+          start = -1;
+        }
+      }
+    }
+
+    return spans;
+  }
+
   function validar(resultat, metode) {
     if (!resultat) return null;
     if (expectedKeys && expectedKeys.length > 0) {
@@ -7173,6 +7943,21 @@ function parseJsonRobust(text, expectedKeys = []) {
     if (parsedArray) return validar(parsedArray, 'Extracció Array []');
   }
 
+  // 5. Quan hi ha text extra abans/després o múltiples JSON consecutius, prova cada objecte top-level.
+  const objectesTop = extreureObjectesJSONTopLevel(s);
+  if (objectesTop.length > 0) {
+    const parsedCandidates = objectesTop
+      .map(c => parseLenientJson(c))
+      .filter(Boolean);
+    if (parsedCandidates.length > 0) {
+      if (expectedKeys && expectedKeys.length > 0) {
+        const ambClaus = parsedCandidates.find(obj => expectedKeys.every(k => k in obj));
+        if (ambClaus) return validar(ambClaus, 'Top-level Object Scan');
+      }
+      return validar(parsedCandidates[0], 'Top-level Object Scan');
+    }
+  }
+
   console.error("⛔ [parseJsonRobust] Totes les heurístiques han fallat. No s'ha pogut extreure JSON. Text rebut:\n", s.substring(0, 300) + "...");
   return null;
 }
@@ -7194,7 +7979,7 @@ Apliques les tècniques de Donna Tartt, Elena Ferrante i Carlos Ruiz Zafón: atm
 • CONTINUÏTAT D'ESCENA: No tanquis artificialment l'energia entre escenes. Cada escena ha de fluir cap a la següent amb una tensió o pregunta oberta, llevat que sigui el tancament explícit del capítol.
 
 ━━━ REGLES D'ESTIL ━━━
-• NOMS: Aplica l'article personal (en, la, l', na) i les preposicions contractes quan la normativa catalana ho requereix (la Maria, en Pere, amb la Júlia, del senyor Puig).
+• NOMS I CONTEXT D'AUTOR: Escriu en català, però preserva l'onomàstica i el món de referència (noms, topònims, institucions, codis socials i històrics). NO facis catalanització automàtica de noms o llocs (no converteixis John→Joan, London→Londres) tret que l'usuari ho demani explícitament.
 • PROSA: Evita el barroquisme. Màxim 1 adjectiu rellevant per substantiu. Pren-te el teu temps: descriu l'atmosfera, explora el monòleg intern, coreografia els moviments per l'espai. Ets exhaustiu i detallista.
 • RITME: Alterna escenes de tensió activa (frases curtes, diàleg incisiu, acció breu) amb moments de respiració (introspecció, detall sensorial, gest quotidià). El contrast de ritme és el que crea la il·lusió de velocitat.
 • SENSORIALITAT: PROHIBIT la prosa asèptica. Integra textura física i sensorial (olors, suor, fred, fricció material, sons ambientals) especialment quan la tensió és alta. Quan la tensió supera 7/10, els detalls viscerals són OBLIGATORIS.`;
@@ -7557,7 +8342,7 @@ function calcularPressioDeTancament(capitolActualIdx) {
 }
 
 function classificarPrioritatFil(filTxt) {
-  const f = String(filTxt || '').toLowerCase();
+  const f = filTextVisible(filTxt).toLowerCase();
   const nomsPrincipals = [ESTAT.protagonistaTriat]
     .concat((ESTAT._personatgesSeleccionats || []).slice(0, 3))
     .filter(Boolean)
@@ -7578,13 +8363,14 @@ function generarDirectivaFils(capitolActualIdx) {
   const baixa = [];
   oberts.forEach(f => {
     const p = classificarPrioritatFil(f);
-    if (p === 'alta') alta.push(f);
-    else if (p === 'mitjana') mitjana.push(f);
-    else baixa.push(f);
+    const label = filTextVisible(f);
+    if (p === 'alta') alta.push(label);
+    else if (p === 'mitjana') mitjana.push(label);
+    else baixa.push(label);
   });
 
   if (d.pressio === 'baixa') {
-    return `Fils narratius actius (referència): ${oberts.slice(0, 10).join(' | ')}. No cal tancar-los tots, però no els contradiguis.`;
+    return `Fils narratius actius (referència): ${oberts.slice(0, 10).map(f => filTextVisible(f)).join(' | ')}. No cal tancar-los tots, però no els contradiguis.`;
   }
 
   if (d.pressio === 'mitjana') {
@@ -7714,7 +8500,7 @@ function buildRegistreContextLegacy(idx) {
 
   if (reg.fils_oberts && reg.fils_oberts.length > 0) {
     parts.push('\nFils narratius oberts (OBLIGATORI tractar en aquest capítol o deixar explícitament obert):');
-    reg.fils_oberts.forEach(f => parts.push(`- ${f}`));
+    reg.fils_oberts.forEach(f => parts.push(`- ${filTextVisible(f)}`));
   }
 
   // Últims 2 resums de capítol
@@ -8130,7 +8916,7 @@ function filtrarContextFutur(capitolActualIdx) {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 3: Context complet per a cada capítol
+//  FASE 3: Concos íntegre per a cada capítol
 // ═══════════════════════════════════════════════════════════
 
 function buildContextCapitolsComplets(idx, opts = {}, estat = ESTAT) {
@@ -8206,6 +8992,36 @@ ${memoriaText.trim()}`);
 
 CAPÍTOLS ANTERIORS (Context dinàmic per pressupost de tokens):
 ${parts.join('\n\n')}`;
+}
+
+
+function buildContextTransicioBloc(idx, estat = ESTAT) {
+  if (!(idx > 0 && idx % 4 === 0)) return '';
+
+  const prevIdx = idx - 1;
+  const capPrev = String((estat._capitols_generats && estat._capitols_generats[prevIdx]) || '').trim();
+  if (!capPrev) return '';
+
+  const lines = [];
+  lines.push(`### CAPÍTOL ${prevIdx + 1} (COMPLET — OBLIGATORI EN TRANSICIÓ DE BLOC)`);
+  lines.push(capPrev);
+
+  const regCaps = (estat.llibreRegistre && Array.isArray(estat.llibreRegistre.capitols))
+    ? estat.llibreRegistre.capitols
+    : [];
+
+  for (let i = prevIdx - 1; i >= 0; i--) {
+    const reg = regCaps[i] || {};
+    const resum = String(reg.resum_curt || reg.resum_capitol || reg.resum_llarg || '').trim();
+    if (!resum) continue;
+    lines.push(`### CAPÍTOL ${i + 1} (Resum curt)`);
+    lines.push(resum);
+  }
+
+  return `
+
+TRANSICIÓ DE BLOC (regla 4-en-4):
+${lines.join('\n\n')}`;
 }
 
 function buildContextCapitolLegacy(idx, skipRegistre = false, estat = ESTAT) {
@@ -8286,7 +9102,20 @@ function buildContextCapitolLegacy(idx, skipRegistre = false, estat = ESTAT) {
     if (registreCtx && registreCtx.trim()) parts.push(registreCtx);
   }
 
-  // 4) Ajustos globals de rumb
+  // 4) KSN dels darrers capítols per preservar continuïtat compacta
+  const capitolsReg = (estat.llibreRegistre && Array.isArray(estat.llibreRegistre.capitols)) ? estat.llibreRegistre.capitols : [];
+  const ksnRecents = [];
+  for (let i = Math.max(0, idx - 3); i < idx; i++) {
+    const regCap = capitolsReg[i] || {};
+    const ksn = regCap.ksn || construirKSN(i);
+    if (!ksn) continue;
+    ksnRecents.push(`Cap.${i + 1}: ${JSON.stringify(ksn)}`);
+  }
+  if (ksnRecents.length > 0) {
+    parts.push('\nKSN (Kernel de Seguiment Narratiu) — darrers capítols:\n' + ksnRecents.join('\n'));
+  }
+
+  // 5) Ajustos globals de rumb
   if (estat._ajustosRumb) {
     const ajustos = typeof estat._ajustosRumb === 'string' ? estat._ajustosRumb : JSON.stringify(estat._ajustosRumb);
     if (ajustos && ajustos.trim()) {
@@ -8326,6 +9155,7 @@ function buildContextCapitol(idx) {
   const prohibirIniciMeteorologic = !!(r1 && r2 && r1.inici_meteorologic === true && r2.inici_meteorologic === true);
 
   const cap = estatContext._estructuraCapitols ? estatContext._estructuraCapitols[idx] : null;
+  const ctxTransicioBloc = buildContextTransicioBloc(idx, estatContext);
 
   // Context global (Brief, Bíblia, Trames, etc.) sempre present
   const ctxGlobalBase = ESTAT._nkg
@@ -8398,6 +9228,7 @@ function buildContextCapitol(idx) {
     const seccionsNkg = [
       ctxGlobalBase,
       blocEscaleta.length > 0 ? blocEscaleta.join('\n\n') : '',
+      ctxTransicioBloc,
       ctxNkg,
       blocFinal.length > 0 ? blocFinal.join('\n') : ''
     ].filter(Boolean);
@@ -8413,6 +9244,7 @@ function buildContextCapitol(idx) {
   const seccions = [
     ctxGlobalBase,
     blocEscaleta.length > 0 ? blocEscaleta.join('\n\n') : '',
+    ctxTransicioBloc,
     blocFinal.length > 0 ? blocFinal.join('\n') : ''
   ].filter(Boolean);
 
@@ -8651,7 +9483,7 @@ CRÍTIC: Han de ser EXACTAMENT ${capsQueFalten} capítols. L'últim (${capsEsper
 }
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 11: Escriure capítol (Sonnet) — FASE 3: Context complet
+//  FASE 11: Escriure capítol (Sonnet) — FASE 3: Concos íntegre
 // ═══════════════════════════════════════════════════════════
 function generarInstruccionsGanxoFinalCapitol(idx) {
   const esUltimCapitol = idx >= ((ESTAT._estructuraCapitols && ESTAT._estructuraCapitols.length) ? ESTAT._estructuraCapitols.length - 1 : 0);
@@ -8825,7 +9657,7 @@ async function revisarCapitol(textCapitol, idx, userConfig) {
     role: 'user',
     content: `Revisa aquest capítol i comprova la coherència amb tots els capítols anteriors i amb la planificació narrativa.
 ${capitolsAnteriors ? `
-CAPÍTOLS ANTERIORS (text complet — usa'ls per detectar incongruències, repeticions, contradiccions de fets, objectes, roba o emocions):
+CAPÍTOLS ANTERIORS (cos íntegre — usa'ls per detectar incongruències, repeticions, contradiccions de fets, objectes, roba o emocions):
 ${capitolsAnteriors}
 
 ` : ''}
@@ -9003,7 +9835,7 @@ Reescriu el capítol complet incorporant les correccions. Mantén la mateixa veu
 }
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 12: Control d'Arcs Narratius (Opus) — FASE 9: context complet
+//  FASE 12: Control d'Arcs Narratius (Opus) — FASE 9: concos íntegre
 // ═══════════════════════════════════════════════════════════
 async function controlArcsNovella(userConfig) {
   const reg = ESTAT.llibreRegistre;
@@ -9012,7 +9844,7 @@ async function controlArcsNovella(userConfig) {
     .filter(Boolean)
     .join('\n');
 
-  const filsOberts  = (reg.fils_oberts  || []).map(f => `- ${f}`).join('\n') || '(Cap registrat)';
+  const filsOberts  = (reg.fils_oberts  || []).map(f => `- ${filTextVisible(f)}`).join('\n') || '(Cap registrat)';
   const filsTancats = (reg.fils_tancats || []).map(f => `- ${f}`).join('\n') || '(Cap registrat)';
 
   // Estructura completa (JSON si disponible, text si legacy)
@@ -9082,7 +9914,7 @@ async function controlArcsIntermedi(capitolActual, userConfig) {
     .filter(Boolean)
     .join('\n');
 
-  const filsOberts = (reg.fils_oberts || []).map(f => `- ${f}`).join('\n') || '(Cap registrat)';
+  const filsOberts = (reg.fils_oberts || []).map(f => `- ${filTextVisible(f)}`).join('\n') || '(Cap registrat)';
 
   const prefCtx = llistarPrefiguracions();
 
@@ -9392,16 +10224,17 @@ ${ESTAT.estilsParla || '(No definits)'}
 
 Crea un disseny de trames entrellaçades que:
 1. Tingui una trama principal clara que connecti amb el final planificat
-2. 2-4 subtrames que enriqueixin el món i els personatges secundaris
-3. Un mapa de com les trames s'entrelaçen capítol a capítol (aproximat, 12-22 capítols)
+2. 2-3 subtrames màxim que enriqueixin el món i els personatges secundaris
+3. Un mapa de com les trames s'entrelaçen capítol a capítol per EXACTAMENT 12-14 capítols
 4. Cada subtrama ha de tenir una resolució pròpia (no necessàriament al capítol final)
 
 REGLA DE REALISME D'INVESTIGACIÓ: Prohibit utilitzar "MacGuffins" propis del cinema d'acció (com llapis USB encriptats amb autodestrucció, missatges pòstums pre-gravats, claus amagades en llocs secrets o pistes plantades de forma inversemblant). Tota investigació o descobriment de la veritat s'ha de fer a través de mètodes lents i realistes: creuament de dades financeres avorrides, sol·licituds de transparència governamental, contradiccions en documents notarials o factures, testimonis que diuen mitges veritats.
 
-IMPORTANT: El JSON ha de ser COMPLET. El mapa_entrellacat ha de cobrir TOTS els capítols (12-22 entrades). Les notes del mapa han de ser MOLT breus (3-5 paraules màxim per estalviar espai).
+IMPORTANT: El JSON ha de ser COMPLET i net (sense markdown, sense comentaris, sense codi).\n- "nombre_capitols" ha d'estar entre 12 i 14.\n- "subtrames" ha de tenir entre 2 i 3 elements.\n- "mapa_entrellacat" ha de tenir EXACTAMENT "nombre_capitols" entrades.\n- CADA capítol del "mapa_entrellacat" ha d'incloure una decisió irreversible o una prova nova al camp "decisio_o_prova" (NO val repetir "més paperassa").\n- Les notes del mapa han de ser MOLT breus (3-5 paraules màxim).
 
 Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense markdown, sense text addicional):
 {
+  "nombre_capitols": 13,
   "trama_principal": {
     "descripcio": "descripció de la trama principal en 3-5 línies",
     "conflicte_central": "el conflicte central en una frase",
@@ -9419,8 +10252,8 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense markdown, sense text addicio
     }
   ],
   "mapa_entrellacat": [
-    {"capitol": 1, "trames_actives": ["trama_principal"], "notes": "establiment del món"},
-    {"capitol": 2, "trames_actives": ["trama_principal", "subtrama_1"], "notes": "s'introdueix la subtrama 1"}
+    {"capitol": 1, "trames_actives": ["trama_principal"], "notes": "establiment del món", "decisio_o_prova": "Laia conserva una mostra d'accelerant fora del circuit intern."},
+    {"capitol": 2, "trames_actives": ["trama_principal", "subtrama_1"], "notes": "s'introdueix la subtrama 1", "decisio_o_prova": "Biel admet una ordre prèvia i fixa una hora verificable."}
   ]
 }`
   }];
@@ -9449,13 +10282,14 @@ SUBTRAMES: ${subtramesNoms || '(cap)'}
 Retorna EXCLUSIVAMENT un JSON vàlid amb EXACTAMENT ${capsEsperats} entrades:
 {
   "mapa_entrellacat": [
-    {"capitol": 1, "trames_actives": ["trama_principal"], "notes": "breu 3-5 paraules"},
-    {"capitol": 2, "trames_actives": ["trama_principal", "nom_subtrama"], "notes": "breu"},
+    {"capitol": 1, "trames_actives": ["trama_principal"], "notes": "breu 3-5 paraules", "decisio_o_prova": "una decisió irreversible o prova nova"},
+    {"capitol": 2, "trames_actives": ["trama_principal", "nom_subtrama"], "notes": "breu", "decisio_o_prova": "una decisió irreversible o prova nova"},
     ... fins a capitol ${capsEsperats}
   ]
 }
 
-CRÍTIC: Han de ser EXACTAMENT ${capsEsperats} entrades. Notes de 3-5 paraules MÀXIM.`
+CRÍTIC: Han de ser EXACTAMENT ${capsEsperats} entrades. Notes de 3-5 paraules MÀXIM.
+CADA entrada ha de tenir el camp "decisio_o_prova" amb una decisió irreversible o una prova nova concreta.`
   }];
   const response = await callLLMMulti(msgs,
     'Retorna EXCLUSIVAMENT JSON vàlid. Cap text addicional.',
@@ -9611,32 +10445,50 @@ async function jutgeIntervalInconsistencies(fromIdx, toIdx, userConfig) {
   const cfg = userConfig || USER_CONFIG;
   const models = getModelConfig(cfg);
   const capitols = ESTAT.llibreRegistre?.capitols || [];
-  const capsGenerats = ESTAT._capitols_generats || [];
   const nkg = ESTAT._nkg || {};
 
-  // Anteriors congelats: resum_curt de cada capítol 0..fromIdx-1
+  // Anteriors bloquejats: KSN + resum_curt (sense cos íntegre)
   const anteriorLines = [];
   for (let i = 0; i < fromIdx; i++) {
     const reg = capitols[i] || {};
-    const rc = (reg.resum_curt || '').trim();
-    if (rc) anteriorLines.push(`[Cap.${i + 1} — resum]: ${rc}`);
+    const ksn = reg.ksn || construirKSN(i);
+    const rc = (reg.resum_curt || ksn?.resum_curt || '').trim();
+    if (!ksn && !rc) continue;
+    anteriorLines.push(`[Cap.${i + 1} — KSN]: ${JSON.stringify(ksn || {})}`);
+    if (rc) anteriorLines.push(`[Cap.${i + 1} — resum_curt]: ${rc}`);
   }
   const contextAnteriors = anteriorLines.length
-    ? 'CAPÍTOLS ANTERIORS (congelats, resum):\n' + anteriorLines.join('\n')
+    ? 'CAPÍTOLS ANTERIORS BLOQUEJATS (KSN + resum_curt, sense cos íntegre):\n' + anteriorLines.join('\n')
     : '';
 
-  // Interval actiu: text sencer de cada capítol fromIdx..toIdx
+  // Interval actiu: KSN + resum_llarg opcional (sense cos íntegre)
   const actualLines = [];
   for (let i = fromIdx; i <= toIdx; i++) {
-    const text = (capsGenerats[i] || '').trim();
-    if (text) actualLines.push(`[Cap.${i + 1} — text complet]:\n${text}`);
+    const reg = capitols[i] || {};
+    const ksn = reg.ksn || construirKSN(i);
+    const resumLlarg = (reg.resum_llarg || '').trim();
+    actualLines.push(`[Cap.${i + 1} — KSN]: ${JSON.stringify(ksn || {})}`);
+    if (resumLlarg) actualLines.push(`[Cap.${i + 1} — resum_llarg]: ${resumLlarg}`);
   }
   const contextActual = actualLines.length
-    ? 'CAPÍTOLS DE L\'INTERVAL ACTIU (text sencer):\n' + actualLines.join('\n\n')
+    ? "CAPÍTOLS DE L'INTERVAL ACTIU (KSN + resum_llarg opcional, sense cos íntegre):\n" + actualLines.join('\n\n')
     : '';
 
   // NKG: últimes 15 entrades de cada timeline
   const sliceLast = (arr, n) => Array.isArray(arr) ? arr.slice(-n) : [];
+  const checkpointsCtx = Object.entries(ESTAT._checkpoints || {})
+    .map(([k, v]) => ({ idx: Number(k), v }))
+    .filter(it => Number.isInteger(it.idx) && it.idx <= toIdx && it.v)
+    .sort((a, b) => a.idx - b.idx)
+    .slice(-6)
+    .map(it => {
+      const q = it.v.qualitat_coherencia && typeof it.v.qualitat_coherencia === 'object'
+        ? `${it.v.qualitat_coherencia.puntuacio || '?'} (${it.v.qualitat_coherencia.diagnostic || ''})`
+        : 'sense puntuació';
+      const inc = Array.isArray(it.v.inconsistencies_cronologiques) ? it.v.inconsistencies_cronologiques.slice(0, 2).join(' | ') : '—';
+      return `Cap.${it.idx + 1}: qualitat=${q}; inconsistències=${inc}`;
+    }).join('\n') || '(cap checkpoint disponible)';
+
   const nkgCtx = [
     'NKG — TIMELINE ACCIONS (darreres 15):\n' + (sliceLast(nkg.timeline_accions, 15).map(e => typeof e === 'object' ? JSON.stringify(e) : e).join('\n') || '(cap)'),
     'NKG — TIMELINE PERSONATGES (darreres 15):\n' + (sliceLast(nkg.timeline_personatges, 15).map(e => typeof e === 'object' ? JSON.stringify(e) : e).join('\n') || '(cap)'),
@@ -9650,6 +10502,9 @@ ${contextAnteriors}
 ${contextActual}
 
 ${nkgCtx}
+
+CHECKPOINTS (revisions cada 3 capítols):
+${checkpointsCtx}
 
 Analitza els capítols de l'interval actiu (caps. ${fromIdx + 1}–${toIdx + 1}) i detecta inconsistències internes o respecte als capítols anteriors: contradiccions de fets, errors de continuïtat de personatges, objectes o localitzacions, anacronismes, inconsistències de to o veu narrativa, i salts de lògica.
 
@@ -9702,26 +10557,58 @@ Les claus de instruccions_correccio han de ser índexs en string (0-based) dins 
 
 async function aplicarCorreccionsJutge(fromIdx, toIdx, instruccions, userConfig) {
   const cfg = userConfig || USER_CONFIG;
-  for (const k of Object.keys(instruccions)) {
-    const idx = parseInt(k, 10);
+  const capitolsReescrits = [];
+  const capitolsLocked = (ESTAT._capitolsLocked && typeof ESTAT._capitolsLocked === 'object') ? ESTAT._capitolsLocked : {};
+  ESTAT._capitolsLocked = capitolsLocked;
+  const clausOrdenades = Object.keys(instruccions)
+    .map(k => ({ k, idx: parseInt(k, 10) }))
+    .filter(it => !isNaN(it.idx))
+    .sort((a, b) => b.idx - a.idx);
+
+  for (const { k, idx } of clausOrdenades) {
     if (isNaN(idx) || idx < fromIdx || idx > toIdx) continue; // guard: no tocar congelats
+    if (capitolsLocked[idx] === true) {
+      jutgePanelLog(`  🔒 Cap. ${idx + 1} bloquejat. No es reescriu.`);
+      continue;
+    }
+    const lockPerm = canRewrite(idx, 'patch', { reason: 'alineació canon jutge' });
+    if (!lockPerm.ok && obtenirLockCapitol(idx).lockState !== 'unlocked') {
+      jutgePanelLog(`  🔒 ${lockPerm.msg}`);
+      continue;
+    }
     const textOriginal = ESTAT._capitols_generats[idx];
     if (!textOriginal) continue;
     try {
       jutgePanelLog(`  ✏️ Reescrivint cap. ${idx + 1}…`);
-      const textCorregit = await reescriureAmbCorreccions(textOriginal, instruccions[k], idx, cfg);
+      let instr = instruccions[k];
+      if (idx >= 4 && idx <= 7) {
+        const c58 = obtenirBlockCanon58();
+        if (!c58 || c58.frozen !== true) throw new Error('Cal BlockCanon frozen per al bloc 5-8 abans de reescriptures.');
+      }
+      if (idx === 4) {
+        const canon = obtenirBlockCanon58();
+        if (!canon || canon.frozen !== true) throw new Error('Falta BlockCanon frozen 5-8 per reescriure capítol 5.');
+        instr = `${instr}\n\nRESTRICCIONS CANON BLOC 5-8 (OBLIGATÒRIES):\n- No introdueixis fets nous.\n- No alteris time/location/object/character states.\n- Només canvia exposició/ritme/formulació/aclariments sense nous fets.\nCANON:${JSON.stringify(canon).slice(0,5000)}`;
+      }
+      const textCorregit = await reescriureAmbCorreccions(textOriginal, instr, idx, cfg);
       if (!textCorregit) continue;
+      if (idx === 4) {
+        const val = validarCapitol5ContraCanon(textCorregit, obtenirBlockCanon58());
+        if (!val.ok) throw new Error(val.msg);
+      }
       ESTAT._capitols_generats[idx] = textCorregit;
       jutgePanelLog(`  🔄 Resincronitzant seguiment cap. ${idx + 1}…`);
-      await actualitzarLlibreRegistreBackground(textCorregit, idx, false, cfg);
+      await actualitzarLlibreRegistreBackground(textCorregit, idx, false, cfg, { saltResumsIEstats: true });
       await nkgActualitzarPostEscena(textCorregit, idx + 1, 1, cfg);
       await actualitzarFilsNarratius(idx, textCorregit, cfg);
+      capitolsReescrits.push(idx);
       jutgePanelLog(`  ✅ Cap. ${idx + 1} corregit i resincronitzat.`);
     } catch (err) {
       jutgePanelLog(`  ⚠️ Error cap. ${idx + 1}: ${err.message}`);
       console.warn(`aplicarCorreccionsJutge cap.${idx + 1}:`, err.message);
     }
   }
+  return capitolsReescrits;
 }
 
 function aplicarCorreccionsPerfilsJutge(correccions) {
@@ -9745,6 +10632,28 @@ function aplicarCorreccionsPerfilsJutge(correccions) {
 
 async function executarJutgeInterval(fromIdx, toIdx, userConfig) {
   const cfg = userConfig || USER_CONFIG;
+  for (let c = fromIdx; c <= toIdx; c++) {
+    if (!canJudge(c)) {
+      jutgePanelIniciar(`🔒 Jutge omès per lock state (cap. ${c + 1})`);
+      jutgePanelLog('Aquest capítol té bloqueig provisional/final.');
+      jutgePanelFinalitzar(true, 1);
+      return;
+    }
+  }
+  ESTAT._intervalLocks = (ESTAT._intervalLocks && typeof ESTAT._intervalLocks === 'object') ? ESTAT._intervalLocks : {};
+  ESTAT._capitolsLocked = (ESTAT._capitolsLocked && typeof ESTAT._capitolsLocked === 'object') ? ESTAT._capitolsLocked : {};
+  ESTAT._intervalsCongelats = Array.isArray(ESTAT._intervalsCongelats) ? ESTAT._intervalsCongelats : [];
+
+  const intervalKey = `${fromIdx}-${toIdx}`;
+  if (ESTAT._intervalLocks[intervalKey]) {
+    const lock = ESTAT._intervalLocks[intervalKey];
+    jutgePanelIniciar(`🔒 Interval bloquejat (caps. ${fromIdx + 1}–${toIdx + 1})`);
+    jutgePanelLog(`Interval: caps. ${fromIdx + 1}–${toIdx + 1}`);
+    jutgePanelLog(`Ja estava bloquejat a: ${lock.lockedAt || 'desconegut'}`);
+    jutgePanelLog("S'omet nova execució del jutge.");
+    jutgePanelFinalitzar(lock.net === true, lock.iteracions || 1);
+    return;
+  }
 
   jutgePanelIniciar(`⚖️ Jutge analitzant caps. ${fromIdx + 1}–${toIdx + 1}…`);
   jutgePanelLog(`Interval: caps. ${fromIdx + 1}–${toIdx + 1}`);
@@ -9752,7 +10661,14 @@ async function executarJutgeInterval(fromIdx, toIdx, userConfig) {
 
   let resultat = { net: false };
   let iter = 0;
-  const MAX_ITER = 3;
+  let capitolsReescrits = [];
+  const esBloc58 = fromIdx === 4 && toIdx === 7;
+  let blockCanon = null;
+  if (esBloc58) {
+    blockCanon = generarICongeleBlockCanon58();
+    jutgePanelLog(`📦 BlockCanon 5-8 congelat (v ${blockCanon.version}).`);
+  }
+  const MAX_ITER = 1;
   while (iter < MAX_ITER) {
     iter++;
     jutgePanelLog(`\n── Iteració ${iter}/${MAX_ITER} ──`);
@@ -9773,7 +10689,7 @@ async function executarJutgeInterval(fromIdx, toIdx, userConfig) {
     const fetsNous        = (cp && cp.fets_canonics)           ? cp.fets_canonics.filter(Boolean) : [];
     const clausSeguent    = (cp && cp.claus_seguent)           ? cp.claus_seguent.filter(Boolean) : [];
     if (persActualitzats.length > 0 || fetsNous.length > 0 || clausSeguent.length > 0) {
-      jutgePanelLog(`📋 Actualitzant bíblia (sense reescriptura):`);
+      jutgePanelLog('📋 Actualitzant bíblia (sense reescriptura):');
       persActualitzats.forEach(p => jutgePanelLog(`  👤 ${p.nom}: ${p.nou_estat || p.motivacions || '(actualitzat)'}`));
       fetsNous.forEach(f => jutgePanelLog(`  📌 Fet canònic: ${f}`));
       clausSeguent.forEach(c => jutgePanelLog(`  🔮 Guia futura: ${c}`));
@@ -9781,28 +10697,61 @@ async function executarJutgeInterval(fromIdx, toIdx, userConfig) {
     }
 
     // Correccions de text (cares — reescriuen capítols)
-    const claus = Object.keys(resultat.instruccions_correccio || {});
+    const claus = Object.keys(resultat.instruccions_correccio || {})
+      .map(k => ({ k, idx: parseInt(k, 10) }))
+      .filter(it => !isNaN(it.idx))
+      .sort((a, b) => b.idx - a.idx)
+      .map(it => it.k);
     if (claus.length > 0) {
       jutgePanelLog(`✏️ Reescriptures necessàries: ${claus.map(k => `cap.${parseInt(k, 10) + 1}`).join(', ')}`);
-      await aplicarCorreccionsJutge(fromIdx, toIdx, resultat.instruccions_correccio, cfg);
+      const reescritsIter = await aplicarCorreccionsJutge(fromIdx, toIdx, resultat.instruccions_correccio, cfg);
+      if (Array.isArray(reescritsIter) && reescritsIter.length > 0) capitolsReescrits.push(...reescritsIter);
     } else if (persActualitzats.length === 0 && fetsNous.length === 0 && clausSeguent.length === 0) {
       jutgePanelLog('Inconsistències detectades però sense correccions aplicables.');
-      break;
-    } else {
-      // Perfils actualitzats, no cal reescriure — sortim del loop
       break;
     }
   }
 
-  ESTAT._intervalsCongelats.push({
-    fromIdx, toIdx,
-    net: resultat.net,
-    iteracions: iter,
-  });
+  capitolsReescrits = Array.from(new Set(capitolsReescrits)).sort((a, b) => a - b);
+  if (capitolsReescrits.length > 0) {
+    jutgePanelLog(`📚 Recalculant derivats post-jutge: ${capitolsReescrits.map(i => `cap.${i + 1}`).join(', ')}`);
+    await recalcularDerivatsDespresJutge(capitolsReescrits, cfg);
+  }
 
-  jutgePanelLog(`\nFinalitzat. Net: ${resultat.net} | Iteracions: ${iter}`);
-  jutgePanelFinalitzar(resultat.net, iter);
+  let qualitatPostJutge = null;
+  try {
+    const cpPost = await executarCheckpoint(toIdx, cfg);
+    qualitatPostJutge = cpPost && cpPost.dades && cpPost.dades.puntuacio_coherencia != null
+      ? Number(cpPost.dades.puntuacio_coherencia)
+      : null;
+    if (qualitatPostJutge != null) jutgePanelLog(`📈 Qualitat post-jutge: ${qualitatPostJutge}/10`);
+  } catch (e) {
+    console.warn('Checkpoint post-jutge:', e.message);
+  }
+
+  const lock = {
+    fromIdx,
+    toIdx,
+    net: resultat.net === true,
+    iteracions: Math.max(1, iter),
+    qualitatPostJutge,
+    lockedAt: new Date().toISOString(),
+  };
+  ESTAT._intervalLocks[intervalKey] = lock;
+
+  for (let i = fromIdx; i <= toIdx; i++) {
+    ESTAT._capitolsLocked[i] = true;
+    setFinalLock(i, 'Jutge interval completat');
+  }
+
+  const jaCongelat = ESTAT._intervalsCongelats.some(iv => iv && iv.fromIdx === fromIdx && iv.toIdx === toIdx);
+  if (!jaCongelat) ESTAT._intervalsCongelats.push(lock);
+
+  jutgePanelLog(`\n🔒 Interval bloquejat: caps. ${fromIdx + 1}–${toIdx + 1}`);
+  jutgePanelLog(`Finalitzat. Net: ${lock.net} | Iteracions: ${lock.iteracions}`);
+  jutgePanelFinalitzar(lock.net, lock.iteracions);
 }
+
 
 // ═══════════════════════════════════════════════════════════
 //  FASE 10.5: Generar Escaleta per Bloc de Capítols (Opus)
@@ -10090,6 +11039,61 @@ Escriu la sinopsi en prosa contínua, sense llistes ni títols. Ha de ser útil 
   ESTAT._memoriasComprimides = (ESTAT._memoriasComprimides || []).filter(m => m.finsCap > finsCapitol);
   ESTAT._memoriasComprimides.push({ finsCap: finsCapitol, text: res || '' });
   ESTAT._memoriasComprimides.sort((a, b) => a.finsCap - b.finsCap);
+}
+
+async function generarResumsBloc(fromIdx, toIdx, userConfig) {
+  const cfg = userConfig || USER_CONFIG;
+  const caps = [];
+  for (let i = fromIdx; i <= toIdx; i++) {
+    const txt = String((ESTAT._capitols_generats && ESTAT._capitols_generats[i]) || '').trim();
+    if (!txt) continue;
+    caps.push({ idx: i, text: txt.slice(0, 9000) });
+  }
+  if (caps.length === 0) return;
+
+  const models = getModelConfig(cfg);
+  const msgs = [{
+    role: 'user',
+    content: `Genera resums de continuïtat per a aquest bloc de capítols.
+
+CAPÍTOLS:
+${caps.map(c => `CAP.${c.idx + 1}:\n${c.text}`).join('\n\n')}
+
+Retorna EXCLUSIVAMENT JSON vàlid:
+{
+  "resums": [
+    {"idx": 0, "resum_curt": "320-380 paraules", "resum_llarg": "900-1200 paraules"}
+  ]
+}`
+  }];
+
+  try {
+    const raw = await callLLMMulti(
+      msgs,
+      'Ets un editor literari de continuïtat. Retorna només JSON vàlid.',
+      Object.assign({}, cfg, { maxTokens: 3500, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+    const data = parseJsonRobust(raw);
+    const arr = Array.isArray(data && data.resums) ? data.resums : [];
+    arr.forEach(r => {
+      const idx = Number(r && r.idx);
+      if (!Number.isInteger(idx) || idx < fromIdx || idx > toIdx) return;
+      if (!ESTAT.llibreRegistre.capitols[idx]) ESTAT.llibreRegistre.capitols[idx] = normalitzarEntradaRegistre(null, ESTAT._capitols_generats[idx] || '', idx);
+      if (r.resum_curt && String(r.resum_curt).trim()) ESTAT.llibreRegistre.capitols[idx].resum_curt = String(r.resum_curt).trim();
+      if (r.resum_llarg && String(r.resum_llarg).trim()) ESTAT.llibreRegistre.capitols[idx].resum_llarg = String(r.resum_llarg).trim();
+      construirKSN(idx);
+    });
+  } catch (err) {
+    console.warn('Resums bloc:', err.message);
+    for (let i = fromIdx; i <= toIdx; i++) {
+      const txt = String((ESTAT._capitols_generats && ESTAT._capitols_generats[i]) || '').trim();
+      if (!txt) continue;
+      await generarResumLlarg(i, txt, cfg);
+      await generarResumCurt(i, txt, cfg);
+      construirKSN(i);
+    }
+  }
 }
 
 async function generarResumLlarg(idx, textCapitol, userConfig) {
@@ -11481,7 +12485,7 @@ async function extreureDadesRegistreIAvaluarSistema(idx, textCapitol, esRevisioS
         const pers = Array.isArray(c.estat_personatges)
           ? c.estat_personatges.map(p => `${p.nom} (${p.ubicacio || '?'}, ${p.estat_actual || '?'})`).join(', ')
           : (Array.isArray(c.personatges) ? c.personatges.map(p => `${p.nom} (${p.ubicacio || '?'}, ${p.estat || '?'})`).join(', ') : '');
-        const fils = Array.isArray(c.fils_oberts) ? c.fils_oberts.slice(0, 3).join(' | ') : '';
+        const fils = Array.isArray(c.fils_oberts) ? c.fils_oberts.slice(0, 3).map(f => filTextVisible(f)).join(' | ') : '';
         return `Cap.${i + 1}: ${c.resum_capitol || '(sense resum)'} | Personatges: ${pers || '—'} | Fils oberts: ${fils || '—'}`;
       })
       .filter(Boolean)
@@ -12039,6 +13043,9 @@ function renderitzarAnalisiVeu(capitolIdx) {
 async function microReescripturaBlocOpus(blocIniciIdx, blocFinalIdx, userConfig) {
   const capitolsBloc = [];
   for (let i = blocIniciIdx; i <= blocFinalIdx; i++) {
+    const lock = obtenirLockCapitol(i);
+    const permPatch = canRewrite(i, 'patch', { reason: 'micro' });
+    if (lock.lockState !== 'unlocked' && !permPatch.ok) continue;
     if (ESTAT._capitols_generats && ESTAT._capitols_generats[i]) {
       capitolsBloc.push({ idx: i, text: ESTAT._capitols_generats[i] });
     }
@@ -12087,6 +13094,9 @@ Retorna EXCLUSIVAMENT JSON:
   let goldenActualitzat = false;
   for (const passatge of diagnosi.passatges) {
     const capIdx = passatge.capitol_idx;
+    const lock = obtenirLockCapitol(capIdx);
+    const permPatch = canRewrite(capIdx, 'patch', { reason: 'micro' });
+    if (lock.lockState !== 'unlocked' && !permPatch.ok) continue;
     if (!ESTAT._capitols_generats || !ESTAT._capitols_generats[capIdx] || !passatge.text_original) continue;
 
     const promptReescriptura = [{
