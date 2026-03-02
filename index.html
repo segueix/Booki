@@ -7876,6 +7876,55 @@ function parseJsonRobust(text, expectedKeys = []) {
     return out;
   }
 
+
+  function normalitzarEscapesDinsStrings(candidate = '') {
+    const src = String(candidate || '');
+    if (!src) return src;
+
+    const escapesValids = new Set(['"', '\\', '/', 'b', 'f', 'n', 'r', 't', 'u']);
+    let out = '';
+    let inString = false;
+    let escaped = false;
+
+    for (let i = 0; i < src.length; i++) {
+      const ch = src[i];
+
+      if (inString) {
+        if (escaped) {
+          if (!escapesValids.has(ch)) out += '\\';
+          out += ch;
+          escaped = false;
+          continue;
+        }
+        if (ch === '\\') {
+          out += ch;
+          escaped = true;
+          continue;
+        }
+        if (ch === '"') {
+          out += ch;
+          inString = false;
+          continue;
+        }
+        if (ch === '\t') {
+          out += '\\t';
+          continue;
+        }
+        out += ch;
+        continue;
+      }
+
+      if (ch === '"') {
+        out += ch;
+        inString = true;
+        continue;
+      }
+      out += ch;
+    }
+
+    return out;
+  }
+
   function tancarJsonIncomplet(candidate = '') {
     const src = String(candidate || '');
     if (!src) return src;
@@ -7912,7 +7961,7 @@ function parseJsonRobust(text, expectedKeys = []) {
   function parseLenientJson(candidate) {
     if (!candidate || typeof candidate !== 'string') return null;
 
-    const cleaned = escaparSaltsLiniaDinsStrings(netejarCandidate(candidate));
+    const cleaned = normalitzarEscapesDinsStrings(escaparSaltsLiniaDinsStrings(netejarCandidate(candidate)));
     try { return JSON.parse(cleaned); } catch (e) {}
 
     // Heurística clau: si la resposta s'ha tallat, intentem tancar l'objecte/array i parsejar.
@@ -8013,6 +8062,15 @@ function parseJsonRobust(text, expectedKeys = []) {
       }
       return validar(parsedCandidates[0], 'Top-level Object Scan');
     }
+  }
+
+
+  // 6. Fallback agressiu: retalla a l'últim tancament visible i torna a provar.
+  const lastClose = Math.max(s.lastIndexOf('}'), s.lastIndexOf(']'));
+  if (lastClose > 0) {
+    const clipped = s.slice(0, lastClose + 1);
+    const parsedClipped = parseLenientJson(clipped);
+    if (parsedClipped) return validar(parsedClipped, 'Clipped Tail');
   }
 
   console.error("⛔ [parseJsonRobust] Totes les heurístiques han fallat. No s'ha pogut extreure JSON. Text rebut:\n", s.substring(0, 300) + "...");
