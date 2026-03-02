@@ -1498,6 +1498,68 @@ function exportarCopiaSeguretat() {
   }
 }
 
+
+function calcularEstudiDebilitatsLocal(estat = ESTAT) {
+  const caps = Array.isArray(estat._capitols_generats) ? estat._capitols_generats : [];
+  const regCaps = Array.isArray(estat.llibreRegistre && estat.llibreRegistre.capitols) ? estat.llibreRegistre.capitols : [];
+  const nkg = estat._nkg || {};
+  const checkpoints = estat._checkpoints && typeof estat._checkpoints === 'object' ? Object.values(estat._checkpoints) : [];
+  const noBuits = caps.map((t, i) => ({ i, t: String(t || '').trim() })).filter(x => x.t);
+
+  const totalCaps = noBuits.length;
+  const paraulesPerCap = noBuits.map(x => x.t.split(/\s+/).length);
+  const mitjaParaules = paraulesPerCap.length ? Math.round(paraulesPerCap.reduce((a, b) => a + b, 0) / paraulesPerCap.length) : 0;
+
+  const ambResumCurt = noBuits.filter(x => String(regCaps[x.i]?.resum_curt || '').trim()).length;
+  const ambResumLlarg = noBuits.filter(x => String(regCaps[x.i]?.resum_llarg || '').trim()).length;
+  const coberturaResums = totalCaps > 0 ? Math.round((Math.min(ambResumCurt, ambResumLlarg) / totalCaps) * 100) : 0;
+
+  const ambSnapshot = noBuits.filter(x => estat._snapshotsFinals && estat._snapshotsFinals[x.i]).length;
+  const coberturaSnapshots = totalCaps > 0 ? Math.round((ambSnapshot / totalCaps) * 100) : 0;
+
+  const filsOberts = Array.isArray(estat.llibreRegistre && estat.llibreRegistre.fils_oberts) ? estat.llibreRegistre.fils_oberts.length : 0;
+  const filsTancats = Array.isArray(estat.llibreRegistre && estat.llibreRegistre.fils_tancats) ? estat.llibreRegistre.fils_tancats.length : 0;
+  const beats = Array.isArray(nkg.beats_gastats) ? nkg.beats_gastats.length : 0;
+
+  const puntuacionsCheckpoint = checkpoints
+    .map(c => Number((c.qualitat_coherencia && c.qualitat_coherencia.puntuacio) || c.puntuacio_coherencia))
+    .filter(n => Number.isFinite(n));
+  const qualitatMitja = puntuacionsCheckpoint.length
+    ? (puntuacionsCheckpoint.reduce((a, b) => a + b, 0) / puntuacionsCheckpoint.length)
+    : null;
+
+  const debilitats = [];
+  if (coberturaResums < 100) debilitats.push({ id: 'resums_incomplets', severitat: 'alta', detall: `Cobertura resums completa ${coberturaResums}%` });
+  if (coberturaSnapshots < 100) debilitats.push({ id: 'snapshots_incomplets', severitat: 'mitjana', detall: `Cobertura snapshots ${coberturaSnapshots}%` });
+  if (mitjaParaules > 0 && mitjaParaules < 450) debilitats.push({ id: 'capitols_curts', severitat: 'mitjana', detall: `Mitjana ${mitjaParaules} paraules/capítol` });
+  if (filsOberts > 24) debilitats.push({ id: 'massa_fils_oberts', severitat: 'mitjana', detall: `${filsOberts} fils oberts actius` });
+  if (beats < Math.max(1, Math.floor(totalCaps * 0.8))) debilitats.push({ id: 'poca_diversitat_beats', severitat: 'baixa', detall: `${beats} beats per ${totalCaps} capítols` });
+  if (qualitatMitja != null && qualitatMitja < 7) debilitats.push({ id: 'qualitat_checkpoint_baixa', severitat: 'alta', detall: `Mitjana checkpoint ${qualitatMitja.toFixed(1)}/10` });
+
+  const millores = [];
+  if (debilitats.some(d => d.id === 'resums_incomplets')) millores.push({ prioritat: 'alta', proposta: 'Forçar generació de resums de bloc immediatament després de cada jutge i validar cobertura 100%.' });
+  if (debilitats.some(d => d.id === 'snapshots_incomplets')) millores.push({ prioritat: 'mitjana', proposta: 'Afegir fallback local de snapshot quan falli el parseig JSON del model.' });
+  if (debilitats.some(d => d.id === 'capitols_curts')) millores.push({ prioritat: 'mitjana', proposta: "Augmentar l'objectiu mínim de longitud i consolidar una única expansió post-capítol." });
+  if (debilitats.some(d => d.id === 'massa_fils_oberts')) millores.push({ prioritat: 'alta', proposta: 'Incrementar tancament assistit de fils al final de cada bloc i limitar fils vius crítics.' });
+  if (debilitats.some(d => d.id === 'qualitat_checkpoint_baixa')) millores.push({ prioritat: 'alta', proposta: 'Executar micro-reescriptura guiada només als capítols amb pitjor score, no a tot el bloc.' });
+  if (millores.length === 0) millores.push({ prioritat: 'baixa', proposta: 'Sistema estable: mantenir cadència actual i monitoritzar cobertura de resums/snapshots.' });
+
+  return {
+    metriques: {
+      totalCaps,
+      mitjaParaules,
+      coberturaResums,
+      coberturaSnapshots,
+      filsOberts,
+      filsTancats,
+      beats,
+      qualitatMitja: qualitatMitja != null ? Number(qualitatMitja.toFixed(2)) : null
+    },
+    debilitats,
+    millores
+  };
+}
+
 function exportarDiagnosticResums() {
   if (ESTAT.fase === 0) { toast('Encara no hi ha cap projecte per exportar.'); return; }
   const capitols = ESTAT.llibreRegistre?.capitols || [];
@@ -1663,6 +1725,35 @@ function exportarDiagnosticResums() {
   } else {
     lines.push('  (cap)');
   }
+  lines.push('');
+
+
+  // ── ESTUDI DE DEBILITATS (local, 0 crides LLM) ──────────
+  const estudi = calcularEstudiDebilitatsLocal(ESTAT);
+  lines.push('═══════════════════════════════════════════════════════════');
+  lines.push('  ESTUDI LOCAL DE DEBILITATS DEL SISTEMA (0 TOKENS API)');
+  lines.push('═══════════════════════════════════════════════════════════');
+  lines.push('');
+  lines.push(`MÈTRIQUES CLAU:`);
+  lines.push(`  · Capítols analitzats: ${estudi.metriques.totalCaps}`);
+  lines.push(`  · Mitjana paraules/capítol: ${estudi.metriques.mitjaParaules}`);
+  lines.push(`  · Cobertura resums (curt+llarg): ${estudi.metriques.coberturaResums}%`);
+  lines.push(`  · Cobertura snapshots: ${estudi.metriques.coberturaSnapshots}%`);
+  lines.push(`  · Fils oberts / tancats: ${estudi.metriques.filsOberts} / ${estudi.metriques.filsTancats}`);
+  lines.push(`  · Beats registrats: ${estudi.metriques.beats}`);
+  lines.push(`  · Qualitat checkpoint mitjana: ${estudi.metriques.qualitatMitja != null ? estudi.metriques.qualitatMitja + '/10' : 'N/D'}`);
+  lines.push('');
+
+  lines.push('DEBILITATS DETECTADES:');
+  if (estudi.debilitats.length === 0) {
+    lines.push("  (No s'han detectat debilitats crítiques amb les mètriques locals)");
+  } else {
+    estudi.debilitats.forEach(d => lines.push(`  · [${d.severitat}] ${d.id}: ${d.detall}`));
+  }
+  lines.push('');
+
+  lines.push('MILLORA RECOMANADA (prioritzada):');
+  estudi.millores.forEach(m => lines.push(`  · [${m.prioritat}] ${m.proposta}`));
   lines.push('');
 
   const contingut = lines.join('\n');
