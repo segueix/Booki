@@ -6870,44 +6870,67 @@ async function callAnthropicWithFinishReason(messages, systemPrompt, apiKey, mod
 // ─── OpenAI (GPT) ───────────────────────────────────────────
 // OpenAI permet CORS des del navegador amb la seva API pública,
 // de manera que no cal proxy.
-async function callOpenAI(messages, systemPrompt, apiKey, model, maxTokens) {
+function isGPT5Model(modelId) {
+  return typeof modelId === 'string' && modelId.toLowerCase().startsWith('gpt-5');
+}
+
+function buildOpenAIPayload(messages, systemPrompt, model, maxTokens) {
+  const finalModel = model || PROVIDER_DEFAULTS.openai.model;
   const payload = {
-    model:      model || PROVIDER_DEFAULTS.openai.model,
-    messages:   buildOpenAIMessages(messages, systemPrompt),
-    max_tokens: maxTokens
+    model:    finalModel,
+    messages: buildOpenAIMessages(messages, systemPrompt)
   };
 
-  const raw = await fetchSegur(PROVIDER_DEFAULTS.openai.apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': 'Bearer ' + apiKey
-    },
-    body: JSON.stringify(payload)
-  });
+  if (typeof maxTokens === 'number' && Number.isFinite(maxTokens)) {
+    if (isGPT5Model(finalModel)) payload.max_completion_tokens = maxTokens;
+    else payload.max_tokens = maxTokens;
+  }
 
-  const result = await parseJsonResponse(raw, 'OpenAI');
+  return payload;
+}
+
+function removeOpenAITokenLimits(payload) {
+  const nextPayload = Object.assign({}, payload);
+  delete nextPayload.max_tokens;
+  delete nextPayload.max_completion_tokens;
+  return nextPayload;
+}
+
+async function fetchOpenAIWithFallback(payload, apiKey) {
+  const request = async (requestPayload) => {
+    const raw = await fetchSegur(PROVIDER_DEFAULTS.openai.apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': 'Bearer ' + apiKey
+      },
+      body: JSON.stringify(requestPayload)
+    });
+    return await parseJsonResponse(raw, 'OpenAI');
+  };
+
+  let result = await request(payload);
+  if (result.error && (payload.max_tokens || payload.max_completion_tokens)) {
+    const message = String(result.error.message || '').toLowerCase();
+    const tokenFieldUnsupported = message.includes('max_tokens') || message.includes('max_completion_tokens');
+    if (tokenFieldUnsupported) {
+      result = await request(removeOpenAITokenLimits(payload));
+    }
+  }
+
+  return result;
+}
+
+async function callOpenAI(messages, systemPrompt, apiKey, model, maxTokens) {
+  const payload = buildOpenAIPayload(messages, systemPrompt, model, maxTokens);
+  const result = await fetchOpenAIWithFallback(payload, apiKey);
   if (result.error) throw new Error(result.error.message || "Error desconegut d'OpenAI.");
   return analitzarRespostaGenerica(result, 'openai').text;
 }
 
 async function callOpenAIWithFinishReason(messages, systemPrompt, apiKey, model, maxTokens) {
-  const payload = {
-    model:      model || PROVIDER_DEFAULTS.openai.model,
-    messages:   buildOpenAIMessages(messages, systemPrompt),
-    max_tokens: maxTokens
-  };
-
-  const raw = await fetchSegur(PROVIDER_DEFAULTS.openai.apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': 'Bearer ' + apiKey
-    },
-    body: JSON.stringify(payload)
-  });
-
-  const result = await parseJsonResponse(raw, 'OpenAI');
+  const payload = buildOpenAIPayload(messages, systemPrompt, model, maxTokens);
+  const result = await fetchOpenAIWithFallback(payload, apiKey);
   if (result.error) throw new Error(result.error.message || "Error desconegut d'OpenAI.");
   return analitzarRespostaGenerica(result, 'openai');
 }
