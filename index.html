@@ -12538,6 +12538,69 @@ Sigues crític, directe i molt tècnic.`;
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Ordenació de vídeos per categoria (nous primer + diversitat de canals)
+// ─────────────────────────────────────────────────────────────────────────────
+function obtenirDataVideoMs(video) {
+  if (!video || typeof video !== 'object') return 0;
+  const candidata = video.dataPublicacio || video.publicatEl || video.publishedAt || video.data || video.createdAt || null;
+  if (!candidata) return 0;
+  const t = Date.parse(candidata);
+  return Number.isFinite(t) ? t : 0;
+}
+
+function obtenirEtiquetaCanal(video) {
+  if (!video || typeof video !== 'object') return '';
+  return String(video.etiquetaCanal || video.canalEtiqueta || video.channelTag || video.youtuber || video.canal || '')
+    .trim()
+    .toLowerCase();
+}
+
+function ordenarVideosAmbDiversitat(videos) {
+  if (!Array.isArray(videos) || videos.length <= 1) return Array.isArray(videos) ? videos.slice() : [];
+
+  const videosOrdenatsPerData = videos
+    .slice()
+    .sort((a, b) => obtenirDataVideoMs(b) - obtenirDataVideoMs(a));
+
+  const cubellsPerCanal = new Map();
+  for (const video of videosOrdenatsPerData) {
+    const canal = obtenirEtiquetaCanal(video) || '__sense_canal__';
+    if (!cubellsPerCanal.has(canal)) cubellsPerCanal.set(canal, []);
+    cubellsPerCanal.get(canal).push(video);
+  }
+
+  const resultat = [];
+  const canals = Array.from(cubellsPerCanal.keys());
+
+  // Primera passada: màxima diversitat al principi (1 vídeo per canal)
+  for (const canal of canals) {
+    const cua = cubellsPerCanal.get(canal);
+    if (cua && cua.length) resultat.push(cua.shift());
+  }
+
+  // Resta: prioritzar el vídeo més nou evitant dos canals consecutius iguals
+  let ultimCanal = resultat.length ? obtenirEtiquetaCanal(resultat[resultat.length - 1]) || '__sense_canal__' : null;
+  while (true) {
+    const candidats = [];
+    for (const [canal, cua] of cubellsPerCanal.entries()) {
+      if (!cua || !cua.length) continue;
+      candidats.push({ canal, video: cua[0], dataMs: obtenirDataVideoMs(cua[0]) });
+    }
+    if (!candidats.length) break;
+
+    candidats.sort((a, b) => b.dataMs - a.dataMs);
+    const triat = candidats.find(c => c.canal !== ultimCanal) || candidats[0];
+    resultat.push(triat.video);
+    cubellsPerCanal.get(triat.canal).shift();
+    ultimCanal = triat.canal;
+  }
+
+  return resultat;
+}
+
+window.ordenarVideosAmbDiversitat = ordenarVideosAmbDiversitat;
+
 // ── Inicialització del selector de models en carregar la pàgina ──
 document.addEventListener('DOMContentLoaded', function() {
   // Aplicar preset econòmic per defecte i poblar selectors
