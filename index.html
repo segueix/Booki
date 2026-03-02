@@ -2096,7 +2096,7 @@ const MODEL_REGISTRY = {
     nom: 'GPT-5.2', nomCurt: 'GPT-5.2',
     proveidor: 'openai',
     input_per_m: 1.75, output_per_m: 14.00,
-    context_max: 400000, max_output: 4096,
+    context_max: 400000, max_output: 16384,
     qualitat: { draft: 80, prosa: 78, arquitectura: 82, extraccio: 85 },
     velocitat: 'rapida',
     notes: 'Fort en raonament i codi. Català acceptable però no natiu. Preu competitiu.'
@@ -6566,9 +6566,11 @@ function analitzarRespostaGenerica(respostaJSON, proveidor) {
 
 // ─── Helpers per llegir max_output del registre ──────────────
 function getMaxTokens(safeConfig, modelId) {
-  if (safeConfig.maxTokens) return safeConfig.maxTokens;
   const entry = MODEL_REGISTRY[modelId];
-  return (entry && entry.max_output) || 4096;
+  const modelMax = entry && entry.max_output;
+  const requested = safeConfig && safeConfig.maxTokens;
+  if (requested && modelMax) return Math.min(requested, modelMax);
+  return requested || modelMax || 4096;
 }
 
 // ─── Router multi-proveïdor i multi-rol — v5.1 ──────────────
@@ -12492,7 +12494,7 @@ Retorna únicament el text narratiu del capítol. Cap nota, cap metadada, cap co
   }];
 
   const models = getModelConfig(userConfig);
-  return await callLLMOneShotPlusCompletion(
+  return await callLLMOneShotConditionalCompletion(
     msgs,
     systemPrompt,
     Object.assign({}, userConfig, { maxTokens: 14000, model: models.modelGeneracio }),
