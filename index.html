@@ -4546,7 +4546,7 @@ async function processarDerivatsBlocAbansJutge(fromIdx, toIdx, userConfig) {
     }
     try { await actualitzarBiblia(txt, i, cfg); } catch (e) { console.warn('Bloc bíblia:', e.message); }
     try { await actualitzarBeatsNarratiusGastats(txt, i + 1, cfg); } catch (e) { console.warn('Bloc beats:', e.message); }
-    try { await actualitzarLlibreRegistreBackground(txt, i, false, cfg); } catch (e) { console.warn('Bloc registre:', e.message); }
+    try { await actualitzarLlibreRegistreBackground(txt, i, false, cfg, { saltResumsIEstats: true }); } catch (e) { console.warn('Bloc registre:', e.message); }
   }
 }
 
@@ -4647,6 +4647,7 @@ async function generarCapitol(idx, intents = 0) {
       const bloc = obtenirRangBlocPerCapitol(idx, totalCaps);
       document.getElementById('loader-11-text').textContent = `🧠 Preparant derivats del bloc (caps. ${bloc.fromIdx + 1}–${bloc.toIdx + 1})…`;
       await processarDerivatsBlocAbansJutge(bloc.fromIdx, bloc.toIdx, USER_CONFIG);
+      await generarResumsBloc(bloc.fromIdx, bloc.toIdx, USER_CONFIG);
       await arxitectePostCapitol(idx, textNet, USER_CONFIG, { derivatsJaProcessats: true, bloc });
     } else {
       // Evitem duplicar derivats abans de la passada del jutge del bloc.
@@ -4693,7 +4694,7 @@ async function arxitectePostCapitol(idx, textCapitol, userConfig, opts = {}) {
   try { actualitzarRegistreEstil(idx, textCapitol); generarAlertesEstil(); } catch (e) { console.warn('Estil:', e.message); }
 
   // Checkpoint de coherència narrativa cada 3 capítols
-  const esCheckpoint = !opts.derivatsJaProcessats && (!modeEficient || (idx + 1) % 6 === 0) && (idx + 1) % 3 === 0 && idx + 1 < ESTAT._estructuraCapitols.length;
+  const esCheckpoint = false; // desactivat: fem control de qualitat al tancament de bloc/post-jutge
   if (esCheckpoint) {
     try { await executarCheckpoint(idx, userConfig); } catch (e) { console.warn('Checkpoint:', e.message); }
   }
@@ -5411,7 +5412,7 @@ Retorna EXCLUSIVAMENT JSON vàlid:
 }
 
 // FASE 8: registre síncron amb retry — s'awaita des de generarCapitol
-async function actualitzarLlibreRegistreBackground(textCapitol, idx, esRevisioSistema = false, userConfig) {
+async function actualitzarLlibreRegistreBackground(textCapitol, idx, esRevisioSistema = false, userConfig, opts = {}) {
   const cfg = userConfig || USER_CONFIG;
   const dades = await extreureDadesRegistreIAvaluarSistema(idx, textCapitol, esRevisioSistema, cfg);
   if (dades && dades.actualitzacio_nkg) {
@@ -5447,11 +5448,13 @@ async function actualitzarLlibreRegistreBackground(textCapitol, idx, esRevisioSi
     });
     renderCheckpointsHistoria();
   }
-  await actualitzarEstatsAnimics(textCapitol, idx, cfg);
-  await Promise.all([
-    generarResumLlarg(idx, textCapitol, cfg),
-    generarResumCurt(idx, textCapitol, cfg)
-  ]);
+  if (!opts.saltResumsIEstats) {
+    await actualitzarEstatsAnimics(textCapitol, idx, cfg);
+    await Promise.all([
+      generarResumLlarg(idx, textCapitol, cfg),
+      generarResumCurt(idx, textCapitol, cfg)
+    ]);
+  }
   construirKSN(idx);
 }
 
@@ -5467,7 +5470,7 @@ async function recalcularDerivatsDespresJutge(capitolsIdx, userConfig) {
     try { await generarSnapshotValidat(idx, text, cfg); } catch (e) { console.warn('Post-jutge snapshot:', e.message); }
     try { await actualitzarBiblia(text, idx, cfg); } catch (e) { console.warn('Post-jutge bíblia:', e.message); }
     try { await actualitzarBeatsNarratiusGastats(text, idx + 1, cfg); } catch (e) { console.warn('Post-jutge beats:', e.message); }
-    try { await actualitzarLlibreRegistreBackground(text, idx, false, cfg); } catch (e) { console.warn('Post-jutge registre:', e.message); }
+    try { await actualitzarLlibreRegistreBackground(text, idx, false, cfg, { saltResumsIEstats: true }); } catch (e) { console.warn('Post-jutge registre:', e.message); }
   }
 }
 
@@ -10354,7 +10357,7 @@ async function aplicarCorreccionsJutge(fromIdx, toIdx, instruccions, userConfig)
       }
       ESTAT._capitols_generats[idx] = textCorregit;
       jutgePanelLog(`  🔄 Resincronitzant seguiment cap. ${idx + 1}…`);
-      await actualitzarLlibreRegistreBackground(textCorregit, idx, false, cfg);
+      await actualitzarLlibreRegistreBackground(textCorregit, idx, false, cfg, { saltResumsIEstats: true });
       await nkgActualitzarPostEscena(textCorregit, idx + 1, 1, cfg);
       await actualitzarFilsNarratius(idx, textCorregit, cfg);
       capitolsReescrits.push(idx);
@@ -10795,6 +10798,61 @@ Escriu la sinopsi en prosa contínua, sense llistes ni títols. Ha de ser útil 
   ESTAT._memoriasComprimides = (ESTAT._memoriasComprimides || []).filter(m => m.finsCap > finsCapitol);
   ESTAT._memoriasComprimides.push({ finsCap: finsCapitol, text: res || '' });
   ESTAT._memoriasComprimides.sort((a, b) => a.finsCap - b.finsCap);
+}
+
+async function generarResumsBloc(fromIdx, toIdx, userConfig) {
+  const cfg = userConfig || USER_CONFIG;
+  const caps = [];
+  for (let i = fromIdx; i <= toIdx; i++) {
+    const txt = String((ESTAT._capitols_generats && ESTAT._capitols_generats[i]) || '').trim();
+    if (!txt) continue;
+    caps.push({ idx: i, text: txt.slice(0, 9000) });
+  }
+  if (caps.length === 0) return;
+
+  const models = getModelConfig(cfg);
+  const msgs = [{
+    role: 'user',
+    content: `Genera resums de continuïtat per a aquest bloc de capítols.
+
+CAPÍTOLS:
+${caps.map(c => `CAP.${c.idx + 1}:\n${c.text}`).join('\n\n')}
+
+Retorna EXCLUSIVAMENT JSON vàlid:
+{
+  "resums": [
+    {"idx": 0, "resum_curt": "320-380 paraules", "resum_llarg": "900-1200 paraules"}
+  ]
+}`
+  }];
+
+  try {
+    const raw = await callLLMMulti(
+      msgs,
+      'Ets un editor literari de continuïtat. Retorna només JSON vàlid.',
+      Object.assign({}, cfg, { maxTokens: 3500, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+    const data = parseJsonRobust(raw);
+    const arr = Array.isArray(data && data.resums) ? data.resums : [];
+    arr.forEach(r => {
+      const idx = Number(r && r.idx);
+      if (!Number.isInteger(idx) || idx < fromIdx || idx > toIdx) return;
+      if (!ESTAT.llibreRegistre.capitols[idx]) ESTAT.llibreRegistre.capitols[idx] = normalitzarEntradaRegistre(null, ESTAT._capitols_generats[idx] || '', idx);
+      if (r.resum_curt && String(r.resum_curt).trim()) ESTAT.llibreRegistre.capitols[idx].resum_curt = String(r.resum_curt).trim();
+      if (r.resum_llarg && String(r.resum_llarg).trim()) ESTAT.llibreRegistre.capitols[idx].resum_llarg = String(r.resum_llarg).trim();
+      construirKSN(idx);
+    });
+  } catch (err) {
+    console.warn('Resums bloc:', err.message);
+    for (let i = fromIdx; i <= toIdx; i++) {
+      const txt = String((ESTAT._capitols_generats && ESTAT._capitols_generats[i]) || '').trim();
+      if (!txt) continue;
+      await generarResumLlarg(i, txt, cfg);
+      await generarResumCurt(i, txt, cfg);
+      construirKSN(i);
+    }
+  }
 }
 
 async function generarResumLlarg(idx, textCapitol, userConfig) {
