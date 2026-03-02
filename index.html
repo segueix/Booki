@@ -6975,6 +6975,33 @@ async function callAnthropicWithFinishReason(messages, systemPrompt, apiKey, mod
 // ─── OpenAI (GPT) ───────────────────────────────────────────
 // OpenAI permet CORS des del navegador amb la seva API pública,
 // de manera que no cal proxy.
+
+function isLocalFileOrigin() {
+  return typeof location !== 'undefined' && location.protocol === 'file:';
+}
+
+async function callOpenAIWithLocalFallback(messages, systemPrompt, model, maxTokens, mode = 'text') {
+  const geminiKey = ESTAT._geminiApiKey || '';
+  const anthropicKey = ESTAT._anthropicApiKey || '';
+
+  if (geminiKey) {
+    console.warn("[OpenAI fallback] Entorn file:// detectat. S'usa Gemini per evitar bloqueig CORS d'OpenAI.");
+    if (mode === 'finish') return await callGeminiWithFinishReason(messages, systemPrompt, geminiKey, PROVIDER_DEFAULTS.gemini.model, maxTokens);
+    return await callGemini(messages, systemPrompt, geminiKey, PROVIDER_DEFAULTS.gemini.model, maxTokens);
+  }
+
+  if (anthropicKey) {
+    console.warn("[OpenAI fallback] Entorn file:// detectat. S'usa Anthropic per evitar bloqueig CORS d'OpenAI.");
+    if (mode === 'finish') return await callAnthropicWithFinishReason(messages, systemPrompt, anthropicKey, PROVIDER_DEFAULTS.anthropic.model, maxTokens);
+    return await callAnthropic(messages, systemPrompt, anthropicKey, PROVIDER_DEFAULTS.anthropic.model, maxTokens);
+  }
+
+  throw new Error(
+    "No es pot cridar OpenAI directament des de file:// (origen null) per CORS. " +
+    "Serveix l'app via http://localhost o configura una clau Gemini/Anthropic per usar fallback automàtic."
+  );
+}
+
 function isGPT5Model(modelId) {
   return typeof modelId === 'string' && modelId.toLowerCase().startsWith('gpt-5');
 }
@@ -7027,6 +7054,9 @@ async function fetchOpenAIWithFallback(payload, apiKey) {
 }
 
 async function callOpenAI(messages, systemPrompt, apiKey, model, maxTokens) {
+  if (isLocalFileOrigin()) {
+    return await callOpenAIWithLocalFallback(messages, systemPrompt, model, maxTokens, 'text');
+  }
   const payload = buildOpenAIPayload(messages, systemPrompt, model, maxTokens);
   const result = await fetchOpenAIWithFallback(payload, apiKey);
   if (result.error) throw new Error(result.error.message || "Error desconegut d'OpenAI.");
@@ -7034,6 +7064,9 @@ async function callOpenAI(messages, systemPrompt, apiKey, model, maxTokens) {
 }
 
 async function callOpenAIWithFinishReason(messages, systemPrompt, apiKey, model, maxTokens) {
+  if (isLocalFileOrigin()) {
+    return await callOpenAIWithLocalFallback(messages, systemPrompt, model, maxTokens, 'finish');
+  }
   const payload = buildOpenAIPayload(messages, systemPrompt, model, maxTokens);
   const result = await fetchOpenAIWithFallback(payload, apiKey);
   if (result.error) throw new Error(result.error.message || "Error desconegut d'OpenAI.");
