@@ -2442,60 +2442,66 @@ function sortVideosByRoundRobin(videos) {
 
     const videosByChannel = {};
     videos.forEach(video => {
-        const channelId = video.channelId;
+        const channelId = String(video?.channelId || '');
+        if (!channelId) {
+            return;
+        }
         if (!videosByChannel[channelId]) {
             videosByChannel[channelId] = [];
         }
         videosByChannel[channelId].push(video);
     });
 
-    Object.values(videosByChannel).forEach(channelVideos => {
-        channelVideos.sort((a, b) => {
-            const dateA = new Date(a.publishedAt || a.uploadDate || 0);
-            const dateB = new Date(b.publishedAt || b.uploadDate || 0);
-            return dateB - dateA;
-        });
+    const channelIds = Object.keys(videosByChannel);
+    if (channelIds.length === 0) {
+        return [...videos];
+    }
+
+    const toTimestamp = (video) => new Date(video?.publishedAt || video?.uploadDate || 0).getTime() || 0;
+
+    channelIds.forEach((channelId) => {
+        videosByChannel[channelId].sort((a, b) => toTimestamp(b) - toTimestamp(a));
     });
 
-    const channelIds = Object.keys(videosByChannel);
-    if (channelIds.length === 0) return [];
-
     const sortedVideos = [];
-    let remaining = Object.values(videosByChannel).reduce((sum, list) => sum + list.length, 0);
-    let lastChannelId = null;
-    let channelIndex = 0;
 
-    while (remaining > 0) {
-        let picked = false;
-        for (let attempts = 0; attempts < channelIds.length; attempts++) {
-            const id = channelIds[channelIndex];
-            channelIndex = (channelIndex + 1) % channelIds.length;
-            if (!videosByChannel[id]?.length) {
-                continue;
-            }
-            if (id === lastChannelId) {
-                if (videosByChannel[id].length === remaining) {
-                    // Only this channel has videos left, allow consecutive placement.
-                } else {
-                    continue;
-                }
-            }
-            sortedVideos.push(videosByChannel[id].shift());
-            remaining -= 1;
-            lastChannelId = id;
-            picked = true;
+    // Fase 1: una primera volta amb tots els canals per maximitzar la diversitat inicial.
+    const firstPass = channelIds
+        .filter(channelId => videosByChannel[channelId].length > 0)
+        .sort((a, b) => toTimestamp(videosByChannel[b][0]) - toTimestamp(videosByChannel[a][0]));
+
+    firstPass.forEach((channelId) => {
+        const nextVideo = videosByChannel[channelId].shift();
+        if (nextVideo) {
+            sortedVideos.push(nextVideo);
+        }
+    });
+
+    // Fase 2: prioritzar recència evitant dos canals consecutius quan hi ha alternatives.
+    let lastChannelId = sortedVideos[sortedVideos.length - 1]?.channelId
+        ? String(sortedVideos[sortedVideos.length - 1].channelId)
+        : null;
+
+    while (channelIds.some(channelId => videosByChannel[channelId].length > 0)) {
+        const available = channelIds.filter(channelId => videosByChannel[channelId].length > 0);
+        const nonRepeated = available.filter(channelId => channelId !== lastChannelId);
+        const candidates = nonRepeated.length > 0 ? nonRepeated : available;
+
+        const bestChannel = candidates.sort(
+            (a, b) => toTimestamp(videosByChannel[b][0]) - toTimestamp(videosByChannel[a][0])
+        )[0];
+
+        if (!bestChannel) {
             break;
         }
-        if (!picked) {
-            const fallbackId = channelIds.find(id => videosByChannel[id]?.length);
-            if (!fallbackId) {
-                break;
-            }
-            sortedVideos.push(videosByChannel[fallbackId].shift());
-            remaining -= 1;
-            lastChannelId = fallbackId;
-            channelIndex = (channelIds.indexOf(fallbackId) + 1) % channelIds.length;
+
+        const nextVideo = videosByChannel[bestChannel].shift();
+        if (!nextVideo) {
+            break;
         }
+
+        sortedVideos.push(nextVideo);
+        lastChannelId = String(bestChannel);
     }
 
     return sortedVideos;
@@ -2899,7 +2905,7 @@ function renderFeed() {
         filtered = filterOutWatchedVideos(filtered);
     }
 
-    if (selectedCategory === 'Novetats') {
+    if (selectedCategory === 'Novetats' || isCustomCategory(selectedCategory)) {
         filtered = sortVideosByRoundRobin(filtered);
     } else if (HYBRID_CATEGORY_SORT.has(selectedCategory)) {
         filtered = hybridCategorySort(filtered);
