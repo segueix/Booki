@@ -6480,6 +6480,18 @@ async function parseJsonResponse(rawResponse, providerName) {
     const message = parsed && parsed.error
       ? (parsed.error.message || JSON.stringify(parsed.error))
       : rawText.slice(0, 300);
+    if (providerName === 'OpenAI' && statusCode === 401) {
+      throw new Error(
+        `OpenAI HTTP 401: ${message}\n` +
+        `Comprova que la API key sigui correcta, activa i amb facturació habilitada.`
+      );
+    }
+    if (providerName === 'OpenAI' && statusCode === 429) {
+      throw new Error(
+        `OpenAI HTTP 429: ${message}\n` +
+        `S'ha excedit el límit de quota/rate-limit. Espera uns segons o revisa l'ús i la quota del compte.`
+      );
+    }
     throw new Error(`${providerName} HTTP ${statusCode}: ${message}`);
   }
   return parsed;
@@ -6512,7 +6524,20 @@ const GeminiRL = {
 async function fetchSegur(url, options, maxIntents = 7) {
   const RETRYABLE = new Set([429, 503, 529]);
   for (let intent = 0; intent < maxIntents; intent++) {
-    const response = await fetch(url, options);
+    let response;
+    try {
+      response = await fetch(url, options);
+    } catch (err) {
+      const isOpenAI = /api\.openai\.com\/v1\/chat\/completions/i.test(String(url || ''));
+      const isLocalFile = typeof location !== 'undefined' && location.protocol === 'file:';
+      if (isOpenAI && isLocalFile) {
+        throw new Error(
+          `No es pot cridar OpenAI directament des de file:// (origen null) per CORS. ` +
+          `Serveix l'app via http://localhost o usa un backend/proxy.`
+        );
+      }
+      throw new Error(`Error de xarxa en la crida LLM: ${(err && err.message) || String(err)}`);
+    }
     if (!RETRYABLE.has(response.status)) return response;
     if (intent === maxIntents - 1) return response;
 
