@@ -663,14 +663,6 @@
       </label>
     </div>
 
-    <div class="checkbox-row" onclick="document.getElementById('config-mode-eficient').click()">
-      <input type="checkbox" id="config-mode-eficient" onclick="event.stopPropagation()">
-      <label for="config-mode-eficient">
-        <strong>Mode eficient de crides</strong> — minimitza crides API (més barat)
-        <small style="display:block;color:var(--text2);font-size:.78rem;margin-top:2px;">Fa validacions i sincronitzacions pesades cada 2 capítols i redueix passades de tancament.</small>
-      </label>
-    </div>
-
     <label class="field-label" for="config-target-qualitat" style="margin-top:10px;">Qualitat objectiu del jutge (0-100)</label>
     <input type="number" id="config-target-qualitat" min="60" max="98" step="1" value="85" placeholder="85">
     <small style="display:block;color:var(--text2);font-size:.78rem;margin-top:4px;">El generador iterarà fins assolir aquest llindar (amb límit de seguretat d'intents).</small>
@@ -1463,9 +1455,6 @@ function aplicarSnapshotProjecte(dades) {
   if (targetQualitatInput && USER_CONFIG && USER_CONFIG.targetQualitat != null) {
     targetQualitatInput.value = USER_CONFIG.targetQualitat;
   }
-
-  const modeEficientInput = document.getElementById('config-mode-eficient');
-  if (modeEficientInput) modeEficientInput.checked = !!(USER_CONFIG && USER_CONFIG.modeEficient);
 
   restaurarInterficieDesDeEstat();
 }
@@ -2274,7 +2263,6 @@ function guardarIComencar() {
     const modelGeneracioInput    = document.getElementById('config-model-generacio').value.trim();
     const modelArquitecturaInput = document.getElementById('config-model-arquitectura').value.trim();
     const fluxAutomatic     = document.getElementById('config-flux-automatic').checked;
-    const modeEficient      = !!document.getElementById('config-mode-eficient')?.checked;
     const targetQualitatEl  = document.getElementById('config-target-qualitat');
     const targetQualitatRaw = targetQualitatEl ? Number(targetQualitatEl.value) : 85;
     const targetQualitat    = Math.max(60, Math.min(98, Number.isFinite(targetQualitatRaw) ? targetQualitatRaw : 85));
@@ -2318,7 +2306,6 @@ function guardarIComencar() {
         arquitecte: modelArquitectura
       },
       fluxAutomatic,
-      modeEficient,
       targetQualitat
     };
 
@@ -2374,7 +2361,6 @@ function actualitzarConfiguracioActiva() {
     const modelGeneracioInput    = document.getElementById('config-model-generacio').value.trim();
     const modelArquitecturaInput = document.getElementById('config-model-arquitectura').value.trim();
     const fluxAutomatic     = document.getElementById('config-flux-automatic').checked;
-    const modeEficient      = !!document.getElementById('config-mode-eficient')?.checked;
     const targetQualitatEl  = document.getElementById('config-target-qualitat');
     const targetQualitatRaw = targetQualitatEl ? Number(targetQualitatEl.value) : 85;
     const targetQualitat    = Math.max(60, Math.min(98, Number.isFinite(targetQualitatRaw) ? targetQualitatRaw : 85));
@@ -2405,7 +2391,7 @@ function actualitzarConfiguracioActiva() {
       modelGeneracio, modelArquitectura, modelDraft,
       modelArquitecte: modelArquitectura,
       models: { draft: modelDraft, generacio: modelGeneracio, arquitecte: modelArquitectura },
-      fluxAutomatic, modeEficient, targetQualitat
+      fluxAutomatic, targetQualitat
     };
 
     if (typeof poblarSelectorsModels === 'function') poblarSelectorsModels();
@@ -4679,10 +4665,6 @@ async function processarDerivatsBlocAbansJutge(fromIdx, toIdx, userConfig) {
   }
 }
 
-function esModeEficient(userConfig = USER_CONFIG) {
-  return !!(userConfig && userConfig.modeEficient);
-}
-
 async function generarCapitol(idx, intents = 0) {
   const permGenerate = canRewrite(idx, 'full');
   if (idx < (ESTAT._estructuraCapitols || []).length && !permGenerate.ok) { toast(permGenerate.msg); return; }
@@ -4737,8 +4719,8 @@ async function generarCapitol(idx, intents = 0) {
     const ajust = await ajustarLongitud(idx, textNet, USER_CONFIG);
     textNet = ajust.text;
 
-    // PAS 6: Bucle de revisió de continuïtat (màxim 2 intents; 1 en mode eficient)
-    const intentsRevisioContinu = esModeEficient(USER_CONFIG) ? 1 : 2;
+    // PAS 6: Bucle de revisió de continuïtat (1 intent, mode econòmic permanent)
+    const intentsRevisioContinu = 1;
     for (let intent = 0; intent < intentsRevisioContinu; intent++) {
       try {
         document.getElementById('loader-11-text').textContent = `🔍 Revisió continuïtat cap. ${idx + 1} (intent ${intent + 1}/${intentsRevisioContinu})…`;
@@ -4796,11 +4778,10 @@ async function generarCapitol(idx, intents = 0) {
 }
 
 async function arxitectePostCapitol(idx, textCapitol, userConfig, opts = {}) {
-  const modeEficient = esModeEficient(userConfig);
-  const esRevisioSistema = idx > 0 && idx % 3 === 2 && (!modeEficient || (idx + 1) % 6 === 0); // en mode eficient, cada 6 capítols
+  const esRevisioSistema = idx > 0 && (idx + 1) % 6 === 0;
 
   const capitolNum = idx + 1;
-  const haDeSincronitzarPesat = !modeEficient || (capitolNum % 2 === 0) || capitolNum === ESTAT._estructuraCapitols.length;
+  const haDeSincronitzarPesat = (capitolNum % 2 === 0) || capitolNum === ESTAT._estructuraCapitols.length;
 
   // 1. Bíblia narrativa
   if (!opts.derivatsJaProcessats && haDeSincronitzarPesat) {
@@ -4830,7 +4811,7 @@ async function arxitectePostCapitol(idx, textCapitol, userConfig, opts = {}) {
 
   // Jutge d'interval cada 4 capítols
   const totalCaps = ESTAT._estructuraCapitols.length;
-  const esJutgeComplet = (!modeEficient || (idx + 1) % 8 === 0) && (idx + 1) % 4 === 0 && idx + 1 < totalCaps;
+  const esJutgeComplet = (idx + 1) % 8 === 0 && idx + 1 < totalCaps;
   const esJutgeFinal   = idx === totalCaps - 1 && (idx + 1) % 4 !== 0;
   if (esJutgeComplet || esJutgeFinal) {
     const fromJutge = esJutgeComplet
@@ -4844,7 +4825,7 @@ async function arxitectePostCapitol(idx, textCapitol, userConfig, opts = {}) {
   }
 
   // Compressió de memòria cada 5 capítols
-  const esCompressio = (!modeEficient || (idx + 1) % 10 === 0) && (idx + 1) % 5 === 0 && idx + 1 < ESTAT._estructuraCapitols.length;
+  const esCompressio = (idx + 1) % 10 === 0 && idx + 1 < ESTAT._estructuraCapitols.length;
   if (esCompressio) {
     const loaderEl = document.getElementById('loader-11-text');
     if (loaderEl) loaderEl.textContent = '🔵 Opus comprimint memòria narrativa…';
@@ -6725,47 +6706,6 @@ async function callLLMOneShotPlusCompletion(messages, systemPrompt, config, tag)
   }
 
   let text = primera.text || '';
-
-  if (safeConfig.modeEficient) {
-    return text;
-  }
-
-  // Segona crida: només verificació de tancament (i, si cal, micro-completat).
-  console.log('[callLLMOneShotPlusCompletion] Segona crida de validació final.');
-  const missatgesTancament = [
-    ...messages,
-    { role: 'assistant', content: text },
-    { role: 'user', content: `VERIFICACIÓ DE TANCAMENT (PASSADA 2):
-Revisa l'últim paràgraf que acabes d'escriure.
-1. Si el text està perfectament tancat a nivell narratiu, no s'ha tallat a mitja frase i la longitud és l'adequada, respon EXACTAMENT amb la paraula: OK
-2. Si el text s'ha tallat, ha quedat incomplet o necessita una expansió final per tancar bé l'escena/capítol, respon EXACTAMENT en aquest format:
-APPEND: <escriu aquí la continuació directa des del punt exacte on t'has aturat, afegint el desenvolupament final necessari per tancar-ho amb excel·lència>.
-No repeteixis res del que ja has escrit.` }
-  ];
-  const configTancament = Object.assign({}, safeConfig, { maxTokens: 220 });
-
-  try {
-    const revisio = (await callLLMMulti(missatgesTancament, systemPrompt, configTancament, tag) || '').trim();
-    if (/^OK\s*$/i.test(revisio)) return text;
-
-    const match = revisio.match(/^APPEND:\s*([\s\S]*)$/i);
-    if (match && match[1] && match[1].trim()) {
-      text += match[1].trimStart();
-      return text;
-    }
-
-    // Fallback robust: només si el detector local veu final incomplet.
-    if (primera.textIncomplet || textSemblaIncomplet(text)) {
-      const rescat = await callLLMMulti([
-        ...messages,
-        { role: 'assistant', content: text },
-        { role: 'user', content: "Completa NOMÉS el tram final si havia quedat tallat. No repeteixis res. Escriu només el mínim per tancar correctament la frase o l'últim paràgraf." }
-      ], systemPrompt, Object.assign({}, safeConfig, { maxTokens: 240 }), tag);
-      if (rescat && rescat.trim()) text += rescat;
-    }
-  } catch (err) {
-    console.warn('[callLLMOneShotPlusCompletion] Validació final fallida:', err.message);
-  }
 
   return text;
 }
