@@ -1996,6 +1996,7 @@ const ESTAT = {
   },
   _escaletes: [],
   _memoriasComprimides: [],
+  _resumsBlocs: {},
   _snapshotsFinals: {},
   _traitsImmutablesInicialitzats: false,
   _registreEstil: { frequencies: {}, alertes: [], verbs_atribucio: {}, tancaments: [] },
@@ -4133,6 +4134,15 @@ function setFinalLock(chapterId, reason = 'system final lock') {
   return lock;
 }
 
+function congelerBloc(fromIdx, toIdx) {
+  for (let i = fromIdx; i <= toIdx; i++) {
+    setFinalLock(i, `Bloc ${fromIdx + 1}–${toIdx + 1} congelat post-jutge`);
+  }
+  if (!Array.isArray(ESTAT._intervalsCongelats)) ESTAT._intervalsCongelats = [];
+  ESTAT._intervalsCongelats.push({ fromIdx, toIdx, frozenAt: new Date().toISOString() });
+  jutgePanelLog(`🔒 Bloc caps. ${fromIdx + 1}–${toIdx + 1} congelat definitivament.`);
+}
+
 function canJudge(chapterId) {
   const l = obtenirLockCapitol(chapterId);
   return l.lockState === 'unlocked';
@@ -4665,6 +4675,38 @@ async function processarDerivatsBlocAbansJutge(fromIdx, toIdx, userConfig) {
   }
 }
 
+async function tancamentBlocComplet(idx, bloc, userConfig) {
+  const { fromIdx, toIdx } = bloc;
+  const loader = document.getElementById('loader-11-text');
+
+  // A. Derivats pre-jutge
+  if (loader) loader.textContent = `🧠 Preparant derivats del bloc (caps. ${fromIdx+1}–${toIdx+1})…`;
+  await processarDerivatsBlocAbansJutge(fromIdx, toIdx, userConfig);
+
+  // B. Resums per capítol
+  if (loader) loader.textContent = `📝 Generant resums del bloc (caps. ${fromIdx+1}–${toIdx+1})…`;
+  await generarResumsBloc(fromIdx, toIdx, userConfig);
+
+  // C. Jutge — avalua + reescriu de dalt a baix si cal
+  if (loader) loader.textContent = `⚖️ Jutge avaluant el bloc (caps. ${fromIdx+1}–${toIdx+1})…`;
+  await executarJutgeInterval(fromIdx, toIdx, userConfig);
+
+  // D. Resum consolidat del bloc (UNA sola crida LLM)
+  if (loader) loader.textContent = `📦 Generant resum consolidat del bloc…`;
+  await generarResumConsolidatBloc(fromIdx, toIdx, userConfig);
+
+  // E. Congelar bloc
+  congelerBloc(fromIdx, toIdx);
+
+  // F. UI
+  renderLlistaCapitols();
+  hideLoader(11);
+  const totalCaps = ESTAT._estructuraCapitols.length;
+  const isLast = toIdx >= totalCaps - 1;
+  actualitzarEstatCapitol(idx, 'fet');
+  mostrarAccionsCapitolSimple(idx, isLast);
+}
+
 async function generarCapitol(idx, intents = 0) {
   const permGenerate = canRewrite(idx, 'full');
   if (idx < (ESTAT._estructuraCapitols || []).length && !permGenerate.ok) { toast(permGenerate.msg); return; }
@@ -4674,6 +4716,8 @@ async function generarCapitol(idx, intents = 0) {
     await executarLoopCoherenciaFinal(USER_CONFIG);
     try { await generarRevisioFinalApp(USER_CONFIG); } catch (err) { console.warn('Revisió final app:', err.message); }
     iniciarRevisioGlobal();
+    // Informe post-mortem automàtic al final de la novel·la
+    try { await generarInformePostMortem(); } catch (e) { console.warn('Post-mortem:', e.message); }
     return;
   }
 
@@ -4756,10 +4800,7 @@ async function generarCapitol(idx, intents = 0) {
     const tancamentBloc = esTancamentBloc(idx, totalCaps);
     if (tancamentBloc) {
       const bloc = obtenirRangBlocPerCapitol(idx, totalCaps);
-      document.getElementById('loader-11-text').textContent = `🧠 Preparant derivats del bloc (caps. ${bloc.fromIdx + 1}–${bloc.toIdx + 1})…`;
-      await processarDerivatsBlocAbansJutge(bloc.fromIdx, bloc.toIdx, USER_CONFIG);
-      await generarResumsBloc(bloc.fromIdx, bloc.toIdx, USER_CONFIG);
-      await arxitectePostCapitol(idx, textNet, USER_CONFIG, { derivatsJaProcessats: true, bloc });
+      await tancamentBlocComplet(idx, bloc, USER_CONFIG);
     } else {
       // Evitem duplicar derivats abans de la passada del jutge del bloc.
       generarCapitol(idx + 1);
@@ -4807,29 +4848,6 @@ async function arxitectePostCapitol(idx, textCapitol, userConfig, opts = {}) {
   const esCheckpoint = false; // desactivat: fem control de qualitat al tancament de bloc/post-jutge
   if (esCheckpoint) {
     try { await executarCheckpoint(idx, userConfig); } catch (e) { console.warn('Checkpoint:', e.message); }
-  }
-
-  // Jutge d'interval cada 4 capítols
-  const totalCaps = ESTAT._estructuraCapitols.length;
-  const esJutgeComplet = (idx + 1) % 8 === 0 && idx + 1 < totalCaps;
-  const esJutgeFinal   = idx === totalCaps - 1 && (idx + 1) % 4 !== 0;
-  if (esJutgeComplet || esJutgeFinal) {
-    const fromJutge = esJutgeComplet
-      ? idx - 3
-      : Math.floor(idx / 4) * 4;
-    try {
-      const loaderEl = document.getElementById('loader-11-text');
-      if (loaderEl) loaderEl.textContent = `⚖️ Jutge d'interval (caps. ${fromJutge + 1}–${idx + 1})…`;
-      await executarJutgeInterval(fromJutge, idx, userConfig);
-    } catch (e) { console.warn('Jutge interval:', e.message); }
-  }
-
-  // Compressió de memòria cada 5 capítols
-  const esCompressio = (idx + 1) % 10 === 0 && idx + 1 < ESTAT._estructuraCapitols.length;
-  if (esCompressio) {
-    const loaderEl = document.getElementById('loader-11-text');
-    if (loaderEl) loaderEl.textContent = '🔵 Opus comprimint memòria narrativa…';
-    try { await comprimirMemoria(idx + 1, userConfig); } catch (e) { console.warn('Compressió:', e.message); }
   }
 
   // Mostra panel de revisió de codi si escau
@@ -9154,6 +9172,29 @@ function buildContextCapitol(idx) {
     blocFinal.push(`INSTRUCCIONS DE PROSA: ${instrRitme}`);
   }
 
+  // Capítols anteriors del MATEIX BLOC (text complet, per continuïtat dins el bloc)
+  const blocActual = obtenirRangBlocPerCapitol(idx, (estatContext._estructuraCapitols || []).length);
+  const capsBloc = [];
+  for (let i = blocActual.fromIdx; i < idx; i++) {
+    const txt = String((ESTAT._capitols_generats || [])[i] || '').trim();
+    if (txt) capsBloc.push(`--- CAPÍTOL ${i + 1} (text complet) ---\n${txt}`);
+  }
+  const ctxCapitolsBloc = capsBloc.length > 0
+    ? `CAPÍTOLS JA ESCRITS EN AQUEST BLOC (mantén continuïtat perfecta):\n\n${capsBloc.join('\n\n')}`
+    : '';
+
+  // Resums consolidats de blocs anteriors (disponible des del bloc 2, idx >= 4)
+  const resumsBlocsAnteriorsList = [];
+  for (let bStart = 0; bStart < blocActual.fromIdx; bStart += 4) {
+    const bEnd = bStart + 3;
+    const key = `${bStart}-${bEnd}`;
+    const res = (ESTAT._resumsBlocs || {})[key];
+    if (res) resumsBlocsAnteriorsList.push(`RESUM BLOC caps. ${bStart+1}–${bEnd+1}:\n${res}`);
+  }
+  const ctxResumsBlocsAnteriors = resumsBlocsAnteriorsList.length > 0
+    ? resumsBlocsAnteriorsList.join('\n\n')
+    : '';
+
   // Quan NKG és actiu, combina (no substitueix) ctxGlobal + ctxNkg
   if (ESTAT._nkg) {
     const escenaSpec = {
@@ -9166,9 +9207,11 @@ function buildContextCapitol(idx) {
     const ctxNkg = nkgGenerarContextMinim(escenaSpec);
 
     const seccionsNkg = [
+      ctxResumsBlocsAnteriors,
       ctxGlobalBase,
       blocEscaleta.length > 0 ? blocEscaleta.join('\n\n') : '',
       ctxTransicioBloc,
+      ctxCapitolsBloc,
       ctxNkg,
       blocFinal.length > 0 ? blocFinal.join('\n') : ''
     ].filter(Boolean);
@@ -9182,9 +9225,11 @@ function buildContextCapitol(idx) {
   }
 
   const seccions = [
+    ctxResumsBlocsAnteriors,
     ctxGlobalBase,
     blocEscaleta.length > 0 ? blocEscaleta.join('\n\n') : '',
     ctxTransicioBloc,
+    ctxCapitolsBloc,
     blocFinal.length > 0 ? blocFinal.join('\n') : ''
   ].filter(Boolean);
 
@@ -10503,7 +10548,7 @@ async function aplicarCorreccionsJutge(fromIdx, toIdx, instruccions, userConfig)
   const clausOrdenades = Object.keys(instruccions)
     .map(k => ({ k, idx: parseInt(k, 10) }))
     .filter(it => !isNaN(it.idx))
-    .sort((a, b) => b.idx - a.idx);
+    .sort((a, b) => a.idx - b.idx);
 
   for (const { k, idx } of clausOrdenades) {
     if (isNaN(idx) || idx < fromIdx || idx > toIdx) continue; // guard: no tocar congelats
@@ -10640,7 +10685,7 @@ async function executarJutgeInterval(fromIdx, toIdx, userConfig) {
     const claus = Object.keys(resultat.instruccions_correccio || {})
       .map(k => ({ k, idx: parseInt(k, 10) }))
       .filter(it => !isNaN(it.idx))
-      .sort((a, b) => b.idx - a.idx)
+      .sort((a, b) => a.idx - b.idx)
       .map(it => it.k);
     if (claus.length > 0) {
       jutgePanelLog(`✏️ Reescriptures necessàries: ${claus.map(k => `cap.${parseInt(k, 10) + 1}`).join(', ')}`);
@@ -11033,6 +11078,47 @@ Retorna EXCLUSIVAMENT JSON vàlid:
       await generarResumCurt(i, txt, cfg);
       construirKSN(i);
     }
+  }
+}
+
+async function generarResumConsolidatBloc(fromIdx, toIdx, userConfig) {
+  const cfg = userConfig || USER_CONFIG;
+  const models = getModelConfig(cfg);
+  const caps = [];
+  for (let i = fromIdx; i <= toIdx; i++) {
+    const txt = String((ESTAT._capitols_generats && ESTAT._capitols_generats[i]) || '').trim();
+    const resumCurt = (ESTAT.llibreRegistre?.capitols?.[i]?.resum_curt || '').trim();
+    if (txt) caps.push({ idx: i, text: txt.slice(0, 6000), resumCurt });
+  }
+  if (caps.length === 0) return;
+  const msgs = [{
+    role: 'user',
+    content: `Genera UN RESUM CONSOLIDAT del BLOC de capítols ${fromIdx + 1}–${toIdx + 1}.
+
+CAPÍTOLS:
+${caps.map(c => `CAP.${c.idx + 1}:\n${c.text}\n\nRESUM CURT: ${c.resumCurt}`).join('\n\n---\n\n')}
+
+Escriu un resum consolidat de 400-500 paraules en prosa fluïda orientada al futur que capturi:
+- Estat final de tots els personatges principals
+- Fils narratius oberts i decisions irreversibles
+- Girs i moments clau del bloc
+- To i tensió narratius al final del bloc
+
+Retorna EXCLUSIVAMENT el text del resum, sense JSON ni etiquetes.`
+  }];
+  try {
+    const text = await callLLMMulti(
+      msgs,
+      'Ets un expert en síntesi narrativa. Respon amb text pla, sense JSON.',
+      Object.assign({}, cfg, { maxTokens: 900, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+    const key = `${fromIdx}-${toIdx}`;
+    ESTAT._resumsBlocs = ESTAT._resumsBlocs || {};
+    ESTAT._resumsBlocs[key] = (text || '').trim();
+    await comprimirMemoria(toIdx + 1, cfg);
+  } catch (err) {
+    console.warn('[generarResumConsolidatBloc]', err.message);
   }
 }
 
