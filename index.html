@@ -6216,10 +6216,10 @@ async function iniciarFaseTrames() {
   document.getElementById('trames-result').classList.add('hidden');
   try {
     const res   = await generarTrames(USER_CONFIG);
-    let dades = parseJsonRobust(res.response, ['trama_principal', 'subtrames', 'mapa_entrellacat']);
+    let dades = parseJsonRobust(res.response, ['nombre_capitols', 'trama_principal', 'subtrames', 'mapa_entrellacat']);
     if (!dades) {
       const reparada = await repararRespostaTrames(res.response, USER_CONFIG);
-      if (reparada && reparada.trim()) dades = parseJsonRobust(reparada, ['trama_principal', 'subtrames', 'mapa_entrellacat']);
+      if (reparada && reparada.trim()) dades = parseJsonRobust(reparada, ['nombre_capitols', 'trama_principal', 'subtrames', 'mapa_entrellacat']);
     }
     if (dades) {
       ESTAT.trames.trama_principal  = dades.trama_principal  || null;
@@ -6227,7 +6227,11 @@ async function iniciarFaseTrames() {
       ESTAT.trames.mapa_entrellacat = dades.mapa_entrellacat || [];
 
       // Retry: si el mapa està incomplet, completar-lo per separat
-      const capsEsperats = ESTAT._nombreCapitols || 12;
+      const capsModel = Number(dades && dades.nombre_capitols);
+      const capsEsperats = (Number.isFinite(capsModel) && capsModel >= 12 && capsModel <= 14)
+        ? Math.round(capsModel)
+        : (ESTAT._nombreCapitols || 12);
+      if (Number.isFinite(capsModel) && capsModel >= 12 && capsModel <= 14) ESTAT._nombreCapitols = Math.round(capsModel);
       if (!dades.mapa_entrellacat || dades.mapa_entrellacat.length < capsEsperats) {
         console.warn(`Mapa entrellaçat incomplet: ${(dades.mapa_entrellacat||[]).length}/${capsEsperats}. Regenerant...`);
         document.getElementById('loader-9-5-text').textContent = '🔵 Completant mapa de trames…';
@@ -6309,7 +6313,9 @@ function mostrarTrames(textOriginal, dades) {
     html += `<div style="font-weight:600;color:var(--accent2);margin:12px 0 8px">🗺️ Mapa d'Entrellaçat</div>
     <div style="font-size:.85rem;color:var(--text2)">`;
     dades.mapa_entrellacat.forEach(m => {
-      html += `<div style="margin-bottom:4px">Cap. ${m.capitol}: ${m.trames_actives ? m.trames_actives.join(' + ') : (m.notes || '')}</div>`;
+      const tramesActives = m.trames_actives ? m.trames_actives.join(' + ') : (m.notes || '');
+      const decisio = m.decisio_o_prova ? ` — <span style="color:var(--accent2)">Decisió/Prova:</span> ${escHtml(String(m.decisio_o_prova))}` : '';
+      html += `<div style="margin-bottom:6px">Cap. ${m.capitol}: ${escHtml(String(tramesActives))}${decisio}</div>`;
     });
     html += '</div>';
   }
@@ -10216,16 +10222,17 @@ ${ESTAT.estilsParla || '(No definits)'}
 
 Crea un disseny de trames entrellaçades que:
 1. Tingui una trama principal clara que connecti amb el final planificat
-2. 2-4 subtrames que enriqueixin el món i els personatges secundaris
-3. Un mapa de com les trames s'entrelaçen capítol a capítol (aproximat, 12-22 capítols)
+2. 2-3 subtrames màxim que enriqueixin el món i els personatges secundaris
+3. Un mapa de com les trames s'entrelaçen capítol a capítol per EXACTAMENT 12-14 capítols
 4. Cada subtrama ha de tenir una resolució pròpia (no necessàriament al capítol final)
 
 REGLA DE REALISME D'INVESTIGACIÓ: Prohibit utilitzar "MacGuffins" propis del cinema d'acció (com llapis USB encriptats amb autodestrucció, missatges pòstums pre-gravats, claus amagades en llocs secrets o pistes plantades de forma inversemblant). Tota investigació o descobriment de la veritat s'ha de fer a través de mètodes lents i realistes: creuament de dades financeres avorrides, sol·licituds de transparència governamental, contradiccions en documents notarials o factures, testimonis que diuen mitges veritats.
 
-IMPORTANT: El JSON ha de ser COMPLET. El mapa_entrellacat ha de cobrir TOTS els capítols (12-22 entrades). Les notes del mapa han de ser MOLT breus (3-5 paraules màxim per estalviar espai).
+IMPORTANT: El JSON ha de ser COMPLET i net (sense markdown, sense comentaris, sense codi).\n- "nombre_capitols" ha d'estar entre 12 i 14.\n- "subtrames" ha de tenir entre 2 i 3 elements.\n- "mapa_entrellacat" ha de tenir EXACTAMENT "nombre_capitols" entrades.\n- CADA capítol del "mapa_entrellacat" ha d'incloure una decisió irreversible o una prova nova al camp "decisio_o_prova" (NO val repetir "més paperassa").\n- Les notes del mapa han de ser MOLT breus (3-5 paraules màxim).
 
 Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense markdown, sense text addicional):
 {
+  "nombre_capitols": 13,
   "trama_principal": {
     "descripcio": "descripció de la trama principal en 3-5 línies",
     "conflicte_central": "el conflicte central en una frase",
@@ -10243,8 +10250,8 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense markdown, sense text addicio
     }
   ],
   "mapa_entrellacat": [
-    {"capitol": 1, "trames_actives": ["trama_principal"], "notes": "establiment del món"},
-    {"capitol": 2, "trames_actives": ["trama_principal", "subtrama_1"], "notes": "s'introdueix la subtrama 1"}
+    {"capitol": 1, "trames_actives": ["trama_principal"], "notes": "establiment del món", "decisio_o_prova": "Laia conserva una mostra d'accelerant fora del circuit intern."},
+    {"capitol": 2, "trames_actives": ["trama_principal", "subtrama_1"], "notes": "s'introdueix la subtrama 1", "decisio_o_prova": "Biel admet una ordre prèvia i fixa una hora verificable."}
   ]
 }`
   }];
@@ -10273,13 +10280,14 @@ SUBTRAMES: ${subtramesNoms || '(cap)'}
 Retorna EXCLUSIVAMENT un JSON vàlid amb EXACTAMENT ${capsEsperats} entrades:
 {
   "mapa_entrellacat": [
-    {"capitol": 1, "trames_actives": ["trama_principal"], "notes": "breu 3-5 paraules"},
-    {"capitol": 2, "trames_actives": ["trama_principal", "nom_subtrama"], "notes": "breu"},
+    {"capitol": 1, "trames_actives": ["trama_principal"], "notes": "breu 3-5 paraules", "decisio_o_prova": "una decisió irreversible o prova nova"},
+    {"capitol": 2, "trames_actives": ["trama_principal", "nom_subtrama"], "notes": "breu", "decisio_o_prova": "una decisió irreversible o prova nova"},
     ... fins a capitol ${capsEsperats}
   ]
 }
 
-CRÍTIC: Han de ser EXACTAMENT ${capsEsperats} entrades. Notes de 3-5 paraules MÀXIM.`
+CRÍTIC: Han de ser EXACTAMENT ${capsEsperats} entrades. Notes de 3-5 paraules MÀXIM.
+CADA entrada ha de tenir el camp "decisio_o_prova" amb una decisió irreversible o una prova nova concreta.`
   }];
   const response = await callLLMMulti(msgs,
     'Retorna EXCLUSIVAMENT JSON vàlid. Cap text addicional.',
