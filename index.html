@@ -4154,9 +4154,12 @@ function canJudge(chapterId) {
 
 function selfCheckLockingInvariants() {
   try {
+    // Evitem inspeccionar tot l'outerHTML (pot donar falsos positius per scripts duplicats del navegador).
+    console.assert(typeof executarJutgeInterval === 'function', 'Invariant: executarJutgeInterval ha d\'estar definit');
+    const fnSrc = String(executarJutgeInterval || '');
+    console.assert(fnSrc.includes('const MAX_ITER = 1;'), 'Invariant: MAX_ITER=1 requerit al jutge');
+
     const src = String(document.documentElement && document.documentElement.outerHTML || '');
-    console.assert((src.match(/function executarJutgeInterval\s*\(/g) || []).length === 1, 'Invariant: executarJutgeInterval ha de tenir 1 definició');
-    console.assert(src.includes('const MAX_ITER = 1;'), 'Invariant: MAX_ITER=1 requerit al jutge');
     const jiStart = src.indexOf('function jutgeIntervalInconsistencies');
     if (jiStart >= 0) {
       const jiEnd = src.indexOf('function aplicarCorreccionsJutge', jiStart);
@@ -6213,10 +6216,10 @@ async function iniciarFaseTrames() {
   document.getElementById('trames-result').classList.add('hidden');
   try {
     const res   = await generarTrames(USER_CONFIG);
-    let dades = parseJsonRobust(res.response);
+    let dades = parseJsonRobust(res.response, ['trama_principal', 'subtrames', 'mapa_entrellacat']);
     if (!dades) {
       const reparada = await repararRespostaTrames(res.response, USER_CONFIG);
-      if (reparada && reparada.trim()) dades = parseJsonRobust(reparada);
+      if (reparada && reparada.trim()) dades = parseJsonRobust(reparada, ['trama_principal', 'subtrames', 'mapa_entrellacat']);
     }
     if (dades) {
       ESTAT.trames.trama_principal  = dades.trama_principal  || null;
@@ -7852,6 +7855,41 @@ function parseJsonRobust(text, expectedKeys = []) {
     try { return JSON.parse(repaired); } catch (e) { return null; }
   }
 
+  function extreureObjectesJSONTopLevel(candidate = '') {
+    const txt = String(candidate || '');
+    const spans = [];
+    let inString = false;
+    let escaped = false;
+    let depth = 0;
+    let start = -1;
+
+    for (let i = 0; i < txt.length; i++) {
+      const ch = txt[i];
+      if (inString) {
+        if (escaped) { escaped = false; continue; }
+        if (ch === '\\') { escaped = true; continue; }
+        if (ch === '"') inString = false;
+        continue;
+      }
+
+      if (ch === '"') { inString = true; continue; }
+      if (ch === '{') {
+        if (depth === 0) start = i;
+        depth += 1;
+        continue;
+      }
+      if (ch === '}') {
+        if (depth > 0) depth -= 1;
+        if (depth === 0 && start >= 0) {
+          spans.push(txt.slice(start, i + 1));
+          start = -1;
+        }
+      }
+    }
+
+    return spans;
+  }
+
   function validar(resultat, metode) {
     if (!resultat) return null;
     if (expectedKeys && expectedKeys.length > 0) {
@@ -7895,6 +7933,21 @@ function parseJsonRobust(text, expectedKeys = []) {
     const arrayCandidate = arrEnd > arrStart ? s.slice(arrStart, arrEnd + 1) : s.slice(arrStart);
     let parsedArray = parseLenientJson(arrayCandidate);
     if (parsedArray) return validar(parsedArray, 'Extracció Array []');
+  }
+
+  // 5. Quan hi ha text extra abans/després o múltiples JSON consecutius, prova cada objecte top-level.
+  const objectesTop = extreureObjectesJSONTopLevel(s);
+  if (objectesTop.length > 0) {
+    const parsedCandidates = objectesTop
+      .map(c => parseLenientJson(c))
+      .filter(Boolean);
+    if (parsedCandidates.length > 0) {
+      if (expectedKeys && expectedKeys.length > 0) {
+        const ambClaus = parsedCandidates.find(obj => expectedKeys.every(k => k in obj));
+        if (ambClaus) return validar(ambClaus, 'Top-level Object Scan');
+      }
+      return validar(parsedCandidates[0], 'Top-level Object Scan');
+    }
   }
 
   console.error("⛔ [parseJsonRobust] Totes les heurístiques han fallat. No s'ha pogut extreure JSON. Text rebut:\n", s.substring(0, 300) + "...");
