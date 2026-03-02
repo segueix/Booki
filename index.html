@@ -3072,6 +3072,41 @@ function extreureEstilsPerPersonatge(text) {
   return mapa;
 }
 
+function filtrarEstilsParlaPerSeleccionats(text, nomsEsperats = []) {
+  const esperats = Array.isArray(nomsEsperats) ? nomsEsperats.filter(Boolean) : [];
+  if (!text || esperats.length === 0) return String(text || '').trim();
+
+  const keyOf = (nom = '') => normalitzarNomPersonatge(extreureNomPersonatge(nom) || nom);
+  const esperatsPerKey = {};
+  esperats.forEach(nom => {
+    const key = keyOf(nom);
+    if (key && !esperatsPerKey[key]) esperatsPerKey[key] = nom;
+  });
+
+  const blocs = String(text || '').split(/\n\n+/).map(b => b.trim()).filter(Boolean);
+  const trobats = {};
+
+  blocs.forEach(bloc => {
+    const m = bloc.match(/^\*\*(.+?)\*\*/m);
+    if (!m) return;
+    const nomBlocRaw = m[1].trim();
+    const key = keyOf(nomBlocRaw);
+    const nomOriginal = key ? esperatsPerKey[key] : null;
+    if (!nomOriginal || trobats[nomOriginal]) return;
+
+    // Força capçalera canònica per evitar duplicats per variants de nom
+    const blocCanon = bloc.replace(/^\*\*.+?\*\*/m, `**${nomOriginal}**`).trim();
+    trobats[nomOriginal] = blocCanon;
+  });
+
+  const sortida = esperats.map(nom => {
+    if (trobats[nom]) return trobats[nom];
+    return `**${nom}**\nVocabulari: pendent de generar\nFrases: pendent de generar\nTics: pendent de generar\nRegistre: pendent de generar\nExemple: «pend…»`;
+  });
+
+  return sortida.join('\n\n').trim();
+}
+
 function construirContextPsicologicPersonatges(limit = 8) {
   const perfils = ESTAT._perfilsPersonatges || {};
   const noms = ESTAT._personatgesSeleccionats || [];
@@ -6178,7 +6213,11 @@ async function iniciarFaseTrames() {
   document.getElementById('trames-result').classList.add('hidden');
   try {
     const res   = await generarTrames(USER_CONFIG);
-    const dades = parseJsonRobust(res.response);
+    let dades = parseJsonRobust(res.response);
+    if (!dades) {
+      const reparada = await repararRespostaTrames(res.response, USER_CONFIG);
+      if (reparada && reparada.trim()) dades = parseJsonRobust(reparada);
+    }
     if (dades) {
       ESTAT.trames.trama_principal  = dades.trama_principal  || null;
       ESTAT.trames.subtrames        = dades.subtrames        || [];
@@ -6205,6 +6244,31 @@ async function iniciarFaseTrames() {
   } catch (err) {
     hideLoader('9-5');
     alert('Error generant les trames: ' + err.message);
+  }
+}
+
+async function repararRespostaTrames(rawText, userConfig) {
+  const text = String(rawText || '').trim();
+  if (!text) return '';
+  const msgs = [{
+    role: 'user',
+    content: `Converteix aquesta sortida en JSON vàlid i estricte per al sistema de trames.
+No inventis camps ni contingut nou: només neteja format i retorna EXCLUSIVAMENT un objecte JSON.
+
+Sortida original:
+${text.substring(0, 12000)}`
+  }];
+
+  try {
+    return await callLLMMulti(
+      msgs,
+      'Ets un normalitzador de JSON. Retorna només JSON vàlid, sense markdown, sense explicacions.',
+      Object.assign({}, userConfig, { maxTokens: 2500, model: getModelConfig(userConfig).modelArquitecte }),
+      'arquitectura'
+    );
+  } catch (err) {
+    console.warn('No s\'ha pogut reparar la resposta de trames:', err.message);
+    return '';
   }
 }
 
@@ -7580,7 +7644,7 @@ Per assegurar que hi caben tots en la teva resposta, sigues molt concís: dedica
     partsResposta.push(respostaBloc.trim());
   }
 
-  const response = partsResposta.join('\n\n');
+  const response = filtrarEstilsParlaPerSeleccionats(partsResposta.join('\n\n'), totsPersonatges);
   const newHistory = [...history, { role: 'assistant', content: response }];
   return { response, history: newHistory };
 }
