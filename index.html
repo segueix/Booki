@@ -5434,6 +5434,23 @@ async function actualitzarLlibreRegistreBackground(textCapitol, idx, esRevisioSi
   construirKSN(idx);
 }
 
+
+async function recalcularDerivatsDespresJutge(capitolsIdx, userConfig) {
+  const cfg = userConfig || USER_CONFIG;
+  const llista = Array.from(new Set((capitolsIdx || []).map(n => Number(n)).filter(n => Number.isInteger(n) && n >= 0))).sort((a, b) => a - b);
+  if (llista.length === 0) return;
+
+  for (const idx of llista) {
+    const text = String((ESTAT._capitols_generats && ESTAT._capitols_generats[idx]) || '').trim();
+    if (!text) continue;
+    try { await generarSnapshotValidat(idx, text, cfg); } catch (e) { console.warn('Post-jutge snapshot:', e.message); }
+    try { await actualitzarBiblia(text, idx, cfg); } catch (e) { console.warn('Post-jutge bíblia:', e.message); }
+    try { await actualitzarBeatsNarratiusGastats(text, idx + 1, cfg); } catch (e) { console.warn('Post-jutge beats:', e.message); }
+    try { await actualitzarLlibreRegistreBackground(text, idx, false, cfg); } catch (e) { console.warn('Post-jutge registre:', e.message); }
+  }
+}
+
+
 // ═══════════════════════════════════════════════════════════
 //  FASE 12: Control d'Arcs (Opus) + Epíleg (Sonnet)
 // ═══════════════════════════════════════════════════════════
@@ -8845,6 +8862,10 @@ function buildContextCapitol(idx) {
   const prohibirIniciMeteorologic = !!(r1 && r2 && r1.inici_meteorologic === true && r2.inici_meteorologic === true);
 
   const cap = estatContext._estructuraCapitols ? estatContext._estructuraCapitols[idx] : null;
+  const forcarCapsCompletsBlocInicial = idx < 8; // caps 1-4 i 5-8
+  const ctxCapsComplets = forcarCapsCompletsBlocInicial
+    ? buildContextCapitolsComplets(idx, { maxParaules: 12000 }, estatContext)
+    : '';
 
   // Context global (Brief, Bíblia, Trames, etc.) sempre present
   const ctxGlobalBase = ESTAT._nkg
@@ -8917,6 +8938,7 @@ function buildContextCapitol(idx) {
     const seccionsNkg = [
       ctxGlobalBase,
       blocEscaleta.length > 0 ? blocEscaleta.join('\n\n') : '',
+      ctxCapsComplets,
       ctxNkg,
       blocFinal.length > 0 ? blocFinal.join('\n') : ''
     ].filter(Boolean);
@@ -8932,6 +8954,7 @@ function buildContextCapitol(idx) {
   const seccions = [
     ctxGlobalBase,
     blocEscaleta.length > 0 ? blocEscaleta.join('\n\n') : '',
+    ctxCapsComplets,
     blocFinal.length > 0 ? blocFinal.join('\n') : ''
   ].filter(Boolean);
 
@@ -10226,6 +10249,7 @@ Les claus de instruccions_correccio han de ser índexs en string (0-based) dins 
 
 async function aplicarCorreccionsJutge(fromIdx, toIdx, instruccions, userConfig) {
   const cfg = userConfig || USER_CONFIG;
+  const capitolsReescrits = [];
   const capitolsLocked = (ESTAT._capitolsLocked && typeof ESTAT._capitolsLocked === 'object') ? ESTAT._capitolsLocked : {};
   ESTAT._capitolsLocked = capitolsLocked;
   const clausOrdenades = Object.keys(instruccions)
@@ -10269,12 +10293,14 @@ async function aplicarCorreccionsJutge(fromIdx, toIdx, instruccions, userConfig)
       await actualitzarLlibreRegistreBackground(textCorregit, idx, false, cfg);
       await nkgActualitzarPostEscena(textCorregit, idx + 1, 1, cfg);
       await actualitzarFilsNarratius(idx, textCorregit, cfg);
+      capitolsReescrits.push(idx);
       jutgePanelLog(`  ✅ Cap. ${idx + 1} corregit i resincronitzat.`);
     } catch (err) {
       jutgePanelLog(`  ⚠️ Error cap. ${idx + 1}: ${err.message}`);
       console.warn(`aplicarCorreccionsJutge cap.${idx + 1}:`, err.message);
     }
   }
+  return capitolsReescrits;
 }
 
 function aplicarCorreccionsPerfilsJutge(correccions) {
@@ -10327,6 +10353,7 @@ async function executarJutgeInterval(fromIdx, toIdx, userConfig) {
 
   let resultat = { net: false };
   let iter = 0;
+  let capitolsReescrits = [];
   const esBloc58 = fromIdx === 4 && toIdx === 7;
   let blockCanon = null;
   if (esBloc58) {
@@ -10369,11 +10396,18 @@ async function executarJutgeInterval(fromIdx, toIdx, userConfig) {
       .map(it => it.k);
     if (claus.length > 0) {
       jutgePanelLog(`✏️ Reescriptures necessàries: ${claus.map(k => `cap.${parseInt(k, 10) + 1}`).join(', ')}`);
-      await aplicarCorreccionsJutge(fromIdx, toIdx, resultat.instruccions_correccio, cfg);
+      const reescritsIter = await aplicarCorreccionsJutge(fromIdx, toIdx, resultat.instruccions_correccio, cfg);
+      if (Array.isArray(reescritsIter) && reescritsIter.length > 0) capitolsReescrits.push(...reescritsIter);
     } else if (persActualitzats.length === 0 && fetsNous.length === 0 && clausSeguent.length === 0) {
       jutgePanelLog('Inconsistències detectades però sense correccions aplicables.');
       break;
     }
+  }
+
+  capitolsReescrits = Array.from(new Set(capitolsReescrits)).sort((a, b) => a - b);
+  if (capitolsReescrits.length > 0) {
+    jutgePanelLog(`📚 Recalculant derivats post-jutge: ${capitolsReescrits.map(i => `cap.${i + 1}`).join(', ')}`);
+    await recalcularDerivatsDespresJutge(capitolsReescrits, cfg);
   }
 
   const lock = {
