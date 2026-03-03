@@ -6531,34 +6531,52 @@ const GeminiRL = {
 
 // ─── fetchSegur: fetch amb backoff exponencial ───────────────
 // Substitueix fetch() directe per a totes les crides LLM.
-// Reintenta automàticament si l'API retorna 429, 503 o 529.
+// Reintenta automàticament si l'API retorna 429, 5xx o 529.
 // Llegeix el header Retry-After (present en 429 de Gemini).
 async function fetchSegur(url, options, maxIntents = 7) {
-  const RETRYABLE = new Set([429, 503, 529]);
+  const RETRYABLE = new Set([429, 500, 502, 503, 504, 529]);
+  let ultimErrorXarxa = null;
+
   for (let intent = 0; intent < maxIntents; intent++) {
-    const response = await fetch(url, options);
+    let response;
+    try {
+      response = await fetch(url, options);
+    } catch (netErr) {
+      ultimErrorXarxa = netErr;
+      if (intent === maxIntents - 1) throw netErr;
+      const delayNetMs = Math.min(5000 * Math.pow(2, intent), 60000) + Math.random() * 3000;
+      console.warn(`[fetchSegur] Error de xarxa (${netErr && netErr.message ? netErr.message : 'fetch failed'}) — reintent ${intent + 1}/${maxIntents - 1} en ${(delayNetMs / 1000).toFixed(1)}s...`);
+      await new Promise(resolve => setTimeout(resolve, delayNetMs));
+      continue;
+    }
+
     if (!RETRYABLE.has(response.status)) return response;
     if (intent === maxIntents - 1) return response;
 
-    // Llegir Retry-After si el servidor l'indica (Gemini ho fa en 429)
+    // Llegir Retry-After si el servidor l'indica (sovint en 429 i alguns 503)
     let delayMs;
     const retryAfter = response.headers.get('Retry-After') || response.headers.get('retry-after');
     if (retryAfter && !isNaN(Number(retryAfter))) {
       delayMs = Number(retryAfter) * 1000 + 1500; // marge extra d'1.5s
     } else {
-      // 429 → base 20s (els límits de Gemini solen ser per minut)
-      // 503/529 → base 5s (sobrecàrrega transitòria)
-      const base = response.status === 429 ? 20000 : 5000;
+      // 429 → base 20s (quota)
+      // 5xx/529 → base 8s (sobrecàrrega transitòria del proveïdor)
+      const base = response.status === 429 ? 20000 : 8000;
       delayMs = Math.min(base * Math.pow(2, intent), 120000); // cap a 2 min
       delayMs += Math.random() * 3000; // jitter per evitar thundering herd
     }
+
     // Avisar el rate limiter global perquè crides concurrents esperin
-    if (response.status === 429 && typeof GeminiRL !== 'undefined') {
+    if (typeof GeminiRL !== 'undefined' && (response.status === 429 || response.status === 503 || response.status === 529)) {
       GeminiRL.penalitzar(delayMs);
     }
+
     console.warn(`[fetchSegur] HTTP ${response.status} — reintent ${intent + 1}/${maxIntents - 1} en ${(delayMs / 1000).toFixed(1)}s...`);
     await new Promise(resolve => setTimeout(resolve, delayMs));
   }
+
+  if (ultimErrorXarxa) throw ultimErrorXarxa;
+  throw new Error('fetchSegur: intents exhaurits sense resposta vàlida.');
 }
 
 // ─── analitzarRespostaGenerica: parser estandarditzat ────────
