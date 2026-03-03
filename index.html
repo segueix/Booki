@@ -667,6 +667,10 @@
     <input type="number" id="config-target-qualitat" min="60" max="98" step="1" value="85" placeholder="85">
     <small style="display:block;color:var(--text2);font-size:.78rem;margin-top:4px;">El generador iterarà fins assolir aquest llindar (amb límit de seguretat d'intents).</small>
 
+    <label class="field-label" for="config-delay-capitols" style="margin-top:10px;">Pausa entre capítols (segons, mode semi-automàtic)</label>
+    <input type="number" id="config-delay-capitols" min="0" max="300" step="5" value="30" placeholder="30">
+    <small style="display:block;color:var(--text2);font-size:.78rem;margin-top:4px;">Controla el ritme de crides: 20–60s ajuda a evitar pics de TPM i errors 429.</small>
+
     <!-- Panell de selecció de models flexible v5.1 -->
     <div id="panellModels" style="margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:8px;">
       <h3 style="margin:0 0 10px;font-size:1em;">⚙️ Configuració de Models</h3>
@@ -1354,6 +1358,12 @@ function esModeManualEntreCapitols() {
   return !!(USER_CONFIG && USER_CONFIG.fluxAutomatic && ESTAT._modeManualCapitols);
 }
 
+function obtenirDelayEntreCapitolsMs() {
+  const raw = Number(USER_CONFIG && USER_CONFIG.delayEntreCapitolsMs);
+  if (!Number.isFinite(raw)) return 30000;
+  return Math.max(0, Math.min(300000, raw));
+}
+
 function actualitzarBotoModeManualCapitols() {
   const btn = document.getElementById('btn-mode-manual-capitols');
   if (!btn) return;
@@ -1454,6 +1464,10 @@ function aplicarSnapshotProjecte(dades) {
   const targetQualitatInput = document.getElementById('config-target-qualitat');
   if (targetQualitatInput && USER_CONFIG && USER_CONFIG.targetQualitat != null) {
     targetQualitatInput.value = USER_CONFIG.targetQualitat;
+  }
+  const delayInput = document.getElementById('config-delay-capitols');
+  if (delayInput && USER_CONFIG && USER_CONFIG.delayEntreCapitolsMs != null) {
+    delayInput.value = Math.round(Number(USER_CONFIG.delayEntreCapitolsMs) / 1000);
   }
 
   restaurarInterficieDesDeEstat();
@@ -2267,6 +2281,9 @@ function guardarIComencar() {
     const targetQualitatEl  = document.getElementById('config-target-qualitat');
     const targetQualitatRaw = targetQualitatEl ? Number(targetQualitatEl.value) : 85;
     const targetQualitat    = Math.max(60, Math.min(98, Number.isFinite(targetQualitatRaw) ? targetQualitatRaw : 85));
+    const delayEl = document.getElementById('config-delay-capitols');
+    const delayRaw = delayEl ? Number(delayEl.value) : 30;
+    const delayEntreCapitolsMs = Math.max(0, Math.min(300000, (Number.isFinite(delayRaw) ? delayRaw : 30) * 1000));
 
     // Prioritzem el que l'usuari veu al panell en aquest moment (inputs/selectors),
     // per evitar arrossegar valors antics d'ESTAT d'un proveïdor diferent.
@@ -2307,7 +2324,8 @@ function guardarIComencar() {
         arquitecte: modelArquitectura
       },
       fluxAutomatic,
-      targetQualitat
+      targetQualitat,
+      delayEntreCapitolsMs
     };
 
     if (typeof poblarSelectorsModels === 'function') {
@@ -2365,6 +2383,9 @@ function actualitzarConfiguracioActiva() {
     const targetQualitatEl  = document.getElementById('config-target-qualitat');
     const targetQualitatRaw = targetQualitatEl ? Number(targetQualitatEl.value) : 85;
     const targetQualitat    = Math.max(60, Math.min(98, Number.isFinite(targetQualitatRaw) ? targetQualitatRaw : 85));
+    const delayEl           = document.getElementById('config-delay-capitols');
+    const delayRaw          = delayEl ? Number(delayEl.value) : 30;
+    const delayEntreCapitolsMs = Math.max(0, Math.min(300000, (Number.isFinite(delayRaw) ? delayRaw : 30) * 1000));
 
     const selectDraft = document.getElementById('selectModelDraft');
     const selectGen   = document.getElementById('selectModelGen');
@@ -2392,7 +2413,7 @@ function actualitzarConfiguracioActiva() {
       modelGeneracio, modelArquitectura, modelDraft,
       modelArquitecte: modelArquitectura,
       models: { draft: modelDraft, generacio: modelGeneracio, arquitecte: modelArquitectura },
-      fluxAutomatic, targetQualitat
+      fluxAutomatic, targetQualitat, delayEntreCapitolsMs
     };
 
     if (typeof poblarSelectorsModels === 'function') poblarSelectorsModels();
@@ -4803,7 +4824,17 @@ async function generarCapitol(idx, intents = 0) {
       await tancamentBlocComplet(idx, bloc, USER_CONFIG);
     } else {
       // Evitem duplicar derivats abans de la passada del jutge del bloc.
-      generarCapitol(idx + 1);
+      if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
+        const delayMs = obtenirDelayEntreCapitolsMs();
+        const delayTxt = (delayMs / 1000).toFixed(0);
+        const accions = document.getElementById('capitol-accions');
+        if (accions) {
+          accions.innerHTML = `<span style="color:var(--text2);font-size:.85rem;">⏳ Esperant ${delayTxt}s abans del següent capítol (mode semi-automàtic)…</span>`;
+        }
+        GestorFlux.afegirTasca(`Generar Cap. ${idx + 2}`, () => generarCapitol(idx + 1), delayMs);
+      } else {
+        generarCapitol(idx + 1);
+      }
     }
 
   } catch (err) {
@@ -5009,7 +5040,7 @@ function mostrarRevisioCapitol(revisat, idx, isLast) {
   if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
     if (!ok && instruccions) {
       accions.innerHTML = `<span style="color:var(--text2);font-size:.85rem;">🔴 Opus demana correccions. Entrant a la cua per reescriure...</span>`;
-      GestorFlux.afegirTasca(`Reescriure Cap. ${idx + 1}`, () => reescriureCapitol(idx), 15000);
+      GestorFlux.afegirTasca(`Reescriure Cap. ${idx + 1}`, () => reescriureCapitol(idx), obtenirDelayEntreCapitolsMs());
     } else {
       if (!isLast && esModeManualEntreCapitols()) {
         accions.innerHTML = `<span style="color:var(--success);font-size:.85rem;">✅ Capítol aprovat. Esperant inici manual del següent.</span>`;
@@ -5018,9 +5049,9 @@ function mostrarRevisioCapitol(revisat, idx, isLast) {
         amagarBotoSeguentCapitolManual();
         accions.innerHTML = `<span style="color:var(--success);font-size:.85rem;">✅ Capítol aprovat. Entrant a la cua pel següent...</span>`;
         if (!isLast) {
-          GestorFlux.afegirTasca(`Generar Cap. ${idx + 2}`, () => generarCapitol(idx + 1), 15000);
+          GestorFlux.afegirTasca(`Generar Cap. ${idx + 2}`, () => generarCapitol(idx + 1), obtenirDelayEntreCapitolsMs());
         } else {
-          GestorFlux.afegirTasca('Revisió/Epíleg Final', () => generarCapitol(ESTAT._estructuraCapitols.length), 2000);
+          GestorFlux.afegirTasca('Revisió/Epíleg Final', () => generarCapitol(ESTAT._estructuraCapitols.length), Math.max(2000, obtenirDelayEntreCapitolsMs()));
         }
       }
     }
@@ -5111,7 +5142,7 @@ function mostrarAccionsCapitolSimple(idx, isLast) {
     amagarBotoSeguentCapitolManual();
     document.getElementById('capitol-accions').innerHTML = '';
     if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
-      GestorFlux.afegirTasca('Revisió/Epíleg Final', () => generarCapitol(ESTAT._estructuraCapitols.length), 2000);
+      GestorFlux.afegirTasca('Revisió/Epíleg Final', () => generarCapitol(ESTAT._estructuraCapitols.length), Math.max(2000, obtenirDelayEntreCapitolsMs()));
     } else {
       generarCapitol(ESTAT._estructuraCapitols.length);
     }
@@ -5122,8 +5153,9 @@ function mostrarAccionsCapitolSimple(idx, isLast) {
         document.getElementById('capitol-accions').innerHTML = `<span style="color:var(--text2);font-size:.85rem;">Capítol llest. Inicia manualment el següent des del botó inferior.</span>`;
         mostrarBotoSeguentCapitolManual(idx + 1);
       } else {
-        document.getElementById('capitol-accions').innerHTML = `<span style="color:var(--text2);font-size:.85rem;">Avançant automàticament al següent capítol...</span>`;
-        GestorFlux.afegirTasca(`Generar Cap. ${idx + 2}`, () => generarCapitol(idx + 1), 15000);
+        const delayMs = obtenirDelayEntreCapitolsMs();
+        document.getElementById('capitol-accions').innerHTML = `<span style="color:var(--text2);font-size:.85rem;">⏳ Esperant ${(delayMs / 1000).toFixed(0)}s abans del següent capítol (mode semi-automàtic)...</span>`;
+        GestorFlux.afegirTasca(`Generar Cap. ${idx + 2}`, () => generarCapitol(idx + 1), delayMs);
       }
     } else {
       document.getElementById('capitol-accions').innerHTML =
