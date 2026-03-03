@@ -663,17 +663,13 @@
       </label>
     </div>
 
-    <div class="checkbox-row" onclick="document.getElementById('config-mode-eficient').click()">
-      <input type="checkbox" id="config-mode-eficient" onclick="event.stopPropagation()">
-      <label for="config-mode-eficient">
-        <strong>Mode eficient de crides</strong> — minimitza crides API (més barat)
-        <small style="display:block;color:var(--text2);font-size:.78rem;margin-top:2px;">Fa validacions i sincronitzacions pesades cada 2 capítols i redueix passades de tancament.</small>
-      </label>
-    </div>
-
     <label class="field-label" for="config-target-qualitat" style="margin-top:10px;">Qualitat objectiu del jutge (0-100)</label>
     <input type="number" id="config-target-qualitat" min="60" max="98" step="1" value="85" placeholder="85">
     <small style="display:block;color:var(--text2);font-size:.78rem;margin-top:4px;">El generador iterarà fins assolir aquest llindar (amb límit de seguretat d'intents).</small>
+
+    <label class="field-label" for="config-delay-capitols" style="margin-top:10px;">Pausa entre capítols (segons, mode semi-automàtic)</label>
+    <input type="number" id="config-delay-capitols" min="0" max="300" step="5" value="30" placeholder="30">
+    <small style="display:block;color:var(--text2);font-size:.78rem;margin-top:4px;">Controla el ritme de crides: 20–60s ajuda a evitar pics de TPM i errors 429.</small>
 
     <!-- Panell de selecció de models flexible v5.1 -->
     <div id="panellModels" style="margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:8px;">
@@ -1362,6 +1358,12 @@ function esModeManualEntreCapitols() {
   return !!(USER_CONFIG && USER_CONFIG.fluxAutomatic && ESTAT._modeManualCapitols);
 }
 
+function obtenirDelayEntreCapitolsMs() {
+  const raw = Number(USER_CONFIG && USER_CONFIG.delayEntreCapitolsMs);
+  if (!Number.isFinite(raw)) return 30000;
+  return Math.max(0, Math.min(300000, raw));
+}
+
 function actualitzarBotoModeManualCapitols() {
   const btn = document.getElementById('btn-mode-manual-capitols');
   if (!btn) return;
@@ -1463,9 +1465,10 @@ function aplicarSnapshotProjecte(dades) {
   if (targetQualitatInput && USER_CONFIG && USER_CONFIG.targetQualitat != null) {
     targetQualitatInput.value = USER_CONFIG.targetQualitat;
   }
-
-  const modeEficientInput = document.getElementById('config-mode-eficient');
-  if (modeEficientInput) modeEficientInput.checked = !!(USER_CONFIG && USER_CONFIG.modeEficient);
+  const delayInput = document.getElementById('config-delay-capitols');
+  if (delayInput && USER_CONFIG && USER_CONFIG.delayEntreCapitolsMs != null) {
+    delayInput.value = Math.round(Number(USER_CONFIG.delayEntreCapitolsMs) / 1000);
+  }
 
   restaurarInterficieDesDeEstat();
 }
@@ -2007,6 +2010,7 @@ const ESTAT = {
   },
   _escaletes: [],
   _memoriasComprimides: [],
+  _resumsBlocs: {},
   _snapshotsFinals: {},
   _traitsImmutablesInicialitzats: false,
   _registreEstil: { frequencies: {}, alertes: [], verbs_atribucio: {}, tancaments: [] },
@@ -2106,7 +2110,7 @@ const MODEL_REGISTRY = {
     nom: 'GPT-5.2', nomCurt: 'GPT-5.2',
     proveidor: 'openai',
     input_per_m: 1.75, output_per_m: 14.00,
-    context_max: 400000, max_output: 4096,
+    context_max: 400000, max_output: 16384,
     qualitat: { draft: 80, prosa: 78, arquitectura: 82, extraccio: 85 },
     velocitat: 'rapida',
     notes: 'Fort en raonament i codi. Català acceptable però no natiu. Preu competitiu.'
@@ -2274,10 +2278,12 @@ function guardarIComencar() {
     const modelGeneracioInput    = document.getElementById('config-model-generacio').value.trim();
     const modelArquitecturaInput = document.getElementById('config-model-arquitectura').value.trim();
     const fluxAutomatic     = document.getElementById('config-flux-automatic').checked;
-    const modeEficient      = !!document.getElementById('config-mode-eficient')?.checked;
     const targetQualitatEl  = document.getElementById('config-target-qualitat');
     const targetQualitatRaw = targetQualitatEl ? Number(targetQualitatEl.value) : 85;
     const targetQualitat    = Math.max(60, Math.min(98, Number.isFinite(targetQualitatRaw) ? targetQualitatRaw : 85));
+    const delayEl = document.getElementById('config-delay-capitols');
+    const delayRaw = delayEl ? Number(delayEl.value) : 30;
+    const delayEntreCapitolsMs = Math.max(0, Math.min(300000, (Number.isFinite(delayRaw) ? delayRaw : 30) * 1000));
 
     // Prioritzem el que l'usuari veu al panell en aquest moment (inputs/selectors),
     // per evitar arrossegar valors antics d'ESTAT d'un proveïdor diferent.
@@ -2318,8 +2324,8 @@ function guardarIComencar() {
         arquitecte: modelArquitectura
       },
       fluxAutomatic,
-      modeEficient,
-      targetQualitat
+      targetQualitat,
+      delayEntreCapitolsMs
     };
 
     if (typeof poblarSelectorsModels === 'function') {
@@ -2374,10 +2380,12 @@ function actualitzarConfiguracioActiva() {
     const modelGeneracioInput    = document.getElementById('config-model-generacio').value.trim();
     const modelArquitecturaInput = document.getElementById('config-model-arquitectura').value.trim();
     const fluxAutomatic     = document.getElementById('config-flux-automatic').checked;
-    const modeEficient      = !!document.getElementById('config-mode-eficient')?.checked;
     const targetQualitatEl  = document.getElementById('config-target-qualitat');
     const targetQualitatRaw = targetQualitatEl ? Number(targetQualitatEl.value) : 85;
     const targetQualitat    = Math.max(60, Math.min(98, Number.isFinite(targetQualitatRaw) ? targetQualitatRaw : 85));
+    const delayEl           = document.getElementById('config-delay-capitols');
+    const delayRaw          = delayEl ? Number(delayEl.value) : 30;
+    const delayEntreCapitolsMs = Math.max(0, Math.min(300000, (Number.isFinite(delayRaw) ? delayRaw : 30) * 1000));
 
     const selectDraft = document.getElementById('selectModelDraft');
     const selectGen   = document.getElementById('selectModelGen');
@@ -2405,7 +2413,7 @@ function actualitzarConfiguracioActiva() {
       modelGeneracio, modelArquitectura, modelDraft,
       modelArquitecte: modelArquitectura,
       models: { draft: modelDraft, generacio: modelGeneracio, arquitecte: modelArquitectura },
-      fluxAutomatic, modeEficient, targetQualitat
+      fluxAutomatic, targetQualitat, delayEntreCapitolsMs
     };
 
     if (typeof poblarSelectorsModels === 'function') poblarSelectorsModels();
@@ -3059,15 +3067,47 @@ async function generarEstilsParla() {
 }
 
 
+function detectarNomCapcaleraEstil(linea = '') {
+  const raw = String(linea || '').trim();
+  if (!raw) return '';
+
+  let m = raw.match(/^(?:[-*]\s*)?(?:\d+[\).:-]?\s*)?\*\*\s*([^*\n][^*\n]{0,120}?)\s*\*\*/i);
+  if (m && m[1]) return extreureNomPersonatge(m[1]).trim();
+
+  m = raw.match(/^(?:[-*]\s*)?(?:\d+[\).:-]?\s*)?(?:nom(?:\s+del\s+personatge)?|personatge)\s*:\s*(.+)$/i);
+  if (m && m[1]) {
+    const brut = m[1].split(/[|·–—]/)[0].trim();
+    return extreureNomPersonatge(brut).trim();
+  }
+  return '';
+}
+
+function parsejarBlocsEstilsParla(text) {
+  const lines = String(text || '').split('\n');
+  const blocs = [];
+  let current = null;
+
+  for (const line of lines) {
+    const nom = detectarNomCapcaleraEstil(line);
+    if (nom) {
+      if (current && current.lines.some(l => String(l || '').trim())) blocs.push(current);
+      current = { nom, lines: [line] };
+      continue;
+    }
+    if (!current) continue;
+    current.lines.push(line);
+  }
+
+  if (current && current.lines.some(l => String(l || '').trim())) blocs.push(current);
+  return blocs;
+}
+
 function extreureEstilsPerPersonatge(text) {
   const mapa = {};
-  const src = String(text || '');
-  const blocs = src.split(/\n\n+/).map(b => b.trim()).filter(Boolean);
-  blocs.forEach(bloc => {
-    const m = bloc.match(/^\*\*(.+?)\*\*/m);
-    if (!m) return;
-    const nom = m[1].trim();
-    mapa[nom] = bloc;
+  const blocs = parsejarBlocsEstilsParla(text);
+  blocs.forEach(({ nom, lines }) => {
+    if (!nom || mapa[nom]) return;
+    mapa[nom] = (lines || []).join('\n').trim();
   });
   return mapa;
 }
@@ -3083,19 +3123,16 @@ function filtrarEstilsParlaPerSeleccionats(text, nomsEsperats = []) {
     if (key && !esperatsPerKey[key]) esperatsPerKey[key] = nom;
   });
 
-  const blocs = String(text || '').split(/\n\n+/).map(b => b.trim()).filter(Boolean);
+  const blocs = parsejarBlocsEstilsParla(text);
   const trobats = {};
 
-  blocs.forEach(bloc => {
-    const m = bloc.match(/^\*\*(.+?)\*\*/m);
-    if (!m) return;
-    const nomBlocRaw = m[1].trim();
-    const key = keyOf(nomBlocRaw);
+  blocs.forEach(({ nom, lines }) => {
+    const key = keyOf(nom);
     const nomOriginal = key ? esperatsPerKey[key] : null;
     if (!nomOriginal || trobats[nomOriginal]) return;
 
-    // Força capçalera canònica per evitar duplicats per variants de nom
-    const blocCanon = bloc.replace(/^\*\*.+?\*\*/m, `**${nomOriginal}**`).trim();
+    const resta = (lines || []).slice(1).join('\n').trim();
+    const blocCanon = `**${nomOriginal}**${resta ? `\n${resta}` : ''}`.trim();
     trobats[nomOriginal] = blocCanon;
   });
 
@@ -3660,35 +3697,24 @@ async function iniciarFaseRelacions() {
 
 function mostrarEstilsParla(text) {
   const cos = document.getElementById('estils-cos');
+  const blocs = parsejarBlocsEstilsParla(text);
+  const cards = blocs.length > 0 ? blocs : [{ nom: 'Resultat', lines: String(text || '').split('\n') }];
 
-  // Partir el text en blocs per personatge (cada bloc comença amb **Nom**)
-  const lines  = text.split('\n');
-  const cards  = [];
-  let current  = [];
+  cos.innerHTML = cards.map(card => {
+    const nom = escHtml(card.nom || 'Personatge');
 
-  for (const line of lines) {
-    if (/^\*\*.+\*\*\s*$/.test(line.trim()) && current.length > 0) {
-      cards.push(current);
-      current = [line];
-    } else {
-      current.push(line);
-    }
-  }
-  if (current.length > 0) cards.push(current);
-
-  cos.innerHTML = cards.map(cardLines => {
-    const nomLine = cardLines[0] || '';
-    const nom     = escHtml(nomLine.trim().replace(/\*\*/g, ''));
-
-    const campsHtml = cardLines.slice(1).map(line => {
-      const l = line.trim();
+    const campsHtml = card.lines.slice(1).map(line => {
+      const l = String(line || '').trim();
       if (!l) return '';
 
-      const match = l.match(/^([^:]+):\s*(.+)$/);
-      if (match) {
+      const fragments = l.split(/\s*[|·]\s*/).filter(Boolean);
+      return fragments.map(fragment => {
+        const match = fragment.match(/^([^:]{2,40}):\s*(.+)$/);
+        if (!match) return `<div class="veu-camp-val">${escHtml(fragment)}</div>`;
+
         const label = escHtml(match[1].trim());
         const val   = escHtml(match[2].trim());
-        if (/exemple/i.test(label)) {
+        if (/exemple/i.test(match[1])) {
           return `<div>
             <div class="veu-camp-label">${label}</div>
             <div class="veu-exemple">${val}</div>
@@ -3698,13 +3724,12 @@ function mostrarEstilsParla(text) {
           <div class="veu-camp-label">${label}</div>
           <div class="veu-camp-val">${val}</div>
         </div>`;
-      }
-      return `<div class="veu-camp-val">${escHtml(l)}</div>`;
-    }).filter(h => h).join('\n');
+      }).join('');
+    }).filter(Boolean).join('\n');
 
     return `<div class="veu-card">
       <div class="veu-card-nom">👤 ${nom}</div>
-      <div class="veu-card-camps">${campsHtml}</div>
+      <div class="veu-card-camps">${campsHtml || '<div class="veu-camp-val">Sense camps detectats.</div>'}</div>
     </div>`;
   }).join('\n');
 
@@ -4145,6 +4170,15 @@ function setFinalLock(chapterId, reason = 'system final lock') {
   };
   ESTAT._chapterLocks[chapterId] = lock;
   return lock;
+}
+
+function congelerBloc(fromIdx, toIdx) {
+  for (let i = fromIdx; i <= toIdx; i++) {
+    setFinalLock(i, `Bloc ${fromIdx + 1}–${toIdx + 1} congelat post-jutge`);
+  }
+  if (!Array.isArray(ESTAT._intervalsCongelats)) ESTAT._intervalsCongelats = [];
+  ESTAT._intervalsCongelats.push({ fromIdx, toIdx, frozenAt: new Date().toISOString() });
+  jutgePanelLog(`🔒 Bloc caps. ${fromIdx + 1}–${toIdx + 1} congelat definitivament.`);
 }
 
 function canJudge(chapterId) {
@@ -4679,8 +4713,36 @@ async function processarDerivatsBlocAbansJutge(fromIdx, toIdx, userConfig) {
   }
 }
 
-function esModeEficient(userConfig = USER_CONFIG) {
-  return !!(userConfig && userConfig.modeEficient);
+async function tancamentBlocComplet(idx, bloc, userConfig) {
+  const { fromIdx, toIdx } = bloc;
+  const loader = document.getElementById('loader-11-text');
+
+  // A. Derivats pre-jutge
+  if (loader) loader.textContent = `🧠 Preparant derivats del bloc (caps. ${fromIdx+1}–${toIdx+1})…`;
+  await processarDerivatsBlocAbansJutge(fromIdx, toIdx, userConfig);
+
+  // B. Resums per capítol
+  if (loader) loader.textContent = `📝 Generant resums del bloc (caps. ${fromIdx+1}–${toIdx+1})…`;
+  await generarResumsBloc(fromIdx, toIdx, userConfig);
+
+  // C. Jutge — avalua + reescriu de dalt a baix si cal
+  if (loader) loader.textContent = `⚖️ Jutge avaluant el bloc (caps. ${fromIdx+1}–${toIdx+1})…`;
+  await executarJutgeInterval(fromIdx, toIdx, userConfig);
+
+  // D. Resum consolidat del bloc (UNA sola crida LLM)
+  if (loader) loader.textContent = `📦 Generant resum consolidat del bloc…`;
+  await generarResumConsolidatBloc(fromIdx, toIdx, userConfig);
+
+  // E. Congelar bloc
+  congelerBloc(fromIdx, toIdx);
+
+  // F. UI
+  renderLlistaCapitols();
+  hideLoader(11);
+  const totalCaps = ESTAT._estructuraCapitols.length;
+  const isLast = toIdx >= totalCaps - 1;
+  actualitzarEstatCapitol(idx, 'fet');
+  mostrarAccionsCapitolSimple(idx, isLast);
 }
 
 async function generarCapitol(idx, intents = 0) {
@@ -4692,6 +4754,8 @@ async function generarCapitol(idx, intents = 0) {
     await executarLoopCoherenciaFinal(USER_CONFIG);
     try { await generarRevisioFinalApp(USER_CONFIG); } catch (err) { console.warn('Revisió final app:', err.message); }
     iniciarRevisioGlobal();
+    // Informe post-mortem automàtic al final de la novel·la
+    try { await generarInformePostMortem(); } catch (e) { console.warn('Post-mortem:', e.message); }
     return;
   }
 
@@ -4737,8 +4801,8 @@ async function generarCapitol(idx, intents = 0) {
     const ajust = await ajustarLongitud(idx, textNet, USER_CONFIG);
     textNet = ajust.text;
 
-    // PAS 6: Bucle de revisió de continuïtat (màxim 2 intents; 1 en mode eficient)
-    const intentsRevisioContinu = esModeEficient(USER_CONFIG) ? 1 : 2;
+    // PAS 6: Bucle de revisió de continuïtat (1 intent, mode econòmic permanent)
+    const intentsRevisioContinu = 1;
     for (let intent = 0; intent < intentsRevisioContinu; intent++) {
       try {
         document.getElementById('loader-11-text').textContent = `🔍 Revisió continuïtat cap. ${idx + 1} (intent ${intent + 1}/${intentsRevisioContinu})…`;
@@ -4774,13 +4838,20 @@ async function generarCapitol(idx, intents = 0) {
     const tancamentBloc = esTancamentBloc(idx, totalCaps);
     if (tancamentBloc) {
       const bloc = obtenirRangBlocPerCapitol(idx, totalCaps);
-      document.getElementById('loader-11-text').textContent = `🧠 Preparant derivats del bloc (caps. ${bloc.fromIdx + 1}–${bloc.toIdx + 1})…`;
-      await processarDerivatsBlocAbansJutge(bloc.fromIdx, bloc.toIdx, USER_CONFIG);
-      await generarResumsBloc(bloc.fromIdx, bloc.toIdx, USER_CONFIG);
-      await arxitectePostCapitol(idx, textNet, USER_CONFIG, { derivatsJaProcessats: true, bloc });
+      await tancamentBlocComplet(idx, bloc, USER_CONFIG);
     } else {
       // Evitem duplicar derivats abans de la passada del jutge del bloc.
-      generarCapitol(idx + 1);
+      if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
+        const delayMs = obtenirDelayEntreCapitolsMs();
+        const delayTxt = (delayMs / 1000).toFixed(0);
+        const accions = document.getElementById('capitol-accions');
+        if (accions) {
+          accions.innerHTML = `<span style="color:var(--text2);font-size:.85rem;">⏳ Esperant ${delayTxt}s abans del següent capítol (mode semi-automàtic)…</span>`;
+        }
+        GestorFlux.afegirTasca(`Generar Cap. ${idx + 2}`, () => generarCapitol(idx + 1), delayMs);
+      } else {
+        generarCapitol(idx + 1);
+      }
     }
 
   } catch (err) {
@@ -4796,11 +4867,10 @@ async function generarCapitol(idx, intents = 0) {
 }
 
 async function arxitectePostCapitol(idx, textCapitol, userConfig, opts = {}) {
-  const modeEficient = esModeEficient(userConfig);
-  const esRevisioSistema = idx > 0 && idx % 3 === 2 && (!modeEficient || (idx + 1) % 6 === 0); // en mode eficient, cada 6 capítols
+  const esRevisioSistema = idx > 0 && (idx + 1) % 6 === 0;
 
   const capitolNum = idx + 1;
-  const haDeSincronitzarPesat = !modeEficient || (capitolNum % 2 === 0) || capitolNum === ESTAT._estructuraCapitols.length;
+  const haDeSincronitzarPesat = (capitolNum % 2 === 0) || capitolNum === ESTAT._estructuraCapitols.length;
 
   // 1. Bíblia narrativa
   if (!opts.derivatsJaProcessats && haDeSincronitzarPesat) {
@@ -4826,29 +4896,6 @@ async function arxitectePostCapitol(idx, textCapitol, userConfig, opts = {}) {
   const esCheckpoint = false; // desactivat: fem control de qualitat al tancament de bloc/post-jutge
   if (esCheckpoint) {
     try { await executarCheckpoint(idx, userConfig); } catch (e) { console.warn('Checkpoint:', e.message); }
-  }
-
-  // Jutge d'interval cada 4 capítols
-  const totalCaps = ESTAT._estructuraCapitols.length;
-  const esJutgeComplet = (!modeEficient || (idx + 1) % 8 === 0) && (idx + 1) % 4 === 0 && idx + 1 < totalCaps;
-  const esJutgeFinal   = idx === totalCaps - 1 && (idx + 1) % 4 !== 0;
-  if (esJutgeComplet || esJutgeFinal) {
-    const fromJutge = esJutgeComplet
-      ? idx - 3
-      : Math.floor(idx / 4) * 4;
-    try {
-      const loaderEl = document.getElementById('loader-11-text');
-      if (loaderEl) loaderEl.textContent = `⚖️ Jutge d'interval (caps. ${fromJutge + 1}–${idx + 1})…`;
-      await executarJutgeInterval(fromJutge, idx, userConfig);
-    } catch (e) { console.warn('Jutge interval:', e.message); }
-  }
-
-  // Compressió de memòria cada 5 capítols
-  const esCompressio = (!modeEficient || (idx + 1) % 10 === 0) && (idx + 1) % 5 === 0 && idx + 1 < ESTAT._estructuraCapitols.length;
-  if (esCompressio) {
-    const loaderEl = document.getElementById('loader-11-text');
-    if (loaderEl) loaderEl.textContent = '🔵 Opus comprimint memòria narrativa…';
-    try { await comprimirMemoria(idx + 1, userConfig); } catch (e) { console.warn('Compressió:', e.message); }
   }
 
   // Mostra panel de revisió de codi si escau
@@ -5010,7 +5057,7 @@ function mostrarRevisioCapitol(revisat, idx, isLast) {
   if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
     if (!ok && instruccions) {
       accions.innerHTML = `<span style="color:var(--text2);font-size:.85rem;">🔴 Opus demana correccions. Entrant a la cua per reescriure...</span>`;
-      GestorFlux.afegirTasca(`Reescriure Cap. ${idx + 1}`, () => reescriureCapitol(idx), 15000);
+      GestorFlux.afegirTasca(`Reescriure Cap. ${idx + 1}`, () => reescriureCapitol(idx), obtenirDelayEntreCapitolsMs());
     } else {
       if (!isLast && esModeManualEntreCapitols()) {
         accions.innerHTML = `<span style="color:var(--success);font-size:.85rem;">✅ Capítol aprovat. Esperant inici manual del següent.</span>`;
@@ -5019,9 +5066,9 @@ function mostrarRevisioCapitol(revisat, idx, isLast) {
         amagarBotoSeguentCapitolManual();
         accions.innerHTML = `<span style="color:var(--success);font-size:.85rem;">✅ Capítol aprovat. Entrant a la cua pel següent...</span>`;
         if (!isLast) {
-          GestorFlux.afegirTasca(`Generar Cap. ${idx + 2}`, () => generarCapitol(idx + 1), 15000);
+          GestorFlux.afegirTasca(`Generar Cap. ${idx + 2}`, () => generarCapitol(idx + 1), obtenirDelayEntreCapitolsMs());
         } else {
-          GestorFlux.afegirTasca('Revisió/Epíleg Final', () => generarCapitol(ESTAT._estructuraCapitols.length), 2000);
+          GestorFlux.afegirTasca('Revisió/Epíleg Final', () => generarCapitol(ESTAT._estructuraCapitols.length), Math.max(2000, obtenirDelayEntreCapitolsMs()));
         }
       }
     }
@@ -5112,7 +5159,7 @@ function mostrarAccionsCapitolSimple(idx, isLast) {
     amagarBotoSeguentCapitolManual();
     document.getElementById('capitol-accions').innerHTML = '';
     if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
-      GestorFlux.afegirTasca('Revisió/Epíleg Final', () => generarCapitol(ESTAT._estructuraCapitols.length), 2000);
+      GestorFlux.afegirTasca('Revisió/Epíleg Final', () => generarCapitol(ESTAT._estructuraCapitols.length), Math.max(2000, obtenirDelayEntreCapitolsMs()));
     } else {
       generarCapitol(ESTAT._estructuraCapitols.length);
     }
@@ -5123,8 +5170,9 @@ function mostrarAccionsCapitolSimple(idx, isLast) {
         document.getElementById('capitol-accions').innerHTML = `<span style="color:var(--text2);font-size:.85rem;">Capítol llest. Inicia manualment el següent des del botó inferior.</span>`;
         mostrarBotoSeguentCapitolManual(idx + 1);
       } else {
-        document.getElementById('capitol-accions').innerHTML = `<span style="color:var(--text2);font-size:.85rem;">Avançant automàticament al següent capítol...</span>`;
-        GestorFlux.afegirTasca(`Generar Cap. ${idx + 2}`, () => generarCapitol(idx + 1), 15000);
+        const delayMs = obtenirDelayEntreCapitolsMs();
+        document.getElementById('capitol-accions').innerHTML = `<span style="color:var(--text2);font-size:.85rem;">⏳ Esperant ${(delayMs / 1000).toFixed(0)}s abans del següent capítol (mode semi-automàtic)...</span>`;
+        GestorFlux.afegirTasca(`Generar Cap. ${idx + 2}`, () => generarCapitol(idx + 1), delayMs);
       }
     } else {
       document.getElementById('capitol-accions').innerHTML =
@@ -6500,34 +6548,52 @@ const GeminiRL = {
 
 // ─── fetchSegur: fetch amb backoff exponencial ───────────────
 // Substitueix fetch() directe per a totes les crides LLM.
-// Reintenta automàticament si l'API retorna 429, 503 o 529.
+// Reintenta automàticament si l'API retorna 429, 5xx o 529.
 // Llegeix el header Retry-After (present en 429 de Gemini).
 async function fetchSegur(url, options, maxIntents = 7) {
-  const RETRYABLE = new Set([429, 503, 529]);
+  const RETRYABLE = new Set([429, 500, 502, 503, 504, 529]);
+  let ultimErrorXarxa = null;
+
   for (let intent = 0; intent < maxIntents; intent++) {
-    const response = await fetch(url, options);
+    let response;
+    try {
+      response = await fetch(url, options);
+    } catch (netErr) {
+      ultimErrorXarxa = netErr;
+      if (intent === maxIntents - 1) throw netErr;
+      const delayNetMs = Math.min(5000 * Math.pow(2, intent), 60000) + Math.random() * 3000;
+      console.warn(`[fetchSegur] Error de xarxa (${netErr && netErr.message ? netErr.message : 'fetch failed'}) — reintent ${intent + 1}/${maxIntents - 1} en ${(delayNetMs / 1000).toFixed(1)}s...`);
+      await new Promise(resolve => setTimeout(resolve, delayNetMs));
+      continue;
+    }
+
     if (!RETRYABLE.has(response.status)) return response;
     if (intent === maxIntents - 1) return response;
 
-    // Llegir Retry-After si el servidor l'indica (Gemini ho fa en 429)
+    // Llegir Retry-After si el servidor l'indica (sovint en 429 i alguns 503)
     let delayMs;
     const retryAfter = response.headers.get('Retry-After') || response.headers.get('retry-after');
     if (retryAfter && !isNaN(Number(retryAfter))) {
       delayMs = Number(retryAfter) * 1000 + 1500; // marge extra d'1.5s
     } else {
-      // 429 → base 20s (els límits de Gemini solen ser per minut)
-      // 503/529 → base 5s (sobrecàrrega transitòria)
-      const base = response.status === 429 ? 20000 : 5000;
+      // 429 → base 20s (quota)
+      // 5xx/529 → base 8s (sobrecàrrega transitòria del proveïdor)
+      const base = response.status === 429 ? 20000 : 8000;
       delayMs = Math.min(base * Math.pow(2, intent), 120000); // cap a 2 min
       delayMs += Math.random() * 3000; // jitter per evitar thundering herd
     }
+
     // Avisar el rate limiter global perquè crides concurrents esperin
-    if (response.status === 429 && typeof GeminiRL !== 'undefined') {
+    if (typeof GeminiRL !== 'undefined' && (response.status === 429 || response.status === 503 || response.status === 529)) {
       GeminiRL.penalitzar(delayMs);
     }
+
     console.warn(`[fetchSegur] HTTP ${response.status} — reintent ${intent + 1}/${maxIntents - 1} en ${(delayMs / 1000).toFixed(1)}s...`);
     await new Promise(resolve => setTimeout(resolve, delayMs));
   }
+
+  if (ultimErrorXarxa) throw ultimErrorXarxa;
+  throw new Error('fetchSegur: intents exhaurits sense resposta vàlida.');
 }
 
 // ─── analitzarRespostaGenerica: parser estandarditzat ────────
@@ -6567,9 +6633,11 @@ function analitzarRespostaGenerica(respostaJSON, proveidor) {
 
 // ─── Helpers per llegir max_output del registre ──────────────
 function getMaxTokens(safeConfig, modelId) {
-  if (safeConfig.maxTokens) return safeConfig.maxTokens;
   const entry = MODEL_REGISTRY[modelId];
-  return (entry && entry.max_output) || 4096;
+  const modelMax = entry && entry.max_output;
+  const requested = safeConfig && safeConfig.maxTokens;
+  if (requested && modelMax) return Math.min(requested, modelMax);
+  return requested || modelMax || 4096;
 }
 
 // ─── Router multi-proveïdor i multi-rol — v5.1 ──────────────
@@ -6725,47 +6793,6 @@ async function callLLMOneShotPlusCompletion(messages, systemPrompt, config, tag)
   }
 
   let text = primera.text || '';
-
-  if (safeConfig.modeEficient) {
-    return text;
-  }
-
-  // Segona crida: només verificació de tancament (i, si cal, micro-completat).
-  console.log('[callLLMOneShotPlusCompletion] Segona crida de validació final.');
-  const missatgesTancament = [
-    ...messages,
-    { role: 'assistant', content: text },
-    { role: 'user', content: `VERIFICACIÓ DE TANCAMENT (PASSADA 2):
-Revisa l'últim paràgraf que acabes d'escriure.
-1. Si el text està perfectament tancat a nivell narratiu, no s'ha tallat a mitja frase i la longitud és l'adequada, respon EXACTAMENT amb la paraula: OK
-2. Si el text s'ha tallat, ha quedat incomplet o necessita una expansió final per tancar bé l'escena/capítol, respon EXACTAMENT en aquest format:
-APPEND: <escriu aquí la continuació directa des del punt exacte on t'has aturat, afegint el desenvolupament final necessari per tancar-ho amb excel·lència>.
-No repeteixis res del que ja has escrit.` }
-  ];
-  const configTancament = Object.assign({}, safeConfig, { maxTokens: 220 });
-
-  try {
-    const revisio = (await callLLMMulti(missatgesTancament, systemPrompt, configTancament, tag) || '').trim();
-    if (/^OK\s*$/i.test(revisio)) return text;
-
-    const match = revisio.match(/^APPEND:\s*([\s\S]*)$/i);
-    if (match && match[1] && match[1].trim()) {
-      text += match[1].trimStart();
-      return text;
-    }
-
-    // Fallback robust: només si el detector local veu final incomplet.
-    if (primera.textIncomplet || textSemblaIncomplet(text)) {
-      const rescat = await callLLMMulti([
-        ...messages,
-        { role: 'assistant', content: text },
-        { role: 'user', content: "Completa NOMÉS el tram final si havia quedat tallat. No repeteixis res. Escriu només el mínim per tancar correctament la frase o l'últim paràgraf." }
-      ], systemPrompt, Object.assign({}, safeConfig, { maxTokens: 240 }), tag);
-      if (rescat && rescat.trim()) text += rescat;
-    }
-  } catch (err) {
-    console.warn('[callLLMOneShotPlusCompletion] Validació final fallida:', err.message);
-  }
 
   return text;
 }
@@ -9214,6 +9241,29 @@ function buildContextCapitol(idx) {
     blocFinal.push(`INSTRUCCIONS DE PROSA: ${instrRitme}`);
   }
 
+  // Capítols anteriors del MATEIX BLOC (text complet, per continuïtat dins el bloc)
+  const blocActual = obtenirRangBlocPerCapitol(idx, (estatContext._estructuraCapitols || []).length);
+  const capsBloc = [];
+  for (let i = blocActual.fromIdx; i < idx; i++) {
+    const txt = String((ESTAT._capitols_generats || [])[i] || '').trim();
+    if (txt) capsBloc.push(`--- CAPÍTOL ${i + 1} (text complet) ---\n${txt}`);
+  }
+  const ctxCapitolsBloc = capsBloc.length > 0
+    ? `CAPÍTOLS JA ESCRITS EN AQUEST BLOC (mantén continuïtat perfecta):\n\n${capsBloc.join('\n\n')}`
+    : '';
+
+  // Resums consolidats de blocs anteriors (disponible des del bloc 2, idx >= 4)
+  const resumsBlocsAnteriorsList = [];
+  for (let bStart = 0; bStart < blocActual.fromIdx; bStart += 4) {
+    const bEnd = bStart + 3;
+    const key = `${bStart}-${bEnd}`;
+    const res = (ESTAT._resumsBlocs || {})[key];
+    if (res) resumsBlocsAnteriorsList.push(`RESUM BLOC caps. ${bStart+1}–${bEnd+1}:\n${res}`);
+  }
+  const ctxResumsBlocsAnteriors = resumsBlocsAnteriorsList.length > 0
+    ? resumsBlocsAnteriorsList.join('\n\n')
+    : '';
+
   // Quan NKG és actiu, combina (no substitueix) ctxGlobal + ctxNkg
   if (ESTAT._nkg) {
     const escenaSpec = {
@@ -9226,9 +9276,11 @@ function buildContextCapitol(idx) {
     const ctxNkg = nkgGenerarContextMinim(escenaSpec);
 
     const seccionsNkg = [
+      ctxResumsBlocsAnteriors,
       ctxGlobalBase,
       blocEscaleta.length > 0 ? blocEscaleta.join('\n\n') : '',
       ctxTransicioBloc,
+      ctxCapitolsBloc,
       ctxNkg,
       blocFinal.length > 0 ? blocFinal.join('\n') : ''
     ].filter(Boolean);
@@ -9242,9 +9294,11 @@ function buildContextCapitol(idx) {
   }
 
   const seccions = [
+    ctxResumsBlocsAnteriors,
     ctxGlobalBase,
     blocEscaleta.length > 0 ? blocEscaleta.join('\n\n') : '',
     ctxTransicioBloc,
+    ctxCapitolsBloc,
     blocFinal.length > 0 ? blocFinal.join('\n') : ''
   ].filter(Boolean);
 
@@ -10563,7 +10617,7 @@ async function aplicarCorreccionsJutge(fromIdx, toIdx, instruccions, userConfig)
   const clausOrdenades = Object.keys(instruccions)
     .map(k => ({ k, idx: parseInt(k, 10) }))
     .filter(it => !isNaN(it.idx))
-    .sort((a, b) => b.idx - a.idx);
+    .sort((a, b) => a.idx - b.idx);
 
   for (const { k, idx } of clausOrdenades) {
     if (isNaN(idx) || idx < fromIdx || idx > toIdx) continue; // guard: no tocar congelats
@@ -10700,7 +10754,7 @@ async function executarJutgeInterval(fromIdx, toIdx, userConfig) {
     const claus = Object.keys(resultat.instruccions_correccio || {})
       .map(k => ({ k, idx: parseInt(k, 10) }))
       .filter(it => !isNaN(it.idx))
-      .sort((a, b) => b.idx - a.idx)
+      .sort((a, b) => a.idx - b.idx)
       .map(it => it.k);
     if (claus.length > 0) {
       jutgePanelLog(`✏️ Reescriptures necessàries: ${claus.map(k => `cap.${parseInt(k, 10) + 1}`).join(', ')}`);
@@ -11093,6 +11147,47 @@ Retorna EXCLUSIVAMENT JSON vàlid:
       await generarResumCurt(i, txt, cfg);
       construirKSN(i);
     }
+  }
+}
+
+async function generarResumConsolidatBloc(fromIdx, toIdx, userConfig) {
+  const cfg = userConfig || USER_CONFIG;
+  const models = getModelConfig(cfg);
+  const caps = [];
+  for (let i = fromIdx; i <= toIdx; i++) {
+    const txt = String((ESTAT._capitols_generats && ESTAT._capitols_generats[i]) || '').trim();
+    const resumCurt = (ESTAT.llibreRegistre?.capitols?.[i]?.resum_curt || '').trim();
+    if (txt) caps.push({ idx: i, text: txt.slice(0, 6000), resumCurt });
+  }
+  if (caps.length === 0) return;
+  const msgs = [{
+    role: 'user',
+    content: `Genera UN RESUM CONSOLIDAT del BLOC de capítols ${fromIdx + 1}–${toIdx + 1}.
+
+CAPÍTOLS:
+${caps.map(c => `CAP.${c.idx + 1}:\n${c.text}\n\nRESUM CURT: ${c.resumCurt}`).join('\n\n---\n\n')}
+
+Escriu un resum consolidat de 400-500 paraules en prosa fluïda orientada al futur que capturi:
+- Estat final de tots els personatges principals
+- Fils narratius oberts i decisions irreversibles
+- Girs i moments clau del bloc
+- To i tensió narratius al final del bloc
+
+Retorna EXCLUSIVAMENT el text del resum, sense JSON ni etiquetes.`
+  }];
+  try {
+    const text = await callLLMMulti(
+      msgs,
+      'Ets un expert en síntesi narrativa. Respon amb text pla, sense JSON.',
+      Object.assign({}, cfg, { maxTokens: 900, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+    const key = `${fromIdx}-${toIdx}`;
+    ESTAT._resumsBlocs = ESTAT._resumsBlocs || {};
+    ESTAT._resumsBlocs[key] = (text || '').trim();
+    await comprimirMemoria(toIdx + 1, cfg);
+  } catch (err) {
+    console.warn('[generarResumConsolidatBloc]', err.message);
   }
 }
 
@@ -12466,7 +12561,7 @@ Retorna únicament el text narratiu del capítol. Cap nota, cap metadada, cap co
   }];
 
   const models = getModelConfig(userConfig);
-  return await callLLMOneShotPlusCompletion(
+  return await callLLMOneShotConditionalCompletion(
     msgs,
     systemPrompt,
     Object.assign({}, userConfig, { maxTokens: 14000, model: models.modelGeneracio }),
