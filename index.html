@@ -3067,15 +3067,47 @@ async function generarEstilsParla() {
 }
 
 
+function detectarNomCapcaleraEstil(linea = '') {
+  const raw = String(linea || '').trim();
+  if (!raw) return '';
+
+  let m = raw.match(/^(?:[-*]\s*)?(?:\d+[\).:-]?\s*)?\*\*\s*([^*\n][^*\n]{0,120}?)\s*\*\*/i);
+  if (m && m[1]) return extreureNomPersonatge(m[1]).trim();
+
+  m = raw.match(/^(?:[-*]\s*)?(?:\d+[\).:-]?\s*)?(?:nom(?:\s+del\s+personatge)?|personatge)\s*:\s*(.+)$/i);
+  if (m && m[1]) {
+    const brut = m[1].split(/[|·–—]/)[0].trim();
+    return extreureNomPersonatge(brut).trim();
+  }
+  return '';
+}
+
+function parsejarBlocsEstilsParla(text) {
+  const lines = String(text || '').split('\n');
+  const blocs = [];
+  let current = null;
+
+  for (const line of lines) {
+    const nom = detectarNomCapcaleraEstil(line);
+    if (nom) {
+      if (current && current.lines.some(l => String(l || '').trim())) blocs.push(current);
+      current = { nom, lines: [line] };
+      continue;
+    }
+    if (!current) continue;
+    current.lines.push(line);
+  }
+
+  if (current && current.lines.some(l => String(l || '').trim())) blocs.push(current);
+  return blocs;
+}
+
 function extreureEstilsPerPersonatge(text) {
   const mapa = {};
-  const src = String(text || '');
-  const blocs = src.split(/\n\n+/).map(b => b.trim()).filter(Boolean);
-  blocs.forEach(bloc => {
-    const m = bloc.match(/^\*\*(.+?)\*\*/m);
-    if (!m) return;
-    const nom = m[1].trim();
-    mapa[nom] = bloc;
+  const blocs = parsejarBlocsEstilsParla(text);
+  blocs.forEach(({ nom, lines }) => {
+    if (!nom || mapa[nom]) return;
+    mapa[nom] = (lines || []).join('\n').trim();
   });
   return mapa;
 }
@@ -3091,19 +3123,16 @@ function filtrarEstilsParlaPerSeleccionats(text, nomsEsperats = []) {
     if (key && !esperatsPerKey[key]) esperatsPerKey[key] = nom;
   });
 
-  const blocs = String(text || '').split(/\n\n+/).map(b => b.trim()).filter(Boolean);
+  const blocs = parsejarBlocsEstilsParla(text);
   const trobats = {};
 
-  blocs.forEach(bloc => {
-    const m = bloc.match(/^\*\*(.+?)\*\*/m);
-    if (!m) return;
-    const nomBlocRaw = m[1].trim();
-    const key = keyOf(nomBlocRaw);
+  blocs.forEach(({ nom, lines }) => {
+    const key = keyOf(nom);
     const nomOriginal = key ? esperatsPerKey[key] : null;
     if (!nomOriginal || trobats[nomOriginal]) return;
 
-    // Força capçalera canònica per evitar duplicats per variants de nom
-    const blocCanon = bloc.replace(/^\*\*.+?\*\*/m, `**${nomOriginal}**`).trim();
+    const resta = (lines || []).slice(1).join('\n').trim();
+    const blocCanon = `**${nomOriginal}**${resta ? `\n${resta}` : ''}`.trim();
     trobats[nomOriginal] = blocCanon;
   });
 
@@ -3668,35 +3697,24 @@ async function iniciarFaseRelacions() {
 
 function mostrarEstilsParla(text) {
   const cos = document.getElementById('estils-cos');
+  const blocs = parsejarBlocsEstilsParla(text);
+  const cards = blocs.length > 0 ? blocs : [{ nom: 'Resultat', lines: String(text || '').split('\n') }];
 
-  // Partir el text en blocs per personatge (cada bloc comença amb **Nom**)
-  const lines  = text.split('\n');
-  const cards  = [];
-  let current  = [];
+  cos.innerHTML = cards.map(card => {
+    const nom = escHtml(card.nom || 'Personatge');
 
-  for (const line of lines) {
-    if (/^\*\*.+\*\*\s*$/.test(line.trim()) && current.length > 0) {
-      cards.push(current);
-      current = [line];
-    } else {
-      current.push(line);
-    }
-  }
-  if (current.length > 0) cards.push(current);
-
-  cos.innerHTML = cards.map(cardLines => {
-    const nomLine = cardLines[0] || '';
-    const nom     = escHtml(nomLine.trim().replace(/\*\*/g, ''));
-
-    const campsHtml = cardLines.slice(1).map(line => {
-      const l = line.trim();
+    const campsHtml = card.lines.slice(1).map(line => {
+      const l = String(line || '').trim();
       if (!l) return '';
 
-      const match = l.match(/^([^:]+):\s*(.+)$/);
-      if (match) {
+      const fragments = l.split(/\s*[|·]\s*/).filter(Boolean);
+      return fragments.map(fragment => {
+        const match = fragment.match(/^([^:]{2,40}):\s*(.+)$/);
+        if (!match) return `<div class="veu-camp-val">${escHtml(fragment)}</div>`;
+
         const label = escHtml(match[1].trim());
         const val   = escHtml(match[2].trim());
-        if (/exemple/i.test(label)) {
+        if (/exemple/i.test(match[1])) {
           return `<div>
             <div class="veu-camp-label">${label}</div>
             <div class="veu-exemple">${val}</div>
@@ -3706,13 +3724,12 @@ function mostrarEstilsParla(text) {
           <div class="veu-camp-label">${label}</div>
           <div class="veu-camp-val">${val}</div>
         </div>`;
-      }
-      return `<div class="veu-camp-val">${escHtml(l)}</div>`;
-    }).filter(h => h).join('\n');
+      }).join('');
+    }).filter(Boolean).join('\n');
 
     return `<div class="veu-card">
       <div class="veu-card-nom">👤 ${nom}</div>
-      <div class="veu-card-camps">${campsHtml}</div>
+      <div class="veu-card-camps">${campsHtml || '<div class="veu-camp-val">Sense camps detectats.</div>'}</div>
     </div>`;
   }).join('\n');
 
