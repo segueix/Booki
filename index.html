@@ -3116,7 +3116,7 @@ async function modeCreacioAutomatic() {
 
     // FASE 5 — Estructura
     setStatus('5/6 — Generant estructura de capítols…');
-    const estructuraText = await nouFlux_estructura(ESTAT._finalNouText, ESTAT._temaNouText, arcsResumit, ESTAT._monNouText || '', nCaps, autor, USER_CONFIG);
+    const estructuraText = await nouFlux_estructuraAmbValidacio(ESTAT._finalNouText, ESTAT._temaNouText, arcsResumit, ESTAT._monNouText || '', nCaps, autor, USER_CONFIG);
     ESTAT._prefetchNouFlux.estructuraText = estructuraText;
     renderEstructuresNou(estructuraText);
     hideLoader('b1');
@@ -3500,7 +3500,7 @@ async function confirmarMonNou() {
   try {
     const estructuraText = (ESTAT._prefetchNouFlux && ESTAT._prefetchNouFlux.estructuraText)
       ? ESTAT._prefetchNouFlux.estructuraText
-      : await nouFlux_estructura(
+      : await nouFlux_estructuraAmbValidacio(
         ESTAT._finalNouText, ESTAT._temaNouText,
         ESTAT._arcsResumitNou, monTriat,
         ESTAT._nombreCapitolsConfig, ESTAT.tematica, USER_CONFIG
@@ -13412,9 +13412,7 @@ Genera exactament 3 opcions en format numerat. Afegeix "(Recomanat)" a la més a
 
 async function nouFlux_synopsisCore(endingText, themeText, autor, config) {
   const models = getModelConfig(config || USER_CONFIG || {});
-  const msgs = [{
-    role: 'user',
-    content: `A partir del final i tema triats, escriu la sinopsi nuclear de la novel·la en exactament 4 frases:
+  const promptBase = `A partir del final i tema triats, escriu la sinopsi nuclear de la novel·la en exactament 4 frases:
 
 FINAL:
 ${endingText}
@@ -13429,15 +13427,100 @@ Frase 2: L'esdeveniment que trenca l'equilibri.
 Frase 3: El conflicte central i el que el protagonista haurà d'afrontar.
 Frase 4: El final i la transformació (o la seva absència).
 
-Respon directament amb les 4 frases, sense numeració ni etiquetes.`
+Respon directament amb les 4 frases, sense numeració ni etiquetes.`;
+
+  const msgs = [{
+    role: 'user',
+    content: promptBase
   }];
-  return await nouFluxCall(
+  let text = await nouFluxCall(
     msgs,
     'Ets un editor literari. Escrius sinopsis nuclears precises i potents. Respon en català.',
     Object.assign({}, config || USER_CONFIG || {}, { maxTokens: 800, model: models.modelGeneracio }),
     'generacio',
     2
   );
+
+  const frases = String(text || '').trim().match(/[^.!?…]+[.!?…]/g) || [];
+  if (frases.length >= 4 && !textSemblaIncomplet(text)) return text.trim();
+
+  const msgsRepair = [{
+    role: 'user',
+    content: `${promptBase}
+
+ESBORRANY (incomplet o mal format):
+${String(text || '').trim()}
+
+Reescriu-la bé en EXACTAMENT 4 frases completes.`
+  }];
+
+  const repaired = await nouFluxCall(
+    msgsRepair,
+    'Ets un editor literari. Retorna una sinopsi nuclear completa de 4 frases en català.',
+    Object.assign({}, config || USER_CONFIG || {}, { maxTokens: 1000, model: models.modelGeneracio }),
+    'generacio',
+    3
+  );
+  return String(repaired || text || '').trim();
+}
+
+function validarEstructuraNouRaw(text, nCaps) {
+  const noMd = s => (s || '').replace(/\*+/g, '').replace(/_+/g, '').trim();
+  const extractSection = (haystack, headerPat, stopPats) => {
+    const startRe = new RegExp(`(?:^|\\n)[^\\n]*${headerPat}[^\\n]*\\n`, 'i');
+    const m = String(haystack || '').match(startRe);
+    if (!m || m.index === undefined) return '';
+    let section = String(haystack || '').substring(m.index + m[0].length);
+    for (const sp of stopPats) {
+      const endRe = new RegExp(`(?:^|\\n)[^\\n]*${sp}[^\\n]*`, 'i');
+      const em = section.match(endRe);
+      if (em && em.index >= 0) { section = section.substring(0, em.index); break; }
+    }
+    return section;
+  };
+  const parseTaula = (taula) => {
+    const linies = String(taula || '').split('\n').filter(l => {
+      const t = noMd(l.trim());
+      if (!t) return false;
+      const firstToken = t.replace(/^\|/, '').split('|')[0].trim();
+      return (t.match(/\|/g) || []).length >= 2 && /^\d+$/.test(firstToken);
+    });
+    return linies.length;
+  };
+
+  const textA = extractSection(text, 'ESTRUCTURA\\s*A', ['ESTRUCTURA\\s*B', 'VERIFICACI']);
+  const textB = extractSection(text, 'ESTRUCTURA\\s*B', ['VERIFICACI', 'ESTRUCTURA\\s*A']);
+  const rowsA = parseTaula(textA);
+  const rowsB = parseTaula(textB);
+  const minRows = Math.max(3, Math.min(Number(nCaps || 0), 6));
+  return rowsA >= minRows && rowsB >= minRows;
+}
+
+async function nouFlux_estructuraAmbValidacio(endingText, themeText, arcsResumit, monText, nCaps, autor, config) {
+  let text = await nouFlux_estructura(endingText, themeText, arcsResumit, monText, nCaps, autor, config);
+  if (validarEstructuraNouRaw(text, nCaps)) return text;
+
+  const models = getModelConfig(config || USER_CONFIG || {});
+  const repairMsgs = [{
+    role: 'user',
+    content: `Aquest resultat d'estructura és incomplet (falta una de les dues estructures o files):
+
+${String(text || '').slice(0, 12000)}
+
+Regenera la resposta COMPLETA amb aquest format obligatori:
+- === ESTRUCTURA A === (taula completa de ${nCaps} files)
+- === ESTRUCTURA B === (taula completa de ${nCaps} files)
+- === VERIFICACIÓ ===`
+  }];
+
+  text = await nouFluxCall(
+    repairMsgs,
+    'Ets un arquitecte narratiu expert. Retorna la resposta completa en català seguint exactament el format requerit.',
+    Object.assign({}, config || USER_CONFIG || {}, { maxTokens: 5200, model: models.modelArquitecte }),
+    'arquitectura',
+    5
+  );
+  return text;
 }
 
 async function nouFlux_personatges(endingText, themeText, synopsisText, autor, perfilAutor, config) {
