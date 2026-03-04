@@ -2691,6 +2691,7 @@ function renderLlistaAmbRecomanat(text, wrapId, listaKey, idxKey, btnId) {
 }
 
 function triarItem(wrapId, idxKey, idx, el) {
+  if (!el) return;
   document.querySelectorAll(`#${wrapId} .premise-item`).forEach(e => e.classList.remove('chosen'));
   el.classList.add('chosen');
   el.querySelector('input').checked = true;
@@ -2908,9 +2909,9 @@ function iniciarModeGuiat() {
 }
 
 function iniciarModeAutomatic() {
-  ESTAT.fase = 'b-auto';
+  ESTAT.fase = 'b1';
   ESTAT._modeCreacio = 'automatic';
-  modeCreacioAutomatic().catch(err => { hideLoader('b-auto'); toast('Error mode automàtic: ' + err.message); });
+  modeCreacioAutomatic().catch(err => { hideLoader('b1'); toast('Error preparant el flux: ' + err.message); });
 }
 
 async function triarMillorOpcio(opcions, { criteri }) {
@@ -3040,109 +3041,92 @@ async function modeCreacioAutomatic() {
   const to     = ESTAT.estil.to;
   const nCaps  = ESTAT._nombreCapitolsConfig;
   const perfil = ESTAT.configuracio.perfil_autor;
-  const logEl  = document.getElementById('auto-log');
-  const log    = [];
-  const addLog = msg => { log.push(msg); if (logEl) { logEl.textContent = log.join('\n'); logEl.scrollTop = logEl.scrollHeight; } };
-  const setStatus = msg => { const el = document.getElementById('loader-b-auto-text'); if (el) el.textContent = msg; };
+  const setStatus = msg => {
+    const el = document.getElementById('loader-b1-text');
+    if (el) el.textContent = msg;
+  };
 
-  showCard('fase-b-auto');
-  showLoader('b-auto');
+  ESTAT._prefetchNouFlux = {};
+
+  showCard('fase-b1');
+  showLoader('b1');
   try {
     // FASE 1 — Final
     setStatus('1/6 — Generant finals narratius…');
     const finalsText = await nouFlux_finals(perfil, autor, to, USER_CONFIG);
+    ESTAT._prefetchNouFlux.finalsText = finalsText;
     renderFinalsNou(finalsText);
-    hideLoader('b-auto');
-    await bAutoMostrarFase('1/6 — Final narratiu', finalsText);
-    showLoader('b-auto');
     setStatus('1/6 — Seleccionant el millor final…');
     if (ESTAT._idxFinalNou === null || ESTAT._idxFinalNou === undefined) {
       const idx = await triarMillorOpcio(ESTAT._finalsNouLlista || [], { criteri: `Quin d'aquests finals és dramàticament més potent per a ${autor}? Respon ÚNICAMENT amb el número (1-${(ESTAT._finalsNouLlista||[]).length}).` });
       ESTAT._idxFinalNou = idx - 1;
     }
+    if (ESTAT._idxFinalNou !== null && ESTAT._idxFinalNou !== undefined && ESTAT._idxFinalNou >= 0) accioFinal('select', ESTAT._idxFinalNou);
     const fi = (ESTAT._finalsNouLlista||[])[ESTAT._idxFinalNou] || {};
-    ESTAT._nkg.macronarrativa.ending = { emocio_final_lector: fi.emocio||'', desti_protagonista: fi.protagonista||'', imatge_o_escena_final: fi.imatge||'', veritat_que_es_revela: fi.veritat||'' };
-    ESTAT._finalNouText = `${fi.titol||''}\nEmoció: ${fi.emocio||''}\nProtagonista: ${fi.protagonista||''}\nImatge: ${fi.imatge||''}\nVeritat: ${fi.veritat||''}`;
-    addLog(`✓ Final: ${fi.titol || '#'+(ESTAT._idxFinalNou+1)}`);
+    const endingText = `${fi.titol||''}\nEmoció: ${fi.emocio||''}\nProtagonista: ${fi.protagonista||''}\nImatge: ${fi.imatge||''}\nVeritat: ${fi.veritat||''}`;
+    ESTAT._prefetchNouFlux.endingText = endingText;
 
     // FASE 2 — Tema + Synopsis
     setStatus('2/6 — Generant temes narratius…');
-    const temaText = await nouFlux_tema(ESTAT._finalNouText, autor, perfil, USER_CONFIG);
-    renderLlistaAmbRecomanat(temaText, 'temes-nou-llista', '_temesNouLlista', '_idxTemaNou', 'btn-confirmar-tema');
+    const temaText = await nouFlux_tema(endingText, autor, perfil, USER_CONFIG);
+    ESTAT._prefetchNouFlux.temesText = temaText;
+    renderTemesNou(temaText);
     if (!ESTAT._temesNouLlista?.length) ESTAT._temesNouLlista = [temaText];
-    hideLoader('b-auto');
-    await bAutoMostrarFase('2/6 — Tema narratiu', temaText);
-    showLoader('b-auto');
     setStatus('2/6 — Seleccionant el millor tema…');
     if (ESTAT._idxTemaNou === null || ESTAT._idxTemaNou === undefined || ESTAT._idxTemaNou < 0) {
       const idx = await triarMillorOpcio(ESTAT._temesNouLlista, { criteri: `Quin tema és més coherent amb el final i l'estil de ${autor}? Respon ÚNICAMENT amb el número.` });
       ESTAT._idxTemaNou = idx - 1;
     }
+    if (ESTAT._idxTemaNou !== null && ESTAT._idxTemaNou !== undefined && ESTAT._idxTemaNou >= 0) triarItem('temes-nou-llista','_idxTemaNou',ESTAT._idxTemaNou,document.getElementById('temes-nou-llista-item-' + ESTAT._idxTemaNou));
     const temaTriat = ESTAT._temesNouLlista[ESTAT._idxTemaNou] || temaText;
-    ESTAT._nkg.macronarrativa.theme = typeof temaTriat === 'string' ? temaTriat : JSON.stringify(temaTriat);
-    ESTAT._temaNouText = ESTAT._nkg.macronarrativa.theme;
+    const temaTriatText = typeof temaTriat === 'string' ? temaTriat : JSON.stringify(temaTriat);
+    ESTAT._prefetchNouFlux.temaTriat = temaTriatText;
     setStatus('2/6 — Generant sinopsi…');
-    const synText = await nouFlux_synopsisCore(ESTAT._finalNouText, ESTAT._temaNouText, autor, USER_CONFIG);
-    ESTAT._nkg.macronarrativa.synopsis_core = synText.trim();
-    ESTAT._arcGlobal = ESTAT._nkg.macronarrativa.synopsis_core;
-    addLog(`✓ Tema + Sinopsi`);
+    const synText = await nouFlux_synopsisCore(endingText, temaTriatText, autor, USER_CONFIG);
+    ESTAT._prefetchNouFlux.synopsisText = synText.trim();
 
     // FASE 3 — Personatges
     setStatus('3/6 — Generant personatges…');
-    const persText = await nouFlux_personatges(ESTAT._finalNouText, ESTAT._temaNouText, ESTAT._nkg.macronarrativa.synopsis_core, autor, perfil, USER_CONFIG);
+    const persText = await nouFlux_personatges(endingText, temaTriatText, synText, autor, perfil, USER_CONFIG);
+    ESTAT._prefetchNouFlux.personatgesText = persText;
     renderPersonatgesNouProposals(persText);
-    hideLoader('b-auto');
-    await bAutoMostrarFase('3/6 — Personatges', persText);
-    showLoader('b-auto');
     setStatus('3/6 — Seleccionant els millors personatges…');
     if (ESTAT._idxPropostaNou === null || ESTAT._idxPropostaNou === undefined) {
       const idx = await triarMillorOpcio(ESTAT._personatgesNouPropostes || [persText], { criteri: `Quin conjunt de personatges té els arcs més necessaris per fer el final inevitable? Respon ÚNICAMENT amb el número.` });
       seleccionarPropostaNou(idx - 1);
     }
+    if (ESTAT._idxPropostaNou !== null && ESTAT._idxPropostaNou !== undefined && ESTAT._idxPropostaNou >= 0) seleccionarPropostaNou(ESTAT._idxPropostaNou);
+
     _confirmarPersonatgesNouSilent();
-    addLog(`✓ Personatges: ${(ESTAT._personatgesSeleccionats||[]).join(', ')}`);
 
     // FASE 4 — Món
     setStatus('4/6 — Generant món narratiu…');
     const arcsResumit = ESTAT._arcsResumitNou || Object.values(ESTAT._nkg.personatges||{}).map(p=>`${p.nom}: ${p.arc?.inici_emocional||''} → ${p.arc?.final_emocional||''}`).join('; ');
     const monText = await nouFlux_mon(arcsResumit, ESTAT._temaNouText, autor, to, USER_CONFIG);
-    renderLlistaAmbRecomanat(monText, 'mon-nou-llista', '_monNouLlista', '_idxMonNou', 'btn-confirmar-mon');
+    ESTAT._prefetchNouFlux.monText = monText;
+    renderVariantsMonNou(monText);
     if (!ESTAT._monNouLlista?.length) ESTAT._monNouLlista = [monText];
-    hideLoader('b-auto');
-    await bAutoMostrarFase('4/6 — Món narratiu', monText);
-    showLoader('b-auto');
     setStatus('4/6 — Seleccionant el millor món…');
     if (ESTAT._idxMonNou === null || ESTAT._idxMonNou === undefined || ESTAT._idxMonNou < 0) {
       const idx = await triarMillorOpcio(ESTAT._monNouLlista, { criteri: `Quin entorn pressiona els personatges amb més força en la direcció del tema? Respon ÚNICAMENT amb el número.` });
       ESTAT._idxMonNou = idx - 1;
     }
+    if (ESTAT._idxMonNou !== null && ESTAT._idxMonNou !== undefined && ESTAT._idxMonNou >= 0) triarItem('mon-nou-llista','_idxMonNou',ESTAT._idxMonNou,document.getElementById('mon-nou-llista-item-' + ESTAT._idxMonNou));
     _confirmarMonNouSilent();
-    addLog(`✓ Món: ${(ESTAT.worldbuilding||'').substring(0,60)}…`);
 
     // FASE 5 — Estructura
     setStatus('5/6 — Generant estructura de capítols…');
     const estructuraText = await nouFlux_estructura(ESTAT._finalNouText, ESTAT._temaNouText, arcsResumit, ESTAT._monNouText || '', nCaps, autor, USER_CONFIG);
+    ESTAT._prefetchNouFlux.estructuraText = estructuraText;
     renderEstructuresNou(estructuraText);
-    hideLoader('b-auto');
-    await bAutoMostrarFase('5/6 — Estructura de capítols', estructuraText);
-    showLoader('b-auto');
-    setStatus('5/6 — Seleccionant la millor estructura…');
-    if (ESTAT._idxEstructuraNou === null || ESTAT._idxEstructuraNou === undefined) {
-      const idx = await triarMillorOpcio((ESTAT._estructuresNouOpcions||[]).map(JSON.stringify), { criteri: `Quina estructura (1 o 2) distribueix millor la tensió i respecta les regles d'intensitat? Respon ÚNICAMENT amb el número (1-2).` });
-      seleccionarEstructuraNou(idx - 1);
-    }
-    addLog(`✓ Estructura: ${(ESTAT._estructuresNouOpcions?.[ESTAT._idxEstructuraNou]||[]).length} capítols`);
-
-    // FASE 6 — Escaleta
-    setStatus('6/6 — Generant escaleta…');
-    hideLoader('b-auto');
-    await confirmarEstructuraNou();
-    addLog(`✓ Escaleta completa`);
+    hideLoader('b1');
+    showCard('fase-b1');
+    setStatus('✅ Preparat. Revisa el final recomanat i confirma per continuar.');
 
   } catch (err) {
-    console.error('[AutoMode]', err);
-    hideLoader('b-auto');
-    toast('Error mode automàtic: ' + err.message);
+    console.error('[AutoModeManual]', err);
+    hideLoader('b1');
+    toast('Error preparant el flux diferent: ' + err.message);
   }
 }
 
@@ -3272,7 +3256,9 @@ async function confirmarFinalNou() {
   try {
     const endingText = `${final.titol || ''}\nEmoció: ${final.emocio || ''}\nProtagonista: ${final.protagonista || ''}\nImatge: ${final.imatge || ''}\nVeritat: ${final.veritat || ''}\nTipus: ${final.tipus || ''}`;
     ESTAT._finalNouText = endingText;
-    const temesText = await nouFlux_tema(endingText, ESTAT.tematica, ESTAT.configuracio.perfil_autor, USER_CONFIG);
+    const temesText = (ESTAT._prefetchNouFlux && ESTAT._prefetchNouFlux.temesText)
+      ? ESTAT._prefetchNouFlux.temesText
+      : await nouFlux_tema(endingText, ESTAT.tematica, ESTAT.configuracio.perfil_autor, USER_CONFIG);
     renderTemesNou(temesText);
   } catch (err) {
     hideLoader('b2');
@@ -3298,9 +3284,11 @@ async function confirmarTemaNou() {
   document.getElementById('loader-b2-text').textContent = 'Generant sinopsi nuclear…';
   showLoader('b2');
   try {
-    const synopsis = await nouFlux_synopsisCore(
-      ESTAT._finalNouText, ESTAT._temaNouText, ESTAT.tematica, USER_CONFIG
-    );
+    const synopsis = (ESTAT._prefetchNouFlux && ESTAT._prefetchNouFlux.synopsisText)
+      ? ESTAT._prefetchNouFlux.synopsisText
+      : await nouFlux_synopsisCore(
+        ESTAT._finalNouText, ESTAT._temaNouText, ESTAT.tematica, USER_CONFIG
+      );
     ESTAT._nkg.macronarrativa.synopsis_core = synopsis;
     document.getElementById('synopsis-nou-text').textContent = synopsis;
     document.getElementById('synopsis-nou-result').classList.remove('hidden');
@@ -3313,11 +3301,13 @@ async function confirmarTemaNou() {
   showCard('fase-b3');
   showLoader('b3');
   try {
-    const personatgesText = await nouFlux_personatges(
-      ESTAT._finalNouText, ESTAT._temaNouText,
-      ESTAT._nkg.macronarrativa.synopsis_core,
-      ESTAT.tematica, ESTAT.configuracio.perfil_autor, USER_CONFIG
-    );
+    const personatgesText = (ESTAT._prefetchNouFlux && ESTAT._prefetchNouFlux.personatgesText)
+      ? ESTAT._prefetchNouFlux.personatgesText
+      : await nouFlux_personatges(
+        ESTAT._finalNouText, ESTAT._temaNouText,
+        ESTAT._nkg.macronarrativa.synopsis_core,
+        ESTAT.tematica, ESTAT.configuracio.perfil_autor, USER_CONFIG
+      );
     renderPersonatgesNouProposals(personatgesText);
   } catch (err) {
     hideLoader('b3');
@@ -3352,7 +3342,7 @@ function renderPersonatgesNouProposals(text) {
         ${recomanats[i] ? '<span class="badge-recomanat">Recomanat</span>' : ''}
         <strong>Proposta ${i+1}</strong>
       </label>
-      <div style="margin-top:8px;font-size:.85rem;color:var(--text2);white-space:pre-wrap;padding-left:8px;">${escHtml(prop.trim().substring(0, 600))}${prop.trim().length > 600 ? '…' : ''}</div>
+      <div style="margin-top:8px;font-size:.85rem;color:var(--text2);white-space:pre-wrap;padding-left:8px;">${escHtml(prop.trim())}</div>
     </div>
   `).join('');
 
@@ -3470,7 +3460,9 @@ async function confirmarPersonatgesNou() {
   showCard('fase-b4');
   showLoader('b4');
   try {
-    const monText = await nouFlux_mon(arcsResumit, ESTAT._temaNouText, ESTAT.tematica, ESTAT.estil.to, USER_CONFIG);
+    const monText = (ESTAT._prefetchNouFlux && ESTAT._prefetchNouFlux.monText)
+      ? ESTAT._prefetchNouFlux.monText
+      : await nouFlux_mon(arcsResumit, ESTAT._temaNouText, ESTAT.tematica, ESTAT.estil.to, USER_CONFIG);
     renderVariantsMonNou(monText);
   } catch (err) {
     hideLoader('b4');
@@ -3506,11 +3498,13 @@ async function confirmarMonNou() {
   showCard('fase-b5');
   showLoader('b5');
   try {
-    const estructuraText = await nouFlux_estructura(
-      ESTAT._finalNouText, ESTAT._temaNouText,
-      ESTAT._arcsResumitNou, monTriat,
-      ESTAT._nombreCapitolsConfig, ESTAT.tematica, USER_CONFIG
-    );
+    const estructuraText = (ESTAT._prefetchNouFlux && ESTAT._prefetchNouFlux.estructuraText)
+      ? ESTAT._prefetchNouFlux.estructuraText
+      : await nouFlux_estructura(
+        ESTAT._finalNouText, ESTAT._temaNouText,
+        ESTAT._arcsResumitNou, monTriat,
+        ESTAT._nombreCapitolsConfig, ESTAT.tematica, USER_CONFIG
+      );
     renderEstructuresNou(estructuraText);
   } catch (err) {
     hideLoader('b5');
@@ -13303,6 +13297,10 @@ INSTRUCCIONS:
 //  NOU FLUX DE CREACIÓ (B): funcions LLM backend
 // ═══════════════════════════════════════════════════════════
 
+async function nouFluxCall(messages, systemPrompt, config, tag, maxCont = 4) {
+  return await callLLMWithContinuation(messages, systemPrompt, config, tag, maxCont);
+}
+
 async function nouFlux_perfilAutor(autor, to, config) {
   const models = getModelConfig(config || USER_CONFIG || {});
   const msgs = [{
@@ -13316,11 +13314,12 @@ ALLÒ QUE NO ÉS: Quins elements evita o rebutja completament?
 
 Sigues concís i precís. Màxim 200 paraules.`
   }];
-  return await callLLMMulti(
+  return await nouFluxCall(
     msgs,
     'Ets un analista literari especialitzat en emulació d\'estil. Respon en la mateixa llengua que l\'autor. Màxim 200 paraules.',
     Object.assign({}, config || USER_CONFIG || {}, { maxTokens: 400, model: models.modelGeneracio }),
-    'generacio'
+    'generacio',
+    2
   );
 }
 
@@ -13346,11 +13345,12 @@ Separa cada opció amb "=== FINAL [N] ===" (on N és el número).
 Marca el final dramàticament més potent com "=== FINAL [N] (Recomanat) ===".
 Els 5 finals han de ser dramàticament incompatibles entre ells.`
   }];
-  return await callLLMMulti(
+  return await nouFluxCall(
     msgs,
     'Ets un sistema de creació narrativa. Genera finals amb alt potencial dramàtic. Respon en català.',
-    Object.assign({}, config || USER_CONFIG || {}, { maxTokens: 1800, model: models.modelGeneracio }),
-    'generacio'
+    Object.assign({}, config || USER_CONFIG || {}, { maxTokens: 2600, model: models.modelGeneracio }),
+    'generacio',
+    5
   );
 }
 
@@ -13376,11 +13376,12 @@ AUTOR DE REFERÈNCIA: ${autor}
 TO: ${to}
 PERFIL D'ESTIL: ${perfilAutor}`
   }];
-  return await callLLMMulti(
+  return await nouFluxCall(
     msgs,
     'Ets un sistema de creació narrativa. Regenera finals narratius amb alt potencial dramàtic. Respon en català.',
     Object.assign({}, config || USER_CONFIG || {}, { maxTokens: 600, model: models.modelGeneracio }),
-    'generacio'
+    'generacio',
+    3
   );
 }
 
@@ -13400,11 +13401,12 @@ Per a cada tema:
 
 Genera exactament 3 opcions en format numerat. Afegeix "(Recomanat)" a la més adequada per al final triat.`
   }];
-  return await callLLMMulti(
+  return await nouFluxCall(
     msgs,
     'Ets un sistema de creació narrativa especialitzat en temes literaris. Respon en català.',
-    Object.assign({}, config || USER_CONFIG || {}, { maxTokens: 1500, model: models.modelGeneracio }),
-    'generacio'
+    Object.assign({}, config || USER_CONFIG || {}, { maxTokens: 2200, model: models.modelGeneracio }),
+    'generacio',
+    4
   );
 }
 
@@ -13429,11 +13431,12 @@ Frase 4: El final i la transformació (o la seva absència).
 
 Respon directament amb les 4 frases, sense numeració ni etiquetes.`
   }];
-  return await callLLMMulti(
+  return await nouFluxCall(
     msgs,
     'Ets un editor literari. Escrius sinopsis nuclears precises i potents. Respon en català.',
     Object.assign({}, config || USER_CONFIG || {}, { maxTokens: 800, model: models.modelGeneracio }),
-    'generacio'
+    'generacio',
+    2
   );
 }
 
@@ -13462,11 +13465,12 @@ Separa cada proposta amb "=== PROPOSTA [N] ===" (on N és el número, 1 a 3).
 Marca la proposta amb major tensió dramàtica com "=== PROPOSTA [N] (Recomanat) ===".
 Al final de cada proposta, afegeix: TENSIÓ ENTRE PERSONATGES: [com xoquen els arcs entre ells]`
   }];
-  return await callLLMMulti(
+  return await nouFluxCall(
     msgs,
     'Ets un creador de personatges literaris. Crees personatges complexos i contradictoris. Respon en català.',
-    Object.assign({}, config || USER_CONFIG || {}, { maxTokens: 2500, model: models.modelGeneracio }),
-    'generacio'
+    Object.assign({}, config || USER_CONFIG || {}, { maxTokens: 3200, model: models.modelGeneracio }),
+    'generacio',
+    5
   );
 }
 
@@ -13486,11 +13490,12 @@ Per a cada variant:
 
 Genera exactament 3 opcions en format numerat. Afegeix "(Recomanat)" a la més adequada.`
   }];
-  return await callLLMMulti(
+  return await nouFluxCall(
     msgs,
     'Ets un creador de mons narratius. Respon en català.',
-    Object.assign({}, config || USER_CONFIG || {}, { maxTokens: 1800, model: models.modelGeneracio }),
-    'generacio'
+    Object.assign({}, config || USER_CONFIG || {}, { maxTokens: 2400, model: models.modelGeneracio }),
+    'generacio',
+    4
   );
 }
 
@@ -13518,11 +13523,12 @@ Al final, afegeix "=== VERIFICACIÓ ===" i comprova:
 3. La intensitat segueix una corba dramàtica coherent (no és plana)
 4. Cap capítol és prescindible (tots fan avançar el conflicte)`
   }];
-  return await callLLMMulti(
+  return await nouFluxCall(
     msgs,
     'Ets un arquitecte narratiu expert. Dissenyes estructures de novel·les amb precisió dramàtica. Respon en català.',
-    Object.assign({}, config || USER_CONFIG || {}, { maxTokens: 3500, model: models.modelArquitecte }),
-    'arquitectura'
+    Object.assign({}, config || USER_CONFIG || {}, { maxTokens: 5000, model: models.modelArquitecte }),
+    'arquitectura',
+    5
   );
 }
 
@@ -13596,11 +13602,12 @@ Instruccions per al ganxo:
 ${instruccioGanxo}
 La intensitat del ganxo ha de ser ≥ ${esPenultim ? 5 : intensitat}.`
   }];
-  return await callLLMMulti(
+  return await nouFluxCall(
     msgs,
     'Ets un arquitecte narratiu. Generes escaletes de capítols precises i coherents. Respon EXCLUSIVAMENT amb JSON vàlid.',
-    Object.assign({}, config || USER_CONFIG || {}, { maxTokens: 2000, model: models.modelArquitecte }),
-    'arquitectura'
+    Object.assign({}, config || USER_CONFIG || {}, { maxTokens: 2600, model: models.modelArquitecte }),
+    'arquitectura',
+    4
   );
 }
 
