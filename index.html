@@ -3272,7 +3272,77 @@ async function confirmarFinalNou() {
 }
 
 function renderTemesNou(text) {
-  renderLlistaAmbRecomanat(text, 'temes-nou-llista', '_temesNouLlista', '_idxTemaNou', 'btn-confirmar-tema');
+  const wrapId = 'temes-nou-llista';
+  const wrap = document.getElementById(wrapId);
+  const raw = String(text || '').trim();
+
+  const parseOpcionsTemesNou = (input) => {
+    const normalized = String(input || '').replace(/\r/g, '');
+    const headingRe = /^(?:\s*(?:===\s*)?(?:TEMA\s*)?(\d+)[\)\.:\-]\s*|\s*===\s*TEMA\s*(\d+)\s*(?:\(Recomanat\))?\s*===\s*)/i;
+    const lines = normalized.split('\n');
+    const blocs = [];
+    let current = null;
+
+    const pushCurrent = () => {
+      if (!current) return;
+      const txt = current.trim();
+      if (txt) blocs.push(txt);
+      current = null;
+    };
+
+    for (const line of lines) {
+      if (headingRe.test(line.trim())) {
+        pushCurrent();
+        current = line.replace(headingRe, '').trim();
+      } else if (current !== null) {
+        current += `\n${line}`;
+      }
+    }
+    pushCurrent();
+
+    if (blocs.length >= 2) return blocs;
+
+    const byBlank = normalized.split(/\n\s*\n+/).map(s => s.trim()).filter(Boolean);
+    if (byBlank.length >= 2) return byBlank.slice(0, 3);
+
+    const oneLine = normalized.split('\n').map(s => s.trim()).filter(Boolean).join(' ');
+    return oneLine ? [oneLine] : [];
+  };
+
+  const opcions = parseOpcionsTemesNou(raw).map(item => item.replace(/\*+/g, '').trim()).filter(Boolean);
+  if (!opcions.length) {
+    wrap.innerHTML = `<pre style="white-space:pre-wrap;font-size:.9rem;">${escHtml(raw)}</pre>`;
+    ESTAT._temesNouLlista = [];
+    ESTAT._idxTemaNou = null;
+    hideLoader('b2');
+    return;
+  }
+
+  ESTAT._temesNouLlista = opcions.map(item => item.replace(/\s*\(Recomanat\)\s*/ig, '').trim());
+  ESTAT._idxTemaNou = null;
+
+  let autoIdx = opcions.findIndex(item => /\(Recomanat\)/i.test(item));
+  if (autoIdx < 0) autoIdx = 0;
+
+  wrap.innerHTML = opcions.map((item, i) => {
+    const esRecomanat = i === autoIdx || /\(Recomanat\)/i.test(item);
+    const textNet = item.replace(/\s*\(Recomanat\)\s*/ig, '').trim();
+    const badge = esRecomanat ? '<span class="badge-recomanat">Recomanat</span>' : '';
+    return `<div class="premise-item" id="${wrapId}-item-${i}" onclick="triarItem('${wrapId}','_idxTemaNou',${i},this)">
+      <input type="radio" name="${wrapId}-radio" id="${wrapId}-r-${i}">
+      <label for="${wrapId}-r-${i}" style="white-space:pre-wrap;display:block;line-height:1.45;">${badge}${escHtml(textNet)}</label>
+    </div>`;
+  }).join('\n');
+
+  const elAuto = document.getElementById(`${wrapId}-item-${autoIdx}`);
+  if (elAuto) {
+    elAuto.classList.add('chosen');
+    const radio = elAuto.querySelector('input');
+    if (radio) radio.checked = true;
+    ESTAT._idxTemaNou = autoIdx;
+  }
+
+  showBtn('btn-confirmar-tema');
   hideLoader('b2');
 }
 
