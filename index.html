@@ -6819,6 +6819,8 @@ function generarFitxerContexte(nkg, biblia, capitolActual) {
   const contingut = {
     exportat_en_capitol: capitolActual,
     exportat_a: new Date().toISOString(),
+    fase_actual: ESTAT.fase || null,
+    mode_creacio: ESTAT._modeCreacio || 'guiat',
     macronarrativa: nkg.macronarrativa,
     threads: nkg.threads,
     personatges: nkg.personatges,
@@ -6831,11 +6833,23 @@ function generarFitxerContexte(nkg, biblia, capitolActual) {
     timeline_objectes: (nkg.timeline_objectes || []).slice(-20),
     timeline_personatges: (nkg.timeline_personatges || []).slice(-20),
     beats_gastats: nkg.beats_gastats || [],
+    context_creacio: {
+      tematica: ESTAT.tematica || '',
+      estil: ESTAT.estil || {},
+      final_text: ESTAT._finalNouText || '',
+      tema_text: ESTAT._temaNouText || '',
+      worldbuilding: ESTAT.worldbuilding || '',
+      personatges_seleccionats: ESTAT._personatgesSeleccionats || [],
+      trames: ESTAT.trames || { trama_principal: null, subtrames: [], mapa_entrellacat: [] },
+      estructura_capitols: ESTAT._estructuraCapitols || [],
+      escaletes: ESTAT._escaletes || []
+    },
     biblia: {
       regles_mon: biblia.regles_mon,
       llocs_importants: biblia.llocs_importants,
       objectes_clau: biblia.objectes_clau,
-      fets_canonics: biblia.fets_canonics
+      fets_canonics: biblia.fets_canonics,
+      fitxes_personatges: biblia.fitxes_personatges || []
     }
   };
   const nomFitxer = `NKG_Biblia_Cap${capitolActual}_${Date.now()}.json`;
