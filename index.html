@@ -4037,6 +4037,7 @@ async function iniciarEscaletaSeqNou() {
   }
 
   verificarDistribucioGanxos(ESTAT._estructuraCapitols);
+  generarMapaTransicionsCapitolsNKG();
   hideLoader('b6');
   const validacioNKG = validarNKGComplet(ESTAT._nkg, ESTAT._estructuraCapitols);
   mostrarResumNKGiTransicio(ESTAT._nkg, ESTAT._estructuraCapitols, validacioNKG, ESTAT._modeCreacio || 'guiat');
@@ -11104,6 +11105,44 @@ function generarDirectivaContinuitat(capitolIdx) {
   return `ALERTA DE TRANSICIÓ LOGÍSTICA: El capítol anterior va acabar amb ${protagonista} a ${ubicacioAnterior}. El nou capítol se situa a ${ubicacioNova}. ÉS IMPERATIU que dediquis el primer paràgraf a narrar de forma realista el desplaçament (com hi arriba) o estableixis una el·lipsi temporal explícita justificant el pas del temps. NO teletransportis el personatge.\nEstat emocional previ: ${snapshotAnterior.estat_emocional || 'no determinat'}.${textLiteralBloc}${reglesEstrictes}`;
 }
 
+function generarMapaTransicionsCapitolsNKG() {
+  if (!ESTAT._nkg || typeof ESTAT._nkg !== 'object') return;
+  const estructura = Array.isArray(ESTAT._estructuraCapitols) ? ESTAT._estructuraCapitols : [];
+  const escaletes = Array.isArray(ESTAT._escaletes) ? ESTAT._escaletes : [];
+  const out = [];
+
+  for (let i = 0; i < estructura.length - 1; i++) {
+    const capActual = estructura[i] || {};
+    const capSeguent = estructura[i + 1] || {};
+    const escActual = escaletes.find(e => e.capitol === (i + 1)) || {};
+    const escSeguent = escaletes.find(e => e.capitol === (i + 2)) || {};
+    const ubicacioFrom = obtenirUbicacioEscaletaCapitol(i) || '';
+    const ubicacioTo = obtenirUbicacioEscaletaCapitol(i + 1) || '';
+    const mateixa = normalitzarUbicacioContinuitat(ubicacioFrom) === normalitzarUbicacioContinuitat(ubicacioTo);
+    const ganxo = capActual.ganxo_final || escActual.ganxo_final || {};
+
+    out.push({
+      de_capitol: i + 1,
+      a_capitol: i + 2,
+      darrera_imatge_origen: escActual.darrera_imatge || '',
+      primera_frase_desti: escSeguent.primera_frase || '',
+      ganxo_final_origen: {
+        tipus: ganxo.tipus || '',
+        intensitat: ganxo.intensitat || '',
+        pregunta_implicita: ganxo.pregunta_implicita || ''
+      },
+      ubicacio_origen: ubicacioFrom,
+      ubicacio_desti: ubicacioTo,
+      tipus_transicio: mateixa ? 'solapament_directe' : 'transicio_logistica',
+      directiva_obligatoria: mateixa
+        ? 'Reprendre l\'acció en continuïtat immediata (microsegon següent) sense salt temporal.'
+        : 'Explicar arribada o el·lipsi explícita abans d\'activar nova acció. Prohibit teletransport.'
+    });
+  }
+
+  ESTAT._nkg.transicions_capitols = out;
+}
+
 function filtrarContextFutur(capitolActualIdx) {
   // FUTURE MASKING
   const estatFiltrat = typeof structuredClone === 'function'
@@ -11159,72 +11198,12 @@ function buildContextCapitolsComplets(idx, opts = {}, estat = ESTAT) {
     if (t && t.trim()) entrades.push({ idx: i, text: t });
   });
   if (entrades.length === 0) return '';
-
-  // Pressupost aproximat: 4500 paraules representen uns 6000 tokens.
-  // Això deixa prou espai lliure al prompt per la Bíblia de món i l'escaleta.
-  const MAX_PARAULES_CONTEXT = opts.maxParaules || 4500;
-  let paraulesAcumulades = 0;
-  const parts = [];
-
-  // Recorrem els capítols de més recent a més antic
-  for (let i = entrades.length - 1; i >= 0; i--) {
-    const e = entrades[i];
-    const textComplet = e.text.trim();
-    const paraulesText = textComplet.split(/\s+/).length;
-
-    // TIER 1: Si hi ha pressupost, posem el capítol sencer
-    if (paraulesAcumulades + paraulesText <= MAX_PARAULES_CONTEXT) {
-      parts.unshift(`### CAPÍTOL ${e.idx + 1}
-${textComplet}`);
-      paraulesAcumulades += paraulesText;
-    } else {
-      // TIER 2: Si ja no hi cap el text sencer, usem el resum del llibre de registre
-      const reg = estat.llibreRegistre?.capitols?.[e.idx];
-      const esElMesRecent = (i === entrades.length - 1);
-      let resum;
-      if (esElMesRecent) {
-        resum = reg?.resum_llarg || reg?.resum_capitol || reg?.resum_curt || '';
-      } else {
-        resum = reg?.resum_curt || reg?.resum_capitol || '';
-      }
-      if (!resum) resum = textComplet.split(/\s+/).slice(0, 500).join(' ') + '...';
-      const paraulesResum = resum.split(/\s+/).length;
-
-      if (paraulesAcumulades + paraulesResum <= MAX_PARAULES_CONTEXT) {
-        parts.unshift(`### CAPÍTOL ${e.idx + 1} (Resum)
-${resum}`);
-        paraulesAcumulades += paraulesResum;
-      } else {
-        // TIER 3: Estem al límit del pressupost. Afegim la memòria global comprimida per cobrir la resta i parem el bucle.
-        const cobertaFinsCap = e.idx + 1;
-        let memoriaText = '';
-
-        if (estat._memoriasComprimides && estat._memoriasComprimides.length > 0) {
-          const mem = [...estat._memoriasComprimides]
-            .filter(m => m.finsCap <= cobertaFinsCap)
-            .sort((a, b) => b.finsCap - a.finsCap)[0];
-          if (mem && mem.text) memoriaText = mem.text;
-        }
-        if (!memoriaText && estat._resumCompacte) {
-          memoriaText = estat._resumCompacte;
-        }
-
-        if (memoriaText) {
-          parts.unshift(`### SINOPSI CAPÍTOLS 1–${cobertaFinsCap} (comprimida)
-${memoriaText.trim()}`);
-        } else {
-          // Mini-fallback per evitar quedar-nos sense context inicial si no hi ha memòria
-          parts.unshift(`### CAPÍTOLS 1–${cobertaFinsCap}
-(Contingut omès per mantenir el focus narratiu).`);
-        }
-        break; // Tallem l'addició de context antic per protegir el context window
-      }
-    }
-  }
+  const parts = entrades.map(e => `### CAPÍTOL ${e.idx + 1}
+${e.text.trim()}`);
 
   return `
 
-CAPÍTOLS ANTERIORS (Context dinàmic per pressupost de tokens):
+CAPÍTOLS ANTERIORS (TEXT COMPLET, sense retalls):
 ${parts.join('\n\n')}`;
 }
 
@@ -11471,6 +11450,21 @@ function buildContextCapitol(idx) {
     ? resumsBlocsAnteriorsList.join('\n\n')
     : '';
 
+  // Mapa de transicions capítol->capítol generat a NKG (anti-desconnexió logística)
+  let ctxTransicionsNkg = '';
+  if (ESTAT._nkg && Array.isArray(ESTAT._nkg.transicions_capitols)) {
+    const tr = ESTAT._nkg.transicions_capitols.find(t => Number(t.a_capitol) === (idx + 1));
+    if (tr) {
+      ctxTransicionsNkg = `TRANSICIÓ OBLIGATÒRIA DES DEL CAPÍTOL ${tr.de_capitol} AL ${tr.a_capitol}:
+- Tipus: ${tr.tipus_transicio || ''}
+- Ubicació origen: ${tr.ubicacio_origen || '—'}
+- Ubicació destí: ${tr.ubicacio_desti || '—'}
+- Directiva: ${tr.directiva_obligatoria || ''}
+- Ganxo heretat: ${(tr.ganxo_final_origen && tr.ganxo_final_origen.tipus) ? tr.ganxo_final_origen.tipus : '—'}
+- Pregunta pendent: ${(tr.ganxo_final_origen && tr.ganxo_final_origen.pregunta_implicita) ? tr.ganxo_final_origen.pregunta_implicita : '—'}`;
+    }
+  }
+
   // Quan NKG és actiu, combina (no substitueix) ctxGlobal + ctxNkg
   if (ESTAT._nkg) {
     const escenaSpec = {
@@ -11487,6 +11481,7 @@ function buildContextCapitol(idx) {
       ctxGlobalBase,
       blocEscaleta.length > 0 ? blocEscaleta.join('\n\n') : '',
       ctxTransicioBloc,
+      ctxTransicionsNkg,
       ctxCapitolsBloc,
       ctxNkg,
       blocFinal.length > 0 ? blocFinal.join('\n') : ''
@@ -11505,6 +11500,7 @@ function buildContextCapitol(idx) {
     ctxGlobalBase,
     blocEscaleta.length > 0 ? blocEscaleta.join('\n\n') : '',
     ctxTransicioBloc,
+    ctxTransicionsNkg,
     ctxCapitolsBloc,
     blocFinal.length > 0 ? blocFinal.join('\n') : ''
   ].filter(Boolean);
@@ -13896,6 +13892,7 @@ function crearNKG() {
     timeline_accions: [], // Registre d'Accions Consumades (NKG CHRONOS): "C3E2: Maja entra al laboratori"
     timeline_objectes: [], // Registre de moviment d'objectes: C3E2: [Claus] Personatge A -> Personatge B (motiu)
     timeline_personatges: [], // Registre de canvis de personatge: ubicació/roba/estat per escena
+    transicions_capitols: [], // Regles de pas capítol->capítol per evitar salts i pèrdua de continuïtat
     beats_gastats: [], // Registre de beats narratius consumits (anti-repetició dramàtica)
     ultima_actualitzacio: { capitol: 0, escena: 0 },
     versio: 1
