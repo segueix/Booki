@@ -3622,7 +3622,96 @@ async function confirmarPersonatgesNou() {
 }
 
 function renderVariantsMonNou(text) {
-  renderLlistaAmbRecomanat(text, 'mon-nou-llista', '_monNouLlista', '_idxMonNou', 'btn-confirmar-mon');
+  const wrapId = 'mon-nou-llista';
+  const wrap = document.getElementById(wrapId);
+  const raw = String(text || '').trim();
+
+  const parseOpcionsMonNou = (input) => {
+    const normalized = String(input || '')
+      .replace(/\r/g, '')
+      .replace(/```[\s\S]*?```/g, ' ')
+      .trim();
+    if (!normalized) return [];
+
+    // Format principal numerat (accepta multiline)
+    const numbered = [];
+    const numberedRe = /(?:^|\n)\s*(\d+)\s*[\)\.:\-]\s+([\s\S]*?)(?=(?:\n\s*\d+\s*[\)\.:\-]\s+)|$)/g;
+    let m;
+    while ((m = numberedRe.exec(normalized)) !== null) {
+      const bloc = String(m[2] || '').trim();
+      if (bloc) numbered.push(bloc);
+    }
+    if (numbered.length >= 2) return numbered;
+
+    // Format alternatiu en variants
+    const byVariantHeader = [];
+    const variantRe = /(?:^|\n)\s*===\s*(?:VARIANT|M[ÓO]N)\s*\d+\s*(?:\(Recomanat\))?\s*===\s*\n?([\s\S]*?)(?=(?:\n\s*===\s*(?:VARIANT|M[ÓO]N)\s*\d+\s*(?:\(Recomanat\))?\s*===)|$)/gi;
+    let t;
+    while ((t = variantRe.exec(normalized)) !== null) {
+      const bloc = String(t[1] || '').trim();
+      if (bloc) byVariantHeader.push(bloc);
+    }
+    if (byVariantHeader.length >= 2) return byVariantHeader;
+
+    // Fallback per blocs
+    const byBlank = normalized
+      .split(/\n\s*\n+/)
+      .map(s => s.trim())
+      .filter(Boolean)
+      .filter(s => !/^#/.test(s) && !/^[-_]{3,}$/.test(s));
+    if (byBlank.length >= 2) return byBlank.slice(0, 3);
+
+    return [normalized];
+  };
+
+  const monQualitat = (txt) => {
+    const net = String(txt || '').replace(/\s+/g, ' ').trim();
+    if (!net) return false;
+    if (/^#/.test(net)) return false;
+    const marques = ['LLOC I ÈPOCA:', 'EXPRESSIÓ DEL TEMA:', 'CONFLICTE NATURAL:', 'RESTRICCIONS:'];
+    const hits = marques.reduce((n, k) => n + (net.toUpperCase().includes(k) ? 1 : 0), 0);
+    return net.length >= 120 || hits >= 2;
+  };
+
+  const opcions = parseOpcionsMonNou(raw)
+    .map(item => item.replace(/\*+/g, '').trim())
+    .filter(Boolean)
+    .filter(monQualitat)
+    .slice(0, 3);
+
+  if (!opcions.length) {
+    wrap.innerHTML = `<pre style="white-space:pre-wrap;font-size:.9rem;">${escHtml(raw)}</pre>`;
+    ESTAT._monNouLlista = [];
+    ESTAT._idxMonNou = null;
+    hideLoader('b4');
+    return;
+  }
+
+  ESTAT._monNouLlista = opcions.map(item => item.replace(/\s*\(Recomanat\)\s*/ig, '').trim());
+  ESTAT._idxMonNou = null;
+
+  let autoIdx = opcions.findIndex(item => /\(Recomanat\)/i.test(item));
+  if (autoIdx < 0) autoIdx = 0;
+
+  wrap.innerHTML = opcions.map((item, i) => {
+    const esRecomanat = i === autoIdx || /\(Recomanat\)/i.test(item);
+    const textNet = item.replace(/\s*\(Recomanat\)\s*/ig, '').trim();
+    const badge = esRecomanat ? '<span class="badge-recomanat">Recomanat</span>' : '';
+    return `<div class="premise-item" id="${wrapId}-item-${i}" onclick="triarItem('${wrapId}','_idxMonNou',${i},this)">
+      <input type="radio" name="${wrapId}-radio" id="${wrapId}-r-${i}">
+      <label for="${wrapId}-r-${i}" style="white-space:pre-wrap;display:block;line-height:1.45;">${badge}${escHtml(textNet)}</label>
+    </div>`;
+  }).join('\n');
+
+  const elAuto = document.getElementById(`${wrapId}-item-${autoIdx}`);
+  if (elAuto) {
+    elAuto.classList.add('chosen');
+    const radio = elAuto.querySelector('input');
+    if (radio) radio.checked = true;
+    ESTAT._idxMonNou = autoIdx;
+  }
+
+  showBtn('btn-confirmar-mon');
   hideLoader('b4');
 }
 
