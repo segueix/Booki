@@ -3277,39 +3277,58 @@ function renderTemesNou(text) {
   const raw = String(text || '').trim();
 
   const parseOpcionsTemesNou = (input) => {
-    const normalized = String(input || '').replace(/\r/g, '');
-    const headingRe = /^(?:\s*(?:===\s*)?(?:TEMA\s*)?(\d+)[\)\.:\-]\s*|\s*===\s*TEMA\s*(\d+)\s*(?:\(Recomanat\))?\s*===\s*)/i;
-    const lines = normalized.split('\n');
-    const blocs = [];
-    let current = null;
+    const normalized = String(input || '')
+      .replace(/\r/g, '')
+      .replace(/```[\s\S]*?```/g, ' ')
+      .trim();
+    if (!normalized) return [];
 
-    const pushCurrent = () => {
-      if (!current) return;
-      const txt = current.trim();
-      if (txt) blocs.push(txt);
-      current = null;
-    };
-
-    for (const line of lines) {
-      if (headingRe.test(line.trim())) {
-        pushCurrent();
-        current = line.replace(headingRe, '').trim();
-      } else if (current !== null) {
-        current += `\n${line}`;
-      }
+    // Format principal: 1. ... / 2) ... / 3: ... (multilínia)
+    const numbered = [];
+    const numberedRe = /(?:^|\n)\s*(\d+)\s*[\)\.:\-]\s+([\s\S]*?)(?=(?:\n\s*\d+\s*[\)\.:\-]\s+)|$)/g;
+    let m;
+    while ((m = numberedRe.exec(normalized)) !== null) {
+      const bloc = String(m[2] || '').trim();
+      if (bloc) numbered.push(bloc);
     }
-    pushCurrent();
+    if (numbered.length >= 2) return numbered;
 
-    if (blocs.length >= 2) return blocs;
+    // Format alternatiu: === TEMA N === ... === TEMA N+1 === ...
+    const byTemaHeader = [];
+    const temaRe = /(?:^|\n)\s*===\s*TEMA\s*\d+\s*(?:\(Recomanat\))?\s*===\s*\n?([\s\S]*?)(?=(?:\n\s*===\s*TEMA\s*\d+\s*(?:\(Recomanat\))?\s*===)|$)/gi;
+    let t;
+    while ((t = temaRe.exec(normalized)) !== null) {
+      const bloc = String(t[1] || '').trim();
+      if (bloc) byTemaHeader.push(bloc);
+    }
+    if (byTemaHeader.length >= 2) return byTemaHeader;
 
-    const byBlank = normalized.split(/\n\s*\n+/).map(s => s.trim()).filter(Boolean);
+    // Últim recurs: blocs per línia en blanc, filtrant capçaleres genèriques
+    const byBlank = normalized
+      .split(/\n\s*\n+/)
+      .map(s => s.trim())
+      .filter(Boolean)
+      .filter(s => !/^#/.test(s) && !/^[-_]{3,}$/.test(s));
     if (byBlank.length >= 2) return byBlank.slice(0, 3);
 
-    const oneLine = normalized.split('\n').map(s => s.trim()).filter(Boolean).join(' ');
-    return oneLine ? [oneLine] : [];
+    return [normalized];
   };
 
-  const opcions = parseOpcionsTemesNou(raw).map(item => item.replace(/\*+/g, '').trim()).filter(Boolean);
+  const temaQualitat = (txt) => {
+    const net = String(txt || '').replace(/\s+/g, ' ').trim();
+    if (!net) return false;
+    if (/^#/.test(net)) return false;
+    const marques = ['TENSIÓ:', 'PREGUNTA:', 'NO ÉS:', 'SUBTEXTUALITAT:'];
+    const hits = marques.reduce((n, k) => n + (net.toUpperCase().includes(k) ? 1 : 0), 0);
+    return net.length >= 80 || hits >= 2;
+  };
+
+  const opcions = parseOpcionsTemesNou(raw)
+    .map(item => item.replace(/\*+/g, '').trim())
+    .filter(Boolean)
+    .filter(temaQualitat)
+    .slice(0, 3);
+
   if (!opcions.length) {
     wrap.innerHTML = `<pre style="white-space:pre-wrap;font-size:.9rem;">${escHtml(raw)}</pre>`;
     ESTAT._temesNouLlista = [];
