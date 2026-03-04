@@ -918,6 +918,8 @@
     <p id="synopsis-nou-text" style="margin-top:8px;font-size:.9rem;color:var(--text2);"></p>
   </div>
   <div class="btn-row">
+    <button class="btn btn-ghost" onclick="regenerarTemesNou()">🔄 Regenerar temes</button>
+    <button class="btn btn-ghost" onclick="regenerarSynopsisNou()">🔄 Regenerar sinopsi</button>
     <button class="btn btn-primary hidden" id="btn-confirmar-tema" onclick="confirmarTemaNou()">Confirmar tema →</button>
   </div>
 </div>
@@ -932,6 +934,7 @@
   </div>
   <div id="personatges-nou-llista"></div>
   <div class="btn-row">
+    <button class="btn btn-ghost" onclick="regenerarPersonatgesNou()">🔄 Regenerar personatges</button>
     <button class="btn btn-primary hidden" id="btn-confirmar-personatges" onclick="confirmarPersonatgesNou()">Confirmar personatges →</button>
   </div>
 </div>
@@ -946,6 +949,7 @@
   </div>
   <div id="mon-nou-llista" class="premise-list"></div>
   <div class="btn-row">
+    <button class="btn btn-ghost" onclick="regenerarMonNou()">🔄 Regenerar món</button>
     <button class="btn btn-primary hidden" id="btn-confirmar-mon" onclick="confirmarMonNou()">Confirmar món →</button>
   </div>
 </div>
@@ -964,6 +968,7 @@
     <div id="estructura-nou-verificacio-text" style="font-size:.85rem;color:var(--text2);margin-top:8px;white-space:pre-wrap;"></div>
   </div>
   <div class="btn-row">
+    <button class="btn btn-ghost" onclick="regenerarEstructuraNou()">🔄 Regenerar estructura</button>
     <button class="btn btn-primary hidden" id="btn-confirmar-estructura" onclick="confirmarEstructuraNou()">Confirmar estructura →</button>
   </div>
 </div>
@@ -3271,6 +3276,43 @@ function renderTemesNou(text) {
   hideLoader('b2');
 }
 
+async function regenerarTemesNou() {
+  if (!ESTAT._finalNouText) { toast('Primer confirma un final.'); return; }
+  showLoader('b2');
+  const el = document.getElementById('loader-b2-text');
+  if (el) el.textContent = 'Regenerant temes…';
+  try {
+    const temesText = await nouFlux_tema(ESTAT._finalNouText, ESTAT.tematica, ESTAT.configuracio.perfil_autor, USER_CONFIG);
+    ESTAT._prefetchNouFlux = ESTAT._prefetchNouFlux || {};
+    ESTAT._prefetchNouFlux.temesText = temesText;
+    renderTemesNou(temesText);
+  } catch (err) {
+    hideLoader('b2');
+    toast('Error regenerant temes: ' + err.message);
+  }
+}
+
+async function regenerarSynopsisNou() {
+  if (!ESTAT._finalNouText) { toast('Primer confirma un final.'); return; }
+  if (!ESTAT._temaNouText) { toast('Primer selecciona un tema.'); return; }
+  showLoader('b2');
+  const el = document.getElementById('loader-b2-text');
+  if (el) el.textContent = 'Regenerant sinopsi nuclear…';
+  try {
+    const synopsis = await nouFlux_synopsisCore(ESTAT._finalNouText, ESTAT._temaNouText, ESTAT.tematica, USER_CONFIG);
+    const synopsisNet = normalitzarSynopsisPerNKG(synopsis);
+    ESTAT._nkg.macronarrativa.synopsis_core = synopsisNet;
+    ESTAT._prefetchNouFlux = ESTAT._prefetchNouFlux || {};
+    ESTAT._prefetchNouFlux.synopsisText = synopsisNet;
+    document.getElementById('synopsis-nou-text').textContent = synopsisNet;
+    document.getElementById('synopsis-nou-result').classList.remove('hidden');
+    hideLoader('b2');
+  } catch (err) {
+    hideLoader('b2');
+    toast('Error regenerant sinopsi: ' + err.message);
+  }
+}
+
 async function confirmarTemaNou() {
   const idx = ESTAT._idxTemaNou;
   if (idx === null || idx === undefined || !ESTAT._temesNouLlista || !ESTAT._temesNouLlista[idx]) {
@@ -3351,6 +3393,25 @@ function renderPersonatgesNouProposals(text) {
   if (autoIdx !== -1) seleccionarPropostaNou(autoIdx);
   document.getElementById('btn-confirmar-personatges').classList[autoIdx !== -1 ? 'remove' : 'add']('hidden');
   hideLoader('b3');
+}
+
+async function regenerarPersonatgesNou() {
+  if (!ESTAT._finalNouText || !ESTAT._temaNouText) { toast('Primer confirma final i tema.'); return; }
+  showLoader('b3');
+  try {
+    const synopsisBase = ESTAT._nkg?.macronarrativa?.synopsis_core || ESTAT._prefetchNouFlux?.synopsisText || '';
+    const personatgesText = await nouFlux_personatges(
+      ESTAT._finalNouText, ESTAT._temaNouText,
+      synopsisBase,
+      ESTAT.tematica, ESTAT.configuracio.perfil_autor, USER_CONFIG
+    );
+    ESTAT._prefetchNouFlux = ESTAT._prefetchNouFlux || {};
+    ESTAT._prefetchNouFlux.personatgesText = personatgesText;
+    renderPersonatgesNouProposals(personatgesText);
+  } catch (err) {
+    hideLoader('b3');
+    toast('Error regenerant personatges: ' + err.message);
+  }
 }
 
 function seleccionarPropostaNou(idx) {
@@ -3474,6 +3535,25 @@ async function confirmarPersonatgesNou() {
 function renderVariantsMonNou(text) {
   renderLlistaAmbRecomanat(text, 'mon-nou-llista', '_monNouLlista', '_idxMonNou', 'btn-confirmar-mon');
   hideLoader('b4');
+}
+
+async function regenerarMonNou() {
+  if (ESTAT._idxPropostaNou === null || ESTAT._idxPropostaNou === undefined) {
+    toast('Primer selecciona una proposta de personatges.');
+    return;
+  }
+  _confirmarPersonatgesNouSilent();
+  showLoader('b4');
+  try {
+    const arcsResumit = ESTAT._arcsResumitNou || '';
+    const monText = await nouFlux_mon(arcsResumit, ESTAT._temaNouText, ESTAT.tematica, ESTAT.estil.to, USER_CONFIG);
+    ESTAT._prefetchNouFlux = ESTAT._prefetchNouFlux || {};
+    ESTAT._prefetchNouFlux.monText = monText;
+    renderVariantsMonNou(monText);
+  } catch (err) {
+    hideLoader('b4');
+    toast('Error regenerant món: ' + err.message);
+  }
 }
 
 async function confirmarMonNou() {
@@ -3612,6 +3692,32 @@ function seleccionarEstructuraNou(idx) {
   const idEl = idx === 0 ? 'estructura-nou-a' : 'estructura-nou-b';
   const btns = document.getElementById(idEl).querySelectorAll('.btn');
   btns.forEach(b => b.classList.add('btn-primary'));
+}
+
+async function regenerarEstructuraNou() {
+  if (ESTAT._idxMonNou === null || ESTAT._idxMonNou === undefined) {
+    toast('Primer selecciona un món.');
+    return;
+  }
+  _confirmarMonNouSilent();
+  showLoader('b5');
+  try {
+    const estructuraText = await nouFlux_estructuraAmbValidacio(
+      ESTAT._finalNouText,
+      ESTAT._temaNouText,
+      ESTAT._arcsResumitNou,
+      ESTAT._monNouText || '',
+      ESTAT._nombreCapitolsConfig,
+      ESTAT.tematica,
+      USER_CONFIG
+    );
+    ESTAT._prefetchNouFlux = ESTAT._prefetchNouFlux || {};
+    ESTAT._prefetchNouFlux.estructuraText = estructuraText;
+    renderEstructuresNou(estructuraText);
+  } catch (err) {
+    hideLoader('b5');
+    toast('Error regenerant estructura: ' + err.message);
+  }
 }
 
 async function confirmarEstructuraNou() {
