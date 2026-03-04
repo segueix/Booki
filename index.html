@@ -3289,8 +3289,9 @@ async function confirmarTemaNou() {
       : await nouFlux_synopsisCore(
         ESTAT._finalNouText, ESTAT._temaNouText, ESTAT.tematica, USER_CONFIG
       );
-    ESTAT._nkg.macronarrativa.synopsis_core = synopsis;
-    document.getElementById('synopsis-nou-text').textContent = synopsis;
+    const synopsisNet = normalitzarSynopsisPerNKG(synopsis);
+    ESTAT._nkg.macronarrativa.synopsis_core = synopsisNet;
+    document.getElementById('synopsis-nou-text').textContent = synopsisNet;
     document.getElementById('synopsis-nou-result').classList.remove('hidden');
     hideLoader('b2');
   } catch (err) {
@@ -6771,7 +6772,50 @@ function descarregarFitxer(contingut, nomFitxer, tipusMime) {
   URL.revokeObjectURL(url);
 }
 
+function normalitzarSynopsisPerNKG(text) {
+  let s = String(text || '').trim();
+  if (!s) return '';
+  // Elimina blocs de codi/"thought" filtrats accidentalment pel model
+  s = s.replace(/```[\s\S]*?```/g, ' ');
+  s = s.replace(/(?:^|\n)\s*The user was unsatisfied[\s\S]*$/i, ' ');
+  s = s.replace(/(?:^|\n)\s*Sentence\s*\d+\s*\(Completion\):/gi, ' ');
+  s = s.replace(/\s+/g, ' ').trim();
+  // Talla a 4 frases màxim per mantenir el contracte de sinopsi nuclear
+  const frases = s.match(/[^.!?…]+[.!?…]/g) || [];
+  if (frases.length >= 4) return frases.slice(0, 4).join(' ').trim();
+  return s;
+}
+
+function assegurarPersonatgesNKGMinims(nkg, biblia) {
+  if (!nkg || typeof nkg !== 'object') return;
+  if (!nkg.personatges || typeof nkg.personatges !== 'object') nkg.personatges = {};
+  if (Object.keys(nkg.personatges).length > 0) return;
+  const fitxes = (biblia && Array.isArray(biblia.fitxes_personatges)) ? biblia.fitxes_personatges : [];
+  fitxes.forEach(fp => {
+    const nom = String(fp && fp.nom || '').trim();
+    if (!nom) return;
+    const clau = nkgNormalitzarNom(nom);
+    if (!clau) return;
+    nkg.personatges[clau] = {
+      nom,
+      estat_fisic: '',
+      estat_emocional: 'neutre',
+      arc: fp.arc || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '' },
+      limit_moral: fp.limit_moral || '',
+      veu: fp.veu || { registre: '', mai_diria: '', quan_menteix: '', quan_es_sincer: '' },
+      objectes_inventari: [], objectes_descartats: [], ubicacio: '', objectius: [], secrets: [], viu: true, primera_aparicio: 0, trets_immutables: null
+    };
+  });
+}
+
 function generarFitxerContexte(nkg, biblia, capitolActual) {
+  try {
+    if (nkg && nkg.macronarrativa) {
+      nkg.macronarrativa.synopsis_core = normalitzarSynopsisPerNKG(nkg.macronarrativa.synopsis_core);
+    }
+    assegurarPersonatgesNKGMinims(nkg, biblia);
+  } catch (e) { console.warn('Normalització export NKG:', e.message); }
+
   const contingut = {
     exportat_en_capitol: capitolActual,
     exportat_a: new Date().toISOString(),
@@ -13442,7 +13486,7 @@ Respon directament amb les 4 frases, sense numeració ni etiquetes.`;
   );
 
   const frases = String(text || '').trim().match(/[^.!?…]+[.!?…]/g) || [];
-  if (frases.length >= 4 && !textSemblaIncomplet(text)) return text.trim();
+  if (frases.length >= 4 && !textSemblaIncomplet(text)) return normalitzarSynopsisPerNKG(text);
 
   const msgsRepair = [{
     role: 'user',
@@ -13461,7 +13505,7 @@ Reescriu-la bé en EXACTAMENT 4 frases completes.`
     'generacio',
     3
   );
-  return String(repaired || text || '').trim();
+  return normalitzarSynopsisPerNKG(String(repaired || text || '').trim());
 }
 
 function validarEstructuraNouRaw(text, nCaps) {
