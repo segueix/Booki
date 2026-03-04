@@ -11078,23 +11078,30 @@ Retorna EXCLUSIVAMENT JSON vàlid:
 function generarDirectivaContinuitat(capitolIdx) {
   if (capitolIdx <= 0) return '';
   if (!ESTAT._snapshotsFinals || typeof ESTAT._snapshotsFinals !== 'object') ESTAT._snapshotsFinals = {};
-
   const snapshotAnterior = ESTAT._snapshotsFinals[capitolIdx - 1];
-  if (!snapshotAnterior) return '';
+
+  // 1. SOLAPAMENT FÍSIC: Capturar els últims paràgrafs literals
+  const textAnterior = (ESTAT._capitols_generats && ESTAT._capitols_generats[capitolIdx - 1]) || '';
+  const ultimsParagrafs = textAnterior.split(/\n\n+/).slice(-2).join('\n\n').trim();
+  const textLiteralBloc = ultimsParagrafs ? `\n\nTEXT EXACTE ON HO VAM DEIXAR:\n"""\n${ultimsParagrafs}\n"""\nINSTRUCCIÓ OBLIGATÒRIA DE SOLAPAMENT: El teu primer paràgraf HA DE continuar l'acció EXACTAMENT on acaba aquest text. Si el text anterior acabava amb una porta obrint-se o algú parlant, el teu capítol comença resolent aquesta mateixa acció sense fer cap salt temporal.` : '';
+
+  if (!snapshotAnterior) return 'ALERTA DE CONTINUÏTAT: Mantingues la coherència espacial i temporal amb el capítol anterior.' + textLiteralBloc;
 
   const protagonista = snapshotAnterior.protagonista || ESTAT.protagonistaTriat || 'la protagonista';
   const ubicacioAnterior = snapshotAnterior.ubicacio || 'ubicació no determinada';
   const ubicacioNova = obtenirUbicacioEscaletaCapitol(capitolIdx) || 'ubicació no especificada';
   const mateixaUbicacio = normalitzarUbicacioContinuitat(ubicacioAnterior) === normalitzarUbicacioContinuitat(ubicacioNova);
-  const objectes = Array.isArray(snapshotAnterior.objectes_rellevants) && snapshotAnterior.objectes_rellevants.length > 0
-    ? snapshotAnterior.objectes_rellevants.join(', ')
-    : 'cap objecte crític';
+
+  const objectes = Array.isArray(snapshotAnterior.objectes_rellevants) && snapshotAnterior.objectes_rellevants.length > 0 ? snapshotAnterior.objectes_rellevants.join(', ') : 'cap objecte rellevant';
+
+  // 2. GUARDRAILS STRICTES
+  const reglesEstrictes = `\nREGLA D'INVENTARI I MATERIAL: El personatge es troba exclusivament amb el que tenia: ${objectes}. Tens PROHIBIT fer aparèixer de la butxaca objectes claus que no estiguin al context.\nREGLA DE CLÍMAX: Tens PROHIBIT inventar amenaces físiques, personatges sorpresa o cliffhangers al final del capítol que no estiguin dictats pel teu 'ganxo_final' de l'escaleta.`;
 
   if (mateixaUbicacio) {
-    return `CONTINUÏTAT: El capítol anterior va acabar amb ${protagonista} a ${ubicacioAnterior}, ${snapshotAnterior.situacio_immediata || 'en situació no especificada'}. Hora: ${snapshotAnterior.hora_narrativa || 'no determinada'}. Estat: ${snapshotAnterior.estat_emocional || 'no determinat'}. Objectes: ${objectes}. COMENÇA exactament des d'aquest punt.`;
+    return `CONTINUÏTAT DIRECTA: El capítol anterior va acabar amb ${protagonista} a ${ubicacioAnterior}, ${snapshotAnterior.situacio_immediata || 'en situació no especificada'}. Hora: ${snapshotAnterior.hora_narrativa || 'no determinada'}. Estat: ${snapshotAnterior.estat_emocional || 'no determinat'}.${textLiteralBloc}${reglesEstrictes}`;
   }
 
-  return `ALERTA DE CONTINUÏTAT: El capítol anterior va acabar amb ${protagonista} a ${ubicacioAnterior}, ${snapshotAnterior.situacio_immediata || 'en situació no especificada'}, ${snapshotAnterior.hora_narrativa || 'hora no determinada'}. El nou capítol se situa a ${ubicacioNova}. ÉS IMPERATIU que narris el desplaçament o facis una el·lipsi temporal explícita a l'inici. NO pots començar com si el personatge ja fos allà sense explicació. Estat emocional previ: ${snapshotAnterior.estat_emocional || 'no determinat'}. El personatge NO pot reiniciar-se emocionalment sense motiu.`;
+  return `ALERTA DE TRANSICIÓ LOGÍSTICA: El capítol anterior va acabar amb ${protagonista} a ${ubicacioAnterior}. El nou capítol se situa a ${ubicacioNova}. ÉS IMPERATIU que dediquis el primer paràgraf a narrar de forma realista el desplaçament (com hi arriba) o estableixis una el·lipsi temporal explícita justificant el pas del temps. NO teletransportis el personatge.\nEstat emocional previ: ${snapshotAnterior.estat_emocional || 'no determinat'}.${textLiteralBloc}${reglesEstrictes}`;
 }
 
 function filtrarContextFutur(capitolActualIdx) {
@@ -15287,8 +15294,19 @@ ${thematicCount >= 1
     lines.push(`LONGITUD: ~${paraulesObjectiu} paraules. Desenvolupa cada escena fins a la seva resolució natural, sense truncar.`);
   }
 
-  // Instrucció d'obertura
-  lines.push(`PRIMERA FRASE: Comença in media res — amb acció, tensió o veu que enganxi immediatament. PROHIBIT: descriure el temps atmosfèric, narrar el despertar d'un son, o obrir amb una frase genèrica ("Era un dia...", "El sol sortia..."). La primera frase ha de posar el lector dins l'escena sense avís.`);
+  // Instrucció d'obertura (Respectant la transició o continuïtat)
+  const snapshotAnteriorObertura = idx > 0 ? (ESTAT._snapshotsFinals || {})[idx - 1] : null;
+  const ubicacioAnteriorOb = snapshotAnteriorObertura ? snapshotAnteriorObertura.ubicacio : '';
+  const ubicacioNovaOb = obtenirUbicacioEscaletaCapitol(idx);
+  const mateixaUbicacioOb = normalitzarUbicacioContinuitat(ubicacioAnteriorOb) === normalitzarUbicacioContinuitat(ubicacioNovaOb);
+
+  if (idx === 0) {
+    lines.push(`PRIMERA FRASE: Comença 'in media res' — amb acció, tensió o veu que enganxi immediatament. PROHIBIT descriure el temps atmosfèric o un despertar.`);
+  } else if (mateixaUbicacioOb) {
+    lines.push(`OBERTURA: Com que estàs a la mateixa ubicació que el capítol anterior, HAS de reprendre exactament l'acció en el microsegon següent, donant continuïtat orgànica (sense preàmbuls ni repeticions innecessàries).`);
+  } else {
+    lines.push(`OBERTURA: Com que hi ha un canvi d'escenari, HAS de descriure la transició logística o l'arribada abans de detonar l'acció de l'escena. Reubica al lector espacialment abans de seguir.`);
+  }
 
   // Instrucció de tancament dinàmica + especials
   if (esUltim) {
