@@ -805,14 +805,38 @@
 
   <!-- Formulari de nova creació (hidden fins que es clica el botó) -->
   <div id="nova-creacio-form" class="hidden" style="margin-top:16px;">
-    <label class="field-label" for="sel-tematica">Autor de referència</label>
+    <label class="field-label" for="sel-tematica">Univers narratiu base</label>
     <select id="sel-tematica">
-      <option value="">— Selecciona un autor —</option>
-      <option value="conte negre nòrdic (Stieg Larsson)">Stieg Larsson — Noir, misteri i crítica social</option>
-      <option value="conte fantàstic èpic (J.R.R. Tolkien)">J.R.R. Tolkien — Fantasia èpica</option>
-      <option value="conte de ciència-ficció distòpica (Philip K. Dick)">Philip K. Dick — Distopia, paranoia i drogues</option>
-      <option value="conte de misticisme xamànic (Carlos Castaneda)">Carlos Castaneda — Misticisme xamànic</option>
+      <option value="">— Selecciona un univers —</option>
+      <option value="thriller social contemporani">Thriller social contemporani</option>
+      <option value="misteri psicològic urbà">Misteri psicològic urbà</option>
+      <option value="distopia íntima">Distopia íntima</option>
+      <option value="drama criminal emocional">Drama criminal emocional</option>
     </select>
+
+    <div style="margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg2);">
+      <div style="font-weight:700;margin-bottom:8px;">🧬 Creador de Veu Literària Original</div>
+      <label class="field-label" for="sel-ritme-prosa">Ritme de la prosa</label>
+      <select id="sel-ritme-prosa">
+        <option value="tallant">Tallant</option>
+        <option value="fluid" selected>Fluid</option>
+        <option value="laberíntic">Laberíntic</option>
+      </select>
+
+      <label class="field-label" for="sel-pes-sensorial" style="margin-top:8px;">Pes sensorial</label>
+      <select id="sel-pes-sensorial">
+        <option value="baix">Baix</option>
+        <option value="mitjà" selected>Mitjà</option>
+        <option value="alt">Alt</option>
+      </select>
+
+      <label class="field-label" for="sel-enfocament-introspectiu" style="margin-top:8px;">Enfocament introspectiu</label>
+      <select id="sel-enfocament-introspectiu">
+        <option value="extern i conductual">Extern i conductual</option>
+        <option value="equilibrat" selected>Equilibrat</option>
+        <option value="profund i confessiu">Profund i confessiu</option>
+      </select>
+    </div>
 
     <label class="field-label" for="sel-to-b">To narratiu</label>
     <select id="sel-to-b">
@@ -829,8 +853,8 @@
       <option value="ràbia i tensió social">Ràbia i tensió social</option>
     </select>
 
-    <label class="field-label" for="text-estil-autor" style="margin-top:12px;">Text de mostra de l'autor <span style="font-weight:400;color:var(--text2);">(opcional)</span></label>
-    <textarea id="text-estil-autor" rows="6" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);font-size:.9rem;resize:vertical;box-sizing:border-box;" placeholder="Enganxa aquí fragments reals de l'autor per analitzar el seu estil empíricament. Si deixes el camp buit, el sistema buscarà fragments automàticament a internet."></textarea>
+    <label class="field-label" for="text-estil-autor" style="margin-top:12px;">Nota de veu pròpia <span style="font-weight:400;color:var(--text2);">(opcional)</span></label>
+    <textarea id="text-estil-autor" rows="5" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);font-size:.9rem;resize:vertical;box-sizing:border-box;" placeholder="Descriu en 3-6 línies com vols que soni la veu narrativa: ritme, imatges, duresa, vulnerabilitat, etc."></textarea>
 
     <label class="field-label" for="sel-caps-b" style="margin-top:12px;">Nombre de capítols</label>
     <select id="sel-caps-b">
@@ -852,7 +876,7 @@
   <div id="analisi-resum-wrap" class="hidden" style="margin-top:16px;">
     <div id="analisi-loader-wrap" style="display:flex;align-items:center;gap:8px;color:var(--text2);font-size:.88rem;margin-bottom:8px;">
       <div class="spinner" style="width:18px;height:18px;border-width:2px;"></div>
-      <span id="analisi-loader-text">Analitzant estil de l'autor…</span>
+      <span id="analisi-loader-text">Construint perfil d'escriptor original…</span>
     </div>
     <div id="analisi-resultat" class="hidden" style="font-size:.88rem;padding:12px;background:var(--bg2);border-radius:8px;margin-bottom:12px;line-height:1.6;"></div>
     <div id="mode-seleccio" class="hidden">
@@ -866,7 +890,7 @@
 <!-- FASE B-AUTO: Mode automàtic -->
 <div class="card hidden" id="fase-b-auto">
   <h2><span class="icon">⚡</span> Creació automàtica</h2>
-  <p style="color:var(--text2);font-size:.9rem;margin-bottom:8px;">El sistema pren totes les decisions creatives basades en el perfil de l'autor.</p>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:8px;">El sistema pren totes les decisions creatives basades en el perfil d'escriptor original definit per l'usuari.</p>
   <div class="loader-wrap" id="loader-b-auto">
     <div class="spinner"></div>
     <span id="loader-b-auto-text">Processant…</span>
@@ -2760,25 +2784,8 @@ async function cridarAPIambWebSearch(payload) {
 }
 
 async function cercarFragmentsAutor(autor) {
-  try {
-    const resposta = await cridarAPIambWebSearch({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 2000,
-      messages: [{ role: 'user', content: `Busca 4 fragments de prosa narrativa originals de l'autor ${autor}.
-
-Criteris: fragments de 100-200 paraules d'obres de ficció (no entrevistes), moments variats (descripció, diàleg, introspecció, acció). Si l'autor escriu en una altra llengua, busca l'original.
-
-Retorna ÚNICAMENT JSON:
-{"autor":"${autor}","fragments":[{"numero":1,"obra":"títol","tipus":"descripcio|dialeg|introspeccio|accio","text":"fragment sencer"}]}
-
-Si no trobes fragments verificables, retorna: {"fragments_trobats":false}` }]
-    });
-    const json = JSON.parse(resposta.replace(/```json|```/g, '').trim());
-    return json.fragments_trobats === false ? null : json;
-  } catch (e) {
-    console.warn('cercarFragmentsAutor:', e.message);
-    return null;
-  }
+  console.info('cercarFragmentsAutor desactivat: el flux utilitza perfil de veu original propi.');
+  return null;
 }
 
 async function analitzarEstilAutor(autor, fragments) {
@@ -2801,25 +2808,20 @@ async function analitzarEstilAutor(autor, fragments) {
   }
 }
 
-function mostrarResumAnalisi(autor, analisiEmpirica) {
+function mostrarResumAnalisi(perfilNom, perfilOriginal) {
   const div = document.getElementById('analisi-resultat');
   if (!div) return;
-  if (!analisiEmpirica) {
-    div.innerHTML = `<strong>📚 ${escHtml(autor)}</strong><br><em>Perfil basat en coneixement del model (no s'han trobat fragments verificables per a l'anàlisi empírica).</em>`;
+  if (!perfilOriginal || typeof perfilOriginal !== 'object') {
+    div.innerHTML = `<strong>🧬 Perfil d'Escriptor Original</strong><br><em>Perfil generat en mode bàsic, sense metadades extres.</em>`;
   } else {
-    const ld = analisiEmpirica.longitud_frase || {};
-    const dd = analisiEmpirica.densitat_descriptiva || {};
-    const vn = analisiEmpirica.veu_narrativa || {};
-    const di = analisiEmpirica.dialeg || {};
-    div.innerHTML = `<strong>📚 Anàlisi d'estil: ${escHtml(autor)}</strong>
+    div.innerHTML = `<strong>🧬 Perfil d'Escriptor Original: ${escHtml(perfilNom || 'veu personal')}</strong>
 <hr style="border:none;border-top:1px solid var(--border);margin:8px 0;">
-Frase: <strong>${escHtml(ld.predominant||'')}</strong> · variació ${escHtml(ld.variacio||'')}
-${ld.exemple ? `<br><em>"${escHtml(ld.exemple)}"</em>` : ''}
-<br>Descripció: <strong>${escHtml(dd.nivell||'')}</strong> · focus ${escHtml(dd.focus||'')}
-<br>Veu: <strong>${escHtml(vn.persona||'')}</strong> · ${escHtml(vn.distancia_emocional||'')}
-<br>Diàleg: <strong>${escHtml(di.presencia||'')}</strong> · ${escHtml(di.format||'')}
+Ritme de la prosa: <strong>${escHtml(perfilOriginal.ritme_prosa || '')}</strong>
+<br>Pes sensorial: <strong>${escHtml(perfilOriginal.pes_sensorial || '')}</strong>
+<br>Enfocament introspectiu: <strong>${escHtml(perfilOriginal.enfocament_introspectiu || '')}</strong>
+${perfilOriginal.nota_usuari ? `<br>Nota de veu: <em>${escHtml(perfilOriginal.nota_usuari)}</em>` : ''}
 <hr style="border:none;border-top:1px solid var(--border);margin:8px 0;">
-<em>${escHtml(analisiEmpirica.tret_mes_distintiu||'')}</em>`;
+<em>${escHtml(perfilOriginal.manifest_veu || '')}</em>`;
   }
   div.classList.remove('hidden');
 }
@@ -2834,16 +2836,19 @@ function mostrarFormNovaCreacio() {
 }
 
 async function iniciarNovaCreacio() {
-  const autor     = document.getElementById('sel-tematica').value;
+  const univers   = document.getElementById('sel-tematica').value;
   const to        = document.getElementById('sel-to-b').value;
   const caps      = document.getElementById('sel-caps-b').value;
-  const textMostra = (document.getElementById('text-estil-autor')?.value || '').trim();
+  const ritmeProsa = (document.getElementById('sel-ritme-prosa')?.value || '').trim();
+  const pesSensorial = (document.getElementById('sel-pes-sensorial')?.value || '').trim();
+  const enfocamentIntrospectiu = (document.getElementById('sel-enfocament-introspectiu')?.value || '').trim();
+  const notaVeu = (document.getElementById('text-estil-autor')?.value || '').trim();
 
-  if (!autor) { toast('Tria un autor primer.'); return; }
+  if (!univers) { toast('Tria un univers narratiu base.'); return; }
   if (!to)    { toast('Tria el to narratiu.'); return; }
   if (!caps)  { toast('Tria el nombre de capítols.'); return; }
 
-  ESTAT.tematica = autor;
+  ESTAT.tematica = univers;
   ESTAT.estil.to = to;
   ESTAT._nombreCapitolsConfig = parseInt(caps);
   ESTAT.estil.paraules = 3000;
@@ -2860,43 +2865,58 @@ async function iniciarNovaCreacio() {
   if (modeSelec) modeSelec.classList.add('hidden');
 
   try {
-    let fragments;
-    if (textMostra) {
-      if (loaderText) loaderText.textContent = 'Analitzant el text aportat…';
-      fragments = { autor, fragments: [{ numero: 1, obra: 'text aportat per l\'usuari', tipus: 'prosa', text: textMostra }] };
-    } else {
-      if (loaderText) loaderText.textContent = 'Cercant fragments reals de l\'autor…';
-      fragments = await cercarFragmentsAutor(autor);
-      if (!fragments) console.warn(`⚠️  No s'han trobat fragments verificables de ${autor}.`);
-    }
+    if (loaderText) loaderText.textContent = 'Composant perfil d'escriptor original…';
 
-    if (loaderText) loaderText.textContent = 'Analitzant estil…';
-    const analisiEmpirica = fragments ? await analitzarEstilAutor(autor, fragments) : null;
-    ESTAT.configuracio.analisi_estil = analisiEmpirica;
+    const perfilOriginal = {
+      univers,
+      to,
+      ritme_prosa: ritmeProsa || 'fluid',
+      pes_sensorial: pesSensorial || 'mitjà',
+      enfocament_introspectiu: enfocamentIntrospectiu || 'equilibrat',
+      nota_usuari: notaVeu
+    };
 
-    if (loaderText) loaderText.textContent = 'Generant perfil d\'emulació…';
-    const contextAnalisi = analisiEmpirica
-      ? `Anàlisi empírica:\n- Frase: ${analisiEmpirica.longitud_frase?.predominant||''}, variació ${analisiEmpirica.longitud_frase?.variacio||''}\n- Exemple: "${analisiEmpirica.longitud_frase?.exemple||''}"\n- Descripció: ${analisiEmpirica.densitat_descriptiva?.nivell||''} (${analisiEmpirica.densitat_descriptiva?.focus||''})\n- Veu: ${analisiEmpirica.veu_narrativa?.persona||''}, ${analisiEmpirica.veu_narrativa?.distancia_emocional||''}\n- Diàleg: ${analisiEmpirica.dialeg?.presencia||''}, ${analisiEmpirica.dialeg?.format||''}\n- Tret: ${analisiEmpirica.tret_mes_distintiu||''}\n- Prohibicions: ${(analisiEmpirica.prohibicions||[]).join(', ')}`
-      : 'No hi ha anàlisi empírica disponible. Usa el teu coneixement de l\'autor.';
+    ESTAT.configuracio.analisi_estil = perfilOriginal;
+
+    const promptPerfil = `Construeix un "Perfil d'Escriptor Original" operatiu per a una novel·la.
+
+UNIVERS: ${univers}
+TO: ${to}
+RITME DE LA PROSA: ${perfilOriginal.ritme_prosa}
+PES SENSORIAL: ${perfilOriginal.pes_sensorial}
+ENFOCAMENT INTROSPECTIU: ${perfilOriginal.enfocament_introspectiu}
+NOTA DE VEU (usuari): ${notaVeu || '(cap)'}
+
+Retorna un perfil curt i accionable (màxim 220 paraules) amb:
+- Manifest de veu (2-3 frases)
+- Ritme i cadència
+- Tractament emocional (subtext, gest, cos)
+- Què ha d'evitar per sonar derivatiu`;
 
     ESTAT.configuracio.perfil_autor = await callLLMMulti(
-      [{ role: 'user', content: `Genera un perfil d'emulació operatiu per a ${autor} amb to "${to}".\n\n${contextAnalisi}\n\nGuia pràctica per a un model que escriurà ficció en el seu estil. Màxim 200 paraules. Inclou:\n- Ritme i longitud de frase\n- Densitat descriptiva i focus\n- Tractament de les emocions (explícit vs. implícit)\n- Finals de capítol preferits\n- Allò que NO ha de semblar un text d'aquest autor` }],
-      'Ets un analista literari especialitzat en emulació d\'estil. Respon en la mateixa llengua que l\'autor. Màxim 200 paraules.',
+      [{ role: 'user', content: promptPerfil }],
+      'Ets un dissenyador de veu literària original. Evites imitació d'autors i prioritzes una veu pròpia, coherent i emocional.',
       USER_CONFIG,
       'generacio'
     );
 
+    perfilOriginal.manifest_veu = ESTAT.configuracio.perfil_autor;
+
     if (loaderWrap) loaderWrap.style.display = 'none';
-    mostrarResumAnalisi(autor, analisiEmpirica);
+    mostrarResumAnalisi('veu original', perfilOriginal);
     if (modeSelec) modeSelec.classList.remove('hidden');
 
   } catch (err) {
-    console.warn('Anàlisi d\'estil:', err.message);
-    try {
-      ESTAT.configuracio.perfil_autor = await nouFlux_perfilAutor(autor, to, USER_CONFIG);
-    } catch (e2) { toast('Error generant el perfil: ' + e2.message); return; }
+    console.warn('Perfil de veu original:', err.message);
+    ESTAT.configuracio.perfil_autor = `Veu original (${ritmeProsa || 'fluid'}, ${pesSensorial || 'mitjà'}, ${enfocamentIntrospectiu || 'equilibrat'}) per a ${univers} amb to ${to}.`;
     if (loaderWrap) loaderWrap.style.display = 'none';
-    mostrarResumAnalisi(autor, null);
+    mostrarResumAnalisi('veu original', {
+      ritme_prosa: ritmeProsa,
+      pes_sensorial: pesSensorial,
+      enfocament_introspectiu: enfocamentIntrospectiu,
+      nota_usuari: notaVeu,
+      manifest_veu: ESTAT.configuracio.perfil_autor
+    });
     if (modeSelec) modeSelec.classList.remove('hidden');
   }
 }
@@ -4123,6 +4143,7 @@ async function iniciarEscaletaSeqNou() {
         capitol: idx + 1,
         titol: capInfo.titol,
         funcio: dades.funcio || capInfo.resum || '',
+        detonant_emocional_escena: dades.detonant_emocional_escena || '',
         primera_frase: dades.primera_frase || '',
         darrera_imatge: dades.darrera_imatge || '',
         ganxo_final: ganxoFinal,
@@ -4191,6 +4212,7 @@ async function iniciarEscaletaSeqNou() {
       div.innerHTML = `
         <p><strong>Capítol ${idx + 1}: ${escHtml(capInfo.titol)}</strong> <small style="color:var(--text2);font-weight:normal;">(intensitat ${capInfo.intensity_level}/5)</small></p>
         <p>${escHtml(escaleta.funcio)}</p>
+        ${escaleta.detonant_emocional_escena ? `<p style="color:var(--accent2);"><strong>Detonant emocional:</strong> ${escHtml(escaleta.detonant_emocional_escena)}</p>` : ''}
         ${escaleta.primera_frase ? `<p><em>${escHtml(escaleta.primera_frase)}</em></p>` : ''}
         ${escaleta.darrera_imatge ? `<p style="color:var(--text2);">${escHtml(escaleta.darrera_imatge)}</p>` : ''}
         ${dades.fils_obren && dades.fils_obren.length ? `<p style="font-size:.85rem;color:var(--text2);">Fils: ${escHtml(dades.fils_obren.join(', '))}</p>` : ''}
@@ -9530,7 +9552,14 @@ El desert, la nit, els somnis lúcids i les plantes de poder com a espais on les
 
 // ─── System prompt dinàmic per gènere (conte breu) ──────────
 function getSystemPrompt(tematica) {
-  return SYSTEM_DEFAULT + getGenreStyle(tematica);
+  return SYSTEM_DEFAULT + '\n\n' + buildDirectivaEstilEmocional() + getGenreStyle(tematica);
+}
+
+function buildDirectivaEstilEmocional() {
+  return `DIRECTIVA D'ESTIL (INNEGOCIABLE):
+Prohibit anomenar l'emoció directament. Aplica estrictament el principi "Show, don't tell".
+Tradueix l'estat anímic en reaccions viscerals, detalls sensorials de l'entorn i subtext en el diàleg.
+La prosa ha de permetre que el lector senti l'esquerda emocional del personatge, evitant descripcions clíniques.`;
 }
 
 // ─── FASE 1: 10 premisses ────────────────────────────────────
@@ -10369,7 +10398,7 @@ ${reglesEstilDures}• NOMS I CONTEXT D'AUTOR: Escriu en català, però preserva
 • PROSA: Evita el barroquisme. Màxim 1 adjectiu rellevant per substantiu. Pren-te el teu temps: descriu l'atmosfera, explora el monòleg intern, coreografia els moviments per l'espai. Ets exhaustiu i detallista.
 • RITME: Alterna escenes de tensió activa (frases curtes, diàleg incisiu, acció breu) amb moments de respiració (introspecció, detall sensorial, gest quotidià). El contrast de ritme és el que crea la il·lusió de velocitat.
 • SENSORIALITAT: PROHIBIT la prosa asèptica. Integra textura física i sensorial (olors, suor, fred, fricció material, sons ambientals) especialment quan la tensió és alta. Quan la tensió supera 7/10, els detalls viscerals són OBLIGATORIS.`;
-  return base + getGenreStyle(tematica || ESTAT.tematica);
+  return base + '\n\n' + buildDirectivaEstilEmocional() + '\n' + getGenreStyle(tematica || ESTAT.tematica);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -14017,9 +14046,13 @@ FILS OBERTS ACTUALS: ${filsObertsText}
 ESCALETES ANTERIORS:
 ${escaletesText}
 
+FERIDA NUCLEAR (personatges):
+${JSON.stringify((ESTAT._perfilsPersonatges || {}), null, 2).substring(0, 1600)}
+
 Retorna EXCLUSIVAMENT JSON vàlid:
 {
   "funcio": "descripció de la funció del capítol (1 frase)",
+  "detonant_emocional_escena": "element concret (objecte, frase, gest, absència o situació) que furgarà orgànicament en la ferida_nuclear dels personatges presents",
   "fils_avancen": ["fil que avança 1"],
   "fils_obren": ["fil nou que s'obre"],
   "fils_tanquen": ["fil que es tanca"],
@@ -14036,7 +14069,9 @@ Retorna EXCLUSIVAMENT JSON vàlid:
 
 Instruccions per al ganxo:
 ${instruccioGanxo}
-La intensitat del ganxo ha de ser ≥ ${esPenultim ? 5 : intensitat}.`
+La intensitat del ganxo ha de ser ≥ ${esPenultim ? 5 : intensitat}.
+
+OBLIGATORI: Fusiona plot i drama intern. El camp "detonant_emocional_escena" ha de ser específic i accionable; no acceptis formulacions genèriques del tipus "record del passat" o "patiment intern".`
   }];
   return await nouFluxCall(
     msgs,
