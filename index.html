@@ -10357,6 +10357,9 @@ Apliques les tècniques de Donna Tartt, Elena Ferrante i Carlos Ruiz Zafón: atm
 • CONTINUÏTAT D'ESCENA: No tanquis artificialment l'energia entre escenes. Cada escena ha de fluir cap a la següent amb una tensió o pregunta oberta, llevat que sigui el tancament explícit del capítol.
 
 ━━━ REGLES D'ESTIL ━━━
+• TO BRUTAL I EXPLÍCIT: La prosa ha de ser crua i directa, a l'estil de Stieg Larsson. No endolceixis les escenes denses ni la visceralitat psicològica.
+• DIÀLEGS AL GRA: No allarguis les converses. Quan la tensió o el subtext ja ha quedat clar per al lector, talla l'escena immediatament.
+• ECONOMIA PSICOLÒGICA: No repeteixis estructures de pensament (racionalització, càlcul). Un cop el lector entén com processa la informació un personatge, no ho tornis a descriure.
 • NOMS I CONTEXT D'AUTOR: Escriu en català, però preserva l'onomàstica i el món de referència (noms, topònims, institucions, codis socials i històrics). NO facis catalanització automàtica de noms o llocs (no converteixis John→Joan, London→Londres) tret que l'usuari ho demani explícitament.
 • PROSA: Evita el barroquisme. Màxim 1 adjectiu rellevant per substantiu. Pren-te el teu temps: descriu l'atmosfera, explora el monòleg intern, coreografia els moviments per l'espai. Ets exhaustiu i detallista.
 • RITME: Alterna escenes de tensió activa (frases curtes, diàleg incisiu, acció breu) amb moments de respiració (introspecció, detall sensorial, gest quotidià). El contrast de ritme és el que crea la il·lusió de velocitat.
@@ -15032,6 +15035,8 @@ Checklist mínim (obligatori):
 3) Motivacions inconsistents (accions sense causa psicològica creïble).
 4) Incoherència de POV/focalització i salts no justificats.
 5) Repeticions estructurals innecessàries amb capítols anteriors.
+6) Versemblança tècnica: Qualsevol element o mecanisme clau (ex. activar telèfons antics) ha de tenir una línia d'ancoratge o explicació lògica.
+7) Arcs penjats: Cap personatge secundari amb un vector actiu pot desaparèixer o marxar sense una escena o línia de tancament explícita.
 
 Retorna EXCLUSIVAMENT JSON vàlid amb aquest esquema:
 {
@@ -15374,6 +15379,12 @@ function buildRitmInstruccio(intensitat) {
   return instruccions[intensitat] || instruccions[3];
 }
 
+function buildInstruccioInici() {
+  return `ATENCIÓ — ARRENCADA DE LA NOVEL·LA:
+- Ritme àgil: Dedica menys espai a l'observació o atmosfera contemplativa.
+- Motor Emocional: El misteri necessita una peça emocional forta IMMEDIATA (un vincle personal, trauma o urgència vital). El lector s'ha d'implicar abans que comenci la investigació procedimental.`;
+}
+
 function buildInstruccioPenultim() {
   return `ATENCIÓ — PENÚLTIM CAPÍTOL:
 - Prepara el terreny emocional per al desenllaç
@@ -15481,6 +15492,11 @@ ${thematicCount >= 1
     lines.push(`OBERTURA: Com que estàs a la mateixa ubicació que el capítol anterior, HAS de reprendre exactament l'acció en el microsegon següent, donant continuïtat orgànica (sense preàmbuls ni repeticions innecessàries).`);
   } else {
     lines.push(`OBERTURA: Com que hi ha un canvi d'escenari, HAS de descriure la transició logística o l'arribada abans de detonar l'acció de l'escena. Reubica al lector espacialment abans de seguir.`);
+  }
+
+  // Instrucció dinàmica pels 3 primers capítols
+  if (idx <= 2) {
+    lines.push(buildInstruccioInici());
   }
 
   // Instrucció de tancament dinàmica + especials
