@@ -2865,7 +2865,7 @@ async function iniciarNovaCreacio() {
   if (modeSelec) modeSelec.classList.add('hidden');
 
   try {
-    if (loaderText) loaderText.textContent = 'Composant perfil d'escriptor original…';
+    if (loaderText) loaderText.textContent = "Composant perfil d'escriptor original…";
 
     const perfilOriginal = {
       univers,
@@ -2895,7 +2895,7 @@ Retorna un perfil curt i accionable (màxim 220 paraules) amb:
 
     ESTAT.configuracio.perfil_autor = await callLLMMulti(
       [{ role: 'user', content: promptPerfil }],
-      'Ets un dissenyador de veu literària original. Evites imitació d'autors i prioritzes una veu pròpia, coherent i emocional.',
+      "Ets un dissenyador de veu literària original. Evites imitació d'autors i prioritzes una veu pròpia, coherent i emocional.",
       USER_CONFIG,
       'generacio'
     );
