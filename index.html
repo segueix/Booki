@@ -799,6 +799,8 @@
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="10.7">POV/Cronologia</div>
     <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="10.8">Veu/Exemples</div>
+    <div class="step-arrow">›</div>
     <div class="step-pill" data-step="11">Capítols</div>
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="12">Control d'Arcs</div>
@@ -1427,11 +1429,26 @@
     <div id="perspectiva-crono-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
       <button class="btn btn-secondary" onclick="hideCard('fase-10-7');showCard('fase-10-5');">← Tornar a Escaleta</button>
-      <button class="btn btn-primary" id="btn-fase11" onclick="iniciarFase11()">Continuar → Escriptura</button>
+      <button class="btn btn-primary" id="btn-fase10-8" onclick="iniciarFaseVeuExemples()">Continuar → Veu i Exemples</button>
     </div>
   </div>
 </div>
 
+
+
+<!-- FASE 10.8: Veu i Exemples -->
+<div class="card hidden" id="fase-10-8">
+  <h2>🎙️ Fase 10.8 — Veu i Exemples</h2>
+  <p>Completem la veu de cada personatge amb exemples narratius i vocabulari abans de començar a escriure.</p>
+  <div class="loader-wrap" id="loader-10-8"><span class="spinner"></span><span id="loader-10-8-text">Generant exemples de veu…</span></div>
+  <div id="veu-exemples-result" class="hidden">
+    <div id="veu-exemples-cos" class="veu-result"></div>
+    <div class="btn-row" style="margin-top:24px;">
+      <button class="btn btn-secondary" onclick="hideCard('fase-10-8');showCard('fase-10-7');">← Tornar a POV/Cronologia</button>
+      <button class="btn btn-primary" id="btn-fase11" onclick="iniciarFase11()">Continuar → Escriptura</button>
+    </div>
+  </div>
+</div>
 <!-- FASE 11: Escriptura de capítols (Sonnet + registre) -->
 <div class="card hidden" id="fase-11">
   <h2><span class="icon">📖</span> Escriptura de capítols</h2>
@@ -2163,6 +2180,11 @@ function restaurarInterficieDesDeEstat() {
       ESTAT._nkg.timeline_accions || []
     );
     document.getElementById('perspectiva-crono-result').classList.remove('hidden');
+    document.getElementById('btn-fase10-8').classList.remove('hidden');
+  }
+  if (fase >= 10.8 && ESTAT._nkg && ESTAT._nkg.personatges) {
+    mostrarVeuExemples(Object.assign({}, ESTAT._nkg.personatges));
+    document.getElementById('veu-exemples-result').classList.remove('hidden');
   }
   if (fase >= 11) {
     renderLlistaCapitols();
@@ -3703,7 +3725,7 @@ async function confirmarPersonatgesNou() {
     const nomMatch = line.match(/^NOM:\s*(.+)/i);
     if (nomMatch) {
       if (current) personatgesArr.push(current);
-      current = { nom: nomMatch[1].trim(), arc: {inici_emocional:'',final_emocional:'',canvi_o_bloqueig:''}, limit_moral: '', veu: {registre:'',mai_diria:'',quan_menteix:'',quan_es_sincer:''} };
+      current = { nom: nomMatch[1].trim(), arc: {inici_emocional:'',final_emocional:'',canvi_o_bloqueig:''}, limit_moral: '', veu: {registre:'',mai_diria:[],quan_menteix:'',quan_es_sincer:'',exemples_narratius:[],vocabulari_recurrent:[],vocabulari_prohibit:[],longitud_frases:'mitjanes'} };
     }
     if (current) {
       if (/^ARC:/i.test(line)) current.arc = parseArc(line);
@@ -4174,7 +4196,7 @@ function validarNKGComplet(nkg, capitolsEscaleta) {
   if (!nkg.macronarrativa?.ending?.desti_protagonista)  errors.push('ending.desti_protagonista buit');
   for (const p of Object.values(nkg.personatges || {})) {
     if (!p.limit_moral)        warnings.push(`${p.nom}: limit_moral buit`);
-    if (!p.veu?.mai_diria)    warnings.push(`${p.nom}: veu.mai_diria buit`);
+    if (!p.veu?.mai_diria || (Array.isArray(p.veu.mai_diria) && p.veu.mai_diria.length === 0)) warnings.push(`${p.nom}: veu.mai_diria buit`);
     if (!p.arc?.final_emocional) errors.push(`${p.nom}: arc.final_emocional buit`);
   }
   for (const cap of (capitolsEscaleta || [])) {
@@ -4289,7 +4311,7 @@ async function iniciarEscaletaSeqNou() {
       if (ESTAT._estructuraCapitols[idx]) {
         ESTAT._estructuraCapitols[idx].ganxo_final = ganxoFinal;
         if (!ESTAT._estructuraCapitols[idx].ratio_dialeg) {
-          ESTAT._estructuraCapitols[idx].ratio_dialeg = ratioDialegDefault;
+          ESTAT._estructuraCapitols[idx].ratio_dialeg = normalitzarRatioDialeg(ratioDialegDefault, ESTAT._estructuraCapitols[idx] || {});
         }
       }
       // Validar compatibilitat ganxo/intensitat
@@ -6405,10 +6427,123 @@ async function iniciarFasePerspectivaCronologia() {
       ESTAT._nkg.timeline_accions || []
     );
     document.getElementById('perspectiva-crono-result').classList.remove('hidden');
+    document.getElementById('btn-fase10-8').classList.remove('hidden');
     toast('Perspectiva i cronologia injectades al NKG.');
   } catch (err) {
     hideLoader('10-7');
     toast('Error fase Perspectiva i Cronologia: ' + err.message);
+  }
+}
+
+
+function normalitzarVeuAvancada(veu = {}) {
+  const longitudValida = ['curtes_telegrafiques', 'mitjanes', 'llargues_subordinades'];
+  const existMaiDiria = Array.isArray(veu.mai_diria) ? veu.mai_diria : (veu.mai_diria ? String(veu.mai_diria).split(/[,;]+/).map(x => x.trim()).filter(Boolean) : []);
+  const vocabProhibit = Array.isArray(veu.vocabulari_prohibit) ? veu.vocabulari_prohibit : [];
+  return Object.assign({}, veu, {
+    exemples_narratius: Array.isArray(veu.exemples_narratius) ? veu.exemples_narratius.map(x => String(x || '').trim()).filter(Boolean).slice(0, 3) : [],
+    vocabulari_recurrent: Array.isArray(veu.vocabulari_recurrent) ? veu.vocabulari_recurrent.map(x => String(x || '').trim()).filter(Boolean).slice(0, 12) : [],
+    vocabulari_prohibit: [...new Set([...vocabProhibit, ...existMaiDiria].map(x => String(x || '').trim()).filter(Boolean))].slice(0, 12),
+    longitud_frases: longitudValida.includes(veu.longitud_frases) ? veu.longitud_frases : 'mitjanes'
+  });
+}
+
+function veuMaiDiriaText(veu = {}) {
+  const val = veu && veu.mai_diria;
+  return Array.isArray(val) ? val.join(', ') : String(val || '');
+}
+
+function mostrarVeuExemples(personatges = {}) {
+  const cos = document.getElementById('veu-exemples-cos');
+  if (!cos) return;
+  const llista = Object.values(personatges || {});
+  cos.innerHTML = llista.map(p => {
+    const veu = normalitzarVeuAvancada(p.veu || {});
+    const ex = (veu.exemples_narratius || []).slice(0, 2).map(e => `<li>${escHtml(e)}</li>`).join('');
+    const rec = (veu.vocabulari_recurrent || []).slice(0, 8).join(', ');
+    const proh = (veu.vocabulari_prohibit || []).slice(0, 6).join(', ');
+    return `<div class="veu-card"><div class="veu-card-nom">🎭 ${escHtml(p.nom || p.id || 'personatge')}</div><div class="veu-card-camps">
+      <div><div class="veu-camp-label">Longitud de frases</div><div class="veu-camp-val">${escHtml(veu.longitud_frases || 'mitjanes')}</div></div>
+      <div><div class="veu-camp-label">Vocabulari recurrent</div><div class="veu-camp-val">${escHtml(rec || '(pendent)')}</div></div>
+      <div><div class="veu-camp-label">Vocabulari prohibit</div><div class="veu-camp-val">${escHtml(proh || '(pendent)')}</div></div>
+      <div><div class="veu-camp-label">Exemples</div><div class="veu-camp-val">${ex ? `<ul style="padding-left:18px;margin:6px 0">${ex}</ul>` : '(pendents)'}</div></div>
+    </div></div>`;
+  }).join('\n');
+}
+
+async function generarVeuExemples(userConfig) {
+  const nkg = ESTAT._nkg || {};
+  const payload = {
+    sinopsi: nkg.macronarrativa?.synopsis_core || '',
+    tema: nkg.macronarrativa?.theme || '',
+    estil: (nkg.context_creacio || {}).estil || ESTAT.estil || {},
+    personatges: Object.fromEntries(Object.entries(nkg.personatges || {}).map(([k, p]) => [k, { nom: p.nom, veu: p.veu || {}, arc: p.arc || {}, ocupacio: p.trets_immutables?.ocupacio || '' }]))
+  };
+  const systemPrompt = `Ets un estilista literari expert en veu narrativa.
+A partir de les fitxes de veu dels personatges, la sinopsi, el tema i l'estil definit, has de generar per a cada personatge:
+
+1. EXEMPLES NARRATIUS: 2-3 paràgrafs curts en català.
+2. VOCABULARI RECURRENT: 5-10 paraules/expressions.
+3. VOCABULARI PROHIBIT: 3-5 paraules/expressions.
+4. LONGITUD DE FRASES: curtes_telegrafiques | mitjanes | llargues_subordinades.
+
+Respon EXCLUSIVAMENT amb JSON vàlid:
+{
+  "veus_completades": {
+    "clau_personatge": {
+      "exemples_narratius": ["..."],
+      "vocabulari_recurrent": ["..."],
+      "vocabulari_prohibit": ["..."],
+      "longitud_frases": "mitjanes"
+    }
+  }
+}`;
+  const msgs = [{ role: 'user', content: `Context:
+${JSON.stringify(payload, null, 2)}` }];
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  for (let intent = 1; intent <= 2; intent++) {
+    const raw = await callLLMMulti(msgs, systemPrompt, Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 3600, model: models.modelArquitecte }), 'arquitectura');
+    const parsed = parseJsonRobust(raw);
+    if (parsed && parsed.veus_completades && typeof parsed.veus_completades === 'object') return parsed;
+    if (intent === 2) throw new Error('Resposta invàlida a Veu i Exemples.');
+    msgs.push({ role: 'user', content: 'Resposta invàlida. Torna JSON estricte amb veus_completades.' });
+  }
+  throw new Error('No s\'ha pogut completar la veu dels personatges.');
+}
+
+function injectarVeuExemples(data = {}) {
+  if (!ESTAT._nkg || !ESTAT._nkg.personatges) return;
+  const comp = data.veus_completades || {};
+  Object.entries(comp).forEach(([id, veu]) => {
+    const clau = nkgNormalitzarNom(id);
+    if (!ESTAT._nkg.personatges[clau]) return;
+    const ex = ESTAT._nkg.personatges[clau];
+    const baseVeu = Object.assign({}, ex.veu || {}, veu || {});
+    ex.veu = normalitzarVeuAvancada(baseVeu);
+    ex.veu.mai_diria = [...new Set([...(Array.isArray(ex.veu.mai_diria) ? ex.veu.mai_diria : []), ...(ex.veu.vocabulari_prohibit || [])])];
+  });
+  if (!ESTAT._nkg.macronarrativa) ESTAT._nkg.macronarrativa = {};
+  ESTAT._nkg.macronarrativa.thematic_count = 0;
+  ESTAT._nkg.macronarrativa.thematic_count_max = Number(ESTAT._nkg.macronarrativa.thematic_count_max || 3);
+}
+
+async function iniciarFaseVeuExemples() {
+  ESTAT.fase = 10.8;
+  updateProgress(10.8);
+  hideCard('fase-10-7');
+  showCard('fase-10-8');
+  document.getElementById('veu-exemples-result').classList.add('hidden');
+  showLoader('10-8');
+  try {
+    const data = await generarVeuExemples(USER_CONFIG);
+    injectarVeuExemples(data);
+    hideLoader('10-8');
+    mostrarVeuExemples(ESTAT._nkg.personatges || {});
+    document.getElementById('veu-exemples-result').classList.remove('hidden');
+    toast('Veu i exemples completats.');
+  } catch (err) {
+    hideLoader('10-8');
+    toast('Error fase Veu i Exemples: ' + err.message);
   }
 }
 
@@ -7338,13 +7473,33 @@ function construirSeccioProhibicions(idx) {
 }
 
 // ─── Ratio diàleg / narració per autor ────────────────────────────────────────
+function normalitzarRatioDialeg(input, capInfo = {}) {
+  if (input && typeof input === 'object') {
+    return {
+      percentatge_dialeg: Math.max(0, Math.min(100, Number(input.percentatge_dialeg) || 35)),
+      tipus_dialeg: input.tipus_dialeg || 'funcional',
+      notes: String(input.notes || '').trim()
+    };
+  }
+  const legacy = String(input || '').trim().toLowerCase();
+  if (legacy === 'alt') return { percentatge_dialeg: 65, tipus_dialeg: 'predominant', notes: 'Diàleg dominant.' };
+  if (legacy === 'baix') return { percentatge_dialeg: 15, tipus_dialeg: 'minim_intern', notes: 'Predomini narratiu amb diàleg mínim.' };
+  const intensity = Number(capInfo.intensity_level || 3);
+  const relacional = ((capInfo.fil || '') + ' ' + (capInfo.titol || '')).toLowerCase();
+  const confrontacio = /(confront|judici|discussi|xoc|enfrontament)/.test(relacional);
+  if (intensity >= 5) return { percentatge_dialeg: 8, tipus_dialeg: 'absent', notes: 'Capítol final o màxima tensió amb diàleg residual.' };
+  if (confrontacio) return { percentatge_dialeg: 35, tipus_dialeg: 'funcional', notes: 'Confrontació amb diàleg orientat a conflicte.' };
+  if (/(subtrama|relaci|silvia|parella)/.test(relacional)) return { percentatge_dialeg: 50, tipus_dialeg: 'equilibrat', notes: 'Subtrama relacional amb intercanvi sostingut.' };
+  return { percentatge_dialeg: 18, tipus_dialeg: 'minim_intern', notes: 'Capítol interior o de personatge sol.' };
+}
+
 function inferirRatioDialegPerAutor(autorPerfil) {
   const perfil = (autorPerfil || '').toLowerCase();
   const altDialeg = ['carver', 'hemingway', 'elmore leonard', 'mccarthy'];
-  if (altDialeg.some(a => perfil.includes(a))) return 'alt';
+  if (altDialeg.some(a => perfil.includes(a))) return normalitzarRatioDialeg('alt');
   const baixDialeg = ['woolf', 'proust', 'bernhard', 'sebald', 'saramago'];
-  if (baixDialeg.some(a => perfil.includes(a))) return 'baix';
-  return 'mig';
+  if (baixDialeg.some(a => perfil.includes(a))) return normalitzarRatioDialeg('baix');
+  return normalitzarRatioDialeg('mig');
 }
 
 // ─── Validació bàsica de longitud (substitueix el jutge) ──────────────────────
@@ -7665,7 +7820,7 @@ function construirBlocEstatActual(nkg, thematicCount) {
   return `=== ESTAT ACTUAL ===
 Fils oberts: ${(threads.oberts || []).join(', ') || 'cap'}
 Fils tancats: ${(threads.tancats || []).join(', ') || 'cap'}
-Formulacions temàtiques explícites: ${thematicCount}/1`;
+Formulacions temàtiques explícites: ${thematicCount}/${Math.max(1, Number((ESTAT._nkg && ESTAT._nkg.macronarrativa && ESTAT._nkg.macronarrativa.thematic_count_max) || 3))}`;
 }
 
 function construirBlocCapitolBase(capitolNum, capitolInfo, intensitat) {
@@ -7677,9 +7832,10 @@ Extensió objectiu: ~${objectiuParaules} paraules (OBLIGATORI — no tallis cap 
 }
 
 function construirBlocSubtextualitat(thematicCount) {
-  return thematicCount >= 1
-    ? "Subtextualitat: El tema NO pot ser formulat explícitament. Mostra'l per acció o contrast, mai verbalment."
-    : "Subtextualitat: Pots formular el tema una sola vegada si és el moment dramàtic adequat.";
+  const thematicMax = Math.max(1, Number((ESTAT._nkg && ESTAT._nkg.macronarrativa && ESTAT._nkg.macronarrativa.thematic_count_max) || 3));
+  return thematicCount >= thematicMax
+    ? "Subtextualitat: El tema ja s'ha expressat prou explícitament. A partir d'ara, transmet-lo NOMÉS a través de subtextualitat, atmosfera i accions, MAI amb afirmacions directes."
+    : `Subtextualitat: Pots formular el tema explícitament com a màxim ${thematicMax - thematicCount} vegada(es) si és dramàticament necessari.`;
 }
 
 function construirBlocRitme(intensitat, ratioDialeg) {
@@ -7690,12 +7846,9 @@ function construirBlocRitme(intensitat, ratioDialeg) {
     4: 'Ritme tens. Descripció mínima. Paràgrafs de 2-3 línies. Acció dominant.',
     5: 'Ritme màxim. Cap descripció innecessària. Frases curtes. Tot és acció o decisió.'
   };
-  const instruccionsRatio = {
-    alt:  'Diàleg dominant (>60%). La narració existeix per contextualitzar el diàleg, no al revés.',
-    baix: 'Narració dominant (<20% diàleg). El diàleg és excepció, no norma.',
-    mig:  'Equilibri narració/diàleg. Cap dels dos domina.'
-  };
-  const blocRatio = ratioDialeg ? `\n  Proporció: ${instruccionsRatio[ratioDialeg] || ''}` : '';
+  const rr = normalitzarRatioDialeg(ratioDialeg || {});
+  const blocRatio = `
+  Ratio diàleg: ${rr.percentatge_dialeg}% (${rr.tipus_dialeg}). ${rr.notes || ''}`;
   return `RITME (intensitat ${intensitat}/5): ${ritmesBase[intensitat] || ''}${blocRatio}`;
 }
 
@@ -8415,7 +8568,7 @@ function assegurarPersonatgesNKGMinims(nkg, biblia) {
       estat_emocional: inferirEstatEmocionalInicialDesDeArc(fp.arc),
       arc: fp.arc || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '' },
       limit_moral: fp.limit_moral || '',
-      veu: fp.veu || { registre: '', mai_diria: '', quan_menteix: '', quan_es_sincer: '' },
+      veu: fp.veu || { registre: '', mai_diria: [], quan_menteix: '', quan_es_sincer: '', exemples_narratius: [], vocabulari_recurrent: [], vocabulari_prohibit: [], longitud_frases: 'mitjanes' },
       objectes_inventari: [], objectes_descartats: [], ubicacio: '', motivacions_base: { desig_extern: '', necessitat_interna: '' }, objectius: [], secrets: [], viu: true, primera_aparicio: 0, trets_immutables: null
     };
   });
@@ -15463,7 +15616,8 @@ function crearNKG() {
         fets_previs: [],
         cronologia_previa: []
       },
-      thematic_count: 0
+      thematic_count: 0,
+      thematic_count_max: 3
     },
     threads: {
       oberts: [],
@@ -15727,7 +15881,7 @@ async function garantirTretsImmutablesPersonatge(nom, userConfig = USER_CONFIG) 
       estat_emocional: inferirEstatEmocionalInicialDesDeArc({}),
       arc: { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '' },
       limit_moral: '',
-      veu: { registre: '', mai_diria: '', quan_menteix: '', quan_es_sincer: '' },
+      veu: { registre: '', mai_diria: [], quan_menteix: '', quan_es_sincer: '', exemples_narratius: [], vocabulari_recurrent: [], vocabulari_prohibit: [], longitud_frases: 'mitjanes' },
       objectes_inventari: [],
       objectes_descartats: [],
       ubicacio: '',
@@ -16041,7 +16195,7 @@ function nkgInicialitzar() {
           estat_emocional:      ex?.estat_emocional      || inferirEstatEmocionalInicialDesDeArc(ex?.arc || {}),
           arc:                  ex?.arc                  || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '' },
           limit_moral:          ex?.limit_moral          || '',
-          veu:                  ex?.veu                  || { registre: '', mai_diria: '', quan_menteix: '', quan_es_sincer: '' },
+          veu:                  ex?.veu                  || { registre: '', mai_diria: [], quan_menteix: '', quan_es_sincer: '', exemples_narratius: [], vocabulari_recurrent: [], vocabulari_prohibit: [], longitud_frases: 'mitjanes' },
           objectes_inventari:   ex?.objectes_inventari   || [],
           objectes_descartats:  ex?.objectes_descartats  || [],
           ubicacio:             ex?.ubicacio             || '',
@@ -16444,8 +16598,9 @@ Si no hi ha fets nous ni canvis de relació, retorna els arrays buits [].`
       const hiHaFormulacio = await detectarFormulacioTematica(textEscena, theme, userConfig);
       if (hiHaFormulacio) {
         nkg.macronarrativa.thematic_count = (nkg.macronarrativa.thematic_count || 0) + 1;
-        if (nkg.macronarrativa.thematic_count > 1) {
-          console.warn(`⚠️  ALERTA: El tema s'ha formulat explícitament ${nkg.macronarrativa.thematic_count} vegades. Màxim permès: 1.`);
+        const thematicMax = Number(nkg.macronarrativa.thematic_count_max || 3);
+        if (nkg.macronarrativa.thematic_count > thematicMax) {
+          console.warn(`⚠️  ALERTA: El tema s'ha formulat explícitament ${nkg.macronarrativa.thematic_count} vegades. Màxim permès: ${thematicMax}.`);
         }
       }
     }
@@ -16958,10 +17113,10 @@ function construirMissioCapitol(idx) {
 
   // Tema i subtextualitat (thematic_count)
   lines.push(`TEMA I SUBTEXTUALITAT:
-Formulacions temàtiques explícites fins ara: ${thematicCount}/1
-${thematicCount >= 1
+Formulacions temàtiques explícites fins ara: ${thematicCount}/${Math.max(1, Number((nkg && nkg.macronarrativa && nkg.macronarrativa.thematic_count_max) || 3))}
+${thematicCount >= Math.max(1, Number((nkg && nkg.macronarrativa && nkg.macronarrativa.thematic_count_max) || 3))
     ? '— El tema NO pot ser formulat explícitament en aquest capítol.\n  Mostra\'l a través d\'acció, objectes o silenci. Mai verbalment.'
-    : '— Pots formular el tema explícitament UNA sola vegada si és el moment adequat.'}`);
+    : '— Encara pots formular el tema explícitament si és el moment adequat i no superes el límit configurat.'}`);
 
   // Ritme i densitat per intensitat
   lines.push(`RITME I DENSITAT (intensitat ${intensitat}/5):\n${buildRitmInstruccio(intensitat)}`);
