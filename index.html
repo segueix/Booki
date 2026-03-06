@@ -7258,7 +7258,7 @@ async function iniciarFase10() {
     ESTAT._estructuraCapitols = parseEstructura(res.response);
 
     // Retry: si falten capítols, completar-los amb una segona crida
-    const capsEsperats = ESTAT._nombreCapitols || 12;
+    const capsEsperats = ESTAT._nombreCapitolsConfig || ESTAT._nombreCapitols || 13;
     if (ESTAT._estructuraCapitols.length > 0 && ESTAT._estructuraCapitols.length < capsEsperats) {
       console.warn(`Estructura incompleta: ${ESTAT._estructuraCapitols.length}/${capsEsperats} capítols. Completant...`);
       document.getElementById('loader-10-text').textContent = `🔵 Completant capítols ${ESTAT._estructuraCapitols.length + 1}-${capsEsperats}…`;
@@ -7339,10 +7339,12 @@ function parseEstructura(text) {
     ESTAT._corbaTensio    = data.corba_tensio || [];
     ESTAT._arcMoral       = data.arc_moral || null;
 
-    // Validació de límits 12-22 capítols
-    if (data.capitols.length > 22) {
-      console.warn(`Estructura amb ${data.capitols.length} capítols — retallant a 22`);
-      while (data.capitols.length > 22) {
+    // Validació: respectar el nombre de capítols configurat per l'usuari
+    const capsObjectiu = ESTAT._nombreCapitolsConfig || 13;
+    const capsMaxim = Math.max(capsObjectiu + 2, 22);
+    if (data.capitols.length > capsMaxim) {
+      console.warn(`Estructura amb ${data.capitols.length} capítols — retallant a ${capsObjectiu}`);
+      while (data.capitols.length > capsObjectiu) {
         const ultim = data.capitols.pop();
         const penultim = data.capitols[data.capitols.length - 1];
         penultim.resum = (penultim.resum || '') + ' ' + (ultim.resum || '');
@@ -7350,8 +7352,8 @@ function parseEstructura(text) {
         penultim.numero = data.capitols.length;
       }
     }
-    if (data.capitols.length < 12) {
-      console.warn(`Estructura amb ${data.capitols.length} capítols — massa pocs, però continuem`);
+    if (data.capitols.length < Math.max(capsObjectiu - 2, 5)) {
+      console.warn(`Estructura amb ${data.capitols.length} capítols — massa pocs (objectiu: ${capsObjectiu}), però continuem`);
     }
 
     // Guardar el nombre real de capítols i la justificació
@@ -8971,10 +8973,9 @@ function fusionarCampPersonatgeValor(actual, nou) {
 }
 
 function validarImmutablesPerExportCapitol1(nkg, capitolActual) {
-  // Abans de la fase d'escriptura (fase < 11), permetem exportar NKG+Bíblia encara que
-  // faltin trets immutables complets: és precisament un punt de control per revisar-los.
+  // Validació informativa: avisa si falten trets immutables però NO bloqueja l'exportació.
+  // Abans es llençava un error que impedia descarregar NKG+Bíblia al capítol 1.
   if (Number(ESTAT && ESTAT.fase || 0) < 11) return;
-  if ((capitolActual || 1) !== 1) return;
   const personatges = Object.values((nkg && nkg.personatges) || {});
   const camps = ['edat_aproximada', 'genere', 'rol_narratiu', 'relacio_protagonista', 'aspecte_fisic', 'ocupacio', 'tret_definitori'];
   const ambProblemes = [];
@@ -8987,7 +8988,10 @@ function validarImmutablesPerExportCapitol1(nkg, capitolActual) {
     const invalid = camps.some(c => teValorPlaceholder(t[c]));
     if (invalid) ambProblemes.push(p.nom || 'personatge sense nom');
   });
-  if (ambProblemes.length > 0) throw new Error(`Exportació bloquejada (capítol 1): completa els trets immutables de ${ambProblemes.join(', ')}.`);
+  if (ambProblemes.length > 0) {
+    console.warn(`⚠️ Trets immutables incomplets per: ${ambProblemes.join(', ')}. L'exportació continuarà igualment.`);
+    toast(`⚠️ Avís: trets immutables incomplets per ${ambProblemes.join(', ')}. Exportant igualment.`);
+  }
 }
 
 function parseMotivacionsBase(text = '') {
@@ -11751,7 +11755,14 @@ Diàleg com a vehicle principal de l'ensenyament: les converses entre aprenent i
 Tensió irresoluble entre la racionalitat occidental del protagonista i la "realitat separada" que se li ofereix: el text no resol aquesta tensió, la manté viva fins al final.
 El desert, la nit, els somnis lúcids i les plantes de poder com a espais on les fronteres entre mons es fan permeables.`;
 
-  return '';
+  // Per a QUALSEVOL autor no reconegut: crear ambientació en el seu món propi
+  return `
+
+── AMBIENTACIÓ I MÓN DE L'AUTOR ──
+AMBIENTACIÓ (OBLIGATORI): Crea l'ambientació en el món propi de l'autor/gènere de referència (${tematica || 'no especificat'}). Mantén els noms propis, topònims, institucions, clima, codis socials i culturals coherents amb l'univers literari de l'autor.
+NO facis cap mena d'adaptació a Catalunya ni al context català: els noms dels personatges, els llocs, les institucions i els codis culturals han de ser fidels al món de l'autor original.
+El paisatge, l'arquitectura, el clima i l'atmosfera social han de funcionar com a personatges amb pes propi dins la narració.
+La llengua d'escriptura és el català, però l'univers narratiu és el de l'autor de referència — no el transposeu.`;
 }
 
 // ─── System prompt dinàmic per gènere (conte breu) ──────────
@@ -12041,7 +12052,7 @@ async function fase7_worldbuilding(conteActual, tematica, estilDesc, history, us
     ...history,
     {
       role: 'user',
-      content: `Has escrit el conte següent:\n\n${conteActual}\n\n---\nAra, com a arquitecte de mons, analitza el conte i proposa 8 elements del món que es podrien expandir per convertir-lo en una novel·la. Els elements han de ser:\n\n1. Geografia — el territori i els seus llocs rellevants\n2. Política — el sistema de poder i les seves tensions\n3. Màgia/Tecnologia — el sistema màgic o tecnològic que regeix el món\n4. Religions — les creences, rituals i institucions religioses\n5. Faccions — els grups, bandes o organitzacions en conflicte\n6. Història pregressa — els esdeveniments passats que expliquen el present\n7. Economia — els recursos, el comerç i les desigualtats\n8. Cultura quotidiana — els costums, l'art, la gastronomia, les festes\n\nMarca amb "(Recomanat)" els 4 elements més rellevants per expandir basant-te en el que ja apareix al conte. Cada element: nom + descripció d'1 línia del que caldria definir.\n\nFormat ESTRICTE (res més, sense cap introducció):\n1. **Geografia** — [descripció d'1 línia] (Recomanat)\n2. **Política** — [descripció d'1 línia]\n3. **Màgia/Tecnologia** — [descripció d'1 línia] (Recomanat)\n4. **Religions** — [descripció d'1 línia]\n5. **Faccions** — [descripció d'1 línia] (Recomanat)\n6. **Història pregressa** — [descripció d'1 línia]\n7. **Economia** — [descripció d'1 línia] (Recomanat)\n8. **Cultura quotidiana** — [descripció d'1 línia]`
+      content: `Has escrit el conte següent:\n\n${conteActual}\n\n---\nAra, com a arquitecte de mons, analitza el conte i proposa 8 elements del món que es podrien expandir per convertir-lo en una novel·la.\n\nINSTRUCCIÓ FONAMENTAL: Crea l'ambientació dins el món propi de l'autor/gènere (${tematica}). Mantén noms, topònims, institucions, clima i codis socials fidels a l'univers literari de l'autor. NO facis adaptació a Catalunya — els llocs, noms i context cultural han de pertànyer al món de l'autor original.\n\nEls elements han de ser:\n\n1. Geografia — el territori i els seus llocs rellevants (dins el món de l'autor)\n2. Política — el sistema de poder i les seves tensions\n3. Màgia/Tecnologia — el sistema màgic o tecnològic que regeix el món\n4. Religions — les creences, rituals i institucions religioses\n5. Faccions — els grups, bandes o organitzacions en conflicte\n6. Història pregressa — els esdeveniments passats que expliquen el present\n7. Economia — els recursos, el comerç i les desigualtats\n8. Cultura quotidiana — els costums, l'art, la gastronomia, les festes\n\nMarca amb "(Recomanat)" els 4 elements més rellevants per expandir basant-te en el que ja apareix al conte. Cada element: nom + descripció d'1 línia del que caldria definir.\n\nFormat ESTRICTE (res més, sense cap introducció):\n1. **Geografia** — [descripció d'1 línia] (Recomanat)\n2. **Política** — [descripció d'1 línia]\n3. **Màgia/Tecnologia** — [descripció d'1 línia] (Recomanat)\n4. **Religions** — [descripció d'1 línia]\n5. **Faccions** — [descripció d'1 línia] (Recomanat)\n6. **Història pregressa** — [descripció d'1 línia]\n7. **Economia** — [descripció d'1 línia] (Recomanat)\n8. **Cultura quotidiana** — [descripció d'1 línia]`
     }
   ];
   const response   = await callLLMMulti(
@@ -13977,7 +13988,10 @@ ${personatgesCtx}
 ESTILS DE PARLA (resum):
 ${ESTAT.estilsParla ? ESTAT.estilsParla.substring(0, 1000) + (ESTAT.estilsParla.length > 1000 ? '\n[…]' : '') : '(No definits)'}${tramesCtx}
 
-NOMBRE DE CAPÍTOLS: Entre 12 i 22 capítols. La decisió depèn de la complexitat i profunditat de la trama:
+NOMBRE DE CAPÍTOLS: EXACTAMENT ${ESTAT._nombreCapitolsConfig || 13} capítols. L'usuari ha demanat específicament ${ESTAT._nombreCapitolsConfig || 13} capítols — respecta'ls.
+NO en generis més ni menys. L'array "capitols" ha de contenir EXACTAMENT ${ESTAT._nombreCapitolsConfig || 13} elements.
+
+Guia de densitat segons nombre de capítols:
 - 12-14 capítols: Trama principal + 0-2 subtrames. Arc narratiu concentrat. Novel·la de ritme àgil (50.000-65.000 paraules objectiu).
 - 15-18 capítols: Trama principal + 2-3 subtrames significatives, o elencs de 4+ personatges amb arcs propis.
   Espai per a subplots emocionals, desviaments i caps de pont entre actes. (65.000-80.000 paraules objectiu).
@@ -13986,8 +14000,7 @@ NOMBRE DE CAPÍTOLS: Entre 12 i 22 capítols. La decisió depèn de la complexit
 
 REGLA D'OR: Cada capítol ha de justificar la seva existència — si un capítol es pot fusionar
 amb l'anterior o el posterior sense perdre res essencial, fusiona'l.
-Prioritza l'amplitud dramàtica: és millor una novel·la ben desplegada que un relat comprimit.
-NO superis MAI 22 capítols. La densitat narrativa és tan important com l'extensió.
+NO superis MAI ${ESTAT._nombreCapitolsConfig || 13} capítols. La densitat narrativa és tan important com l'extensió.
 
 INSTRUCCIONS DE CORBA DE TENSIÓ:
 La "corba_tensio" ha de seguir una estructura dramàtica adaptada al nombre de capítols.
@@ -14044,14 +14057,14 @@ A més de la corba de tensió, defineix una "corba moral" independent amb exacta
 5. COST FINAL (últims 2-3 caps): El preu emocional/moral concret de la transformació
 Inclou-ho com a camp "arc_moral" al JSON de retorn.
 
-IMPORTANT: L'array "capitols" ha de contenir EXACTAMENT el nombre de capítols indicat a "nombre_capitols". Prioritza completar tots els capítols encara que les descripcions dels últims siguin més breus. Un JSON truncat és INACCEPTABLE.
-CRÍTIC: L'array "corba_tensio" HA DE CONTENIR EXACTAMENT una entrada per a CADA capítol de la novel·la. Si tries 18 capítols, hi ha d'haver 18 entrades a la corba de tensió. NO T'ATURIS A LA MEITAT.
+IMPORTANT: L'array "capitols" ha de contenir EXACTAMENT ${ESTAT._nombreCapitolsConfig || 13} capítols — ni un més ni un menys. Prioritza completar tots els capítols encara que les descripcions dels últims siguin més breus. Un JSON truncat és INACCEPTABLE.
+CRÍTIC: L'array "corba_tensio" HA DE CONTENIR EXACTAMENT ${ESTAT._nombreCapitolsConfig || 13} entrades (una per capítol). NO T'ATURIS A LA MEITAT.
 
 Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense markdown, sense text addicional):
 {
   "titol_novella": "Escriu aquí un títol atractiu, evocador i comercial per a l'obra",
-  "nombre_capitols": 12,
-  "justificacio_capitols": "Explica en 2-3 línies per què has triat N capítols i no N-1 o N+1",
+  "nombre_capitols": ${ESTAT._nombreCapitolsConfig || 13},
+  "justificacio_capitols": "Explica en 2-3 línies com distribuïu la trama en ${ESTAT._nombreCapitolsConfig || 13} capítols",
   "arc_global": "descripció de l'arc narratiu complet en 5-8 línies",
   "temes_centrals": ["tema1", "tema2", "tema3"],
   "prefiguracions": [
@@ -16122,6 +16135,8 @@ TEMA: ${themeText}
 FINAL: ${endingText}
 AUTOR: ${autor}
 
+INSTRUCCIÓ D'AMBIENTACIÓ: Els noms dels personatges han de ser coherents amb el món de l'autor (${autor}). NO facis adaptació a Catalunya — usa noms, cognoms i referències culturals pròpies de l'univers de l'autor.
+
 Per a cada proposta, inclou 3-4 personatges principals. Per a cada personatge:
 NOM: [nom]
 ARC: inici_emocional: [estat inicial] | final_emocional: [estat final] | canvi_o_bloqueig: [transformació o bloqueig]
@@ -16154,8 +16169,14 @@ TO: ${to}
 AUTOR: ${autor}
 ARCS DELS PERSONATGES: ${arcsPersonatgesResumit}
 
+INSTRUCCIÓ FONAMENTAL D'AMBIENTACIÓ:
+Les 3 variants han de crear mons coherents amb l'univers literari de l'autor de referència (${autor}).
+- Mantén noms propis, topònims, institucions, clima i codis socials fidels al món de l'autor.
+- NO facis adaptació a Catalunya: els llocs, noms i context cultural han de ser els de l'autor original.
+- El paisatge i l'atmosfera han de funcionar com a personatge amb pes narratiu propi.
+
 Per a cada variant:
-1. [Nom variant] — LLOC I ÈPOCA: [on i quan] | EXPRESSIÓ DEL TEMA: [com el món encarna el tema] | CONFLICTE NATURAL: [tensions inherents al món] | RESTRICCIONS: [lleis o limitacions d'aquest món] (Recomanat)
+1. [Nom variant] — LLOC I ÈPOCA: [on i quan, dins l'univers de l'autor] | EXPRESSIÓ DEL TEMA: [com el món encarna el tema] | CONFLICTE NATURAL: [tensions inherents al món] | RESTRICCIONS: [lleis o limitacions d'aquest món] (Recomanat)
 
 Genera exactament 3 opcions en format numerat. Afegeix "(Recomanat)" a la més adequada.`
   }];
@@ -16172,13 +16193,16 @@ async function nouFlux_estructura(endingText, themeText, arcsResumit, monText, n
   const models = getModelConfig(config || USER_CONFIG || {});
   const msgs = [{
     role: 'user',
-    content: `Genera 2 estructures alternatives de ${nCaps} capítols per a la novel·la.
+    content: `Genera 2 estructures alternatives de EXACTAMENT ${nCaps} capítols per a la novel·la.
+IMPORTANT: Cada estructura ha de tenir EXACTAMENT ${nCaps} files — ni una més ni una menys.
 
 FINAL: ${endingText}
 TEMA: ${themeText}
 PERSONATGES (arcs): ${arcsResumit}
 MÓN: ${monText}
 AUTOR: ${autor}
+
+AMBIENTACIÓ: Mantén l'ambientació dins el món de l'autor (${autor}). NO facis adaptació a Catalunya.
 
 Per a cada estructura, genera una taula amb exactament ${nCaps} files:
 N | TÍTOL | FUNCIÓ NARRATIVA | INTENSITAT (1-5)
