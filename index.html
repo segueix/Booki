@@ -787,6 +787,8 @@
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="9.47">Objectius/Secrets</div>
     <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="9.48">Objectes</div>
+    <div class="step-arrow">›</div>
     <div class="step-pill" data-step="9.5">Trames</div>
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="10">Estructura</div>
@@ -1329,6 +1331,24 @@
     <div id="objectius-secrets-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
       <button class="btn btn-secondary" onclick="hideCard('fase-9-47');showCard('fase-9-46');">← Tornar a Completar Personatges</button>
+      <button class="btn btn-primary" onclick="iniciarFaseObjectesNarratius()">📦 Objectes narratius</button>
+    </div>
+  </div>
+</div>
+
+<!-- FASE 9.48: Objectes Narratius -->
+<div class="card hidden" id="fase-9-48">
+  <h2><span class="icon">📦</span> Objectes Narratius</h2>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Definim l'attrezzo central de la novel·la i el seu historial de moviment.</p>
+  <div class="loader-wrap" id="loader-9-48">
+    <div class="spinner"></div>
+    <span id="loader-9-48-text">Generant objectes narratius...</span>
+  </div>
+
+  <div id="objectes-result" class="hidden">
+    <div id="objectes-cos" class="veu-result"></div>
+    <div class="btn-row" style="margin-top:24px;">
+      <button class="btn btn-secondary" onclick="hideCard('fase-9-48');showCard('fase-9-47');">← Tornar a Objectius/Secrets</button>
       <button class="btn btn-primary" onclick="iniciarFaseTrames()">🕸️ Dissenyar Trames Opus</button>
     </div>
   </div>
@@ -2093,6 +2113,7 @@ function restaurarInterficieDesDeEstat() {
   if (fase >= 9.45 && ESTAT._nkg && ESTAT._nkg.macronarrativa && ESTAT._nkg.macronarrativa.backstory_canonic) mostrarBackstoryCanonic(ESTAT._nkg.macronarrativa.backstory_canonic, ESTAT._nkg.relacions || []);
   if (fase >= 9.46 && ESTAT._nkg && ESTAT._nkg.personatges && Object.keys(ESTAT._nkg.personatges).length > 0) mostrarCompletarPersonatges(Object.assign({}, ESTAT._nkg.personatges));
   if (fase >= 9.47 && ESTAT._nkg && ESTAT._nkg.personatges && Object.keys(ESTAT._nkg.personatges).length > 0) mostrarObjectiusSecrets(ESTAT._nkg.personatges);
+  if (fase >= 9.48 && ESTAT._nkg && ESTAT._nkg.objectes) mostrarObjectesNarratius(ESTAT._nkg.objectes);
   if (fase >= 10 && ESTAT._estructuraCapitols.length > 0) mostrarEstructura('Reconstruït des de memòria (dades en JSON actiu)');
   if (fase >= 10.5 && ESTAT._escaletes.length > 0) {
     mostrarEscaleta(ESTAT._escaletes);
@@ -5926,6 +5947,114 @@ async function iniciarFaseObjectiusSecrets() {
   }
 }
 
+function mostrarObjectesNarratius(objectes = {}) {
+  const cos = document.getElementById('objectes-cos');
+  if (!cos) return;
+  const cards = Object.entries(objectes || {}).map(([id, raw]) => {
+    const o = normalitzarObjecteNarratiu(raw, id);
+    if (!o) return '';
+    return `<div class="veu-card">
+      <div class="veu-card-nom">📦 ${escHtml(o.nom)} <span style="font-size:.78rem;color:var(--text2)">(${escHtml(o.id)})</span></div>
+      <div class="veu-card-camps">
+        <div><div class="veu-camp-label">Descripció física</div><div class="veu-camp-val">${escHtml(o.descripcio_fisica || '(pendent)')}</div></div>
+        <div><div class="veu-camp-label">Significat simbòlic</div><div class="veu-camp-val">${escHtml(o.significat_simbolic || '(pendent)')}</div></div>
+        <div><div class="veu-camp-label">Inicial</div><div class="veu-camp-val">${escHtml(`${o.posseidor_inicial || 'sense posseïdor'} · ${o.ubicacio_inicial || 'ubicació no indicada'}`)}</div></div>
+        <div><div class="veu-camp-label">Historial</div><div class="veu-camp-val">${escHtml((o.historial || []).map(h => `C${h.capitol}:${h.accio}`).join(' · ') || '(cap)')}</div></div>
+      </div>
+    </div>`;
+  }).filter(Boolean).join('\n');
+  cos.innerHTML = cards || '<div class="veu-card"><div class="veu-card-camps">Sense objectes detectats.</div></div>';
+  document.getElementById('objectes-result').classList.remove('hidden');
+}
+
+async function generarObjectesNarratius(userConfig) {
+  const nkg = ESTAT._nkg || {};
+  const payload = {
+    synopsis: nkg.macronarrativa?.synopsis_core || '',
+    backstory: nkg.macronarrativa?.backstory_canonic || {},
+    personatges: nkg.personatges || {},
+    estructura_capitols: ESTAT._estructuraCapitols || [],
+    escaletes: ESTAT._escaletes || []
+  };
+  const systemPrompt = `Ets un director d'attrezzo expert en narrativa. A partir de la sinopsi, backstory, personatges, estructura de capítols i escaletes, has de identificar i definir TOTS els objectes físics rellevants per a la novel·la.
+
+Respon EXCLUSIVAMENT amb JSON vàlid:
+{
+  "objectes": {
+    "capsa_fusta": {
+      "id": "capsa_fusta",
+      "nom": "La capsa de fusta",
+      "descripcio_fisica": "...",
+      "significat_simbolic": "...",
+      "ubicacio_inicial": "...",
+      "posseidor_inicial": "biel_santamaria",
+      "es_clau_per_al_desenllaç": true,
+      "primera_aparicio_capitol": 1,
+      "historial": [
+        {"capitol": 1, "accio": "agafat", "personatge": "biel_santamaria", "ubicacio_nova": "motxilla d'en Biel"}
+      ]
+    }
+  },
+  "inventari_inicial": {
+    "biel_santamaria": ["capsa_fusta"]
+  }
+}
+
+REGLES:
+- Inclou MÍNIM 8 objectes.
+- Historial coherent amb escaletes.
+- IDs snake_case curts.
+- Significat simbòlic connectat al tema.`;
+  const msgs = [{ role: 'user', content: `Context complet:
+${JSON.stringify(payload, null, 2)}` }];
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  for (let intent = 1; intent <= 2; intent++) {
+    const raw = await callLLMMulti(msgs, systemPrompt, Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 3800, model: models.modelArquitecte }), 'arquitectura');
+    const parsed = parseJsonRobust(raw);
+    if (parsed && parsed.objectes && typeof parsed.objectes === 'object') return parsed;
+    if (intent === 2) throw new Error('Resposta invàlida a la fase Objectes Narratius.');
+    msgs.push({ role: 'user', content: 'Resposta invàlida. Torna només JSON estricte amb objectes i inventari_inicial.' });
+  }
+  throw new Error('No s\'ha pogut generar objectes narratius.');
+}
+
+function injectarObjectesNarratius(data = {}) {
+  const nkg = ESTAT._nkg || {};
+  if (!nkg.objectes || typeof nkg.objectes !== 'object') nkg.objectes = {};
+  Object.entries(data.objectes || {}).forEach(([id, raw]) => {
+    const obj = normalitzarObjecteNarratiu(raw, id);
+    if (!obj) return;
+    nkg.objectes[obj.id] = obj;
+  });
+  const invInicial = data.inventari_inicial || {};
+  Object.entries(invInicial).forEach(([clau, arr]) => {
+    if (!nkg.personatges[clau]) return;
+    nkg.personatges[clau].objectes_inventari = Array.isArray(arr) ? arr.map(ref => resoldreIdObjecte(nkg, ref)).filter(Boolean) : [];
+  });
+  sincronitzarReferenciesObjectesPersonatges();
+}
+
+async function iniciarFaseObjectesNarratius() {
+  ESTAT.fase = 9.48;
+  updateProgress(9.48);
+  hideCard('fase-9-47');
+  showCard('fase-9-48');
+  document.getElementById('objectes-result').classList.add('hidden');
+  showLoader('9-48');
+  try {
+    const data = await generarObjectesNarratius(USER_CONFIG);
+    injectarObjectesNarratius(data);
+    const snap = getObjectState(1);
+    if (!snap || Object.keys(snap).length === 0) throw new Error('No s\'ha pogut construir l\'estat d\'objectes.');
+    hideLoader('9-48');
+    mostrarObjectesNarratius(ESTAT._nkg.objectes || {});
+    toast('Objectes narratius injectats al NKG.');
+  } catch (err) {
+    hideLoader('9-48');
+    toast('Error fase Objectes Narratius: ' + err.message);
+  }
+}
+
 function mostrarEstilsParla(text) {
   const cos = document.getElementById('estils-cos');
   const blocs = parsejarBlocsEstilsParla(text);
@@ -7718,6 +7847,86 @@ function normalitzarSecret(raw, idx = 0, clau = 'pers') {
   };
 }
 
+function normalitzarObjecteNarratiu(raw = {}, fallbackId = '') {
+  const r = raw || {};
+  const idBase = String(r.id || fallbackId || r.nom || '').trim();
+  const id = nkgNormalitzarNom(idBase);
+  if (!id) return null;
+  return {
+    id,
+    nom: String(r.nom || id).trim(),
+    descripcio_fisica: String(r.descripcio_fisica || '').trim(),
+    significat_simbolic: String(r.significat_simbolic || '').trim(),
+    ubicacio_inicial: String(r.ubicacio_inicial || r.ubicacio || '').trim(),
+    posseidor_inicial: r.posseidor_inicial != null && String(r.posseidor_inicial).trim() !== '' ? nkgNormalitzarNom(String(r.posseidor_inicial)) : null,
+    es_clau_per_al_desenllaç: !!r.es_clau_per_al_desenllaç,
+    primera_aparicio_capitol: Math.max(1, Number(r.primera_aparicio_capitol) || 1),
+    historial: Array.isArray(r.historial) ? r.historial.map(h => ({
+      capitol: Math.max(1, Number(h.capitol) || 1),
+      accio: ['agafat','deixat','mogut','destruït','transformat','revelat'].includes(h.accio) ? h.accio : 'mogut',
+      personatge: h.personatge ? nkgNormalitzarNom(String(h.personatge)) : null,
+      ubicacio_nova: String(h.ubicacio_nova || '').trim()
+    })) : []
+  };
+}
+
+function resoldreIdObjecte(nkg, ref = '') {
+  const id = nkgNormalitzarNom(ref);
+  if (!id) return '';
+  if (nkg && nkg.objectes && nkg.objectes[id]) return id;
+  if (nkg && nkg.objectes) {
+    const byNom = Object.keys(nkg.objectes).find(k => nkgNormalitzarNom(nkg.objectes[k]?.nom || '') === id);
+    if (byNom) return byNom;
+  }
+  return id;
+}
+
+function inferirAccioObjecte(causa = '', fromPos = null, toPos = null) {
+  const c = String(causa || '').toLowerCase();
+  if (/destru|trenca|crema/.test(c)) return 'destruït';
+  if (/transform|converteix/.test(c)) return 'transformat';
+  if (/revela|mostra/.test(c)) return 'revelat';
+  if (!fromPos && toPos) return 'agafat';
+  if (fromPos && !toPos) return 'deixat';
+  return 'mogut';
+}
+
+function getObjectState(capitol = 1) {
+  const cap = Math.max(1, Number(capitol) || 1);
+  const nkg = ESTAT._nkg || {};
+  const out = {};
+  Object.entries((nkg.objectes || {})).forEach(([id, raw]) => {
+    const obj = normalitzarObjecteNarratiu(raw, id);
+    if (!obj) return;
+    let posseidor = obj.posseidor_inicial;
+    let ubicacio = obj.ubicacio_inicial || '';
+    (obj.historial || [])
+      .filter(h => h.capitol <= cap)
+      .sort((a, b) => a.capitol - b.capitol)
+      .forEach(h => {
+        if (h.personatge !== undefined) posseidor = h.personatge || null;
+        if (h.ubicacio_nova) ubicacio = h.ubicacio_nova;
+      });
+    out[id] = { posseidor, ubicacio, primera_aparicio_capitol: obj.primera_aparicio_capitol, es_clau_per_al_desenllaç: obj.es_clau_per_al_desenllaç };
+  });
+  return out;
+}
+
+function sincronitzarReferenciesObjectesPersonatges() {
+  const nkg = ESTAT._nkg || {};
+  const pers = nkg.personatges || {};
+  Object.entries(pers).forEach(([clau, p]) => {
+    p.objectes_inventari = (Array.isArray(p.objectes_inventari) ? p.objectes_inventari : [])
+      .map(ref => resoldreIdObjecte(nkg, typeof ref === 'string' ? ref : (ref && ref.id) || (ref && ref.objecte) || ''))
+      .filter(Boolean);
+    p.objectes_descartats = (Array.isArray(p.objectes_descartats) ? p.objectes_descartats : [])
+      .map(ref => resoldreIdObjecte(nkg, typeof ref === 'string' ? ref : (ref && ref.id) || (ref && ref.objecte) || ''))
+      .filter(Boolean);
+    p.objectes_inventari = [...new Set(p.objectes_inventari)];
+    p.objectes_descartats = [...new Set(p.objectes_descartats)];
+  });
+}
+
 function migrarMotivacionsBaseDesDeBiblia() {
   if (!ESTAT._nkg || !ESTAT._nkg.personatges) return;
   const fitxes = (ESTAT.bibliaNarrativa && Array.isArray(ESTAT.bibliaNarrativa.fitxes_personatges)) ? ESTAT.bibliaNarrativa.fitxes_personatges : [];
@@ -7834,6 +8043,7 @@ async function generarFitxerContexte(nkg, biblia, capitolActual) {
     timeline_personatges: (nkg.timeline_personatges || []).slice(-20),
     beats_gastats: nkg.beats_gastats || [],
     vista_filtrada_capitol: getActiveObjectives(capitolActual),
+    snapshot_objectes_capitol: getObjectState(capitolActual),
     context_creacio: {
       tematica: ESTAT.tematica || '',
       estil: ESTAT.estil || {},
@@ -14839,50 +15049,72 @@ function nkgNormalitzarNom(nom) {
 
 function nkgRegistrarMovimentObjecte(nkg, objecteNom, fromState, toState, capitol, escena, causa = '') {
   if (!nkg || !objecteNom) return;
-  const clauObj = nkgNormalitzarNom(objecteNom);
+  const clauObj = resoldreIdObjecte(nkg, objecteNom);
   if (!clauObj) return;
 
-  const fromPos = fromState && fromState.posseidor ? String(fromState.posseidor) : null;
+  const fromPos = fromState && fromState.posseidor ? nkgNormalitzarNom(String(fromState.posseidor)) : null;
   const fromUbi = fromState && fromState.ubicacio ? String(fromState.ubicacio) : '';
-  const toPos   = toState && toState.posseidor ? String(toState.posseidor) : null;
+  const toPos   = toState && toState.posseidor ? nkgNormalitzarNom(String(toState.posseidor)) : null;
   const toUbi   = toState && toState.ubicacio ? String(toState.ubicacio) : '';
   const noCanvi = (fromPos || '') === (toPos || '') && (fromUbi || '') === (toUbi || '');
   if (noCanvi) return;
 
-  if (!Array.isArray(nkg.timeline_objectes)) nkg.timeline_objectes = [];
-  const sigSimb = nkg.objectes[clauObj]?.significat_simbolic;
-  if (sigSimb !== null && sigSimb !== undefined && String(sigSimb).trim() !== '') {
-    const linia = `C${capitol}E${escena}: [${objecteNom}] ${fromPos || (fromUbi || '(desconegut)')} -> ${toPos || (toUbi || '(desconegut)')}${causa ? ` (${causa})` : ''}`;
-    nkg.timeline_objectes.push(linia);
-    if (nkg.timeline_objectes.length > 20) nkg.timeline_objectes = nkg.timeline_objectes.slice(-20);
+  if (!nkg.objectes[clauObj]) {
+    nkg.objectes[clauObj] = normalitzarObjecteNarratiu({
+      id: clauObj,
+      nom: objecteNom,
+      descripcio_fisica: '',
+      significat_simbolic: '',
+      ubicacio_inicial: fromUbi || toUbi || '',
+      posseidor_inicial: fromPos,
+      es_clau_per_al_desenllaç: false,
+      primera_aparicio_capitol: Math.max(1, Number(capitol) || 1),
+      historial: []
+    }, clauObj);
   }
 
-  if (!nkg.objectes[clauObj]) nkg.objectes[clauObj] = { nom: objecteNom, ubicacio: '', posseidor: null, significat_simbolic: '' };
-  const obj = nkg.objectes[clauObj];
-  obj.nom = obj.nom || objecteNom;
+  const obj = normalitzarObjecteNarratiu(nkg.objectes[clauObj], clauObj);
+  if (!obj) return;
+  const accio = inferirAccioObjecte(causa, fromPos, toPos);
+  obj.historial.push({
+    capitol: Math.max(1, Number(capitol) || 1),
+    accio,
+    personatge: toPos,
+    ubicacio_nova: toUbi || fromUbi || ''
+  });
+  if (obj.historial.length > 80) obj.historial = obj.historial.slice(-80);
+
+  // Compatibilitat camps antics
   obj.posseidor = toPos || null;
   obj.ubicacio = toUbi || '';
-  if (!Array.isArray(obj.historial_ubicacions)) obj.historial_ubicacions = [];
-  obj.historial_ubicacions.push({ capitol, escena, posseidor: obj.posseidor, ubicacio: obj.ubicacio, causa: causa || '' });
-  if (obj.historial_ubicacions.length > 40) obj.historial_ubicacions = obj.historial_ubicacions.slice(-40);
+
+  if (!Array.isArray(nkg.timeline_objectes)) nkg.timeline_objectes = [];
+  const linia = `C${capitol}E${escena}: [${obj.nom}] ${fromPos || (fromUbi || '(desconegut)')} -> ${toPos || (toUbi || '(desconegut)')}${causa ? ` (${causa})` : ''}`;
+  nkg.timeline_objectes.push(linia);
+  if (nkg.timeline_objectes.length > 40) nkg.timeline_objectes = nkg.timeline_objectes.slice(-40);
+
+  nkg.objectes[clauObj] = obj;
 }
 
 function nkgSincronitzarInventariPersonatge(nkg, abans, despres, capitol, escena) {
   if (!nkg || !despres || !despres.nom) return;
-  const invAbans = Array.isArray(abans && abans.objectes_inventari) ? abans.objectes_inventari : [];
-  const invDespres = Array.isArray(despres.objectes_inventari) ? despres.objectes_inventari : [];
-  const nomPers = despres.nom;
+  const invAbansRaw = Array.isArray(abans && abans.objectes_inventari) ? abans.objectes_inventari : [];
+  const invDespresRaw = Array.isArray(despres.objectes_inventari) ? despres.objectes_inventari : [];
+
+  const invAbans = invAbansRaw.map(ref => resoldreIdObjecte(nkg, ref)).filter(Boolean);
+  const invDespres = invDespresRaw.map(ref => resoldreIdObjecte(nkg, ref)).filter(Boolean);
+  despres.objectes_inventari = [...new Set(invDespres)];
+
+  const nomPers = nkgNormalitzarNom(despres.nom);
   const ubiPers = despres.ubicacio || (abans && abans.ubicacio) || '';
 
-  // Tot objecte que queda a inventari passa a estar en possessió del personatge a la seva ubicació actual.
-  invDespres.forEach(objNom => {
-    const clauObj = nkgNormalitzarNom(objNom);
-    const existent = nkg.objectes[clauObj] || { nom: objNom, posseidor: null, ubicacio: '', significat_simbolic: '' };
-    nkg.objectes[clauObj] = existent;
+  despres.objectes_inventari.forEach(objId => {
+    const existent = nkg.objectes[objId] || normalitzarObjecteNarratiu({ id: objId, nom: objId, ubicacio_inicial: ubiPers, posseidor_inicial: nomPers }, objId);
+    nkg.objectes[objId] = existent;
     nkgRegistrarMovimentObjecte(
       nkg,
-      objNom,
-      { posseidor: existent.posseidor, ubicacio: existent.ubicacio },
+      objId,
+      { posseidor: existent.posseidor || existent.posseidor_inicial, ubicacio: existent.ubicacio || existent.ubicacio_inicial },
       { posseidor: nomPers, ubicacio: ubiPers },
       capitol,
       escena,
@@ -14890,17 +15122,16 @@ function nkgSincronitzarInventariPersonatge(nkg, abans, despres, capitol, escena
     );
   });
 
-  // Objectes que ja no són a inventari però no han estat descartats explícitament: marquem ubicació incerta.
-  const setDespres = new Set(invDespres.map(n => nkgNormalitzarNom(n)));
-  invAbans.forEach(objNom => {
-    const clauObj = nkgNormalitzarNom(objNom);
-    if (!clauObj || setDespres.has(clauObj) || !nkg.objectes[clauObj]) return;
-    const exObj = nkg.objectes[clauObj];
-    if (exObj.posseidor && nkgNormalitzarNom(exObj.posseidor) === nkgNormalitzarNom(nomPers)) {
+  const setDespres = new Set(despres.objectes_inventari);
+  invAbans.forEach(objId => {
+    if (!objId || setDespres.has(objId) || !nkg.objectes[objId]) return;
+    const exObj = nkg.objectes[objId];
+    const posseidorActual = exObj.posseidor || exObj.posseidor_inicial;
+    if (posseidorActual && nkgNormalitzarNom(posseidorActual) === nomPers) {
       nkgRegistrarMovimentObjecte(
         nkg,
-        objNom,
-        { posseidor: exObj.posseidor, ubicacio: exObj.ubicacio },
+        objId,
+        { posseidor: posseidorActual, ubicacio: exObj.ubicacio || exObj.ubicacio_inicial || '' },
         { posseidor: null, ubicacio: exObj.ubicacio || ubiPers || 'ubicació no especificada' },
         capitol,
         escena,
@@ -15364,6 +15595,7 @@ function nkgInicialitzar() {
 
   // Inicialitzar emmagatzematge d'escenes
   ESTAT._escenes_generades = {};
+  sincronitzarReferenciesObjectesPersonatges();
 
   console.log('NKG inicialitzat:', Object.keys(nkg.personatges).length, 'personatges,', Object.keys(nkg.llocs).length, 'llocs');
 }
@@ -15393,8 +15625,8 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
           arc: { inici_emocional: p.arc?.inici_emocional || '', final_emocional: p.arc?.final_emocional || '', canvi_o_bloqueig: p.arc?.canvi_o_bloqueig || '' },
           limit_moral: p.limit_moral || '',
           veu: { registre: p.veu?.registre || '', mai_diria: p.veu?.mai_diria || '', quan_menteix: p.veu?.quan_menteix || '', quan_es_sincer: p.veu?.quan_es_sincer || '' },
-          objectes_inventari: Array.isArray(p.objectes_inventari) ? p.objectes_inventari : [],
-          objectes_descartats: Array.isArray(p.objectes_descartats) ? p.objectes_descartats : [],
+          objectes_inventari: Array.isArray(p.objectes_inventari) ? p.objectes_inventari.map(ref => resoldreIdObjecte(nkg, ref)).filter(Boolean) : [],
+          objectes_descartats: Array.isArray(p.objectes_descartats) ? p.objectes_descartats.map(ref => resoldreIdObjecte(nkg, (ref && ref.objecte) || ref)).filter(Boolean) : [],
           ubicacio: p.ubicacio || '',
           historial_ubicacions: p.ubicacio ? [{ capitol, escena, ubicacio: p.ubicacio }] : [],
           motivacions_base: parseMotivacionsBase(''),
@@ -15412,10 +15644,10 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
         if (ex.primera_aparicio === 0 && capitol > 0) ex.primera_aparicio = capitol;
         if (p.estat_emocional) ex.estat_emocional = p.estat_emocional;
         if (p.estat_fisic) ex.estat_fisic = p.estat_fisic;
-        if (Array.isArray(p.objectes_inventari)) ex.objectes_inventari = p.objectes_inventari;
+        if (Array.isArray(p.objectes_inventari)) ex.objectes_inventari = p.objectes_inventari.map(ref => resoldreIdObjecte(nkg, ref)).filter(Boolean);
         if (Array.isArray(p.objectes_descartats) && p.objectes_descartats.length > 0) {
           if (!Array.isArray(ex.objectes_descartats)) ex.objectes_descartats = [];
-          ex.objectes_descartats = ex.objectes_descartats.concat(p.objectes_descartats);
+          ex.objectes_descartats = ex.objectes_descartats.concat(p.objectes_descartats.map(ref => resoldreIdObjecte(nkg, (ref && ref.objecte) || ref)).filter(Boolean));
           if (ex.objectes_descartats.length > 20) ex.objectes_descartats = ex.objectes_descartats.slice(-20);
         }
         if (p.ubicacio) ex.ubicacio = p.ubicacio;
@@ -15449,16 +15681,15 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
       // Registrar descarts explícits d'objectes amb ubicació si existeix.
       const descarts = Array.isArray(p.objectes_descartats) ? p.objectes_descartats : [];
       descarts.forEach(d => {
-        const objNom = d && d.objecte ? d.objecte : '';
-        if (!objNom) return;
-        const clauObj = nkgNormalitzarNom(objNom);
-        const existent = nkg.objectes[clauObj] || { nom: objNom, posseidor: p.nom || null, ubicacio: despres.ubicacio || '', significat_simbolic: '' };
-        nkg.objectes[clauObj] = existent;
+        const objId = resoldreIdObjecte(nkg, (d && d.objecte) || d || '');
+        if (!objId) return;
+        const existent = nkg.objectes[objId] || normalitzarObjecteNarratiu({ id: objId, nom: objId, posseidor_inicial: nkgNormalitzarNom(p.nom || ''), ubicacio_inicial: despres.ubicacio || '' }, objId);
+        nkg.objectes[objId] = existent;
         nkgRegistrarMovimentObjecte(
           nkg,
-          objNom,
-          { posseidor: existent.posseidor, ubicacio: existent.ubicacio },
-          { posseidor: null, ubicacio: d.ubicacio || despres.ubicacio || '' },
+          objId,
+          { posseidor: existent.posseidor || existent.posseidor_inicial, ubicacio: existent.ubicacio || existent.ubicacio_inicial },
+          { posseidor: null, ubicacio: (d && d.ubicacio) || despres.ubicacio || '' },
           capitol,
           escena,
           'objecte descartat'
@@ -15478,19 +15709,20 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
 
   if (dades.nous_objectes) {
     dades.nous_objectes.forEach(o => {
-      const clau = nkgNormalitzarNom(o.nom);
-      const existent = nkg.objectes[clau] || { nom: o.nom, ubicacio: '', posseidor: null, significat_simbolic: '' };
-      nkg.objectes[clau] = existent;
+      const obj = normalitzarObjecteNarratiu(o, o && (o.id || o.nom));
+      if (!obj) return;
+      const clau = obj.id;
+      const existent = nkg.objectes[clau] ? normalitzarObjecteNarratiu(nkg.objectes[clau], clau) : obj;
+      nkg.objectes[clau] = Object.assign({}, existent, obj);
       nkgRegistrarMovimentObjecte(
         nkg,
-        o.nom,
-        { posseidor: existent.posseidor, ubicacio: existent.ubicacio },
-        { posseidor: o.posseidor || null, ubicacio: o.ubicacio || '' },
+        clau,
+        { posseidor: existent.posseidor || existent.posseidor_inicial, ubicacio: existent.ubicacio || existent.ubicacio_inicial },
+        { posseidor: obj.posseidor_inicial || null, ubicacio: obj.ubicacio_inicial || '' },
         capitol,
         escena,
         'objecte nou o actualitzat'
       );
-      if (o.significat_simbolic) existent.significat_simbolic = o.significat_simbolic;
     });
   }
 
@@ -15630,7 +15862,7 @@ async function nkgActualitzarPostEscena(textEscena, capitol, escena, userConfig)
   const estatPersistent = Object.values(nkg.personatges).map(p => {
     const inv = Array.isArray(p.objectes_inventari) && p.objectes_inventari.length > 0 ? p.objectes_inventari.join(', ') : '(buit)';
     const desc = Array.isArray(p.objectes_descartats) && p.objectes_descartats.length > 0
-      ? p.objectes_descartats.slice(-3).map(o => `${o.objecte || '?'}@${o.ubicacio || '?'}`).join(' | ')
+      ? p.objectes_descartats.slice(-3).map(o => { const id = typeof o === 'string' ? o : (o && (o.id || o.objecte)) || '?'; const obj = (ESTAT._nkg && ESTAT._nkg.objectes && ESTAT._nkg.objectes[id]) || {}; return `${id}@${obj.ubicacio || obj.ubicacio_inicial || '?'}`; }).join(' | ')
       : '(cap)';
     return `- ${p.nom}: emoció=${p.estat_emocional || 'neutre'} | roba=${p.indumentaria_actual || '(sense dades)'} | inventari=${inv} | descartats=${desc}`;
   }).join('\n');
