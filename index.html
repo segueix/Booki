@@ -1443,8 +1443,10 @@
   <div class="loader-wrap" id="loader-10-8"><span class="spinner"></span><span id="loader-10-8-text">Generant exemples de veu…</span></div>
   <div id="veu-exemples-result" class="hidden">
     <div id="veu-exemples-cos" class="veu-result"></div>
+    <div id="nkg-faltants-cos" class="veu-result" style="margin-top:14px;"></div>
     <div class="btn-row" style="margin-top:24px;">
       <button class="btn btn-secondary" onclick="hideCard('fase-10-8');showCard('fase-10-7');">← Tornar a POV/Cronologia</button>
+      <button class="btn btn-ghost" id="btn-autocompletar-nkg" onclick="autocompletarNKGFaltantsManual()">🧩 Completar dades faltants</button>
       <button class="btn btn-primary" id="btn-fase11" onclick="iniciarFase11()">Continuar → Escriptura</button>
     </div>
   </div>
@@ -2184,6 +2186,7 @@ function restaurarInterficieDesDeEstat() {
   }
   if (fase >= 10.8 && ESTAT._nkg && ESTAT._nkg.personatges) {
     mostrarVeuExemples(Object.assign({}, ESTAT._nkg.personatges));
+    mostrarFaltantsNKG();
     document.getElementById('veu-exemples-result').classList.remove('hidden');
   }
   if (fase >= 11) {
@@ -4215,21 +4218,24 @@ function validarNKGComplet(nkg, capitolsEscaleta) {
 }
 
 function validarNKGPreparatPerCapitol1(nkg, biblia = {}) {
+  const faltants = detectarFaltantsNKG(nkg, biblia);
+  return { ok: faltants.length === 0, errors: faltants };
+}
+
+function detectarFaltantsNKG(nkg = {}, biblia = {}) {
   const errors = [];
-  if (!nkg) return { ok: false, errors: ['NKG no inicialitzat.'] };
+  if (!nkg || Object.keys(nkg).length === 0) return ['NKG no inicialitzat.'];
   const bs = nkg.macronarrativa && nkg.macronarrativa.backstory_canonic;
   if (!bs || !Array.isArray(bs.fets_previs) || bs.fets_previs.length === 0) errors.push('Falten fets previs de backstory canònic.');
   if (!Array.isArray(nkg.relacions) || nkg.relacions.length === 0) errors.push('Falta graf de relacions.');
   if (!nkg.objectes || Object.keys(nkg.objectes).length === 0) errors.push('Falten objectes narratius.');
   if (!nkg.llocs || Object.keys(nkg.llocs).length < 3) errors.push('Mapa de llocs insuficient.');
   if (!Array.isArray(biblia.regles_mon) || biblia.regles_mon.length === 0) errors.push('Falten regles del món.');
-
   const perspectiva = (((nkg.context_creacio || {}).estil || {}).perspectiva || {});
   const cronologia = ((nkg.context_creacio || {}).cronologia || {});
   if (!perspectiva.tipus) errors.push('Falta tipus de perspectiva narrativa.');
   if (!Array.isArray(perspectiva.pov_per_capitol) || perspectiva.pov_per_capitol.length === 0) errors.push('Falta POV per capítol.');
   if (!Array.isArray(cronologia.per_capitol) || cronologia.per_capitol.length === 0) errors.push('Falta cronologia per capítol.');
-
   const pers = Object.values(nkg.personatges || {});
   if (pers.length === 0) errors.push('No hi ha personatges al NKG.');
   pers.forEach(p => {
@@ -4239,8 +4245,18 @@ function validarNKGPreparatPerCapitol1(nkg, biblia = {}) {
     if (!Array.isArray(veu.exemples_narratius) || veu.exemples_narratius.length < 2) errors.push(`${p.nom || 'Personatge'} sense exemples narratius de veu.`);
     if (!Array.isArray(veu.vocabulari_recurrent) || veu.vocabulari_recurrent.length < 3) errors.push(`${p.nom || 'Personatge'} sense vocabulari recurrent suficient.`);
   });
+  return errors;
+}
 
-  return { ok: errors.length === 0, errors };
+function mostrarFaltantsNKG() {
+  const cos = document.getElementById('nkg-faltants-cos');
+  if (!cos) return;
+  const faltants = detectarFaltantsNKG(ESTAT._nkg || {}, ESTAT.bibliaNarrativa || {});
+  if (faltants.length === 0) {
+    cos.innerHTML = '<div class="veu-card"><div class="veu-card-nom">✅ NKG complet</div><div class="veu-camp-val">Ja tens totes les dades necessàries per començar la novel·la.</div></div>';
+    return;
+  }
+  cos.innerHTML = `<div class="veu-card"><div class="veu-card-nom">⚠️ Dades pendents al NKG</div><ul style="padding-left:18px;margin-top:8px;">${faltants.map(f => `<li>${escHtml(f)}</li>`).join('')}</ul></div>`;
 }
 
 function mostrarResumNKGiTransicio(nkg, capitolsEscaleta, validacio, modeCreacio) {
@@ -6568,11 +6584,58 @@ async function iniciarFaseVeuExemples() {
     injectarVeuExemples(data);
     hideLoader('10-8');
     mostrarVeuExemples(ESTAT._nkg.personatges || {});
+    mostrarFaltantsNKG();
     document.getElementById('veu-exemples-result').classList.remove('hidden');
     toast('Veu i exemples completats.');
   } catch (err) {
     hideLoader('10-8');
     toast('Error fase Veu i Exemples: ' + err.message);
+  }
+}
+
+async function autocompletarNKGFaltantsManual() {
+  const btn = document.getElementById('btn-autocompletar-nkg');
+  if (btn) btn.disabled = true;
+  showLoader('10-8');
+  try {
+    const nkg = ESTAT._nkg || {};
+    const biblia = ESTAT.bibliaNarrativa || {};
+    const faltants = detectarFaltantsNKG(nkg, biblia).join(' | ').toLowerCase();
+
+    if (faltants.includes('backstory') || faltants.includes('relacions')) {
+      const d = await generarBackstoryIRelacions(USER_CONFIG);
+      if (d && d.backstory_canonic) nkg.macronarrativa.backstory_canonic = d.backstory_canonic;
+      if (Array.isArray(d && d.relacions)) nkg.relacions = d.relacions;
+    }
+    if (faltants.includes('trets immutables')) {
+      const d = await generarCompletarPersonatges(USER_CONFIG);
+      mergeCompletarPersonatgesNKG(d);
+    }
+    if (faltants.includes('objectes narratius')) {
+      const d = await generarObjectesNarratius(USER_CONFIG);
+      injectarObjectesNarratius(d);
+    }
+    if (faltants.includes('mapa de llocs') || faltants.includes('regles del món')) {
+      const d = await generarMapaEspacialRegles(USER_CONFIG);
+      injectarMapaEspacialRegles(d);
+    }
+    if (faltants.includes('pov per capítol') || faltants.includes('cronologia') || faltants.includes('tipus de perspectiva')) {
+      const d = await generarPerspectivaCronologia(USER_CONFIG);
+      injectarPerspectivaCronologia(d);
+    }
+    if (faltants.includes('exemples narratius de veu') || faltants.includes('vocabulari recurrent')) {
+      const d = await generarVeuExemples(USER_CONFIG);
+      injectarVeuExemples(d);
+    }
+
+    mostrarVeuExemples(ESTAT._nkg.personatges || {});
+    mostrarFaltantsNKG();
+    toast('Autocompleció NKG finalitzada. Revisa i continua manualment.');
+  } catch (err) {
+    toast('Error autocompletant NKG: ' + err.message);
+  } finally {
+    hideLoader('10-8');
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -6970,8 +7033,14 @@ async function iniciarFase11() {
 
   const chkNKG = validarNKGPreparatPerCapitol1(ESTAT._nkg || {}, ESTAT.bibliaNarrativa || {});
   if (!chkNKG.ok) {
-    toast('NKG incomplet abans del capítol 1: ' + chkNKG.errors.slice(0, 2).join(' | '));
+    toast('Falten dades al NKG. Et porto a la fase de compleció perquè puguis autogenerar-les i continuar manualment.');
     console.error('NKG incomplet abans del capítol 1:', chkNKG.errors);
+    ESTAT.fase = 10.8;
+    updateProgress(10.8);
+    showCard('fase-10-8');
+    document.getElementById('veu-exemples-result').classList.remove('hidden');
+    mostrarVeuExemples((ESTAT._nkg && ESTAT._nkg.personatges) || {});
+    mostrarFaltantsNKG();
     return;
   }
 
