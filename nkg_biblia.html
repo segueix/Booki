@@ -34,13 +34,16 @@
     .toast.warn { border-left-color:var(--warn); }
     .toast.error { border-left-color:var(--error); }
     .small { font-size:.82rem; color:var(--text2); }
+    .field-label { display:block; margin:8px 0 4px; font-size:.86rem; color:var(--text2); }
+    .input, .select { width:100%; max-width:520px; background:#0f1520; color:var(--text); border:1px solid var(--border); border-radius:8px; padding:8px 10px; }
+    .hidden { display:none !important; }
     code { background:#0c111a; border:1px solid var(--border); padding:1px 5px; border-radius:6px; }
   </style>
 </head>
 <body>
   <div class="app">
     <h1 class="title">📚 Booki · NKG + Bíblia</h1>
-    <p class="subtitle">Fase 0 implementada: esquelet navegable 0 → 10.8 amb utilitats i estat mínim.</p>
+    <p class="subtitle">Fase 0+1 implementades: esquelet navegable 0 → 10.8 + configuració API amb gating d'autor.</p>
 
     <div class="step-row" id="fase-pills"></div>
 
@@ -53,7 +56,40 @@
       </div>
     </section>
 
-    <section class="card" id="fase-1"><h2>Fase 1 — Dades base</h2><p>Placeholder de migració.</p><div class="btn-row"><button class="btn" onclick="anarAFase('fase-0')">Enrere</button><button class="btn btn-primary" onclick="anarAFase('fase-2')">Continuar</button></div></section>
+    <section class="card" id="fase-1">
+      <h2>Fase 1 — Configuració API i gating d'autor</h2>
+      <p>Confirma la clau API. El selector d'autor només apareix després d'aquesta confirmació.</p>
+
+      <label class="field-label" for="config-provider">Proveïdor</label>
+      <select class="select" id="config-provider" onchange="actualitzarConfigProvider()">
+        <option value="anthropic">Anthropic</option>
+        <option value="openai">OpenAI</option>
+        <option value="gemini">Gemini</option>
+      </select>
+
+      <label class="field-label" id="api-key-label" for="api-key-input">Clau API</label>
+      <input class="input" id="api-key-input" type="password" placeholder="Enganxa aquí la clau API" />
+
+      <div class="btn-row">
+        <button class="btn" onclick="guardarClausAPI()">Confirmar clau API</button>
+      </div>
+
+      <div id="autor-wrap" class="hidden" style="margin-top:10px;">
+        <label class="field-label" for="autor-select">Autor de referència</label>
+        <select class="select" id="autor-select">
+          <option value="Stieg Larsson">Stieg Larsson</option>
+          <option value="Mercè Rodoreda">Mercè Rodoreda</option>
+          <option value="Ursula K. Le Guin">Ursula K. Le Guin</option>
+          <option value="Haruki Murakami">Haruki Murakami</option>
+        </select>
+        <div class="small">Aquest camp només es mostra després de confirmar API (regla UX).</div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn" onclick="anarAFase('fase-0')">Enrere</button>
+        <button class="btn btn-primary" onclick="anarAFase('fase-2')">Continuar</button>
+      </div>
+    </section>
     <section class="card" id="fase-2"><h2>Fase 2 — Personatges/Món</h2><p>Placeholder de migració.</p><div class="btn-row"><button class="btn" onclick="anarAFase('fase-1')">Enrere</button><button class="btn btn-primary" onclick="anarAFase('fase-3')">Continuar</button></div></section>
     <section class="card" id="fase-3"><h2>Fase 3 — Trames</h2><p>Placeholder de migració.</p><div class="btn-row"><button class="btn" onclick="anarAFase('fase-2')">Enrere</button><button class="btn btn-primary" onclick="anarAFase('fase-4')">Continuar</button></div></section>
     <section class="card" id="fase-4"><h2>Fase 4 — Estructura</h2><p>Placeholder de migració.</p><div class="btn-row"><button class="btn" onclick="anarAFase('fase-3')">Enrere</button><button class="btn btn-primary" onclick="anarAFase('fase-5')">Continuar</button></div></section>
@@ -74,7 +110,7 @@
       </div>
     </section>
 
-    <p class="small">Utilitats incloses en Fase 0: <code>escHtml</code>, <code>toast</code>, <code>showLoader/hideLoader</code>, <code>showCard/hideCard</code>, estat <code>ESTAT</code>/<code>USER_CONFIG</code> mínim.</p>
+    <p class="small">Utilitats incloses en Fase 0+1: <code>escHtml</code>, <code>toast</code>, <code>showLoader/hideLoader</code>, <code>showCard/hideCard</code>, <code>actualitzarConfigProvider</code>, <code>guardarClausAPI</code>, estat <code>ESTAT</code>/<code>USER_CONFIG</code> mínim.</p>
   </div>
 
   <div class="toast-wrap" id="toast-wrap"></div>
@@ -89,6 +125,7 @@
 
     const ESTAT = {
       fase: 0,
+      _apiConfirmada: false,
       _nkg: {
         macronarrativa: {},
         personatges: {},
@@ -97,6 +134,7 @@
         llocs: {},
         context_creacio: { estil: { perspectiva: {} }, cronologia: { per_capitol: [] } }
       },
+      autorRef: '',
       bibliaNarrativa: {
         regles_mon: [],
         llocs_importants: [],
@@ -141,6 +179,29 @@
       if (el) el.style.display = 'none';
     }
 
+
+    function actualitzarConfigProvider() {
+      const provider = document.getElementById('config-provider')?.value || 'anthropic';
+      USER_CONFIG.provider = provider;
+      const lbl = document.getElementById('api-key-label');
+      if (lbl) lbl.textContent = `Clau API (${provider})`;
+    }
+
+    function guardarClausAPI() {
+      const apiKey = (document.getElementById('api-key-input')?.value || '').trim();
+      if (!apiKey) {
+        toast('Introdueix una clau API abans de confirmar.', 'warn');
+        return;
+      }
+      USER_CONFIG.apiKey = apiKey;
+      ESTAT._apiConfirmada = true;
+      const autorWrap = document.getElementById('autor-wrap');
+      if (autorWrap) autorWrap.classList.remove('hidden');
+      const autorSelect = document.getElementById('autor-select');
+      ESTAT.autorRef = autorSelect ? autorSelect.value : '';
+      toast("Clau API confirmada. Selector d'autor activat.", "ok");
+    }
+
     function showCard(id) {
       const el = document.getElementById(id);
       if (el) el.classList.add('active');
@@ -172,6 +233,9 @@
     window.addEventListener('DOMContentLoaded', () => {
       try {
         pintarPills('fase-0');
+        actualitzarConfigProvider();
+        const autorWrap = document.getElementById('autor-wrap');
+        if (autorWrap) autorWrap.classList.add('hidden');
         anarAFase('fase-0');
         console.log('[nkg_biblia] cold-start OK');
       } catch (err) {
