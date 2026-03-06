@@ -781,11 +781,25 @@
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="9.4">Relacions</div>
     <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="9.45">Backstory</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="9.46">Completar personatges</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="9.47">Objectius/Secrets</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="9.48">Objectes</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="9.49">Mapa/Regles</div>
+    <div class="step-arrow">›</div>
     <div class="step-pill" data-step="9.5">Trames</div>
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="10">Estructura</div>
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="10.5">Escaleta</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="10.7">POV/Cronologia</div>
+    <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="10.8">Veu/Exemples</div>
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="11">Capítols</div>
     <div class="step-arrow">›</div>
@@ -1269,6 +1283,96 @@
     <div id="relacions-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
       <button class="btn btn-secondary" onclick="hideCard('fase-9-4');showCard('fase-9-3');">← Tornar a Ferida/Arc</button>
+      <button class="btn btn-primary" onclick="iniciarFaseBackstoryRelacions()">🧩 Backstory canònic</button>
+    </div>
+  </div>
+</div>
+
+<!-- FASE 9.45: Backstory i Relacions Canòniques -->
+<div class="card hidden" id="fase-9-45">
+  <h2><span class="icon">🧩</span> Backstory i Relacions Canòniques</h2>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Construïm el passat canònic i el graf complet de relacions abans de dissenyar les trames.</p>
+  <div class="loader-wrap" id="loader-9-45">
+    <div class="spinner"></div>
+    <span id="loader-9-45-text">Generant backstory canònic i relacions...</span>
+  </div>
+
+  <div id="backstory-result" class="hidden">
+    <div id="backstory-cos" class="veu-result"></div>
+    <div class="btn-row" style="margin-top:24px;">
+      <button class="btn btn-secondary" onclick="hideCard('fase-9-45');showCard('fase-9-4');">← Tornar a Relacions</button>
+      <button class="btn btn-primary" onclick="iniciarFaseCompletarPersonatges()">🧬 Completar personatges</button>
+    </div>
+  </div>
+</div>
+
+<!-- FASE 9.46: Completar Personatges -->
+<div class="card hidden" id="fase-9-46">
+  <h2><span class="icon">🧬</span> Completar Personatges</h2>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Omplim trets immutables i estats inicials perquè les fitxes quedin completes abans de trames.</p>
+  <div class="loader-wrap" id="loader-9-46">
+    <div class="spinner"></div>
+    <span id="loader-9-46-text">Completant fitxes de personatge...</span>
+  </div>
+
+  <div id="completar-personatges-result" class="hidden">
+    <div id="completar-personatges-cos" class="veu-result"></div>
+    <div class="btn-row" style="margin-top:24px;">
+      <button class="btn btn-secondary" onclick="hideCard('fase-9-46');showCard('fase-9-45');">← Tornar a Backstory</button>
+      <button class="btn btn-primary" onclick="iniciarFaseObjectiusSecrets()">🎯 Objectius i secrets</button>
+    </div>
+  </div>
+</div>
+
+<!-- FASE 9.47: Objectius i Secrets -->
+<div class="card hidden" id="fase-9-47">
+  <h2><span class="icon">🎯</span> Objectius i Secrets</h2>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Definim objectius accionables i secrets dramàtics per personatge abans de trames.</p>
+  <div class="loader-wrap" id="loader-9-47">
+    <div class="spinner"></div>
+    <span id="loader-9-47-text">Generant objectius i secrets...</span>
+  </div>
+
+  <div id="objectius-secrets-result" class="hidden">
+    <div id="objectius-secrets-cos" class="veu-result"></div>
+    <div class="btn-row" style="margin-top:24px;">
+      <button class="btn btn-secondary" onclick="hideCard('fase-9-47');showCard('fase-9-46');">← Tornar a Completar Personatges</button>
+      <button class="btn btn-primary" onclick="iniciarFaseObjectesNarratius()">📦 Objectes narratius</button>
+    </div>
+  </div>
+</div>
+
+<!-- FASE 9.48: Objectes Narratius -->
+<div class="card hidden" id="fase-9-48">
+  <h2><span class="icon">📦</span> Objectes Narratius</h2>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Definim l'attrezzo central de la novel·la i el seu historial de moviment.</p>
+  <div class="loader-wrap" id="loader-9-48">
+    <div class="spinner"></div>
+    <span id="loader-9-48-text">Generant objectes narratius...</span>
+  </div>
+
+  <div id="objectes-result" class="hidden">
+    <div id="objectes-cos" class="veu-result"></div>
+    <div class="btn-row" style="margin-top:24px;">
+      <button class="btn btn-secondary" onclick="hideCard('fase-9-48');showCard('fase-9-47');">← Tornar a Objectius/Secrets</button>
+      <button class="btn btn-primary" onclick="iniciarFaseMapaEspacialRegles()">🗺️ Mapa espacial i regles</button>
+    </div>
+  </div>
+</div>
+
+<!-- FASE 9.49: Mapa Espacial i Regles -->
+<div class="card hidden" id="fase-9-49">
+  <h2><span class="icon">🗺️</span> Mapa Espacial i Regles</h2>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Construïm el graf d'espais de la finca i regles operatives verificables.</p>
+  <div class="loader-wrap" id="loader-9-49">
+    <div class="spinner"></div>
+    <span id="loader-9-49-text">Generant mapa espacial i regles del món...</span>
+  </div>
+
+  <div id="mapa-regles-result" class="hidden">
+    <div id="mapa-regles-cos" class="veu-result"></div>
+    <div class="btn-row" style="margin-top:24px;">
+      <button class="btn btn-secondary" onclick="hideCard('fase-9-49');showCard('fase-9-48');">← Tornar a Objectes</button>
       <button class="btn btn-primary" onclick="iniciarFaseTrames()">🕸️ Dissenyar Trames Opus</button>
     </div>
   </div>
@@ -1313,9 +1417,40 @@
   <p>Opus genera l'escaleta detallada per escenes de tots els capítols, incloent objectiu de paraules i funció narrativa de cada escena.</p>
   <div class="loader-wrap" id="loader-10-5"><span class="spinner"></span><span id="loader-10-5-text">Generant escaleta…</span></div>
   <div id="escaleta-result"></div>
-  <button class="btn hidden" id="btn-fase11" onclick="iniciarFase11()">Continuar → Escriptura</button>
+  <button class="btn hidden" id="btn-fase10-7" onclick="iniciarFasePerspectivaCronologia()">Continuar → Perspectiva i Cronologia</button>
 </div>
 
+<!-- FASE 10.7: Perspectiva i Cronologia -->
+<div class="card hidden" id="fase-10-7">
+  <h2>🧭 Fase 10.7 — Perspectiva i Cronologia</h2>
+  <p>Definim el POV per capítol, la cronologia interna i la timeline d'accions perquè l'escriptura sigui consistent.</p>
+  <div class="loader-wrap" id="loader-10-7"><span class="spinner"></span><span id="loader-10-7-text">Analitzant perspectiva i cronologia…</span></div>
+  <div id="perspectiva-crono-result" class="hidden">
+    <div id="perspectiva-crono-cos" class="veu-result"></div>
+    <div class="btn-row" style="margin-top:24px;">
+      <button class="btn btn-secondary" onclick="hideCard('fase-10-7');showCard('fase-10-5');">← Tornar a Escaleta</button>
+      <button class="btn btn-primary" id="btn-fase10-8" onclick="iniciarFaseVeuExemples()">Continuar → Veu i Exemples</button>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- FASE 10.8: Veu i Exemples -->
+<div class="card hidden" id="fase-10-8">
+  <h2>🎙️ Fase 10.8 — Veu i Exemples</h2>
+  <p>Completem la veu de cada personatge amb exemples narratius i vocabulari abans de començar a escriure.</p>
+  <div class="loader-wrap" id="loader-10-8"><span class="spinner"></span><span id="loader-10-8-text">Generant exemples de veu…</span></div>
+  <div id="veu-exemples-result" class="hidden">
+    <div id="veu-exemples-cos" class="veu-result"></div>
+    <div id="nkg-faltants-cos" class="veu-result" style="margin-top:14px;"></div>
+    <div class="btn-row" style="margin-top:24px;">
+      <button class="btn btn-secondary" onclick="hideCard('fase-10-8');showCard('fase-10-7');">← Tornar a POV/Cronologia</button>
+      <button class="btn btn-ghost" id="btn-autocompletar-nkg" onclick="autocompletarNKGFaltantsManual()">🧩 Completar dades faltants</button>
+      <button class="btn btn-primary" id="btn-fase11" onclick="iniciarFase11()">Continuar → Escriptura</button>
+    </div>
+  </div>
+</div>
 <!-- FASE 11: Escriptura de capítols (Sonnet + registre) -->
 <div class="card hidden" id="fase-11">
   <h2><span class="icon">📖</span> Escriptura de capítols</h2>
@@ -2030,10 +2165,29 @@ function restaurarInterficieDesDeEstat() {
   if (fase >= 9.2 && ESTAT._perfilsPersonatges && Object.keys(ESTAT._perfilsPersonatges).length > 0) mostrarPerfilsPsicologics({ personatges: Object.values(ESTAT._perfilsPersonatges) });
   if (fase >= 9.3 && ESTAT._perfilsPersonatges && Object.keys(ESTAT._perfilsPersonatges).length > 0) mostrarFeridaArc({ personatges: Object.values(ESTAT._perfilsPersonatges) });
   if (fase >= 9.4 && ESTAT._matriuRelacional && ESTAT._matriuRelacional.length > 0) mostrarMatriuRelacional(ESTAT._matriuRelacional);
+  if (fase >= 9.45 && ESTAT._nkg && ESTAT._nkg.macronarrativa && ESTAT._nkg.macronarrativa.backstory_canonic) mostrarBackstoryCanonic(ESTAT._nkg.macronarrativa.backstory_canonic, ESTAT._nkg.relacions || []);
+  if (fase >= 9.46 && ESTAT._nkg && ESTAT._nkg.personatges && Object.keys(ESTAT._nkg.personatges).length > 0) mostrarCompletarPersonatges(Object.assign({}, ESTAT._nkg.personatges));
+  if (fase >= 9.47 && ESTAT._nkg && ESTAT._nkg.personatges && Object.keys(ESTAT._nkg.personatges).length > 0) mostrarObjectiusSecrets(ESTAT._nkg.personatges);
+  if (fase >= 9.48 && ESTAT._nkg && ESTAT._nkg.objectes) mostrarObjectesNarratius(ESTAT._nkg.objectes);
+  if (fase >= 9.49 && ESTAT._nkg && ESTAT._nkg.llocs) mostrarMapaRegles(ESTAT._nkg.llocs, ESTAT._nkg.mapa_adjacencies || [], (ESTAT.bibliaNarrativa && ESTAT.bibliaNarrativa.regles_mon) || []);
   if (fase >= 10 && ESTAT._estructuraCapitols.length > 0) mostrarEstructura('Reconstruït des de memòria (dades en JSON actiu)');
   if (fase >= 10.5 && ESTAT._escaletes.length > 0) {
     mostrarEscaleta(ESTAT._escaletes);
-    document.getElementById('btn-fase11').classList.remove('hidden');
+    document.getElementById('btn-fase10-7').classList.remove('hidden');
+  }
+  if (fase >= 10.7 && ESTAT._nkg && ESTAT._nkg.context_creacio && ESTAT._nkg.context_creacio.cronologia) {
+    mostrarPerspectivaCronologia(
+      (ESTAT._nkg.context_creacio.estil && ESTAT._nkg.context_creacio.estil.perspectiva) || {},
+      ESTAT._nkg.context_creacio.cronologia || {},
+      ESTAT._nkg.timeline_accions || []
+    );
+    document.getElementById('perspectiva-crono-result').classList.remove('hidden');
+    document.getElementById('btn-fase10-8').classList.remove('hidden');
+  }
+  if (fase >= 10.8 && ESTAT._nkg && ESTAT._nkg.personatges) {
+    mostrarVeuExemples(Object.assign({}, ESTAT._nkg.personatges));
+    mostrarFaltantsNKG();
+    document.getElementById('veu-exemples-result').classList.remove('hidden');
   }
   if (fase >= 11) {
     renderLlistaCapitols();
@@ -3008,7 +3162,7 @@ function _confirmarPersonatgesNouSilent() {
   personatgesArr.forEach(p => {
     const clau = nkgNormalitzarNom(p.nom);
     const nomNet = p.nom.replace(/\s*\([^)]*\)/g, '').replace(/["'"]/g, '').trim();
-    if (clau) nkg.personatges[clau] = { nom: nomNet, estat_fisic:'', estat_emocional:'neutre', arc: p.arc, limit_moral: p.limit_moral, veu: p.veu, objectes_inventari:[], objectes_descartats:[], ubicacio:'', objectius:[], secrets:[], viu:true, primera_aparicio:0, trets_immutables:null };
+    if (clau) nkg.personatges[clau] = { nom: nomNet, estat_fisic: inferirEstatFisicInicialDesDeArc(p.arc, p.limit_moral), estat_emocional: inferirEstatEmocionalInicialDesDeArc(p.arc), arc: p.arc, limit_moral: p.limit_moral, veu: p.veu, objectes_inventari:[], objectes_descartats:[], ubicacio:'', motivacions_base: parseMotivacionsBase(p.desig || ''), objectius:[], secrets:[], viu:true, primera_aparicio:0, trets_immutables:null };
   });
   ESTAT._personatgesSeleccionats = personatgesArr.map(p => p.nom);
   ESTAT._arcsResumitNou = personatgesArr.map(p => `${p.nom}: ${p.arc.inici_emocional||'?'} → ${p.arc.final_emocional||'?'}`).join('; ');
@@ -3025,7 +3179,7 @@ function _confirmarMonNouSilent() {
   const restriccionsMatch = monTriat.match(/RESTRICCIONS(?:\s+DEL\s+MÓN)?:[\s*#]*(.+)/i);
   if (restriccionsMatch) {
     ESTAT.bibliaNarrativa.regles_mon = restriccionsMatch[1]
-      .replace(/\*+/g, '').split(/[,;]/).map(s => s.trim()).filter(Boolean);
+      .replace(/\*+/g, '').split(/[,;]/).map(s => s.trim()).filter(Boolean).map((desc, i) => normalitzarReglaMon({ id: `regla_auto_${i+1}`, descripcio: desc, categoria: 'logistica', excepcions: null, afecta_personatges: [] }, i + 1));
   }
 
   // Lloc: extreu primer segment fins a punt o final de frase
@@ -3574,7 +3728,7 @@ async function confirmarPersonatgesNou() {
     const nomMatch = line.match(/^NOM:\s*(.+)/i);
     if (nomMatch) {
       if (current) personatgesArr.push(current);
-      current = { nom: nomMatch[1].trim(), arc: {inici_emocional:'',final_emocional:'',canvi_o_bloqueig:''}, limit_moral: '', veu: {registre:'',mai_diria:'',quan_menteix:'',quan_es_sincer:''} };
+      current = { nom: nomMatch[1].trim(), arc: {inici_emocional:'',final_emocional:'',canvi_o_bloqueig:''}, limit_moral: '', veu: {registre:'',mai_diria:[],quan_menteix:'',quan_es_sincer:'',exemples_narratius:[],vocabulari_recurrent:[],vocabulari_prohibit:[],longitud_frases:'mitjanes'} };
     }
     if (current) {
       if (/^ARC:/i.test(line)) current.arc = parseArc(line);
@@ -3604,14 +3758,15 @@ async function confirmarPersonatgesNou() {
     if (clau) {
       nkg.personatges[clau] = {
         nom: p.nom,
-        estat_fisic: '',
-        estat_emocional: 'neutre',
+        estat_fisic: inferirEstatFisicInicialDesDeArc(p.arc, p.limit_moral),
+        estat_emocional: inferirEstatEmocionalInicialDesDeArc(p.arc),
         arc: p.arc,
         limit_moral: p.limit_moral,
         veu: p.veu,
         objectes_inventari: [],
         objectes_descartats: [],
         ubicacio: '',
+        motivacions_base: parseMotivacionsBase(p.desig || ''),
         objectius: [],
         secrets: [],
         viu: true,
@@ -3768,7 +3923,7 @@ async function confirmarMonNou() {
   const restriccionsMatch = monTriat.match(/RESTRICCIONS:\s*(.+)/i);
   const llocMatch = monTriat.match(/LLOC I ÈPOCA:\s*(.+)/i);
   if (restriccionsMatch) {
-    ESTAT.bibliaNarrativa.regles_mon = restriccionsMatch[1].split(/[,;]/).map(s => s.trim()).filter(Boolean);
+    ESTAT.bibliaNarrativa.regles_mon = restriccionsMatch[1].split(/[,;]/).map(s => s.trim()).filter(Boolean).map((desc, i) => normalitzarReglaMon({ id: `regla_auto_${i+1}`, descripcio: desc, categoria: 'logistica', excepcions: null, afecta_personatges: [] }, i + 1));
   }
   if (llocMatch) {
     ESTAT.bibliaNarrativa.llocs_importants = [{ nom: llocMatch[1].trim(), descripcio: monTriat.substring(0, 200) }];
@@ -4044,7 +4199,7 @@ function validarNKGComplet(nkg, capitolsEscaleta) {
   if (!nkg.macronarrativa?.ending?.desti_protagonista)  errors.push('ending.desti_protagonista buit');
   for (const p of Object.values(nkg.personatges || {})) {
     if (!p.limit_moral)        warnings.push(`${p.nom}: limit_moral buit`);
-    if (!p.veu?.mai_diria)    warnings.push(`${p.nom}: veu.mai_diria buit`);
+    if (!p.veu?.mai_diria || (Array.isArray(p.veu.mai_diria) && p.veu.mai_diria.length === 0)) warnings.push(`${p.nom}: veu.mai_diria buit`);
     if (!p.arc?.final_emocional) errors.push(`${p.nom}: arc.final_emocional buit`);
   }
   for (const cap of (capitolsEscaleta || [])) {
@@ -4060,6 +4215,48 @@ function validarNKGComplet(nkg, capitolsEscaleta) {
   if (errors.length > 0) { console.error('❌ NKG incomplet:', errors); return { valid: false, errors, warnings }; }
   if (warnings.length > 0) console.warn('⚠️ NKG amb avisos:', warnings);
   return { valid: true, errors: [], warnings };
+}
+
+function validarNKGPreparatPerCapitol1(nkg, biblia = {}) {
+  const faltants = detectarFaltantsNKG(nkg, biblia);
+  return { ok: faltants.length === 0, errors: faltants };
+}
+
+function detectarFaltantsNKG(nkg = {}, biblia = {}) {
+  const errors = [];
+  if (!nkg || Object.keys(nkg).length === 0) return ['NKG no inicialitzat.'];
+  const bs = nkg.macronarrativa && nkg.macronarrativa.backstory_canonic;
+  if (!bs || !Array.isArray(bs.fets_previs) || bs.fets_previs.length === 0) errors.push('Falten fets previs de backstory canònic.');
+  if (!Array.isArray(nkg.relacions) || nkg.relacions.length === 0) errors.push('Falta graf de relacions.');
+  if (!nkg.objectes || Object.keys(nkg.objectes).length === 0) errors.push('Falten objectes narratius.');
+  if (!nkg.llocs || Object.keys(nkg.llocs).length < 3) errors.push('Mapa de llocs insuficient.');
+  if (!Array.isArray(biblia.regles_mon) || biblia.regles_mon.length === 0) errors.push('Falten regles del món.');
+  const perspectiva = (((nkg.context_creacio || {}).estil || {}).perspectiva || {});
+  const cronologia = ((nkg.context_creacio || {}).cronologia || {});
+  if (!perspectiva.tipus) errors.push('Falta tipus de perspectiva narrativa.');
+  if (!Array.isArray(perspectiva.pov_per_capitol) || perspectiva.pov_per_capitol.length === 0) errors.push('Falta POV per capítol.');
+  if (!Array.isArray(cronologia.per_capitol) || cronologia.per_capitol.length === 0) errors.push('Falta cronologia per capítol.');
+  const pers = Object.values(nkg.personatges || {});
+  if (pers.length === 0) errors.push('No hi ha personatges al NKG.');
+  pers.forEach(p => {
+    const t = p.trets_immutables || {};
+    if (!t.aspecte_fisic || !t.ocupacio || !t.tret_definitori) errors.push(`${p.nom || 'Personatge'} sense trets immutables complets.`);
+    const veu = normalitzarVeuAvancada(p.veu || {});
+    if (!Array.isArray(veu.exemples_narratius) || veu.exemples_narratius.length < 2) errors.push(`${p.nom || 'Personatge'} sense exemples narratius de veu.`);
+    if (!Array.isArray(veu.vocabulari_recurrent) || veu.vocabulari_recurrent.length < 3) errors.push(`${p.nom || 'Personatge'} sense vocabulari recurrent suficient.`);
+  });
+  return errors;
+}
+
+function mostrarFaltantsNKG() {
+  const cos = document.getElementById('nkg-faltants-cos');
+  if (!cos) return;
+  const faltants = detectarFaltantsNKG(ESTAT._nkg || {}, ESTAT.bibliaNarrativa || {});
+  if (faltants.length === 0) {
+    cos.innerHTML = '<div class="veu-card"><div class="veu-card-nom">✅ NKG complet</div><div class="veu-camp-val">Ja tens totes les dades necessàries per començar la novel·la.</div></div>';
+    return;
+  }
+  cos.innerHTML = `<div class="veu-card"><div class="veu-card-nom">⚠️ Dades pendents al NKG</div><ul style="padding-left:18px;margin-top:8px;">${faltants.map(f => `<li>${escHtml(f)}</li>`).join('')}</ul></div>`;
 }
 
 function mostrarResumNKGiTransicio(nkg, capitolsEscaleta, validacio, modeCreacio) {
@@ -4159,7 +4356,7 @@ async function iniciarEscaletaSeqNou() {
       if (ESTAT._estructuraCapitols[idx]) {
         ESTAT._estructuraCapitols[idx].ganxo_final = ganxoFinal;
         if (!ESTAT._estructuraCapitols[idx].ratio_dialeg) {
-          ESTAT._estructuraCapitols[idx].ratio_dialeg = ratioDialegDefault;
+          ESTAT._estructuraCapitols[idx].ratio_dialeg = normalitzarRatioDialeg(ratioDialegDefault, ESTAT._estructuraCapitols[idx] || {});
         }
       }
       // Validar compatibilitat ganxo/intensitat
@@ -5393,6 +5590,1168 @@ async function iniciarFaseRelacions() {
   }
 }
 
+function validarBackstoryIRelacions(dades, clausEsperades = []) {
+  if (!dades || typeof dades !== 'object') return false;
+  const bs = dades.backstory_canonic;
+  if (!bs || !Array.isArray(bs.fets_previs) || !Array.isArray(bs.cronologia_previa)) return false;
+  if (!Array.isArray(dades.relacions)) return false;
+
+  const claus = new Set((clausEsperades || []).map(c => nkgNormalitzarNom(c)).filter(Boolean));
+  const fetsOk = bs.fets_previs.every(f => f && f.id && f.descripcio && Array.isArray(f.personatges_implicats));
+  const cronoOk = bs.cronologia_previa.every(c => c && c.ordre !== undefined && c.descripcio);
+  if (!fetsOk || !cronoOk) return false;
+
+  const relsOk = dades.relacions.every(r => {
+    if (!r || !r.personatge_a || !r.personatge_b || !r.tipus) return false;
+    if (r.coneixement_mutu === undefined) return false;
+    if (claus.size > 0) {
+      const aOk = claus.has(nkgNormalitzarNom(r.personatge_a));
+      const bOk = claus.has(nkgNormalitzarNom(r.personatge_b));
+      if (!aOk || !bOk) return false;
+    }
+    return true;
+  });
+
+  const n = claus.size;
+  const parellesEsperades = n >= 2 ? (n * (n - 1)) / 2 : 0;
+  if (dades.relacions.length < parellesEsperades) return false;
+
+  return relsOk;
+}
+
+async function generarPersonatgesMinimsPerRelacions(falten = 1, userConfig) {
+  const nkg = ESTAT._nkg || {};
+  const macro = nkg.macronarrativa || {};
+  const existents = Object.entries(nkg.personatges || {}).map(([id, p]) => ({ id, nom: p.nom || id }));
+  const payload = {
+    synopsis_core: macro.synopsis_core || '',
+    theme: macro.theme || '',
+    personatges_existents: existents,
+    personatges_a_crear: Math.max(1, Number(falten) || 1)
+  };
+  const systemPrompt = `Ets un editor narratiu. Necessito completar un mínim de personatges per poder generar relacions canòniques.
+Genera EXCLUSIVAMENT JSON vàlid:
+{
+  "personatges_nous": [
+    {
+      "id": "clau_snake_case",
+      "nom": "Nom Cognom",
+      "arc": {"inici_emocional":"...","final_emocional":"...","canvi_o_bloqueig":"..."},
+      "limit_moral": "...",
+      "veu": {"registre":"...","mai_diria":["..."],"quan_menteix":"...","quan_es_sincer":"..."},
+      "motivacions_base": {"desig_extern":"...","necessitat_interna":"..."},
+      "trets_immutables": {"edat_aproximada":"...","genere":"...","rol_narratiu":"secundari","relacio_protagonista":"...","aspecte_fisic":"...","ocupacio":"...","tret_definitori":"..."}
+    }
+  ]
+}
+REGLES: no repeteixis noms existents; genera personatges útils i coherents amb la sinopsi.`;
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  const msgs = [{ role: 'user', content: `Context:\n${JSON.stringify(payload, null, 2)}` }];
+  for (let i = 1; i <= 2; i++) {
+    const raw = await callLLMMulti(msgs, systemPrompt, Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 2200, model: models.modelArquitecte }), 'arquitectura');
+    const data = parseJsonRobust(raw);
+    if (data && Array.isArray(data.personatges_nous) && data.personatges_nous.length > 0) return data.personatges_nous;
+    msgs.push({ role: 'user', content: 'Resposta invàlida. Torna només JSON amb personatges_nous.' });
+  }
+  throw new Error('No s\'han pogut generar personatges mínims per relacions.');
+}
+
+async function assegurarMinimPersonatgesPerRelacions(minim = 2, userConfig) {
+  if (!ESTAT._nkg) nkgInicialitzar();
+  const nkg = ESTAT._nkg;
+  const total = Object.keys(nkg.personatges || {}).length;
+  if (total >= minim) return total;
+  const falten = minim - total;
+  const nous = await generarPersonatgesMinimsPerRelacions(falten, userConfig);
+  (nous || []).forEach(raw => {
+    const clau = nkgNormalitzarNom(raw.id || raw.nom || 'personatge_suport');
+    if (!clau || nkg.personatges[clau]) return;
+    nkg.personatges[clau] = {
+      nom: raw.nom || clau,
+      estat_fisic: inferirEstatFisicInicialDesDeArc(raw.arc || {}, raw.limit_moral || ''),
+      estat_emocional: inferirEstatEmocionalInicialDesDeArc(raw.arc || {}),
+      arc: raw.arc || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '' },
+      limit_moral: raw.limit_moral || '',
+      veu: normalitzarVeuAvancada(raw.veu || {}),
+      objectes_inventari: [], objectes_descartats: [], ubicacio: '',
+      motivacions_base: raw.motivacions_base || { desig_extern: '', necessitat_interna: '' },
+      objectius: [], secrets: [], viu: true, primera_aparicio: 0,
+      trets_immutables: raw.trets_immutables || null
+    };
+    if (!Array.isArray(ESTAT._personatgesSeleccionats)) ESTAT._personatgesSeleccionats = [];
+    if (!ESTAT._personatgesSeleccionats.includes(nkg.personatges[clau].nom)) ESTAT._personatgesSeleccionats.push(nkg.personatges[clau].nom);
+  });
+  return Object.keys(nkg.personatges || {}).length;
+}
+
+function mostrarBackstoryCanonic(backstoryCanonic = {}, relacions = []) {
+  const cos = document.getElementById('backstory-cos');
+  if (!cos) return;
+
+  const fets = Array.isArray(backstoryCanonic.fets_previs) ? backstoryCanonic.fets_previs : [];
+  const cronologia = Array.isArray(backstoryCanonic.cronologia_previa) ? backstoryCanonic.cronologia_previa : [];
+  const rels = Array.isArray(relacions) ? relacions : [];
+
+  const htmlFets = fets.map(f => `<div class="veu-card">
+    <div class="veu-card-nom">🧱 ${escHtml(String(f.id || 'fet'))}</div>
+    <div class="veu-card-camps">
+      <div><div class="veu-camp-label">Descripció</div><div class="veu-camp-val">${escHtml(String(f.descripcio || ''))}</div></div>
+      <div><div class="veu-camp-label">Personatges implicats</div><div class="veu-camp-val">${escHtml((f.personatges_implicats || []).join(', '))}</div></div>
+      <div><div class="veu-camp-label">Data aproximada</div><div class="veu-camp-val">${escHtml(String(f.data_aproximada || ''))}</div></div>
+      <div><div class="veu-camp-label">Impacte narratiu</div><div class="veu-camp-val">${escHtml(String(f.impacte_narratiu || ''))}</div></div>
+    </div>
+  </div>`).join('\n');
+
+  const htmlCrono = cronologia.map(c => `<div class="veu-card">
+    <div class="veu-card-nom">🕰️ Ordre ${escHtml(String(c.ordre || '?'))}</div>
+    <div class="veu-card-camps">
+      <div><div class="veu-camp-label">Descripció</div><div class="veu-camp-val">${escHtml(String(c.descripcio || ''))}</div></div>
+      <div><div class="veu-camp-label">Any aproximat</div><div class="veu-camp-val">${escHtml(String(c.any_aproximat || ''))}</div></div>
+    </div>
+  </div>`).join('\n');
+
+  const htmlRel = rels.slice(0, 18).map(r => `<div class="veu-card">
+    <div class="veu-card-nom">🔗 ${escHtml(String(r.personatge_a || ''))} ↔ ${escHtml(String(r.personatge_b || ''))}</div>
+    <div class="veu-card-camps">
+      <div><div class="veu-camp-label">Tipus</div><div class="veu-camp-val">${escHtml(String(r.tipus || 'desconegut'))}</div></div>
+      <div><div class="veu-camp-label">Coneixement mutu</div><div class="veu-camp-val">${r.coneixement_mutu ? 'Sí' : 'No'}</div></div>
+      <div><div class="veu-camp-label">Descripció</div><div class="veu-camp-val">${escHtml(String(r.descripcio || ''))}</div></div>
+      <div><div class="veu-camp-label">Evolució</div><div class="veu-camp-val">${escHtml(String(r.evolucio || ''))}</div></div>
+    </div>
+  </div>`).join('\n');
+
+  cos.innerHTML = `
+    <div class="veu-card"><div class="veu-card-nom">📌 Resum</div><div class="veu-card-camps">
+      <div><div class="veu-camp-label">Fets previs</div><div class="veu-camp-val">${fets.length}</div></div>
+      <div><div class="veu-camp-label">Entrades de cronologia</div><div class="veu-camp-val">${cronologia.length}</div></div>
+      <div><div class="veu-camp-label">Relacions generades</div><div class="veu-camp-val">${rels.length}</div></div>
+    </div></div>
+    ${htmlFets}
+    ${htmlCrono}
+    ${htmlRel}
+  `;
+
+  document.getElementById('backstory-result').classList.remove('hidden');
+}
+
+async function generarBackstoryIRelacions(userConfig) {
+  const nkg = ESTAT._nkg || {};
+  const macro = nkg.macronarrativa || {};
+  const personatgesObj = nkg.personatges || {};
+  const personatges = Object.entries(personatgesObj).map(([clau, p]) => ({
+    clau,
+    nom: p.nom || clau,
+    arc: p.arc || {},
+    limit_moral: p.limit_moral || '',
+    veu: p.veu || {},
+    estat_emocional: p.estat_emocional || ''
+  }));
+
+  if (personatges.length < 2) {
+    const total = await assegurarMinimPersonatgesPerRelacions(2, userConfig);
+    if (total < 2) throw new Error('Calen almenys 2 personatges per generar relacions canòniques.');
+    return await generarBackstoryIRelacions(userConfig);
+  }
+
+  const resumInput = {
+    synopsis_core: macro.synopsis_core || '',
+    theme: macro.theme || '',
+    ending: macro.ending || {},
+    personatges
+  };
+
+  const systemPrompt = `Ets un novel·lista expert en construcció de backstory. A partir de la sinopsi, el tema, el final previst i les fitxes de personatges, has de generar:
+
+1. BACKSTORY CANÒNIC: Els fets concrets que van passar ABANS que comenci la novel·la. Inclou:
+- Quina relació exacta tenien els personatges entre ells
+- Què va passar (el trauma, l'incident, la connexió original)
+- Quan va passar aproximadament
+- Quin impacte va tenir en cada personatge
+- Com van arribar a la situació actual
+
+2. GRAF DE RELACIONS: Per a cada parella de personatges, defineix:
+- El tipus de relació
+- Si es coneixen mútuament
+- Com evoluciona la relació durant la novel·la
+
+Respon EXCLUSIVAMENT amb un JSON vàlid amb aquesta estructura exacta, sense text addicional ni blocs de codi markdown:
+
+{
+  "backstory_canonic": {
+    "fets_previs": [
+      {
+        "id": "fet_001",
+        "descripcio": "...",
+        "personatges_implicats": ["clau_personatge_1", "clau_personatge_2"],
+        "data_aproximada": "...",
+        "impacte_narratiu": "..."
+      }
+    ],
+    "cronologia_previa": [
+      {
+        "ordre": 1,
+        "descripcio": "...",
+        "any_aproximat": "..."
+      }
+    ]
+  },
+  "relacions": [
+    {
+      "personatge_a": "clau_1",
+      "personatge_b": "clau_2",
+      "tipus": "victima_agressor",
+      "descripcio": "...",
+      "coneixement_mutu": true,
+      "evolucio": "..."
+    }
+  ]
+}
+
+REGLES:
+- Les claus de personatge han de coincidir EXACTAMENT amb les del NKG.
+- Genera relacions per a TOTES les parelles possibles (amb N personatges, hi ha N*(N-1)/2 parelles).
+- Els fets previs han de ser CONCRETS (noms, llocs, dates aproximades), mai genèrics.
+- La cronologia ha d'estar ordenada cronològicament.
+- Tot ha de ser coherent amb la sinopsi i el final previst.`;
+
+  const msgs = [{
+    role: 'user',
+    content: `Dades del NKG per a la fase de backstory i relacions canòniques:
+${JSON.stringify(resumInput, null, 2)}`
+  }];
+
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  const clauPersonatges = personatges.map(p => p.clau);
+
+  for (let intent = 1; intent <= 2; intent++) {
+    const raw = await callLLMMulti(
+      msgs,
+      systemPrompt,
+      Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 2600, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+
+    const dades = parseJsonRobust(raw);
+    if (validarBackstoryIRelacions(dades, clauPersonatges)) return dades;
+
+    if (intent === 2) throw new Error('Resposta invàlida a la fase Backstory i Relacions. Revisa el format JSON i torna-ho a provar.');
+    msgs.push({
+      role: 'user',
+      content: 'La resposta anterior no era vàlida o tenia camps incomplets. Torna a generar el JSON amb l\'estructura exacta i totes les parelles de personatges.'
+    });
+  }
+
+  throw new Error('No s\'ha pogut generar backstory canònic.');
+}
+
+function construirBackstoryMinimalSenseRelacions() {
+  const nkg = ESTAT._nkg || {};
+  const synopsis = (nkg.macronarrativa && nkg.macronarrativa.synopsis_core) || 'Situació inicial per desenvolupar';
+  return {
+    backstory_canonic: {
+      fets_previs: [{
+        id: 'fet_001',
+        descripcio: `Abans de l'inici de la novel·la: ${String(synopsis).slice(0, 180)}`,
+        personatges_implicats: Object.keys(nkg.personatges || {}).slice(0, 1),
+        data_aproximada: 'abans del capítol 1',
+        impacte_narratiu: 'estableix el punt de partida canònic'
+      }],
+      cronologia_previa: [{ ordre: 1, descripcio: 'Punt de partida del passat immediat.', any_aproximat: '' }]
+    },
+    relacions: []
+  };
+}
+
+async function iniciarFaseBackstoryRelacions() {
+  ESTAT.fase = 9.45;
+  updateProgress(9.45);
+  hideCard('fase-9-4');
+  showCard('fase-9-45');
+  document.getElementById('backstory-result').classList.add('hidden');
+  showLoader('9-45');
+  document.getElementById('loader-9-45-text').textContent = 'Generant backstory canònic i graf de relacions...';
+
+  try {
+    if (!ESTAT._nkg) nkgInicialitzar();
+    const totalPers = Object.keys((ESTAT._nkg && ESTAT._nkg.personatges) || {}).length;
+    if (totalPers < 2) {
+      const afegir = confirm('Hi ha menys de 2 personatges. Vols generar automàticament personatges de suport per poder crear relacions canòniques?');
+      if (afegir) {
+        await assegurarMinimPersonatgesPerRelacions(2, USER_CONFIG);
+      } else {
+        const minimal = construirBackstoryMinimalSenseRelacions();
+        ESTAT._nkg.macronarrativa.backstory_canonic = minimal.backstory_canonic;
+        ESTAT._nkg.relacions = minimal.relacions;
+        hideLoader('9-45');
+        mostrarBackstoryCanonic(minimal.backstory_canonic, minimal.relacions);
+        toast('Backstory mínim generat sense relacions. Pots continuar i completar relacions més endavant.');
+        return;
+      }
+    }
+    const data = await generarBackstoryIRelacions(USER_CONFIG);
+    ESTAT._nkg.macronarrativa.backstory_canonic = data.backstory_canonic;
+    ESTAT._nkg.relacions = data.relacions;
+    hideLoader('9-45');
+    mostrarBackstoryCanonic(data.backstory_canonic, data.relacions);
+    toast('Backstory canònic i relacions injectats al NKG.');
+  } catch (err) {
+    hideLoader('9-45');
+    toast('Error fase Backstory/Relacions: ' + err.message);
+  }
+}
+
+function mostrarCompletarPersonatges(personatgesObj = {}) {
+  const cos = document.getElementById('completar-personatges-cos');
+  if (!cos) return;
+  const items = Object.entries(personatgesObj || {});
+  cos.innerHTML = items.map(([clau, p]) => {
+    const t = p.trets_immutables || {};
+    return `<div class="veu-card">
+      <div class="veu-card-nom">👤 ${escHtml(p.nom || clau)} <span style="font-size:.78rem;color:var(--text2)">(${escHtml(clau)})</span></div>
+      <div class="veu-card-camps">
+        <div><div class="veu-camp-label">Estat emocional inicial</div><div class="veu-camp-val">${escHtml(String(p.estat_emocional || ''))}</div></div>
+        <div><div class="veu-camp-label">Estat físic inicial</div><div class="veu-camp-val">${escHtml(String(p.estat_fisic || ''))}</div></div>
+        <div><div class="veu-camp-label">Ocupació</div><div class="veu-camp-val">${escHtml(String(t.ocupacio || ''))}</div></div>
+        <div><div class="veu-camp-label">Tret definitori</div><div class="veu-camp-val">${escHtml(String(t.tret_definitori || ''))}</div></div>
+      </div>
+    </div>`;
+  }).join('\n');
+  document.getElementById('completar-personatges-result').classList.remove('hidden');
+}
+
+function mergeCompletarPersonatgesNKG(personatgesCompletats = {}) {
+  const nkg = ESTAT._nkg || {};
+  if (!nkg.personatges || typeof nkg.personatges !== 'object') return;
+  Object.entries(personatgesCompletats || {}).forEach(([clau, data]) => {
+    const p = nkg.personatges[clau];
+    if (!p || !data || typeof data !== 'object') return;
+    const t = p.trets_immutables && typeof p.trets_immutables === 'object' ? p.trets_immutables : {};
+    const tn = data.trets_immutables || {};
+    p.trets_immutables = {
+      edat_aproximada: fusionarCampPersonatgeValor(t.edat_aproximada, tn.edat_aproximada) || t.edat_aproximada || 'No determinat',
+      genere: fusionarCampPersonatgeValor(t.genere, tn.genere) || t.genere || 'No determinat',
+      rol_narratiu: fusionarCampPersonatgeValor(t.rol_narratiu, tn.rol_narratiu) || t.rol_narratiu || 'No determinat',
+      relacio_protagonista: fusionarCampPersonatgeValor(t.relacio_protagonista, tn.relacio_protagonista) || t.relacio_protagonista || 'No determinada',
+      aspecte_fisic: fusionarCampPersonatgeValor(t.aspecte_fisic, tn.aspecte_fisic) || t.aspecte_fisic || 'No determinat',
+      ocupacio: fusionarCampPersonatgeValor(t.ocupacio, tn.ocupacio) || t.ocupacio || 'No determinat',
+      tret_definitori: fusionarCampPersonatgeValor(t.tret_definitori, tn.tret_definitori) || t.tret_definitori || 'No determinat'
+    };
+
+    const emoInicial = String(data.estat_emocional_inicial || '').trim();
+    const fisicInicial = String(data.estat_fisic_inicial || '').trim();
+    if (!teValorPlaceholder(emoInicial)) p.estat_emocional = emoInicial;
+    if (!teValorPlaceholder(fisicInicial)) p.estat_fisic = fisicInicial;
+    if (teValorPlaceholder(p.estat_emocional)) p.estat_emocional = inferirEstatEmocionalInicialDesDeArc(p.arc || {});
+    if (teValorPlaceholder(p.estat_fisic) || String(p.estat_fisic || '').trim().toLowerCase() === 'neutre') {
+      p.estat_fisic = inferirEstatFisicInicialDesDeArc(p.arc || {}, p.limit_moral || '');
+    }
+  });
+}
+
+async function generarCompletarPersonatges(userConfig) {
+  const nkg = ESTAT._nkg || {};
+  const personatges = nkg.personatges || {};
+  const resum = {
+    synopsis_core: nkg.macronarrativa?.synopsis_core || '',
+    backstory_canonic: nkg.macronarrativa?.backstory_canonic || {},
+    personatges
+  };
+
+  const systemPrompt = `Ets un novel·lista expert en creació de personatges. A partir de la sinopsi, el backstory canònic i les fitxes parcials, has de COMPLETAR la informació que falta de cada personatge.
+
+Per a cada personatge, genera:
+
+1. TRETS IMMUTABLES complets:
+- edat_aproximada: un número o rang creïble (p.ex. "38" o "35-40")
+- genere: si no està definit, dedueix-lo del context
+- rol_narratiu: (protagonista, antagonista, deuteragonista, secundari)
+- relacio_protagonista: relació concreta amb el protagonista
+- aspecte_fisic: 2-3 frases amb detalls visuals concrets i memorables
+- ocupacio: professió o activitat principal
+- tret_definitori: UN detall únic que el diferencia (un gest, una marca, un objecte que sempre porta, un hàbit)
+
+2. ESTATS INICIALS (inici de la novel·la):
+- estat_emocional: coherent amb arc.inici_emocional, però ampliat amb matís
+- estat_fisic: condició física concreta a l'inici de la història
+
+Respon EXCLUSIVAMENT amb JSON vàlid:
+{
+  "personatges_completats": {
+    "clau_personatge": {
+      "trets_immutables": {
+        "edat_aproximada": "...",
+        "genere": "...",
+        "rol_narratiu": "...",
+        "relacio_protagonista": "...",
+        "aspecte_fisic": "...",
+        "ocupacio": "...",
+        "tret_definitori": "..."
+      },
+      "estat_emocional_inicial": "...",
+      "estat_fisic_inicial": "..."
+    }
+  }
+}
+
+REGLES:
+- Les claus han de coincidir amb les del NKG.
+- L'aspecte físic ha de servir per a descripcions literàries (no una fitxa policial).
+- El tret definitori ha de ser ÚNIC per personatge i visualment potent.
+- Tot ha de ser coherent amb el backstory i la sinopsi.`;
+
+  const msgs = [{ role: 'user', content: `Dades actuals del NKG (sinopsi + backstory + fitxes):
+${JSON.stringify(resum, null, 2)}` }];
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+
+  for (let intent = 1; intent <= 2; intent++) {
+    const raw = await callLLMMulti(
+      msgs,
+      systemPrompt,
+      Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 2600, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+    const data = parseJsonRobust(raw);
+    if (data && data.personatges_completats && typeof data.personatges_completats === 'object') return data.personatges_completats;
+    if (intent === 2) throw new Error('Resposta invàlida a la fase Completar Personatges.');
+    msgs.push({ role: 'user', content: 'Resposta invàlida. Retorna només JSON vàlid amb la clau personatges_completats.' });
+  }
+  throw new Error('No s\'ha pogut completar fitxes de personatges.');
+}
+
+async function iniciarFaseCompletarPersonatges() {
+  ESTAT.fase = 9.46;
+  updateProgress(9.46);
+  hideCard('fase-9-45');
+  showCard('fase-9-46');
+  document.getElementById('completar-personatges-result').classList.add('hidden');
+  showLoader('9-46');
+  document.getElementById('loader-9-46-text').textContent = 'Completant trets immutables i estats inicials...';
+
+  try {
+    const data = await generarCompletarPersonatges(USER_CONFIG);
+    mergeCompletarPersonatgesNKG(data);
+    hideLoader('9-46');
+    mostrarCompletarPersonatges(ESTAT._nkg.personatges || {});
+    toast('Fitxes de personatge completades i sincronitzades per al capítol 1.');
+  } catch (err) {
+    hideLoader('9-46');
+    toast('Error fase Completar Personatges: ' + err.message);
+  }
+}
+
+function mostrarObjectiusSecrets(personatgesObj = {}) {
+  const cos = document.getElementById('objectius-secrets-cos');
+  if (!cos) return;
+  const cards = Object.entries(personatgesObj || {}).map(([clau, p]) => {
+    const obj = (Array.isArray(p.objectius) ? p.objectius : []).map((o, i) => normalitzarObjectiu(o, i, 1, clau));
+    const sec = (Array.isArray(p.secrets) ? p.secrets : []).map((x, i) => normalitzarSecret(x, i, clau));
+    return `<div class="veu-card">
+      <div class="veu-card-nom">🎭 ${escHtml(p.nom || clau)}</div>
+      <div class="veu-card-camps">
+        <div><div class="veu-camp-label">Objectius</div><div class="veu-camp-val">${escHtml(obj.map(o => `${o.id}: ${o.descripcio} [P${o.prioritat}]`).join(' · ') || '(cap)')}</div></div>
+        <div><div class="veu-camp-label">Secrets</div><div class="veu-camp-val">${escHtml(sec.map(s => `${s.id}: ${s.contingut}`).join(' · ') || '(cap)')}</div></div>
+      </div>
+    </div>`;
+  }).join('\n');
+  cos.innerHTML = cards || '<div class="veu-card"><div class="veu-card-camps">Sense dades.</div></div>';
+  document.getElementById('objectius-secrets-result').classList.remove('hidden');
+}
+
+function mergeObjectiusSecretsNKG(data = {}) {
+  const nkg = ESTAT._nkg || {};
+  const personatges = nkg.personatges || {};
+  const objPer = data.objectius_per_personatge || {};
+  const secPer = data.secrets_per_personatge || {};
+  Object.entries(personatges).forEach(([clau, p]) => {
+    const objs = Array.isArray(objPer[clau]) ? objPer[clau] : [];
+    const secs = Array.isArray(secPer[clau]) ? secPer[clau] : [];
+    p.objectius = objs.map((o, i) => normalitzarObjectiu(o, i, 1, clau)).filter(o => o.descripcio);
+    p.secrets = secs.map((x, i) => normalitzarSecret(x, i, clau)).filter(x => x.contingut);
+  });
+}
+
+async function generarObjectiusSecrets(userConfig) {
+  const nkg = ESTAT._nkg || {};
+  migrarMotivacionsBaseDesDeBiblia();
+  const estruct = (ESTAT._estructuraCapitols || []).map(c => ({
+    capitol: c.numero || c.capitol || 0,
+    titol: c.titol || '',
+    threads_advancing: c.threads_advancing || [],
+    threads_closing: c.threads_closing || []
+  }));
+  const userPayload = {
+    synopsis: nkg.macronarrativa?.synopsis_core || '',
+    backstory: nkg.macronarrativa?.backstory_canonic || {},
+    relacions: nkg.relacions || [],
+    personatges: nkg.personatges || {},
+    estructura_capitols: estruct
+  };
+
+  const systemPrompt = `Ets un guionista expert en estructura narrativa. A partir de la sinopsi, backstory, relacions, fitxes de personatges i estructura de capítols (amb els seus threads), has de generar:
+
+1. OBJECTIUS PER PERSONATGE: Cada personatge necessita entre 2 i 5 objectius concrets que el mouen. Cada objectiu ha de:
+- Derivar de les motivacions base (desig extern / necessitat interna)
+- Tenir un capítol d'activació (quan es posa en marxa)
+- Tenir un capítol de resolució (o null si queda obert)
+- Indicar què el bloqueja (obstacle concret o null)
+- Tenir una prioritat (1=vital, 5=secundari)
+
+2. SECRETS NARRATIUS: Cada personatge ha de tenir entre 1 i 3 secrets.
+
+Respon EXCLUSIVAMENT amb JSON vàlid:
+{
+  "objectius_per_personatge": {
+    "clau_personatge": [
+      {
+        "id": "obj_biel_01",
+        "descripcio": "...",
+        "prioritat": 1,
+        "actiu_des_de_capitol": 1,
+        "resolt_a_capitol": 13,
+        "bloquejat_per": "..."
+      }
+    ]
+  },
+  "secrets_per_personatge": {
+    "clau_personatge": [
+      {
+        "id": "sec_biel_01",
+        "contingut": "...",
+        "conegut_per": ["clau_1"],
+        "revelat_a_capitol": null,
+        "impacte_si_revelat": "..."
+      }
+    ]
+  }
+}
+
+REGLES:
+- Els objectius han de ser ACCIONABLES.
+- Els secrets han de crear TENSIÓ DRAMÀTICA real.
+- La resolució d'objectius ha de coincidir amb els threads_closing dels capítols.
+- Almenys un secret per personatge ha de ser desconegut pel protagonista.`;
+
+  const msgs = [{ role: 'user', content: `Context estructurat:
+${JSON.stringify(userPayload, null, 2)}` }];
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  for (let intent = 1; intent <= 2; intent++) {
+    const raw = await callLLMMulti(msgs, systemPrompt, Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 3200, model: models.modelArquitecte }), 'arquitectura');
+    const parsed = parseJsonRobust(raw);
+    if (parsed && parsed.objectius_per_personatge && parsed.secrets_per_personatge) return parsed;
+    if (intent === 2) throw new Error('Resposta invàlida a la fase Objectius i Secrets.');
+    msgs.push({ role: 'user', content: 'Resposta invàlida. Torna-ho a generar en JSON estricte.' });
+  }
+  throw new Error('No s\'ha pogut generar objectius i secrets.');
+}
+
+async function iniciarFaseObjectiusSecrets() {
+  ESTAT.fase = 9.47;
+  updateProgress(9.47);
+  hideCard('fase-9-46');
+  showCard('fase-9-47');
+  document.getElementById('objectius-secrets-result').classList.add('hidden');
+  showLoader('9-47');
+  try {
+    const data = await generarObjectiusSecrets(USER_CONFIG);
+    mergeObjectiusSecretsNKG(data);
+    const vista = getActiveObjectives(1);
+    if (!vista || typeof vista !== 'object') throw new Error('Vista activa invàlida després de la injecció.');
+    hideLoader('9-47');
+    mostrarObjectiusSecrets(ESTAT._nkg.personatges || {});
+    toast('Objectius i secrets injectats al NKG.');
+  } catch (err) {
+    hideLoader('9-47');
+    toast('Error fase Objectius i Secrets: ' + err.message);
+  }
+}
+
+function mostrarObjectesNarratius(objectes = {}) {
+  const cos = document.getElementById('objectes-cos');
+  if (!cos) return;
+  const cards = Object.entries(objectes || {}).map(([id, raw]) => {
+    const o = normalitzarObjecteNarratiu(raw, id);
+    if (!o) return '';
+    return `<div class="veu-card">
+      <div class="veu-card-nom">📦 ${escHtml(o.nom)} <span style="font-size:.78rem;color:var(--text2)">(${escHtml(o.id)})</span></div>
+      <div class="veu-card-camps">
+        <div><div class="veu-camp-label">Descripció física</div><div class="veu-camp-val">${escHtml(o.descripcio_fisica || '(pendent)')}</div></div>
+        <div><div class="veu-camp-label">Significat simbòlic</div><div class="veu-camp-val">${escHtml(o.significat_simbolic || '(pendent)')}</div></div>
+        <div><div class="veu-camp-label">Inicial</div><div class="veu-camp-val">${escHtml(`${o.posseidor_inicial || 'sense posseïdor'} · ${o.ubicacio_inicial || 'ubicació no indicada'}`)}</div></div>
+        <div><div class="veu-camp-label">Historial</div><div class="veu-camp-val">${escHtml((o.historial || []).map(h => `C${h.capitol}:${h.accio}`).join(' · ') || '(cap)')}</div></div>
+      </div>
+    </div>`;
+  }).filter(Boolean).join('\n');
+  cos.innerHTML = cards || '<div class="veu-card"><div class="veu-card-camps">Sense objectes detectats.</div></div>';
+  document.getElementById('objectes-result').classList.remove('hidden');
+}
+
+async function generarObjectesNarratius(userConfig) {
+  const nkg = ESTAT._nkg || {};
+  const payload = {
+    synopsis: nkg.macronarrativa?.synopsis_core || '',
+    backstory: nkg.macronarrativa?.backstory_canonic || {},
+    personatges: nkg.personatges || {},
+    estructura_capitols: ESTAT._estructuraCapitols || [],
+    escaletes: ESTAT._escaletes || []
+  };
+  const systemPrompt = `Ets un director d'attrezzo expert en narrativa. A partir de la sinopsi, backstory, personatges, estructura de capítols i escaletes, has de identificar i definir TOTS els objectes físics rellevants per a la novel·la.
+
+Respon EXCLUSIVAMENT amb JSON vàlid:
+{
+  "objectes": {
+    "capsa_fusta": {
+      "id": "capsa_fusta",
+      "nom": "La capsa de fusta",
+      "descripcio_fisica": "...",
+      "significat_simbolic": "...",
+      "ubicacio_inicial": "...",
+      "posseidor_inicial": "biel_santamaria",
+      "es_clau_per_al_desenllaç": true,
+      "primera_aparicio_capitol": 1,
+      "historial": [
+        {"capitol": 1, "accio": "agafat", "personatge": "biel_santamaria", "ubicacio_nova": "motxilla d'en Biel"}
+      ]
+    }
+  },
+  "inventari_inicial": {
+    "biel_santamaria": ["capsa_fusta"]
+  }
+}
+
+REGLES:
+- Inclou MÍNIM 8 objectes.
+- Historial coherent amb escaletes.
+- IDs snake_case curts.
+- Significat simbòlic connectat al tema.`;
+  const msgs = [{ role: 'user', content: `Context complet:
+${JSON.stringify(payload, null, 2)}` }];
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  for (let intent = 1; intent <= 2; intent++) {
+    const raw = await callLLMMulti(msgs, systemPrompt, Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 3800, model: models.modelArquitecte }), 'arquitectura');
+    const parsed = parseJsonRobust(raw);
+    if (parsed && parsed.objectes && typeof parsed.objectes === 'object') return parsed;
+    if (intent === 2) throw new Error('Resposta invàlida a la fase Objectes Narratius.');
+    msgs.push({ role: 'user', content: 'Resposta invàlida. Torna només JSON estricte amb objectes i inventari_inicial.' });
+  }
+  throw new Error('No s\'ha pogut generar objectes narratius.');
+}
+
+function injectarObjectesNarratius(data = {}) {
+  const nkg = ESTAT._nkg || {};
+  if (!nkg.objectes || typeof nkg.objectes !== 'object') nkg.objectes = {};
+  Object.entries(data.objectes || {}).forEach(([id, raw]) => {
+    const obj = normalitzarObjecteNarratiu(raw, id);
+    if (!obj) return;
+    nkg.objectes[obj.id] = obj;
+  });
+  const invInicial = data.inventari_inicial || {};
+  Object.entries(invInicial).forEach(([clau, arr]) => {
+    if (!nkg.personatges[clau]) return;
+    nkg.personatges[clau].objectes_inventari = Array.isArray(arr) ? arr.map(ref => resoldreIdObjecte(nkg, ref)).filter(Boolean) : [];
+  });
+  sincronitzarReferenciesObjectesPersonatges();
+}
+
+async function iniciarFaseObjectesNarratius() {
+  ESTAT.fase = 9.48;
+  updateProgress(9.48);
+  hideCard('fase-9-47');
+  showCard('fase-9-48');
+  document.getElementById('objectes-result').classList.add('hidden');
+  showLoader('9-48');
+  try {
+    const data = await generarObjectesNarratius(USER_CONFIG);
+    injectarObjectesNarratius(data);
+    const snap = getObjectState(1);
+    if (!snap || Object.keys(snap).length === 0) throw new Error('No s\'ha pogut construir l\'estat d\'objectes.');
+    hideLoader('9-48');
+    mostrarObjectesNarratius(ESTAT._nkg.objectes || {});
+    toast('Objectes narratius injectats al NKG.');
+  } catch (err) {
+    hideLoader('9-48');
+    toast('Error fase Objectes Narratius: ' + err.message);
+  }
+}
+
+
+function mostrarMapaRegles(llocs = {}, mapaAdj = [], regles = []) {
+  const cos = document.getElementById('mapa-regles-cos');
+  if (!cos) return;
+  const llistat = Object.entries(llocs || {}).map(([id, raw]) => normalitzarLlocNarratiu(raw, id)).filter(Boolean);
+  const reglesNorm = (regles || []).map((r, i) => normalitzarReglaMon(r, i + 1)).filter(r => r.descripcio);
+  cos.innerHTML = `
+    <div class="veu-card"><div class="veu-card-nom">📍 Resum espacial</div><div class="veu-card-camps">
+      <div><div class="veu-camp-label">Llocs</div><div class="veu-camp-val">${llistat.length}</div></div>
+      <div><div class="veu-camp-label">Adjacències</div><div class="veu-camp-val">${(mapaAdj || []).length}</div></div>
+      <div><div class="veu-camp-label">Regles</div><div class="veu-camp-val">${reglesNorm.length}</div></div>
+    </div></div>
+    ${llistat.slice(0, 12).map(l => `<div class="veu-card"><div class="veu-card-nom">🏠 ${escHtml(l.nom)} (${escHtml(l.id)})</div><div class="veu-card-camps"><div><div class="veu-camp-label">Tipus</div><div class="veu-camp-val">${escHtml(l.tipus)}</div></div><div><div class="veu-camp-label">Connectat amb</div><div class="veu-camp-val">${escHtml((l.connectat_amb || []).join(', ') || '(cap)')}</div></div></div></div>`).join('\n')}
+  `;
+  document.getElementById('mapa-regles-result').classList.remove('hidden');
+}
+
+async function generarMapaEspacialRegles(userConfig) {
+  const nkg = ESTAT._nkg || {};
+  const payload = {
+    worldbuilding: ESTAT.worldbuilding || '',
+    synopsis: nkg.macronarrativa?.synopsis_core || '',
+    escaletes: ESTAT._escaletes || []
+  };
+  const systemPrompt = `Ets un arquitecte i dissenyador de producció cinematogràfica. A partir del worldbuilding narratiu, la sinopsi i les escaletes, has de crear el MAPA COMPLET de la finca i els seus espais, més les regles del món.
+
+Respon EXCLUSIVAMENT amb JSON vàlid:
+{
+  "llocs": {
+    "finca_pirineu": {
+      "id": "finca_pirineu", "nom": "...", "tipus": "edifici",
+      "descripcio_sensorial": "...", "parent": null,
+      "connectat_amb": ["jardi_exterior", "garatge"],
+      "sistemes_tecnics": ["domotica_central"],
+      "temperatura_base": "22°C interior regulat",
+      "accessibilitat": "tancada_clau",
+      "iluminacio": "artificial"
+    }
+  },
+  "mapa_adjacencies": [
+    {"de": "cuina", "a": "salo", "via": "porta oberta"}
+  ],
+  "regles_mon": [
+    {"id":"regla_01","descripcio":"...","categoria":"climatica","excepcions":null,"afecta_personatges":[]}
+  ]
+}
+
+REGLES:
+- Mínim 10 estances/zones.
+- Tota estança mencionada a les escaletes ha d'existir.
+- Mínim 12 regles cobrint totes les categories.
+- Regles específiques i verificables.`;
+  const msgs = [{ role: 'user', content: `Context:
+${JSON.stringify(payload, null, 2)}` }];
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  for (let intent = 1; intent <= 2; intent++) {
+    const raw = await callLLMMulti(msgs, systemPrompt, Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 4200, model: models.modelArquitecte }), 'arquitectura');
+    const parsed = parseJsonRobust(raw);
+    const valid = parsed && parsed.llocs && typeof parsed.llocs === 'object'
+      && Array.isArray(parsed.regles_mon) && Array.isArray(parsed.mapa_adjacencies);
+    if (valid) return parsed;
+    if (intent === 2) throw new Error('Resposta invàlida a la fase Mapa Espacial i Regles.');
+    msgs.push({ role: 'user', content: 'Resposta invàlida. Torna JSON estricte amb llocs + mapa_adjacencies + regles_mon.' });
+  }
+  throw new Error('No s\'ha pogut generar mapa i regles.');
+}
+
+function injectarMapaEspacialRegles(data = {}) {
+  const nkg = ESTAT._nkg || {};
+  if (!nkg.llocs || typeof nkg.llocs !== 'object') nkg.llocs = {};
+  Object.entries(data.llocs || {}).forEach(([id, raw]) => {
+    const l = normalitzarLlocNarratiu(raw, id);
+    if (l) nkg.llocs[l.id] = l;
+  });
+  nkg.mapa_adjacencies = Array.isArray(data.mapa_adjacencies)
+    ? data.mapa_adjacencies.map(e => ({ de: nkgNormalitzarNom(e.de || ''), a: nkgNormalitzarNom(e.a || ''), via: String(e.via || '').trim() || 'connexio' })).filter(e => e.de && e.a)
+    : [];
+  ESTAT.bibliaNarrativa.regles_mon = Array.isArray(data.regles_mon)
+    ? data.regles_mon.map((r, i) => normalitzarReglaMon(r, i + 1)).filter(r => r.descripcio)
+    : (ESTAT.bibliaNarrativa.regles_mon || []);
+  Object.values(nkg.llocs).forEach(loc => {
+    const extra = nkg.mapa_adjacencies.filter(e => e.de === loc.id).map(e => e.a);
+    loc.connectat_amb = [...new Set([...(loc.connectat_amb || []), ...extra])];
+  });
+}
+
+async function iniciarFaseMapaEspacialRegles() {
+  ESTAT.fase = 9.49;
+  updateProgress(9.49);
+  hideCard('fase-9-48');
+  showCard('fase-9-49');
+  document.getElementById('mapa-regles-result').classList.add('hidden');
+  showLoader('9-49');
+  try {
+    const data = await generarMapaEspacialRegles(USER_CONFIG);
+    injectarMapaEspacialRegles(data);
+    const llocsIds = Object.keys((ESTAT._nkg && ESTAT._nkg.llocs) || {});
+    if (llocsIds.length === 0) throw new Error('No s\'han injectat llocs al NKG.');
+    hideLoader('9-49');
+    mostrarMapaRegles(ESTAT._nkg.llocs || {}, ESTAT._nkg.mapa_adjacencies || [], ESTAT.bibliaNarrativa.regles_mon || []);
+    toast('Mapa espacial i regles injectats al NKG.');
+  } catch (err) {
+    hideLoader('9-49');
+    toast('Error fase Mapa Espacial i Regles: ' + err.message);
+  }
+}
+
+function normalitzarPerspectivaNarrativa(raw = {}) {
+  const tipusValids = ['primera_persona', 'tercera_limitada', 'tercera_omniscient', 'alternada'];
+  const tipus = tipusValids.includes(raw.tipus) ? raw.tipus : 'tercera_limitada';
+  const pov = Array.isArray(raw.pov_per_capitol) ? raw.pov_per_capitol : [];
+  return {
+    tipus,
+    pov_per_capitol: pov.map(e => ({
+      capitol: Math.max(1, Number(e.capitol) || 1),
+      personatge_pov: nkgNormalitzarNom(e.personatge_pov || ''),
+      justificacio: String(e.justificacio || '').trim()
+    })).filter(e => e.personatge_pov),
+    restriccions_informacio: String(raw.restriccions_informacio || '').trim()
+  };
+}
+
+function normalitzarCronologiaNarrativa(raw = {}) {
+  const momentsValids = ['matinada', 'mati', 'migdia', 'tarda', 'vespre', 'nit'];
+  const perCapitol = Array.isArray(raw.per_capitol) ? raw.per_capitol : [];
+  return {
+    data_inici_historia: String(raw.data_inici_historia || '').trim(),
+    duracio_total_estimada: String(raw.duracio_total_estimada || '').trim(),
+    per_capitol: perCapitol.map(e => ({
+      capitol: Math.max(1, Number(e.capitol) || 1),
+      data_ficticia: String(e.data_ficticia || '').trim(),
+      duracio_capitol: String(e.duracio_capitol || '').trim(),
+      moment_del_dia: momentsValids.includes(String(e.moment_del_dia || '').trim()) ? String(e.moment_del_dia).trim() : 'tarda',
+      ubicacio_principal: nkgNormalitzarNom(e.ubicacio_principal || '')
+    }))
+  };
+}
+
+function normalitzarTimelineAccio(raw = {}) {
+  return {
+    capitol: Math.max(1, Number(raw.capitol) || 1),
+    personatge: nkgNormalitzarNom(raw.personatge || ''),
+    accio: String(raw.accio || '').trim(),
+    hora_aproximada: String(raw.hora_aproximada || '').trim(),
+    ubicacio: nkgNormalitzarNom(raw.ubicacio || '')
+  };
+}
+
+
+function formatTimelineAccio(entry = {}) {
+  if (!entry) return '';
+  if (typeof entry === 'string') return entry;
+  const cap = entry.capitol ? `C${entry.capitol}` : 'C?';
+  const pers = entry.personatge ? ` ${entry.personatge}` : '';
+  const ubi = entry.ubicacio ? ` @${entry.ubicacio}` : '';
+  const hora = entry.hora_aproximada ? ` (${entry.hora_aproximada})` : '';
+  return `${cap}:${pers} ${entry.accio || ''}${hora}${ubi}`.trim();
+}
+function validarCronologiaPerCapitol(cronologia = {}) {
+  const ordreMoment = { matinada: 0, mati: 1, migdia: 2, tarda: 3, vespre: 4, nit: 5 };
+  const llista = (cronologia.per_capitol || []).slice().sort((a, b) => a.capitol - b.capitol);
+  let ultimaData = '';
+  let ultimMoment = -1;
+  for (const c of llista) {
+    if (!c.data_ficticia) continue;
+    const dataActualTs = Date.parse(c.data_ficticia);
+    const dataUltimaTs = Date.parse(ultimaData);
+    if (ultimaData && !Number.isNaN(dataActualTs) && !Number.isNaN(dataUltimaTs) && dataActualTs < dataUltimaTs) {
+      throw new Error(`Cronologia invàlida: Cap.${c.capitol} retrocedeix en data (${c.data_ficticia} < ${ultimaData}).`);
+    }
+    const ordre = ordreMoment[c.moment_del_dia] ?? 0;
+    if (c.data_ficticia === ultimaData && ordre + 1 < ultimMoment) {
+      throw new Error(`Cronologia invàlida: salt de moment del dia il·lògic a Cap.${c.capitol}.`);
+    }
+    ultimaData = c.data_ficticia;
+    ultimMoment = ordre;
+  }
+  return true;
+}
+
+function mostrarPerspectivaCronologia(perspectiva = {}, cronologia = {}, timeline = []) {
+  const cos = document.getElementById('perspectiva-crono-cos');
+  if (!cos) return;
+  const pov = Array.isArray(perspectiva.pov_per_capitol) ? perspectiva.pov_per_capitol : [];
+  const perCap = Array.isArray(cronologia.per_capitol) ? cronologia.per_capitol : [];
+  cos.innerHTML = `
+    <div class="veu-card"><div class="veu-card-nom">👁️ Perspectiva</div><div class="veu-card-camps">
+      <div><div class="veu-camp-label">Tipus</div><div class="veu-camp-val">${escHtml(perspectiva.tipus || 'tercera_limitada')}</div></div>
+      <div><div class="veu-camp-label">POV definits</div><div class="veu-camp-val">${pov.length}</div></div>
+      <div><div class="veu-camp-label">Restriccions</div><div class="veu-camp-val">${escHtml(perspectiva.restriccions_informacio || '(cap)')}</div></div>
+    </div></div>
+    <div class="veu-card"><div class="veu-card-nom">🗓️ Cronologia interna</div><div class="veu-card-camps">
+      <div><div class="veu-camp-label">Inici</div><div class="veu-camp-val">${escHtml(cronologia.data_inici_historia || '')}</div></div>
+      <div><div class="veu-camp-label">Durada estimada</div><div class="veu-camp-val">${escHtml(cronologia.duracio_total_estimada || '')}</div></div>
+      <div><div class="veu-camp-label">Entrades capítol</div><div class="veu-camp-val">${perCap.length}</div></div>
+    </div></div>
+    <div class="veu-card"><div class="veu-card-nom">⏱️ Timeline accions</div><div class="veu-card-camps">
+      <div><div class="veu-camp-label">Entrades</div><div class="veu-camp-val">${timeline.length}</div></div>
+    </div></div>
+  `;
+}
+
+async function generarPerspectivaCronologia(userConfig) {
+  const nkg = ESTAT._nkg || {};
+  const payload = {
+    estructura_capitols: ESTAT._estructuraCapitols || [],
+    escaletes: ESTAT._escaletes || [],
+    synopsis: nkg.macronarrativa?.synopsis_core || '',
+    personatges: nkg.personatges || {},
+    llocs_ids: Object.keys(nkg.llocs || {})
+  };
+  const systemPrompt = `Ets un editor literari expert en estructura temporal i punt de vista.
+A partir de l'estructura de capítols (amb funcions, threads i escaletes),
+la sinopsi, i les fitxes de personatges, has de definir:
+
+1. PERSPECTIVA NARRATIVA:
+   - Tipus de narrador global
+   - Per a cada capítol: quin personatge és el POV (punt de vista),
+     és a dir, a través dels ulls de qui viu el lector aquella escena
+   - Quina informació pot conèixer el narrador i quina no
+
+2. CRONOLOGIA INTERNA:
+   - Data fictícia d'inici de la novel·la
+   - Per a cada capítol: data, durada, moment del dia, ubicació
+     principal
+   - La seqüència ha de ser temporalment lògica
+
+3. TIMELINE D'ACCIONS:
+   - Per a cada capítol, les accions principals de cada personatge
+     amb hora aproximada i ubicació. Això serveix perquè el model
+     sàpiga on és CADA personatge a CADA moment, fins i tot si no
+     és el POV del capítol.
+
+Respon EXCLUSIVAMENT amb JSON vàlid:
+{
+  "perspectiva": {
+    "tipus": "tercera_limitada",
+    "pov_per_capitol": [
+      {"capitol": 1, "personatge_pov": "biel_santamaria", "justificacio": "..."}
+    ],
+    "restriccions_informacio": "..."
+  },
+  "cronologia": {
+    "data_inici_historia": "...",
+    "duracio_total_estimada": "...",
+    "per_capitol": [
+      {"capitol": 1, "data_ficticia": "...", "duracio_capitol": "...", "moment_del_dia": "vespre", "ubicacio_principal": "pis_barcelona_biel"}
+    ]
+  },
+  "timeline_accions": [
+    {"capitol": 1, "personatge": "biel_santamaria", "accio": "...", "hora_aproximada": "21:00", "ubicacio": "pis_barcelona_biel"}
+  ]
+}
+
+REGLES:
+- El POV ha de coincidir amb el focus narratiu de l'escaleta.
+- La cronologia ha de ser CONTÍNUA.
+- Cada personatge ha de tenir almenys 1 entrada de timeline per capítol on apareix.
+- Les ubicacions de la timeline han de coincidir amb els IDs del mapa de llocs.`;
+
+  const msgs = [{ role: 'user', content: `Context:\n${JSON.stringify(payload, null, 2)}` }];
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  for (let intent = 1; intent <= 2; intent++) {
+    const raw = await callLLMMulti(msgs, systemPrompt, Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 3600, model: models.modelArquitecte }), 'arquitectura');
+    const parsed = parseJsonRobust(raw);
+    if (parsed && parsed.perspectiva && parsed.cronologia && Array.isArray(parsed.timeline_accions)) return parsed;
+    if (intent === 2) throw new Error('Resposta invàlida a Perspectiva i Cronologia.');
+    msgs.push({ role: 'user', content: 'Resposta invàlida. Torna JSON estricte amb perspectiva + cronologia + timeline_accions.' });
+  }
+  throw new Error('No s\'ha pogut generar perspectiva i cronologia.');
+}
+
+function injectarPerspectivaCronologia(data = {}) {
+  if (!ESTAT._nkg) ESTAT._nkg = crearNKG();
+  if (!ESTAT._nkg.context_creacio || typeof ESTAT._nkg.context_creacio !== 'object') ESTAT._nkg.context_creacio = {};
+  if (!ESTAT._nkg.context_creacio.estil || typeof ESTAT._nkg.context_creacio.estil !== 'object') ESTAT._nkg.context_creacio.estil = {};
+  const perspectiva = normalitzarPerspectivaNarrativa(data.perspectiva || {});
+  const cronologia = normalitzarCronologiaNarrativa(data.cronologia || {});
+  validarCronologiaPerCapitol(cronologia);
+  const llocsIds = new Set(Object.keys(ESTAT._nkg.llocs || {}));
+  const timeline = (Array.isArray(data.timeline_accions) ? data.timeline_accions : [])
+    .map(normalitzarTimelineAccio)
+    .filter(a => a.personatge && a.accio && (!a.ubicacio || llocsIds.size === 0 || llocsIds.has(a.ubicacio)));
+  ESTAT._nkg.context_creacio.estil.perspectiva = perspectiva;
+  ESTAT._nkg.context_creacio.cronologia = cronologia;
+  ESTAT._nkg.timeline_accions = timeline;
+}
+
+async function iniciarFasePerspectivaCronologia() {
+  ESTAT.fase = 10.7;
+  updateProgress(10.7);
+  hideCard('fase-10-5');
+  showCard('fase-10-7');
+  document.getElementById('perspectiva-crono-result').classList.add('hidden');
+  showLoader('10-7');
+  try {
+    const data = await generarPerspectivaCronologia(USER_CONFIG);
+    injectarPerspectivaCronologia(data);
+    hideLoader('10-7');
+    mostrarPerspectivaCronologia(
+      ESTAT._nkg.context_creacio.estil.perspectiva,
+      ESTAT._nkg.context_creacio.cronologia,
+      ESTAT._nkg.timeline_accions || []
+    );
+    document.getElementById('perspectiva-crono-result').classList.remove('hidden');
+    document.getElementById('btn-fase10-8').classList.remove('hidden');
+    toast('Perspectiva i cronologia injectades al NKG.');
+  } catch (err) {
+    hideLoader('10-7');
+    toast('Error fase Perspectiva i Cronologia: ' + err.message);
+  }
+}
+
+
+function normalitzarVeuAvancada(veu = {}) {
+  const longitudValida = ['curtes_telegrafiques', 'mitjanes', 'llargues_subordinades'];
+  const existMaiDiria = Array.isArray(veu.mai_diria) ? veu.mai_diria : (veu.mai_diria ? String(veu.mai_diria).split(/[,;]+/).map(x => x.trim()).filter(Boolean) : []);
+  const vocabProhibit = Array.isArray(veu.vocabulari_prohibit) ? veu.vocabulari_prohibit : [];
+  return Object.assign({}, veu, {
+    exemples_narratius: Array.isArray(veu.exemples_narratius) ? veu.exemples_narratius.map(x => String(x || '').trim()).filter(Boolean).slice(0, 3) : [],
+    vocabulari_recurrent: Array.isArray(veu.vocabulari_recurrent) ? veu.vocabulari_recurrent.map(x => String(x || '').trim()).filter(Boolean).slice(0, 12) : [],
+    vocabulari_prohibit: [...new Set([...vocabProhibit, ...existMaiDiria].map(x => String(x || '').trim()).filter(Boolean))].slice(0, 12),
+    longitud_frases: longitudValida.includes(veu.longitud_frases) ? veu.longitud_frases : 'mitjanes'
+  });
+}
+
+function veuMaiDiriaText(veu = {}) {
+  const val = veu && veu.mai_diria;
+  return Array.isArray(val) ? val.join(', ') : String(val || '');
+}
+
+function mostrarVeuExemples(personatges = {}) {
+  const cos = document.getElementById('veu-exemples-cos');
+  if (!cos) return;
+  const llista = Object.values(personatges || {});
+  cos.innerHTML = llista.map(p => {
+    const veu = normalitzarVeuAvancada(p.veu || {});
+    const ex = (veu.exemples_narratius || []).slice(0, 2).map(e => `<li>${escHtml(e)}</li>`).join('');
+    const rec = (veu.vocabulari_recurrent || []).slice(0, 8).join(', ');
+    const proh = (veu.vocabulari_prohibit || []).slice(0, 6).join(', ');
+    return `<div class="veu-card"><div class="veu-card-nom">🎭 ${escHtml(p.nom || p.id || 'personatge')}</div><div class="veu-card-camps">
+      <div><div class="veu-camp-label">Longitud de frases</div><div class="veu-camp-val">${escHtml(veu.longitud_frases || 'mitjanes')}</div></div>
+      <div><div class="veu-camp-label">Vocabulari recurrent</div><div class="veu-camp-val">${escHtml(rec || '(pendent)')}</div></div>
+      <div><div class="veu-camp-label">Vocabulari prohibit</div><div class="veu-camp-val">${escHtml(proh || '(pendent)')}</div></div>
+      <div><div class="veu-camp-label">Exemples</div><div class="veu-camp-val">${ex ? `<ul style="padding-left:18px;margin:6px 0">${ex}</ul>` : '(pendents)'}</div></div>
+    </div></div>`;
+  }).join('\n');
+}
+
+async function generarVeuExemples(userConfig) {
+  const nkg = ESTAT._nkg || {};
+  const payload = {
+    sinopsi: nkg.macronarrativa?.synopsis_core || '',
+    tema: nkg.macronarrativa?.theme || '',
+    estil: (nkg.context_creacio || {}).estil || ESTAT.estil || {},
+    personatges: Object.fromEntries(Object.entries(nkg.personatges || {}).map(([k, p]) => [k, { nom: p.nom, veu: p.veu || {}, arc: p.arc || {}, ocupacio: p.trets_immutables?.ocupacio || '' }]))
+  };
+  const systemPrompt = `Ets un estilista literari expert en veu narrativa.
+A partir de les fitxes de veu dels personatges, la sinopsi, el tema i l'estil definit, has de generar per a cada personatge:
+
+1. EXEMPLES NARRATIUS: 2-3 paràgrafs curts en català.
+2. VOCABULARI RECURRENT: 5-10 paraules/expressions.
+3. VOCABULARI PROHIBIT: 3-5 paraules/expressions.
+4. LONGITUD DE FRASES: curtes_telegrafiques | mitjanes | llargues_subordinades.
+
+Respon EXCLUSIVAMENT amb JSON vàlid:
+{
+  "veus_completades": {
+    "clau_personatge": {
+      "exemples_narratius": ["..."],
+      "vocabulari_recurrent": ["..."],
+      "vocabulari_prohibit": ["..."],
+      "longitud_frases": "mitjanes"
+    }
+  }
+}`;
+  const msgs = [{ role: 'user', content: `Context:
+${JSON.stringify(payload, null, 2)}` }];
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  for (let intent = 1; intent <= 2; intent++) {
+    const raw = await callLLMMulti(msgs, systemPrompt, Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 3600, model: models.modelArquitecte }), 'arquitectura');
+    const parsed = parseJsonRobust(raw);
+    if (parsed && parsed.veus_completades && typeof parsed.veus_completades === 'object') return parsed;
+    if (intent === 2) throw new Error('Resposta invàlida a Veu i Exemples.');
+    msgs.push({ role: 'user', content: 'Resposta invàlida. Torna JSON estricte amb veus_completades.' });
+  }
+  throw new Error('No s\'ha pogut completar la veu dels personatges.');
+}
+
+function injectarVeuExemples(data = {}) {
+  if (!ESTAT._nkg || !ESTAT._nkg.personatges) return;
+  const comp = data.veus_completades || {};
+  Object.entries(comp).forEach(([id, veu]) => {
+    const clau = nkgNormalitzarNom(id);
+    if (!ESTAT._nkg.personatges[clau]) return;
+    const ex = ESTAT._nkg.personatges[clau];
+    const baseVeu = Object.assign({}, ex.veu || {}, veu || {});
+    ex.veu = normalitzarVeuAvancada(baseVeu);
+    ex.veu.mai_diria = [...new Set([...(Array.isArray(ex.veu.mai_diria) ? ex.veu.mai_diria : []), ...(ex.veu.vocabulari_prohibit || [])])];
+  });
+  if (!ESTAT._nkg.macronarrativa) ESTAT._nkg.macronarrativa = {};
+  ESTAT._nkg.macronarrativa.thematic_count = 0;
+  ESTAT._nkg.macronarrativa.thematic_count_max = Number(ESTAT._nkg.macronarrativa.thematic_count_max || 3);
+}
+
+async function iniciarFaseVeuExemples() {
+  ESTAT.fase = 10.8;
+  updateProgress(10.8);
+  hideCard('fase-10-7');
+  showCard('fase-10-8');
+  document.getElementById('veu-exemples-result').classList.add('hidden');
+  showLoader('10-8');
+  try {
+    const data = await generarVeuExemples(USER_CONFIG);
+    injectarVeuExemples(data);
+    hideLoader('10-8');
+    mostrarVeuExemples(ESTAT._nkg.personatges || {});
+    mostrarFaltantsNKG();
+    document.getElementById('veu-exemples-result').classList.remove('hidden');
+    toast('Veu i exemples completats.');
+  } catch (err) {
+    hideLoader('10-8');
+    toast('Error fase Veu i Exemples: ' + err.message);
+  }
+}
+
+async function autocompletarNKGFaltantsManual() {
+  const btn = document.getElementById('btn-autocompletar-nkg');
+  if (btn) btn.disabled = true;
+  showLoader('10-8');
+  try {
+    const nkg = ESTAT._nkg || {};
+    const biblia = ESTAT.bibliaNarrativa || {};
+    const faltants = detectarFaltantsNKG(nkg, biblia).join(' | ').toLowerCase();
+
+    if (faltants.includes('backstory') || faltants.includes('relacions')) {
+      try {
+        await assegurarMinimPersonatgesPerRelacions(2, USER_CONFIG);
+        const d = await generarBackstoryIRelacions(USER_CONFIG);
+        if (d && d.backstory_canonic) nkg.macronarrativa.backstory_canonic = d.backstory_canonic;
+        if (Array.isArray(d && d.relacions)) nkg.relacions = d.relacions;
+      } catch (e) {
+        const minimal = construirBackstoryMinimalSenseRelacions();
+        nkg.macronarrativa.backstory_canonic = minimal.backstory_canonic;
+        nkg.relacions = minimal.relacions;
+      }
+    }
+    if (faltants.includes('trets immutables')) {
+      const d = await generarCompletarPersonatges(USER_CONFIG);
+      mergeCompletarPersonatgesNKG(d);
+    }
+    if (faltants.includes('objectes narratius')) {
+      const d = await generarObjectesNarratius(USER_CONFIG);
+      injectarObjectesNarratius(d);
+    }
+    if (faltants.includes('mapa de llocs') || faltants.includes('regles del món')) {
+      const d = await generarMapaEspacialRegles(USER_CONFIG);
+      injectarMapaEspacialRegles(d);
+    }
+    if (faltants.includes('pov per capítol') || faltants.includes('cronologia') || faltants.includes('tipus de perspectiva')) {
+      const d = await generarPerspectivaCronologia(USER_CONFIG);
+      injectarPerspectivaCronologia(d);
+    }
+    if (faltants.includes('exemples narratius de veu') || faltants.includes('vocabulari recurrent')) {
+      const d = await generarVeuExemples(USER_CONFIG);
+      injectarVeuExemples(d);
+    }
+
+    mostrarVeuExemples(ESTAT._nkg.personatges || {});
+    mostrarFaltantsNKG();
+    toast('Autocompleció NKG finalitzada. Revisa i continua manualment.');
+  } catch (err) {
+    toast('Error autocompletant NKG: ' + err.message);
+  } finally {
+    hideLoader('10-8');
+    if (btn) btn.disabled = false;
+  }
+}
+
 function mostrarEstilsParla(text) {
   const cos = document.getElementById('estils-cos');
   const blocs = parsejarBlocsEstilsParla(text);
@@ -5753,7 +7112,7 @@ async function iniciarFaseEscaleta() {
     ESTAT._escaletes = totsResultats;
     hideLoader('10-5');
     mostrarEscaleta(totsResultats);
-    document.getElementById('btn-fase11').classList.remove('hidden');
+    document.getElementById('btn-fase10-7').classList.remove('hidden');
   } catch (e) {
     hideLoader('10-5');
     toast('Error generant escaleta: ' + e.message);
@@ -5782,6 +7141,19 @@ async function iniciarFase11() {
   if (!ESTAT.estil.paraules || ESTAT.estil.paraules === 0) ESTAT.estil.paraules = 3000;
   if (ESTAT._estructuraCapitols.length === 0) {
     toast('No hi ha capítols a l\'estructura. Torna a generar-la.');
+    return;
+  }
+
+  const chkNKG = validarNKGPreparatPerCapitol1(ESTAT._nkg || {}, ESTAT.bibliaNarrativa || {});
+  if (!chkNKG.ok) {
+    toast('Falten dades al NKG. Et porto a la fase de compleció perquè puguis autogenerar-les i continuar manualment.');
+    console.error('NKG incomplet abans del capítol 1:', chkNKG.errors);
+    ESTAT.fase = 10.8;
+    updateProgress(10.8);
+    showCard('fase-10-8');
+    document.getElementById('veu-exemples-result').classList.remove('hidden');
+    mostrarVeuExemples((ESTAT._nkg && ESTAT._nkg.personatges) || {});
+    mostrarFaltantsNKG();
     return;
   }
 
@@ -6319,13 +7691,33 @@ function construirSeccioProhibicions(idx) {
 }
 
 // ─── Ratio diàleg / narració per autor ────────────────────────────────────────
+function normalitzarRatioDialeg(input, capInfo = {}) {
+  if (input && typeof input === 'object') {
+    return {
+      percentatge_dialeg: Math.max(0, Math.min(100, Number(input.percentatge_dialeg) || 35)),
+      tipus_dialeg: input.tipus_dialeg || 'funcional',
+      notes: String(input.notes || '').trim()
+    };
+  }
+  const legacy = String(input || '').trim().toLowerCase();
+  if (legacy === 'alt') return { percentatge_dialeg: 65, tipus_dialeg: 'predominant', notes: 'Diàleg dominant.' };
+  if (legacy === 'baix') return { percentatge_dialeg: 15, tipus_dialeg: 'minim_intern', notes: 'Predomini narratiu amb diàleg mínim.' };
+  const intensity = Number(capInfo.intensity_level || 3);
+  const relacional = ((capInfo.fil || '') + ' ' + (capInfo.titol || '')).toLowerCase();
+  const confrontacio = /(confront|judici|discussi|xoc|enfrontament)/.test(relacional);
+  if (intensity >= 5) return { percentatge_dialeg: 8, tipus_dialeg: 'absent', notes: 'Capítol final o màxima tensió amb diàleg residual.' };
+  if (confrontacio) return { percentatge_dialeg: 35, tipus_dialeg: 'funcional', notes: 'Confrontació amb diàleg orientat a conflicte.' };
+  if (/(subtrama|relaci|silvia|parella)/.test(relacional)) return { percentatge_dialeg: 50, tipus_dialeg: 'equilibrat', notes: 'Subtrama relacional amb intercanvi sostingut.' };
+  return { percentatge_dialeg: 18, tipus_dialeg: 'minim_intern', notes: 'Capítol interior o de personatge sol.' };
+}
+
 function inferirRatioDialegPerAutor(autorPerfil) {
   const perfil = (autorPerfil || '').toLowerCase();
   const altDialeg = ['carver', 'hemingway', 'elmore leonard', 'mccarthy'];
-  if (altDialeg.some(a => perfil.includes(a))) return 'alt';
+  if (altDialeg.some(a => perfil.includes(a))) return normalitzarRatioDialeg('alt');
   const baixDialeg = ['woolf', 'proust', 'bernhard', 'sebald', 'saramago'];
-  if (baixDialeg.some(a => perfil.includes(a))) return 'baix';
-  return 'mig';
+  if (baixDialeg.some(a => perfil.includes(a))) return normalitzarRatioDialeg('baix');
+  return normalitzarRatioDialeg('mig');
 }
 
 // ─── Validació bàsica de longitud (substitueix el jutge) ──────────────────────
@@ -6505,10 +7897,10 @@ function construirContextPersonatgeSecundari(personatge, capitolsGenerats) {
   const veu = personatge.veu || {};
 
   if (aparicions === 0) {
-    return `${nom} [primera aparició]:\n  Funció: ${arc.inici_emocional || ''}\n  Límit moral: ${personatge.limit_moral || ''}\n  Mai diria: "${veu.mai_diria || ''}"`;
+    return `${nom} [primera aparició]:\n  Funció: ${arc.inici_emocional || ''}\n  Límit moral: ${personatge.limit_moral || ''}\n  Mai diria: "${veuMaiDiriaText(veu)}"`;
   }
 
-  const base = `${nom} [${aparicions} aparició${aparicions > 1 ? 's' : ''} anterior${aparicions > 1 ? 's' : ''}]:\n  Arc: ${arc.inici_emocional || ''} → ${arc.final_emocional || ''}\n  Conflicte intern: ${arc.canvi_o_bloqueig || ''}\n  Límit moral: ${personatge.limit_moral || ''}\n  Veu — Registre: ${veu.registre || ''}\n  Veu — Mai diria: "${veu.mai_diria || ''}"\n  Veu — Quan menteix: ${veu.quan_menteix || ''}\n  Estat emocional actual: ${personatge.estat_emocional || ''}\n  Ubicació actual: ${personatge.ubicacio || ''}`;
+  const base = `${nom} [${aparicions} aparició${aparicions > 1 ? 's' : ''} anterior${aparicions > 1 ? 's' : ''}]:\n  Arc: ${arc.inici_emocional || ''} → ${arc.final_emocional || ''}\n  Conflicte intern: ${arc.canvi_o_bloqueig || ''}\n  Límit moral: ${personatge.limit_moral || ''}\n  Veu — Registre: ${veu.registre || ''}\n  Veu — Mai diria: "${veuMaiDiriaText(veu)}"\n  Veu — Quan menteix: ${veu.quan_menteix || ''}\n  Estat emocional actual: ${personatge.estat_emocional || ''}\n  Ubicació actual: ${personatge.ubicacio || ''}`;
 
   if (aparicions === 1) return base;
 
@@ -6552,7 +7944,7 @@ function construirBlocPersonatges(nkg, capitolsGenerats) {
   const arc = protagonista?.arc || {};
   const veu = protagonista?.veu || {};
 
-  const blocProt = `PROTAGONISTA — ${protagonista?.nom || ''}:\n  Arc: ${arc.inici_emocional || ''} → ${arc.final_emocional || ''}\n  Canvi: ${arc.canvi_o_bloqueig || ''}\n  Límit moral: ${protagonista?.limit_moral || ''}\n  Veu — Registre: ${veu.registre || ''}\n  Veu — Mai diria: "${veu.mai_diria || ''}"\n  Veu — Quan menteix: ${veu.quan_menteix || ''}\n  Veu — Quan és sincer: ${veu.quan_es_sincer || ''}\n  Estat emocional: ${protagonista?.estat_emocional || ''}\n  Ubicació: ${protagonista?.ubicacio || ''}\n  Objectius actuals: ${(protagonista?.objectius || []).join(' / ') || 'cap definit'}`;
+  const blocProt = `PROTAGONISTA — ${protagonista?.nom || ''}:\n  Arc: ${arc.inici_emocional || ''} → ${arc.final_emocional || ''}\n  Canvi: ${arc.canvi_o_bloqueig || ''}\n  Límit moral: ${protagonista?.limit_moral || ''}\n  Veu — Registre: ${veu.registre || ''}\n  Veu — Mai diria: "${veuMaiDiriaText(veu)}"\n  Veu — Quan menteix: ${veu.quan_menteix || ''}\n  Veu — Quan és sincer: ${veu.quan_es_sincer || ''}\n  Estat emocional: ${protagonista?.estat_emocional || ''}\n  Ubicació: ${protagonista?.ubicacio || ''}\n  Objectius actuals: ${((protagonista?.objectius || []).map((o, i) => normalitzarObjectiu(o, i, 1, nkgNormalitzarNom(protagonista?.nom || 'prota')).descripcio).filter(Boolean).join(' / ')) || 'cap definit'}`;
 
   const blocsSecundaris = secundaris.length > 0
     ? secundaris.map(p => construirContextPersonatgeSecundari(p, capitolsGenerats)).join('\n\n')
@@ -6646,7 +8038,7 @@ function construirBlocEstatActual(nkg, thematicCount) {
   return `=== ESTAT ACTUAL ===
 Fils oberts: ${(threads.oberts || []).join(', ') || 'cap'}
 Fils tancats: ${(threads.tancats || []).join(', ') || 'cap'}
-Formulacions temàtiques explícites: ${thematicCount}/1`;
+Formulacions temàtiques explícites: ${thematicCount}/${Math.max(1, Number((ESTAT._nkg && ESTAT._nkg.macronarrativa && ESTAT._nkg.macronarrativa.thematic_count_max) || 3))}`;
 }
 
 function construirBlocCapitolBase(capitolNum, capitolInfo, intensitat) {
@@ -6658,9 +8050,10 @@ Extensió objectiu: ~${objectiuParaules} paraules (OBLIGATORI — no tallis cap 
 }
 
 function construirBlocSubtextualitat(thematicCount) {
-  return thematicCount >= 1
-    ? "Subtextualitat: El tema NO pot ser formulat explícitament. Mostra'l per acció o contrast, mai verbalment."
-    : "Subtextualitat: Pots formular el tema una sola vegada si és el moment dramàtic adequat.";
+  const thematicMax = Math.max(1, Number((ESTAT._nkg && ESTAT._nkg.macronarrativa && ESTAT._nkg.macronarrativa.thematic_count_max) || 3));
+  return thematicCount >= thematicMax
+    ? "Subtextualitat: El tema ja s'ha expressat prou explícitament. A partir d'ara, transmet-lo NOMÉS a través de subtextualitat, atmosfera i accions, MAI amb afirmacions directes."
+    : `Subtextualitat: Pots formular el tema explícitament com a màxim ${thematicMax - thematicCount} vegada(es) si és dramàticament necessari.`;
 }
 
 function construirBlocRitme(intensitat, ratioDialeg) {
@@ -6671,12 +8064,9 @@ function construirBlocRitme(intensitat, ratioDialeg) {
     4: 'Ritme tens. Descripció mínima. Paràgrafs de 2-3 línies. Acció dominant.',
     5: 'Ritme màxim. Cap descripció innecessària. Frases curtes. Tot és acció o decisió.'
   };
-  const instruccionsRatio = {
-    alt:  'Diàleg dominant (>60%). La narració existeix per contextualitzar el diàleg, no al revés.',
-    baix: 'Narració dominant (<20% diàleg). El diàleg és excepció, no norma.',
-    mig:  'Equilibri narració/diàleg. Cap dels dos domina.'
-  };
-  const blocRatio = ratioDialeg ? `\n  Proporció: ${instruccionsRatio[ratioDialeg] || ''}` : '';
+  const rr = normalitzarRatioDialeg(ratioDialeg || {});
+  const blocRatio = `
+  Ratio diàleg: ${rr.percentatge_dialeg}% (${rr.tipus_dialeg}). ${rr.notes || ''}`;
   return `RITME (intensitat ${intensitat}/5): ${ritmesBase[intensitat] || ''}${blocRatio}`;
 }
 
@@ -6721,6 +8111,35 @@ function construirInstruccioCapitol(capitolNum, totalCapitols, nkg, capitolInfo)
     construirBlocGanxo(capitolInfo),
     '\nEscriu ara el capítol directament:'
   ].filter(Boolean).join('\n');
+}
+
+function payloadConteInstruccioTematicaExplicita(payload) {
+  if (!payload) return false;
+  const texts = [];
+  const afegir = x => { if (x) texts.push(String(x)); };
+  if (Array.isArray(payload.system)) payload.system.forEach(b => afegir(typeof b === 'string' ? b : b.text));
+  else afegir(payload.system);
+  (payload.messages || []).forEach(m => {
+    const c = m && m.content;
+    if (typeof c === 'string') afegir(c);
+    else if (Array.isArray(c)) c.forEach(b => afegir(typeof b === 'string' ? b : b.text));
+  });
+  const text = texts.join('\n').toLowerCase();
+  return /pots formular el tema explícitament|pots formular el tema explicitament|formular el tema explícitament una sola vegada|formular el tema explicitament una sola vegada/.test(text);
+}
+
+function registrarConsumInstruccioTematica(nkg, payload) {
+  if (!nkg || !nkg.macronarrativa) return;
+  const thematicMax = Math.max(1, Number(nkg.macronarrativa.thematic_count_max || 3));
+  if (nkg.macronarrativa.thematic_count === undefined || nkg.macronarrativa.thematic_count === null) {
+    nkg.macronarrativa.thematic_count = 0;
+  }
+  if (payloadConteInstruccioTematicaExplicita(payload)) {
+    nkg.macronarrativa.thematic_count += 1;
+    if (nkg.macronarrativa.thematic_count > thematicMax) {
+      console.warn(`⚠️  ALERTA: instrucció temàtica explícita consumida ${nkg.macronarrativa.thematic_count} vegades al capítol. Màxim recomanat: ${thematicMax}.`);
+    }
+  }
 }
 
 async function construirPayload(capitolNum, totalCapitols, nkg, biblia, capitolsGenerats, capitolInfo, autorPerfil) {
@@ -6887,6 +8306,12 @@ async function generarCapitol(idx, intents = 0) {
   const cap = ESTAT._estructuraCapitols[idx];
   const titol = cap.titol || 'Capítol ' + (idx + 1);
   const capitolNum = idx + 1;
+  if (ESTAT._nkg && ESTAT._nkg.macronarrativa) {
+    ESTAT._nkg.macronarrativa.thematic_count = 0;
+    if (ESTAT._nkg.macronarrativa.thematic_count_max === undefined || ESTAT._nkg.macronarrativa.thematic_count_max === null) {
+      ESTAT._nkg.macronarrativa.thematic_count_max = 3;
+    }
+  }
   document.getElementById('capitol-actual-wrap').classList.add('hidden');
   document.getElementById('revisio-panel').classList.add('hidden');
   document.getElementById('checkpoint-intermedi-panel').classList.add('hidden');
@@ -6931,6 +8356,7 @@ async function generarCapitol(idx, intents = 0) {
     const modelConfig = seleccionarModel(capitolNum, totalCaps, cap.intensity_level || 3);
     const payload = await construirPayload(capitolNum, totalCaps, nkg, biblia, capitolsGenerats, cap, autorPerfil);
     Object.assign(payload, modelConfig);
+    registrarConsumInstruccioTematica(nkg, payload);
 
     // Generació — ruta per proveïdor
     const { proveidor: provCapitol } = getProviderAndModelPerRol(USER_CONFIG || {}, 'generacio');
@@ -7093,6 +8519,293 @@ function normalitzarSynopsisPerNKG(text) {
   return s;
 }
 
+
+function inferirEstatEmocionalInicialDesDeArc(arc = {}) {
+  const inici = String(arc && arc.inici_emocional || '').trim();
+  return inici || 'en alerta continguda';
+}
+
+function inferirEstatFisicInicialDesDeArc(arc = {}, limitMoral = '') {
+  const txt = `${String(arc?.inici_emocional || '')} ${String(arc?.canvi_o_bloqueig || '')} ${String(limitMoral || '')}`.toLowerCase();
+  if (/ferit|lesi|cicatriu|dolor|coix|trencat/.test(txt)) return 'amb seqüeles físiques visibles';
+  if (/esgot|fatig|insomni|ansietat|estr[eè]s|p[àa]nic/.test(txt)) return 'fatigat, amb son irregular i tensió muscular';
+  if (/addic|alcohol|drog|abstin/.test(txt)) return 'fràgil físicament, amb tremolor intermitent';
+  return 'cansat però funcional';
+}
+
+function teValorPlaceholder(v = '') {
+  const txt = String(v || '').trim().toLowerCase();
+  return !txt || txt === 'desconeguda' || txt === 'desconegut' || txt === 'no determinat' || txt === 'no determinada' || txt === 'pendent';
+}
+
+function fusionarCampPersonatgeValor(actual, nou) {
+  return teValorPlaceholder(actual) && !teValorPlaceholder(nou) ? String(nou).trim() : actual;
+}
+
+function validarImmutablesPerExportCapitol1(nkg, capitolActual) {
+  if ((capitolActual || 1) !== 1) return;
+  const personatges = Object.values((nkg && nkg.personatges) || {});
+  const camps = ['edat_aproximada', 'genere', 'rol_narratiu', 'relacio_protagonista', 'aspecte_fisic', 'ocupacio', 'tret_definitori'];
+  const ambProblemes = [];
+  personatges.forEach(p => {
+    const t = p && p.trets_immutables;
+    if (!t || typeof t !== 'object') {
+      ambProblemes.push((p && p.nom) || 'personatge sense nom');
+      return;
+    }
+    const invalid = camps.some(c => teValorPlaceholder(t[c]));
+    if (invalid) ambProblemes.push(p.nom || 'personatge sense nom');
+  });
+  if (ambProblemes.length > 0) throw new Error(`Exportació bloquejada (capítol 1): completa els trets immutables de ${ambProblemes.join(', ')}.`);
+}
+
+function parseMotivacionsBase(text = '') {
+  const src = String(text || '').trim();
+  if (!src) return { desig_extern: '', necessitat_interna: '' };
+  const mVull = src.match(/(?:^|[;|,.]\s*)(?:vull|desig(?:o)?):?\s*([^;|.\n]+)/i);
+  const mNec = src.match(/(?:^|[;|,.]\s*)(?:necessit(?:o|a)t(?:\s+interna)?):?\s*([^;|.\n]+)/i);
+  const desig_extern = (mVull ? mVull[1] : src.split(/[;|\n]/)[0] || '').trim();
+  const necessitat_interna = (mNec ? mNec[1] : '').trim();
+  return { desig_extern, necessitat_interna };
+}
+
+function normalitzarObjectiu(raw, idx = 0, capitol = 1, clau = 'pers') {
+  if (typeof raw === 'string') {
+    return {
+      id: `obj_${clau}_${String(idx + 1).padStart(2, '0')}`,
+      descripcio: raw,
+      prioritat: 3,
+      actiu_des_de_capitol: capitol,
+      resolt_a_capitol: null,
+      bloquejat_per: null
+    };
+  }
+  const r = raw || {};
+  return {
+    id: String(r.id || `obj_${clau}_${String(idx + 1).padStart(2, '0')}`).trim(),
+    descripcio: String(r.descripcio || '').trim(),
+    prioritat: Math.max(1, Math.min(5, Number(r.prioritat) || 3)),
+    actiu_des_de_capitol: Math.max(1, Number(r.actiu_des_de_capitol) || capitol || 1),
+    resolt_a_capitol: (r.resolt_a_capitol === null || r.resolt_a_capitol === undefined || r.resolt_a_capitol === '') ? null : Math.max(1, Number(r.resolt_a_capitol) || null),
+    bloquejat_per: (r.bloquejat_per === null || r.bloquejat_per === undefined || String(r.bloquejat_per).trim() === '') ? null : String(r.bloquejat_per).trim()
+  };
+}
+
+function normalitzarSecret(raw, idx = 0, clau = 'pers') {
+  if (typeof raw === 'string') {
+    return {
+      id: `sec_${clau}_${String(idx + 1).padStart(2, '0')}`,
+      contingut: raw,
+      conegut_per: [clau],
+      revelat_a_capitol: null,
+      impacte_si_revelat: ''
+    };
+  }
+  const r = raw || {};
+  return {
+    id: String(r.id || `sec_${clau}_${String(idx + 1).padStart(2, '0')}`).trim(),
+    contingut: String(r.contingut || '').trim(),
+    conegut_per: Array.isArray(r.conegut_per) ? r.conegut_per.map(x => String(x || '').trim()).filter(Boolean) : [clau],
+    revelat_a_capitol: (r.revelat_a_capitol === null || r.revelat_a_capitol === undefined || r.revelat_a_capitol === '') ? null : Math.max(1, Number(r.revelat_a_capitol) || null),
+    impacte_si_revelat: String(r.impacte_si_revelat || '').trim()
+  };
+}
+
+function normalitzarObjecteNarratiu(raw = {}, fallbackId = '') {
+  const r = raw || {};
+  const idBase = String(r.id || fallbackId || r.nom || '').trim();
+  const id = nkgNormalitzarNom(idBase);
+  if (!id) return null;
+  return {
+    id,
+    nom: String(r.nom || id).trim(),
+    descripcio_fisica: String(r.descripcio_fisica || '').trim(),
+    significat_simbolic: String(r.significat_simbolic || '').trim(),
+    ubicacio_inicial: String(r.ubicacio_inicial || r.ubicacio || '').trim(),
+    posseidor_inicial: r.posseidor_inicial != null && String(r.posseidor_inicial).trim() !== '' ? nkgNormalitzarNom(String(r.posseidor_inicial)) : null,
+    es_clau_per_al_desenllaç: !!r.es_clau_per_al_desenllaç,
+    primera_aparicio_capitol: Math.max(1, Number(r.primera_aparicio_capitol) || 1),
+    historial: Array.isArray(r.historial) ? r.historial.map(h => ({
+      capitol: Math.max(1, Number(h.capitol) || 1),
+      accio: ['agafat','deixat','mogut','destruït','transformat','revelat'].includes(h.accio) ? h.accio : 'mogut',
+      personatge: h.personatge ? nkgNormalitzarNom(String(h.personatge)) : null,
+      ubicacio_nova: String(h.ubicacio_nova || '').trim()
+    })) : []
+  };
+}
+
+function resoldreIdObjecte(nkg, ref = '') {
+  const id = nkgNormalitzarNom(ref);
+  if (!id) return '';
+  if (nkg && nkg.objectes && nkg.objectes[id]) return id;
+  if (nkg && nkg.objectes) {
+    const byNom = Object.keys(nkg.objectes).find(k => nkgNormalitzarNom(nkg.objectes[k]?.nom || '') === id);
+    if (byNom) return byNom;
+  }
+  return id;
+}
+
+function inferirAccioObjecte(causa = '', fromPos = null, toPos = null) {
+  const c = String(causa || '').toLowerCase();
+  if (/destru|trenca|crema/.test(c)) return 'destruït';
+  if (/transform|converteix/.test(c)) return 'transformat';
+  if (/revela|mostra/.test(c)) return 'revelat';
+  if (!fromPos && toPos) return 'agafat';
+  if (fromPos && !toPos) return 'deixat';
+  return 'mogut';
+}
+
+function getObjectState(capitol = 1) {
+  const cap = Math.max(1, Number(capitol) || 1);
+  const nkg = ESTAT._nkg || {};
+  const out = {};
+  Object.entries((nkg.objectes || {})).forEach(([id, raw]) => {
+    const obj = normalitzarObjecteNarratiu(raw, id);
+    if (!obj) return;
+    let posseidor = obj.posseidor_inicial;
+    let ubicacio = obj.ubicacio_inicial || '';
+    (obj.historial || [])
+      .filter(h => h.capitol <= cap)
+      .sort((a, b) => a.capitol - b.capitol)
+      .forEach(h => {
+        if (h.personatge !== undefined) posseidor = h.personatge || null;
+        if (h.ubicacio_nova) ubicacio = h.ubicacio_nova;
+      });
+    out[id] = { posseidor, ubicacio, primera_aparicio_capitol: obj.primera_aparicio_capitol, es_clau_per_al_desenllaç: obj.es_clau_per_al_desenllaç };
+  });
+  return out;
+}
+
+function normalitzarLlocNarratiu(raw = {}, fallbackId = '') {
+  const r = raw || {};
+  const id = nkgNormalitzarNom(String(r.id || fallbackId || r.nom || '').trim());
+  if (!id) return null;
+  const tipusValids = ['edifici', 'estança', 'exterior', 'zona_tecnica', 'vehicle'];
+  const accessValids = ['lliure', 'tancada_clau', 'oculta', 'exterior_exposat'];
+  const llumValida = ['natural', 'artificial', 'cap', 'mixta'];
+  return {
+    id,
+    nom: String(r.nom || id).trim(),
+    tipus: tipusValids.includes(r.tipus) ? r.tipus : 'estança',
+    descripcio_sensorial: String(r.descripcio_sensorial || '').trim(),
+    parent: r.parent ? nkgNormalitzarNom(String(r.parent)) : null,
+    connectat_amb: Array.isArray(r.connectat_amb) ? [...new Set(r.connectat_amb.map(x => nkgNormalitzarNom(String(x || ''))).filter(Boolean))] : [],
+    sistemes_tecnics: Array.isArray(r.sistemes_tecnics) ? r.sistemes_tecnics.map(x => String(x || '').trim()).filter(Boolean) : [],
+    temperatura_base: r.temperatura_base == null || String(r.temperatura_base).trim() === '' ? null : String(r.temperatura_base).trim(),
+    accessibilitat: accessValids.includes(r.accessibilitat) ? r.accessibilitat : 'lliure',
+    iluminacio: llumValida.includes(r.iluminacio) ? r.iluminacio : 'mixta'
+  };
+}
+
+function normalitzarReglaMon(raw = {}, idx = 1) {
+  const r = raw || {};
+  const cats = ['fisica', 'tecnologica', 'social', 'climatica', 'logistica'];
+  if (typeof r === 'string') {
+    return {
+      id: `regla_${String(idx).padStart(2, '0')}`,
+      descripcio: r,
+      categoria: 'logistica',
+      excepcions: null,
+      afecta_personatges: []
+    };
+  }
+  return {
+    id: String(r.id || `regla_${String(idx).padStart(2, '0')}`).trim(),
+    descripcio: String(r.descripcio || '').trim(),
+    categoria: cats.includes(r.categoria) ? r.categoria : 'logistica',
+    excepcions: r.excepcions == null || String(r.excepcions).trim() === '' ? null : String(r.excepcions).trim(),
+    afecta_personatges: Array.isArray(r.afecta_personatges) ? r.afecta_personatges.map(x => nkgNormalitzarNom(String(x || ''))).filter(Boolean) : []
+  };
+}
+
+function getAdjacentLocations(locId = '') {
+  const nkg = ESTAT._nkg || {};
+  const id = nkgNormalitzarNom(locId);
+  if (!id || !nkg.llocs || !nkg.llocs[id]) return [];
+  const directes = Array.isArray(nkg.llocs[id].connectat_amb) ? nkg.llocs[id].connectat_amb : [];
+  const graf = Array.isArray(nkg.mapa_adjacencies) ? nkg.mapa_adjacencies : [];
+  const edges = graf.flatMap(e => {
+    const de = nkgNormalitzarNom(e.de || '');
+    const a = nkgNormalitzarNom(e.a || '');
+    if (de === id && a) return [a];
+    if (a === id && de) return [de];
+    return [];
+  });
+  return [...new Set([...directes, ...edges])];
+}
+
+function canReach(personatge, origen, desti) {
+  const nkg = ESTAT._nkg || {};
+  const start = nkgNormalitzarNom(origen || '');
+  const goal = nkgNormalitzarNom(desti || '');
+  if (!start || !goal || !nkg.llocs || !nkg.llocs[start] || !nkg.llocs[goal]) return false;
+  const maxPassos = 30;
+  const q = [start];
+  const vist = new Set([start]);
+  let passos = 0;
+  while (q.length > 0 && passos < maxPassos) {
+    const cur = q.shift();
+    if (cur === goal) return true;
+    passos += 1;
+    getAdjacentLocations(cur).forEach(nx => {
+      if (vist.has(nx) || !nkg.llocs[nx]) return;
+      const acc = nkg.llocs[nx].accessibilitat || 'lliure';
+      if (acc === 'oculta') return;
+      vist.add(nx);
+      q.push(nx);
+    });
+  }
+  return false;
+}
+
+function sincronitzarReferenciesObjectesPersonatges() {
+  const nkg = ESTAT._nkg || {};
+  const pers = nkg.personatges || {};
+  Object.entries(pers).forEach(([clau, p]) => {
+    p.objectes_inventari = (Array.isArray(p.objectes_inventari) ? p.objectes_inventari : [])
+      .map(ref => resoldreIdObjecte(nkg, typeof ref === 'string' ? ref : (ref && ref.id) || (ref && ref.objecte) || ''))
+      .filter(Boolean);
+    p.objectes_descartats = (Array.isArray(p.objectes_descartats) ? p.objectes_descartats : [])
+      .map(ref => resoldreIdObjecte(nkg, typeof ref === 'string' ? ref : (ref && ref.id) || (ref && ref.objecte) || ''))
+      .filter(Boolean);
+    p.objectes_inventari = [...new Set(p.objectes_inventari)];
+    p.objectes_descartats = [...new Set(p.objectes_descartats)];
+  });
+}
+
+function migrarMotivacionsBaseDesDeBiblia() {
+  if (!ESTAT._nkg || !ESTAT._nkg.personatges) return;
+  const fitxes = (ESTAT.bibliaNarrativa && Array.isArray(ESTAT.bibliaNarrativa.fitxes_personatges)) ? ESTAT.bibliaNarrativa.fitxes_personatges : [];
+  Object.entries(ESTAT._nkg.personatges).forEach(([clau, p]) => {
+    const fitxa = fitxes.find(f => nkgNormalitzarNom(f && f.nom || '') === clau);
+    const baseTxt = fitxa && fitxa.motivacions ? fitxa.motivacions : '';
+    const parsed = parseMotivacionsBase(baseTxt);
+    const actual = p.motivacions_base || { desig_extern: '', necessitat_interna: '' };
+    p.motivacions_base = {
+      desig_extern: actual.desig_extern || parsed.desig_extern || '',
+      necessitat_interna: actual.necessitat_interna || parsed.necessitat_interna || ''
+    };
+    p.objectius = Array.isArray(p.objectius) ? p.objectius.map((o, i) => normalitzarObjectiu(o, i, 1, clau)).filter(o => o.descripcio) : [];
+    p.secrets = Array.isArray(p.secrets) ? p.secrets.map((x, i) => normalitzarSecret(x, i, clau)).filter(x => x.contingut) : [];
+  });
+}
+
+function getActiveObjectives(capitol = 1) {
+  const cap = Math.max(1, Number(capitol) || 1);
+  const out = {};
+  const personatges = (ESTAT._nkg && ESTAT._nkg.personatges) ? ESTAT._nkg.personatges : {};
+  Object.entries(personatges).forEach(([clau, p]) => {
+    const objectius = (Array.isArray(p.objectius) ? p.objectius : [])
+      .map((o, i) => normalitzarObjectiu(o, i, 1, clau))
+      .filter(o => o.descripcio && o.actiu_des_de_capitol <= cap && (o.resolt_a_capitol === null || o.resolt_a_capitol > cap));
+    const secrets_no_revelats = (Array.isArray(p.secrets) ? p.secrets : [])
+      .map((x, i) => normalitzarSecret(x, i, clau))
+      .filter(x => x.contingut && (x.revelat_a_capitol === null || x.revelat_a_capitol > cap));
+    out[clau] = { objectius, secrets_no_revelats };
+  });
+  return out;
+}
+
 function assegurarPersonatgesNKGMinims(nkg, biblia) {
   if (!nkg || typeof nkg !== 'object') return;
   if (!nkg.personatges || typeof nkg.personatges !== 'object') nkg.personatges = {};
@@ -7105,12 +8818,12 @@ function assegurarPersonatgesNKGMinims(nkg, biblia) {
     if (!clau) return;
     nkg.personatges[clau] = {
       nom,
-      estat_fisic: '',
-      estat_emocional: 'neutre',
+      estat_fisic: inferirEstatFisicInicialDesDeArc(fp.arc, fp.limit_moral),
+      estat_emocional: inferirEstatEmocionalInicialDesDeArc(fp.arc),
       arc: fp.arc || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '' },
       limit_moral: fp.limit_moral || '',
-      veu: fp.veu || { registre: '', mai_diria: '', quan_menteix: '', quan_es_sincer: '' },
-      objectes_inventari: [], objectes_descartats: [], ubicacio: '', objectius: [], secrets: [], viu: true, primera_aparicio: 0, trets_immutables: null
+      veu: fp.veu || { registre: '', mai_diria: [], quan_menteix: '', quan_es_sincer: '', exemples_narratius: [], vocabulari_recurrent: [], vocabulari_prohibit: [], longitud_frases: 'mitjanes' },
+      objectes_inventari: [], objectes_descartats: [], ubicacio: '', motivacions_base: { desig_extern: '', necessitat_interna: '' }, objectius: [], secrets: [], viu: true, primera_aparicio: 0, trets_immutables: null
     };
   });
 }
@@ -7121,7 +8834,9 @@ async function generarFitxerContexte(nkg, biblia, capitolActual) {
       nkg.macronarrativa.synopsis_core = normalitzarSynopsisPerNKG(nkg.macronarrativa.synopsis_core);
     }
     assegurarPersonatgesNKGMinims(nkg, biblia);
+    migrarMotivacionsBaseDesDeBiblia();
   } catch (e) { console.warn('Normalització export NKG:', e.message); }
+  validarImmutablesPerExportCapitol1(nkg, capitolActual);
 
   const estructuraCapitols = ESTAT._estructuraCapitols || [];
   const idxCapitol = Math.max(0, Math.min((capitolActual || 1) - 1, Math.max(0, estructuraCapitols.length - 1)));
@@ -7156,26 +8871,42 @@ async function generarFitxerContexte(nkg, biblia, capitolActual) {
     console.warn('Export NKG + prompt: no s\'ha pogut construir el payload del capítol.', e.message);
   }
 
+  const perspectivaCtx = ((nkg.context_creacio || {}).estil || {}).perspectiva || {};
+  const cronologiaCtx = (nkg.context_creacio || {}).cronologia || { per_capitol: [] };
+  const povCapitolActual = (perspectivaCtx.pov_per_capitol || []).find(p => Number(p.capitol) === Number(capitolActual));
+
   const contingut = {
     exportat_en_capitol: capitolActual,
     exportat_a: new Date().toISOString(),
     fase_actual: ESTAT.fase || null,
     mode_creacio: ESTAT._modeCreacio || 'guiat',
+    pov_capitol_actual: povCapitolActual || null,
     macronarrativa: nkg.macronarrativa,
     threads: nkg.threads,
     personatges: nkg.personatges,
     llocs: nkg.llocs,
+    mapa_adjacencies: nkg.mapa_adjacencies || [],
     objectes: nkg.objectes,
     fets_canonics: nkg.fets_canonics,
     esdeveniments: (nkg.esdeveniments || []).slice(-10),
     relacions: nkg.relacions || [],
-    timeline_accions: (nkg.timeline_accions || []).slice(-20),
+    timeline_accions: (nkg.timeline_accions || []).filter(a => {
+      if (!a || typeof a === 'string') return true;
+      return Number(a.capitol || 0) <= Number(capitolActual || 0);
+    }).slice(-40),
     timeline_objectes: (nkg.timeline_objectes || []).slice(-20),
     timeline_personatges: (nkg.timeline_personatges || []).slice(-20),
     beats_gastats: nkg.beats_gastats || [],
+    vista_filtrada_capitol: getActiveObjectives(capitolActual),
+    snapshot_objectes_capitol: getObjectState(capitolActual),
     context_creacio: {
       tematica: ESTAT.tematica || '',
-      estil: ESTAT.estil || {},
+      estil: Object.assign({}, ESTAT.estil || {}, {
+        perspectiva: perspectivaCtx || normalitzarPerspectivaNarrativa(ESTAT.estil?.perspectiva || {})
+      }),
+      cronologia: cronologiaCtx || { data_inici_historia: '', duracio_total_estimada: '', per_capitol: [] },
+      cronologia_acumulada_capitol: ((cronologiaCtx.per_capitol || []))
+        .filter(c => Number(c.capitol || 0) <= Number(capitolActual || 0)),
       final_text: ESTAT._finalNouText || '',
       tema_text: ESTAT._temaNouText || '',
       worldbuilding: ESTAT.worldbuilding || '',
@@ -7201,7 +8932,11 @@ async function descarregarNKGiBiblia() {
   const capitolActual = (ESTAT._capitolActual || 0) + 1;
   const nkg = ESTAT._nkg || {};
   const biblia = ESTAT.bibliaNarrativa || {};
-  await generarFitxerContexte(nkg, biblia, capitolActual);
+  try {
+    await generarFitxerContexte(nkg, biblia, capitolActual);
+  } catch (err) {
+    toast(err.message || 'No s\'ha pogut exportar NKG + Bíblia.');
+  }
 }
 
 async function generarDocumentFinal(capitolsGenerats, capitolsEscaleta, nkg, configuracio) {
@@ -8531,7 +10266,7 @@ function obrirBiblia() {
 
   let html = '';
   if (b.regles_mon && b.regles_mon.length > 0) {
-    html += `<h4 style="color:var(--accent2);margin:14px 0 8px">🌍 Regles del Món</h4><ul style="padding-left:18px">${b.regles_mon.map(r => `<li style="margin-bottom:4px">${r}</li>`).join('\n')}</ul>`;
+    html += `<h4 style="color:var(--accent2);margin:14px 0 8px">🌍 Regles del Món</h4><ul style="padding-left:18px">${b.regles_mon.map((r, i) => { const rr = normalitzarReglaMon(r, i + 1); return `<li style="margin-bottom:4px"><strong>${rr.id}</strong> (${rr.categoria}): ${rr.descripcio}</li>`; }).join('\n')}</ul>`;
   }
   if (b.llocs_importants && b.llocs_importants.length > 0) {
     html += `<h4 style="color:var(--accent2);margin:14px 0 8px">📍 Llocs Importants</h4><ul style="padding-left:18px">${b.llocs_importants.map(l => `<li style="margin-bottom:4px"><strong>${l.nom}</strong>: ${l.descripcio}</li>`).join('\n')}</ul>`;
@@ -9537,6 +11272,7 @@ function getGenreStyle(tematica) {
   if (isLarsson) return `
 
 ── ESTIL STIEG LARSSON ──
+AMBIENTACIÓ I PERSONATGES (OBLIGATORI): L'acció i els personatges han de ser nòrdics/escandinaus. Mantén noms, topònims, institucions, clima i codis socials del nord d'Europa. Evita desplaçar el marc a contextos mediterranis o llatinoamericans.
 Pensament i visió del món: Larsson era periodista d'investigació i antifeixista militant. Les seves obres neixen de la convicció que la violència contra les dones i la corrupció institucional són sistèmiques, no excepcions. Escrius des d'aquesta consciència política sense abanderats ni discursos.
 Prosa directa i funcional, carregada de detall procedimental: cada acció d'investigació —una trucada, un arxiu consultat, una font protegida— s'explica amb lògica interna creïble i concreta.
 L'entorn nòrdic (hivern escandinau, foscor, aïllament geogràfic i social) actua com a personatge amb pes propi: el fred és moral tant com climàtic.
@@ -9549,6 +11285,7 @@ Ritme metòdic i pausat en la investigació, amb pics d'acció breu, directa i b
   if (isTolkien) return `
 
 ── ESTIL J.R.R. TOLKIEN ──
+AMBIENTACIÓ I PERSONATGES (OBLIGATORI): Els personatges i el món han de ser imaginaris dins l'òrbita tolkieniana (Terra Mitjana-like): races, regnes, llengües, mites i geografia pròpia de fantasia èpica. Evita marcs contemporanis realistes.
 Pensament i visió del món: Tolkien era filòleg, catòlic i veterà de la Primera Guerra Mundial. El seu univers neix de la convicció que el llenguatge crea realitat, que el bé i el mal existeixen com a forces còsmiques, i que la humilitat dels petits pot transformar la història. Escrius des d'aquesta fe en la bellesa i el sacrifici.
 Prosa èpica, lírica i detallada: les descripcions de paisatge i arquitectura transmeten profunditat i antiguitat immemorial, com si el món existís des d'abans que comencés la història.
 Univers tolkienià complet: races (Eldar, Khazad, hobits, homes, orcs, ents), geografies amb nom i memòria pròpia, llenguatges inventats amb fonologia coherent, cançons i poemes intercalats quan l'escena ho demana.
@@ -9560,6 +11297,7 @@ El mal té pes físic i sensorial: no s'explica, es percep en l'aire que s'espes
   if (isDick) return `
 
 ── ESTIL PHILIP K. DICK ──
+AMBIENTACIÓ I PERSONATGES (OBLIGATORI): L'ambientació i els personatges han de ser nord-americans (Estats Units): ciutats, suburbis, burocràcies, corporacions i codis culturals propis del context nord-americà, encara que sigui en clau distòpica/futurista.
 Pensament i visió del món: Dick era un paranoic funcional fascinat per la gnosi, les drogues, la simulació i la pregunta de si alguna cosa és real. Les seves obres neixen de la convicció que la realitat és una capa prima que pot trencar-se en qualsevol moment i que el sistema —qualsevol sistema— menteix. Escrius des d'aquesta desconfiança radical.
 Paranoia com a estat cognitiu del protagonista i del lector: les institucions (estat, corporacions, androïdes, drogues prescrites) manipulen la percepció; ningú sap mai si el que veu és real o induït.
 Les drogues —legals, il·legals, prescrites per l'estat— com a eina de control social i com a porta ambigua a altres realitats: poden revelar la veritat o ser la mentida més sofisticada.
@@ -9572,6 +11310,7 @@ Empatia com a única brúixola moral: en un món on res és real, la capacitat d
   if (isCastaneda) return `
 
 ── ESTIL CARLOS CASTANEDA ──
+AMBIENTACIÓ I PERSONATGES (OBLIGATORI): L'ambientació i els personatges han de ser mexicans, amb context cultural i territorial de Mèxic (desert, serres, pobles, ciutats, llenguatge i cosmovisions locals), sense desplaçar-ho a marcs genèrics.
 Pensament i visió del món: Castaneda partia de la tradició tolteca i xamànica per demostrar que la realitat ordinària és un acord social, no una veritat absoluta. Les seves obres neixen de la convicció que la percepció es pot estendre més enllà dels límits racionals i que hi ha un "punt d'assemblatge" que pot moure's. Escrius des d'aquesta epistemologia alternativa.
 Marc antropològic o periodístic que es dissol progressivament: el narrador arriba com a investigador racional i occidental i surt transformat per experiències que la seva formació no pot contenir.
 Relació mestre-aprenent com a eix narratiu: el personatge guia (el bruixot, el nagual, el curandero) no explica mai directament, ensenya a través de tasques impossibles, silencis deliberats, paradoxes i situacions límit.
@@ -11519,7 +13258,7 @@ function buildContextCapitolLegacy(idx, skipRegistre = false, estat = ESTAT) {
 
     if (biblia.regles_mon && biblia.regles_mon.length > 0) {
       bibliaLines.push('REGLES DEL MÓN (respecta-les sempre):');
-      biblia.regles_mon.forEach(r => bibliaLines.push('- ' + r));
+      biblia.regles_mon.forEach((r, i) => { const rr = normalitzarReglaMon(r, i + 1); bibliaLines.push(`- [${rr.categoria}] ${rr.descripcio}`); });
     }
 
     if (bibliaLines.length > 0) {
@@ -12142,7 +13881,7 @@ async function revisarCapitol(textCapitol, idx, userConfig) {
 
     if (Array.isArray(nkg.timeline_accions) && nkg.timeline_accions.length > 0) {
       parts.push('ÚLTIMES ACCIONS CONSUMADES (detecta regressió si el capítol les torna a narrar):\n' +
-        nkg.timeline_accions.slice(-10).map(a => `• ${a}`).join('\n'));
+        nkg.timeline_accions.slice(-10).map(a => `• ${formatTimelineAccio(a)}`).join('\n'));
     }
 
     if (Array.isArray(nkg.fets_canonics) && nkg.fets_canonics.length > 0) {
@@ -12572,7 +14311,7 @@ ${personatgesCtx}
 
 Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense markdown, sense text addicional):
 {
-  "regles_mon": ["regla del món 1", "regla del món 2"],
+  "regles_mon": [{"id":"regla_01","descripcio":"...","categoria":"logistica","excepcions":null,"afecta_personatges":[]}],
   "llocs_importants": [{"nom": "nom del lloc", "descripcio": "descripció breu del lloc i el seu paper"}],
   "objectes_clau": [{"nom": "nom de l'objecte", "significat": "significat narratiu o simbòlic"}],
   "fitxes_personatges": [
@@ -12601,7 +14340,7 @@ IMPORTANT: El JSON ha de ser COMPLET amb TOTS els personatges de l'elenc. Manté
 
   const dades = parseJsonRobust(response);
   if (dades) {
-    if (dades.regles_mon)         ESTAT.bibliaNarrativa.regles_mon         = dades.regles_mon;
+    if (dades.regles_mon)         ESTAT.bibliaNarrativa.regles_mon         = dades.regles_mon.map((r, i) => normalitzarReglaMon(r, i + 1)).filter(r => r.descripcio);
     if (dades.llocs_importants)   ESTAT.bibliaNarrativa.llocs_importants   = dades.llocs_importants;
     if (dades.objectes_clau)      ESTAT.bibliaNarrativa.objectes_clau      = dades.objectes_clau;
     if (dades.fitxes_personatges) ESTAT.bibliaNarrativa.fitxes_personatges = dades.fitxes_personatges;
@@ -14117,7 +15856,7 @@ OBLIGATORI: Fusiona plot i drama intern. El camp "detonant_emocional_escena" ha 
 }
 
 // ═══════════════════════════════════════════════════════════
-//  NKG v4: Narrative Knowledge Graph
+//  NKG v5: Narrative Knowledge Graph
 // ═══════════════════════════════════════════════════════════
 
 function crearNKG() {
@@ -14131,7 +15870,12 @@ function crearNKG() {
         imatge_o_escena_final: "",
         veritat_que_es_revela: ""
       },
-      thematic_count: 0
+      backstory_canonic: {
+        fets_previs: [],
+        cronologia_previa: []
+      },
+      thematic_count: 0,
+      thematic_count_max: 3
     },
     threads: {
       oberts: [],
@@ -14140,17 +15884,32 @@ function crearNKG() {
     },
     personatges: {},
     llocs: {},
+    mapa_adjacencies: [],
     objectes: {},
     fets_canonics: [],
     esdeveniments: [],
-    relacions: [],
-    timeline_accions: [], // Registre d'Accions Consumades (NKG CHRONOS): "C3E2: Maja entra al laboratori"
+    relacions: [], // { personatge_a, personatge_b, tipus, descripcio, coneixement_mutu, evolucio }
+    timeline_accions: [], // [{ capitol, personatge, accio, hora_aproximada, ubicacio }]
     timeline_objectes: [], // Registre de moviment d'objectes: C3E2: [Claus] Personatge A -> Personatge B (motiu)
     timeline_personatges: [], // Registre de canvis de personatge: ubicació/roba/estat per escena
+    context_creacio: {
+      estil: {
+        perspectiva: {
+          tipus: 'tercera_limitada',
+          pov_per_capitol: [],
+          restriccions_informacio: ''
+        }
+      },
+      cronologia: {
+        data_inici_historia: '',
+        duracio_total_estimada: '',
+        per_capitol: []
+      }
+    },
     transicions_capitols: [], // Regles de pas capítol->capítol per evitar salts i pèrdua de continuïtat
     beats_gastats: [], // Registre de beats narratius consumits (anti-repetició dramàtica)
     ultima_actualitzacio: { capitol: 0, escena: 0 },
-    versio: 1
+    versio: 5
   };
 }
 
@@ -14170,50 +15929,72 @@ function nkgNormalitzarNom(nom) {
 
 function nkgRegistrarMovimentObjecte(nkg, objecteNom, fromState, toState, capitol, escena, causa = '') {
   if (!nkg || !objecteNom) return;
-  const clauObj = nkgNormalitzarNom(objecteNom);
+  const clauObj = resoldreIdObjecte(nkg, objecteNom);
   if (!clauObj) return;
 
-  const fromPos = fromState && fromState.posseidor ? String(fromState.posseidor) : null;
+  const fromPos = fromState && fromState.posseidor ? nkgNormalitzarNom(String(fromState.posseidor)) : null;
   const fromUbi = fromState && fromState.ubicacio ? String(fromState.ubicacio) : '';
-  const toPos   = toState && toState.posseidor ? String(toState.posseidor) : null;
+  const toPos   = toState && toState.posseidor ? nkgNormalitzarNom(String(toState.posseidor)) : null;
   const toUbi   = toState && toState.ubicacio ? String(toState.ubicacio) : '';
   const noCanvi = (fromPos || '') === (toPos || '') && (fromUbi || '') === (toUbi || '');
   if (noCanvi) return;
 
-  if (!Array.isArray(nkg.timeline_objectes)) nkg.timeline_objectes = [];
-  const sigSimb = nkg.objectes[clauObj]?.significat_simbolic;
-  if (sigSimb !== null && sigSimb !== undefined && String(sigSimb).trim() !== '') {
-    const linia = `C${capitol}E${escena}: [${objecteNom}] ${fromPos || (fromUbi || '(desconegut)')} -> ${toPos || (toUbi || '(desconegut)')}${causa ? ` (${causa})` : ''}`;
-    nkg.timeline_objectes.push(linia);
-    if (nkg.timeline_objectes.length > 20) nkg.timeline_objectes = nkg.timeline_objectes.slice(-20);
+  if (!nkg.objectes[clauObj]) {
+    nkg.objectes[clauObj] = normalitzarObjecteNarratiu({
+      id: clauObj,
+      nom: objecteNom,
+      descripcio_fisica: '',
+      significat_simbolic: '',
+      ubicacio_inicial: fromUbi || toUbi || '',
+      posseidor_inicial: fromPos,
+      es_clau_per_al_desenllaç: false,
+      primera_aparicio_capitol: Math.max(1, Number(capitol) || 1),
+      historial: []
+    }, clauObj);
   }
 
-  if (!nkg.objectes[clauObj]) nkg.objectes[clauObj] = { nom: objecteNom, ubicacio: '', posseidor: null, significat_simbolic: '' };
-  const obj = nkg.objectes[clauObj];
-  obj.nom = obj.nom || objecteNom;
+  const obj = normalitzarObjecteNarratiu(nkg.objectes[clauObj], clauObj);
+  if (!obj) return;
+  const accio = inferirAccioObjecte(causa, fromPos, toPos);
+  obj.historial.push({
+    capitol: Math.max(1, Number(capitol) || 1),
+    accio,
+    personatge: toPos,
+    ubicacio_nova: toUbi || fromUbi || ''
+  });
+  if (obj.historial.length > 80) obj.historial = obj.historial.slice(-80);
+
+  // Compatibilitat camps antics
   obj.posseidor = toPos || null;
   obj.ubicacio = toUbi || '';
-  if (!Array.isArray(obj.historial_ubicacions)) obj.historial_ubicacions = [];
-  obj.historial_ubicacions.push({ capitol, escena, posseidor: obj.posseidor, ubicacio: obj.ubicacio, causa: causa || '' });
-  if (obj.historial_ubicacions.length > 40) obj.historial_ubicacions = obj.historial_ubicacions.slice(-40);
+
+  if (!Array.isArray(nkg.timeline_objectes)) nkg.timeline_objectes = [];
+  const linia = `C${capitol}E${escena}: [${obj.nom}] ${fromPos || (fromUbi || '(desconegut)')} -> ${toPos || (toUbi || '(desconegut)')}${causa ? ` (${causa})` : ''}`;
+  nkg.timeline_objectes.push(linia);
+  if (nkg.timeline_objectes.length > 40) nkg.timeline_objectes = nkg.timeline_objectes.slice(-40);
+
+  nkg.objectes[clauObj] = obj;
 }
 
 function nkgSincronitzarInventariPersonatge(nkg, abans, despres, capitol, escena) {
   if (!nkg || !despres || !despres.nom) return;
-  const invAbans = Array.isArray(abans && abans.objectes_inventari) ? abans.objectes_inventari : [];
-  const invDespres = Array.isArray(despres.objectes_inventari) ? despres.objectes_inventari : [];
-  const nomPers = despres.nom;
+  const invAbansRaw = Array.isArray(abans && abans.objectes_inventari) ? abans.objectes_inventari : [];
+  const invDespresRaw = Array.isArray(despres.objectes_inventari) ? despres.objectes_inventari : [];
+
+  const invAbans = invAbansRaw.map(ref => resoldreIdObjecte(nkg, ref)).filter(Boolean);
+  const invDespres = invDespresRaw.map(ref => resoldreIdObjecte(nkg, ref)).filter(Boolean);
+  despres.objectes_inventari = [...new Set(invDespres)];
+
+  const nomPers = nkgNormalitzarNom(despres.nom);
   const ubiPers = despres.ubicacio || (abans && abans.ubicacio) || '';
 
-  // Tot objecte que queda a inventari passa a estar en possessió del personatge a la seva ubicació actual.
-  invDespres.forEach(objNom => {
-    const clauObj = nkgNormalitzarNom(objNom);
-    const existent = nkg.objectes[clauObj] || { nom: objNom, posseidor: null, ubicacio: '', significat_simbolic: '' };
-    nkg.objectes[clauObj] = existent;
+  despres.objectes_inventari.forEach(objId => {
+    const existent = nkg.objectes[objId] || normalitzarObjecteNarratiu({ id: objId, nom: objId, ubicacio_inicial: ubiPers, posseidor_inicial: nomPers }, objId);
+    nkg.objectes[objId] = existent;
     nkgRegistrarMovimentObjecte(
       nkg,
-      objNom,
-      { posseidor: existent.posseidor, ubicacio: existent.ubicacio },
+      objId,
+      { posseidor: existent.posseidor || existent.posseidor_inicial, ubicacio: existent.ubicacio || existent.ubicacio_inicial },
       { posseidor: nomPers, ubicacio: ubiPers },
       capitol,
       escena,
@@ -14221,17 +16002,16 @@ function nkgSincronitzarInventariPersonatge(nkg, abans, despres, capitol, escena
     );
   });
 
-  // Objectes que ja no són a inventari però no han estat descartats explícitament: marquem ubicació incerta.
-  const setDespres = new Set(invDespres.map(n => nkgNormalitzarNom(n)));
-  invAbans.forEach(objNom => {
-    const clauObj = nkgNormalitzarNom(objNom);
-    if (!clauObj || setDespres.has(clauObj) || !nkg.objectes[clauObj]) return;
-    const exObj = nkg.objectes[clauObj];
-    if (exObj.posseidor && nkgNormalitzarNom(exObj.posseidor) === nkgNormalitzarNom(nomPers)) {
+  const setDespres = new Set(despres.objectes_inventari);
+  invAbans.forEach(objId => {
+    if (!objId || setDespres.has(objId) || !nkg.objectes[objId]) return;
+    const exObj = nkg.objectes[objId];
+    const posseidorActual = exObj.posseidor || exObj.posseidor_inicial;
+    if (posseidorActual && nkgNormalitzarNom(posseidorActual) === nomPers) {
       nkgRegistrarMovimentObjecte(
         nkg,
-        objNom,
-        { posseidor: exObj.posseidor, ubicacio: exObj.ubicacio },
+        objId,
+        { posseidor: posseidorActual, ubicacio: exObj.ubicacio || exObj.ubicacio_inicial || '' },
         { posseidor: null, ubicacio: exObj.ubicacio || ubiPers || 'ubicació no especificada' },
         capitol,
         escena,
@@ -14280,7 +16060,9 @@ function serialitzarTretsImmutables(trets) {
   const genere = trets.genere || 'No determinat';
   const rol = trets.rol_narratiu || 'No determinat';
   const relacio = trets.relacio_protagonista || 'No determinada';
-  return `[IDENTITAT FIXA — NO MODIFICABLE] ${genere}, ${edat}, ${rol}. Relació amb protagonista: ${relacio}. [FI IDENTITAT FIXA]`;
+  const ocupacio = trets.ocupacio || 'No determinada';
+  const tret = trets.tret_definitori || 'No determinat';
+  return `[IDENTITAT FIXA — NO MODIFICABLE] ${genere}, ${edat}, ${rol}. Relació amb protagonista: ${relacio}. Ocupació: ${ocupacio}. Tret definitori: ${tret}. [FI IDENTITAT FIXA]`;
 }
 
 async function extreureTretsImmutablesPersonatge(nom, userConfig = USER_CONFIG) {
@@ -14305,7 +16087,10 @@ Retorna EXCLUSIVAMENT JSON vàlid amb aquesta estructura:
   "edat_aproximada": "...",
   "genere": "...",
   "rol_narratiu": "...",
-  "relacio_protagonista": "..."
+  "relacio_protagonista": "...",
+  "aspecte_fisic": "...",
+  "ocupacio": "...",
+  "tret_definitori": "..."
 }
 
 No incloguis cap camp addicional.`
@@ -14324,7 +16109,10 @@ No incloguis cap camp addicional.`
       edat_aproximada: String(parsed.edat_aproximada || 'No determinat').trim(),
       genere: String(parsed.genere || 'No determinat').trim(),
       rol_narratiu: String(parsed.rol_narratiu || 'No determinat').trim(),
-      relacio_protagonista: String(parsed.relacio_protagonista || 'No determinada').trim()
+      relacio_protagonista: String(parsed.relacio_protagonista || 'No determinada').trim(),
+      aspecte_fisic: String(parsed.aspecte_fisic || 'No determinat').trim(),
+      ocupacio: String(parsed.ocupacio || 'No determinat').trim(),
+      tret_definitori: String(parsed.tret_definitori || 'No determinat').trim()
     };
   } catch (err) {
     console.warn(`Trets immutables: no s'ha pogut extreure ${nom}:`, err.message);
@@ -14332,7 +16120,10 @@ No incloguis cap camp addicional.`
       edat_aproximada: 'No determinat',
       genere: 'No determinat',
       rol_narratiu: 'No determinat',
-      relacio_protagonista: 'No determinada'
+      relacio_protagonista: 'No determinada',
+      aspecte_fisic: 'No determinat',
+      ocupacio: 'No determinat',
+      tret_definitori: 'No determinat'
     };
   }
 }
@@ -14344,14 +16135,15 @@ async function garantirTretsImmutablesPersonatge(nom, userConfig = USER_CONFIG) 
   if (!ESTAT._nkg.personatges[clau]) {
     ESTAT._nkg.personatges[clau] = {
       nom,
-      estat_fisic: '',
-      estat_emocional: 'neutre',
+      estat_fisic: inferirEstatFisicInicialDesDeArc({}, ''),
+      estat_emocional: inferirEstatEmocionalInicialDesDeArc({}),
       arc: { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '' },
       limit_moral: '',
-      veu: { registre: '', mai_diria: '', quan_menteix: '', quan_es_sincer: '' },
+      veu: { registre: '', mai_diria: [], quan_menteix: '', quan_es_sincer: '', exemples_narratius: [], vocabulari_recurrent: [], vocabulari_prohibit: [], longitud_frases: 'mitjanes' },
       objectes_inventari: [],
       objectes_descartats: [],
       ubicacio: '',
+      motivacions_base: { desig_extern: '', necessitat_interna: '' },
       objectius: [],
       secrets: [],
       viu: true,
@@ -14360,7 +16152,18 @@ async function garantirTretsImmutablesPersonatge(nom, userConfig = USER_CONFIG) 
     };
   }
   const p = ESTAT._nkg.personatges[clau];
-  if (p.trets_immutables && typeof p.trets_immutables === 'object') return p.trets_immutables;
+  if (p.trets_immutables && typeof p.trets_immutables === 'object') {
+    p.trets_immutables = {
+      edat_aproximada: p.trets_immutables.edat_aproximada || 'No determinat',
+      genere: p.trets_immutables.genere || 'No determinat',
+      rol_narratiu: p.trets_immutables.rol_narratiu || 'No determinat',
+      relacio_protagonista: p.trets_immutables.relacio_protagonista || 'No determinada',
+      aspecte_fisic: p.trets_immutables.aspecte_fisic || 'No determinat',
+      ocupacio: p.trets_immutables.ocupacio || 'No determinat',
+      tret_definitori: p.trets_immutables.tret_definitori || 'No determinat'
+    };
+    return p.trets_immutables;
+  }
   const trets = await extreureTretsImmutablesPersonatge(nom, userConfig);
   p.trets_immutables = trets;
   return trets;
@@ -14420,7 +16223,7 @@ function nkgQueryEscenaContext(escenaSpec) {
         if (p.indumentaria_actual) desc += ` | Roba: ${p.indumentaria_actual}`;
         if (p.objectes_inventari && p.objectes_inventari.length > 0) desc += ` | Inventari: ${p.objectes_inventari.join(', ')}`;
         if (p.ubicacio) desc += ` | A: ${p.ubicacio}`;
-        if (p.objectius && p.objectius.length > 0) desc += ` | Vol: ${p.objectius[0]}`;
+        if (p.objectius && p.objectius.length > 0) { const o = normalitzarObjectiu(p.objectius[0], 0, 1, nkgNormalitzarNom(nom)); desc += ` | Vol: ${o.descripcio}`; }
         let passiuEmocional = p.passiu_emocional || '';
         if (!passiuEmocional && Array.isArray(p.traumes) && p.traumes.length > 0) passiuEmocional = p.traumes[0];
         if (!passiuEmocional && Array.isArray(p.pors) && p.pors.length > 0) passiuEmocional = p.pors[0];
@@ -14430,7 +16233,7 @@ function nkgQueryEscenaContext(escenaSpec) {
           if (fitxa) passiuEmocional = fitxa.secrets || fitxa.estat_actual || '';
         }
         if (passiuEmocional) desc += ` | Passiu emocional latent: ${passiuEmocional}`;
-        if (p.secrets && p.secrets.length > 0) desc += ` | Amaga: ${p.secrets[0]}`;
+        if (p.secrets && p.secrets.length > 0) { const sec = normalitzarSecret(p.secrets[0], 0, nkgNormalitzarNom(nom)); desc += ` | Amaga: ${sec.contingut}`; }
         parts.push(desc);
 
         if (p.relacions) {
@@ -14563,6 +16366,19 @@ function obtenirUltimesEscenes(n, capitolActual, escenaActual) {
 
 function nkgGenerarContextMinim(escenaSpec) {
   const parts = [];
+  const cap = Math.max(1, Number(escenaSpec && escenaSpec.capitol) || 1);
+
+  const perspectiva = ESTAT._nkg?.context_creacio?.estil?.perspectiva || {};
+  const pov = (perspectiva.pov_per_capitol || []).find(p => Number(p.capitol) === cap);
+  const cronCap = (ESTAT._nkg?.context_creacio?.cronologia?.per_capitol || []).find(c => Number(c.capitol) === cap);
+  const timelineCap = (ESTAT._nkg?.timeline_accions || []).filter(a => Number((a && a.capitol) || 0) === cap).slice(0, 12);
+  if (pov || cronCap || timelineCap.length > 0) {
+    parts.push('BLOQ POV/CRONOLOGIA INTERNA:');
+    if (perspectiva.tipus) parts.push(`- Tipus narrador: ${perspectiva.tipus}`);
+    if (pov) parts.push(`- POV capítol ${cap}: ${pov.personatge_pov}${pov.justificacio ? ` (${pov.justificacio})` : ''}`);
+    if (cronCap) parts.push(`- Cronologia capítol ${cap}: ${cronCap.data_ficticia || '?'} · ${cronCap.moment_del_dia || '?'} · ${cronCap.ubicacio_principal || '?'}`);
+    if (timelineCap.length > 0) parts.push('- Timeline accions capítol:\n' + timelineCap.map(a => `  • ${formatTimelineAccio(a)}`).join('\n'));
+  }
 
   // CAPA 1: Estat viu del NKG (~200-300 tokens)
   const contextNKG = nkgQueryEscenaContext(escenaSpec);
@@ -14605,6 +16421,10 @@ function nkgInicialitzar() {
   const prevMacro    = ESTAT._nkg?.macronarrativa;
   const prevThreads  = ESTAT._nkg?.threads;
   const prevPersonat = ESTAT._nkg?.personatges;
+  const prevRelacions = ESTAT._nkg?.relacions;
+  const prevMapaAdj = ESTAT._nkg?.mapa_adjacencies;
+  const prevContextCreacio = ESTAT._nkg?.context_creacio;
+  const prevTimelineAccions = ESTAT._nkg?.timeline_accions;
 
   ESTAT._nkg = crearNKG();
   const nkg = ESTAT._nkg;
@@ -14615,6 +16435,10 @@ function nkgInicialitzar() {
   }
   // Restaurar threads si existien
   if (prevThreads) nkg.threads = prevThreads;
+  if (Array.isArray(prevRelacions) && prevRelacions.length > 0) nkg.relacions = prevRelacions;
+  if (Array.isArray(prevMapaAdj) && prevMapaAdj.length > 0) nkg.mapa_adjacencies = prevMapaAdj;
+  if (prevContextCreacio && typeof prevContextCreacio === 'object') nkg.context_creacio = prevContextCreacio;
+  if (Array.isArray(prevTimelineAccions) && prevTimelineAccions.length > 0) nkg.timeline_accions = prevTimelineAccions;
 
   // Poblar personatges des de l'elenc, preservant arc/limit_moral/veu si ja existien
   if (ESTAT._personatgesSeleccionats && ESTAT._personatgesSeleccionats.length > 0) {
@@ -14625,16 +16449,17 @@ function nkgInicialitzar() {
         const ex = prevPersonat?.[clau];
         nkg.personatges[clau] = {
           nom: ex?.nom || nomNet,
-          estat_fisic:          ex?.estat_fisic          || '',
-          estat_emocional:      ex?.estat_emocional      || 'neutre',
+          estat_fisic:          ex?.estat_fisic          || inferirEstatFisicInicialDesDeArc(ex?.arc || {}, ex?.limit_moral || ''),
+          estat_emocional:      ex?.estat_emocional      || inferirEstatEmocionalInicialDesDeArc(ex?.arc || {}),
           arc:                  ex?.arc                  || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '' },
           limit_moral:          ex?.limit_moral          || '',
-          veu:                  ex?.veu                  || { registre: '', mai_diria: '', quan_menteix: '', quan_es_sincer: '' },
+          veu:                  ex?.veu                  || { registre: '', mai_diria: [], quan_menteix: '', quan_es_sincer: '', exemples_narratius: [], vocabulari_recurrent: [], vocabulari_prohibit: [], longitud_frases: 'mitjanes' },
           objectes_inventari:   ex?.objectes_inventari   || [],
           objectes_descartats:  ex?.objectes_descartats  || [],
           ubicacio:             ex?.ubicacio             || '',
-          objectius:            ex?.objectius            || [],
-          secrets:              ex?.secrets              || [],
+          motivacions_base:     ex?.motivacions_base     || { desig_extern: '', necessitat_interna: '' },
+          objectius:            Array.isArray(ex?.objectius) ? ex.objectius.map((o, i) => normalitzarObjectiu(o, i, 1, clau)) : [],
+          secrets:              Array.isArray(ex?.secrets) ? ex.secrets.map((x, i) => normalitzarSecret(x, i, clau)) : [],
           viu:                  ex?.viu !== undefined     ? ex.viu : true,
           primera_aparicio:     ex?.primera_aparicio     || 0,
           trets_immutables:     ex?.trets_immutables     || null
@@ -14649,11 +16474,18 @@ function nkgInicialitzar() {
     const wbText = ESTAT.worldbuilding
       ? (typeof ESTAT.worldbuilding === 'string' ? ESTAT.worldbuilding : JSON.stringify(ESTAT.worldbuilding))
       : '';
-    nkg.llocs[clau] = {
+    nkg.llocs[clau] = normalitzarLlocNarratiu({
+      id: clau,
       nom: ESTAT.localitzacioTriada,
-      descripcio_sensorial: wbText.substring(0, 200),
-      ambient: ''
-    };
+      tipus: 'edifici',
+      descripcio_sensorial: wbText.substring(0, 220),
+      parent: null,
+      connectat_amb: [],
+      sistemes_tecnics: [],
+      temperatura_base: null,
+      accessibilitat: 'lliure',
+      iluminacio: 'mixta'
+    }, clau);
   }
 
   // Fet canònic inicial des de l'arc global
@@ -14669,6 +16501,7 @@ function nkgInicialitzar() {
 
   // Inicialitzar emmagatzematge d'escenes
   ESTAT._escenes_generades = {};
+  sincronitzarReferenciesObjectesPersonatges();
 
   console.log('NKG inicialitzat:', Object.keys(nkg.personatges).length, 'personatges,', Object.keys(nkg.llocs).length, 'llocs');
 }
@@ -14697,13 +16530,23 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
           estat_emocional: p.estat_emocional || '',
           arc: { inici_emocional: p.arc?.inici_emocional || '', final_emocional: p.arc?.final_emocional || '', canvi_o_bloqueig: p.arc?.canvi_o_bloqueig || '' },
           limit_moral: p.limit_moral || '',
-          veu: { registre: p.veu?.registre || '', mai_diria: p.veu?.mai_diria || '', quan_menteix: p.veu?.quan_menteix || '', quan_es_sincer: p.veu?.quan_es_sincer || '' },
-          objectes_inventari: Array.isArray(p.objectes_inventari) ? p.objectes_inventari : [],
-          objectes_descartats: Array.isArray(p.objectes_descartats) ? p.objectes_descartats : [],
+          veu: normalitzarVeuAvancada({
+            registre: p.veu?.registre || '',
+            mai_diria: p.veu?.mai_diria || [],
+            quan_menteix: p.veu?.quan_menteix || '',
+            quan_es_sincer: p.veu?.quan_es_sincer || '',
+            exemples_narratius: p.veu?.exemples_narratius || [],
+            vocabulari_recurrent: p.veu?.vocabulari_recurrent || [],
+            vocabulari_prohibit: p.veu?.vocabulari_prohibit || [],
+            longitud_frases: p.veu?.longitud_frases || 'mitjanes'
+          }),
+          objectes_inventari: Array.isArray(p.objectes_inventari) ? p.objectes_inventari.map(ref => resoldreIdObjecte(nkg, ref)).filter(Boolean) : [],
+          objectes_descartats: Array.isArray(p.objectes_descartats) ? p.objectes_descartats.map(ref => resoldreIdObjecte(nkg, (ref && ref.objecte) || ref)).filter(Boolean) : [],
           ubicacio: p.ubicacio || '',
           historial_ubicacions: p.ubicacio ? [{ capitol, escena, ubicacio: p.ubicacio }] : [],
-          objectius: p.nous_objectius || [],
-          secrets: p.nous_secrets || [],
+          motivacions_base: parseMotivacionsBase(''),
+          objectius: Array.isArray(p.nous_objectius) ? p.nous_objectius.map((o, i) => normalitzarObjectiu(o, i, capitol, clau)) : [],
+          secrets: Array.isArray(p.nous_secrets) ? p.nous_secrets.map((x, i) => normalitzarSecret(x, i, clau)) : [],
           viu: p.viu !== undefined ? p.viu : true,
           primera_aparicio: capitol,
           trets_immutables: null
@@ -14716,20 +16559,29 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
         if (ex.primera_aparicio === 0 && capitol > 0) ex.primera_aparicio = capitol;
         if (p.estat_emocional) ex.estat_emocional = p.estat_emocional;
         if (p.estat_fisic) ex.estat_fisic = p.estat_fisic;
-        if (Array.isArray(p.objectes_inventari)) ex.objectes_inventari = p.objectes_inventari;
+        if (Array.isArray(p.objectes_inventari)) ex.objectes_inventari = p.objectes_inventari.map(ref => resoldreIdObjecte(nkg, ref)).filter(Boolean);
         if (Array.isArray(p.objectes_descartats) && p.objectes_descartats.length > 0) {
           if (!Array.isArray(ex.objectes_descartats)) ex.objectes_descartats = [];
-          ex.objectes_descartats = ex.objectes_descartats.concat(p.objectes_descartats);
+          ex.objectes_descartats = ex.objectes_descartats.concat(p.objectes_descartats.map(ref => resoldreIdObjecte(nkg, (ref && ref.objecte) || ref)).filter(Boolean));
           if (ex.objectes_descartats.length > 20) ex.objectes_descartats = ex.objectes_descartats.slice(-20);
         }
         if (p.ubicacio) ex.ubicacio = p.ubicacio;
         if (p.viu !== undefined) ex.viu = p.viu;
         if (p.nous_objectius) {
-          p.nous_objectius.forEach(o => { if (!ex.objectius.includes(o)) ex.objectius.push(o); });
-          if (ex.objectius.length > 2) ex.objectius = ex.objectius.slice(-2);
+          const existIds = new Set((ex.objectius || []).map((o, i) => normalitzarObjectiu(o, i, capitol, clau).id));
+          p.nous_objectius.forEach((o, i) => {
+            const obj = normalitzarObjectiu(o, i, capitol, clau);
+            if (obj.descripcio && !existIds.has(obj.id)) ex.objectius.push(obj);
+          });
+          if (ex.objectius.length > 8) ex.objectius = ex.objectius.slice(-8);
         }
         if (p.nous_secrets) {
-          p.nous_secrets.forEach(s => { if (!ex.secrets.includes(s)) ex.secrets.push(s); });
+          const existIds = new Set((ex.secrets || []).map((x, i) => normalitzarSecret(x, i, clau).id));
+          p.nous_secrets.forEach((sec, i) => {
+            const sObj = normalitzarSecret(sec, i, clau);
+            if (sObj.contingut && !existIds.has(sObj.id)) ex.secrets.push(sObj);
+          });
+          if (ex.secrets.length > 6) ex.secrets = ex.secrets.slice(-6);
         }
         if (p.te_escena_autonoma) {
           if (!ex.autonomia_escenes) ex.autonomia_escenes = [];
@@ -14744,16 +16596,15 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
       // Registrar descarts explícits d'objectes amb ubicació si existeix.
       const descarts = Array.isArray(p.objectes_descartats) ? p.objectes_descartats : [];
       descarts.forEach(d => {
-        const objNom = d && d.objecte ? d.objecte : '';
-        if (!objNom) return;
-        const clauObj = nkgNormalitzarNom(objNom);
-        const existent = nkg.objectes[clauObj] || { nom: objNom, posseidor: p.nom || null, ubicacio: despres.ubicacio || '', significat_simbolic: '' };
-        nkg.objectes[clauObj] = existent;
+        const objId = resoldreIdObjecte(nkg, (d && d.objecte) || d || '');
+        if (!objId) return;
+        const existent = nkg.objectes[objId] || normalitzarObjecteNarratiu({ id: objId, nom: objId, posseidor_inicial: nkgNormalitzarNom(p.nom || ''), ubicacio_inicial: despres.ubicacio || '' }, objId);
+        nkg.objectes[objId] = existent;
         nkgRegistrarMovimentObjecte(
           nkg,
-          objNom,
-          { posseidor: existent.posseidor, ubicacio: existent.ubicacio },
-          { posseidor: null, ubicacio: d.ubicacio || despres.ubicacio || '' },
+          objId,
+          { posseidor: existent.posseidor || existent.posseidor_inicial, ubicacio: existent.ubicacio || existent.ubicacio_inicial },
+          { posseidor: null, ubicacio: (d && d.ubicacio) || despres.ubicacio || '' },
           capitol,
           escena,
           'objecte descartat'
@@ -14764,28 +16615,29 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
 
   if (dades.nous_llocs) {
     dades.nous_llocs.forEach(ll => {
-      const clau = nkgNormalitzarNom(ll.nom);
-      if (!nkg.llocs[clau]) {
-        nkg.llocs[clau] = { nom: ll.nom, descripcio_sensorial: ll.descripcio_sensorial || '', ambient: ll.ambient || '' };
-      }
+      const lNorm = normalitzarLlocNarratiu(ll, ll && (ll.id || ll.nom));
+      if (!lNorm) return;
+      const ex = nkg.llocs[lNorm.id] ? normalitzarLlocNarratiu(nkg.llocs[lNorm.id], lNorm.id) : null;
+      nkg.llocs[lNorm.id] = Object.assign({}, ex || {}, lNorm);
     });
   }
 
   if (dades.nous_objectes) {
     dades.nous_objectes.forEach(o => {
-      const clau = nkgNormalitzarNom(o.nom);
-      const existent = nkg.objectes[clau] || { nom: o.nom, ubicacio: '', posseidor: null, significat_simbolic: '' };
-      nkg.objectes[clau] = existent;
+      const obj = normalitzarObjecteNarratiu(o, o && (o.id || o.nom));
+      if (!obj) return;
+      const clau = obj.id;
+      const existent = nkg.objectes[clau] ? normalitzarObjecteNarratiu(nkg.objectes[clau], clau) : obj;
+      nkg.objectes[clau] = Object.assign({}, existent, obj);
       nkgRegistrarMovimentObjecte(
         nkg,
-        o.nom,
-        { posseidor: existent.posseidor, ubicacio: existent.ubicacio },
-        { posseidor: o.posseidor || null, ubicacio: o.ubicacio || '' },
+        clau,
+        { posseidor: existent.posseidor || existent.posseidor_inicial, ubicacio: existent.ubicacio || existent.ubicacio_inicial },
+        { posseidor: obj.posseidor_inicial || null, ubicacio: obj.ubicacio_inicial || '' },
         capitol,
         escena,
         'objecte nou o actualitzat'
       );
-      if (o.significat_simbolic) existent.significat_simbolic = o.significat_simbolic;
     });
   }
 
@@ -14810,28 +16662,32 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
 
   if (dades.canvis_relacions) {
     dades.canvis_relacions.forEach(r => {
-      const existentIdx = nkg.relacions.findIndex(rel =>
-        (nkgNormalitzarNom(rel.origen) === nkgNormalitzarNom(r.personatge_a) && nkgNormalitzarNom(rel.desti) === nkgNormalitzarNom(r.personatge_b)) ||
-        (nkgNormalitzarNom(rel.origen) === nkgNormalitzarNom(r.personatge_b) && nkgNormalitzarNom(rel.desti) === nkgNormalitzarNom(r.personatge_a))
-      );
+      const aNou = r.personatge_a || r.origen || '';
+      const bNou = r.personatge_b || r.desti || '';
+      const existentIdx = nkg.relacions.findIndex(rel => {
+        const ra = rel.personatge_a || rel.origen || '';
+        const rb = rel.personatge_b || rel.desti || '';
+        return (
+          (nkgNormalitzarNom(ra) === nkgNormalitzarNom(aNou) && nkgNormalitzarNom(rb) === nkgNormalitzarNom(bNou)) ||
+          (nkgNormalitzarNom(ra) === nkgNormalitzarNom(bNou) && nkgNormalitzarNom(rb) === nkgNormalitzarNom(aNou))
+        );
+      });
       if (existentIdx >= 0) {
         const rel = nkg.relacions[existentIdx];
+        if (aNou) rel.personatge_a = aNou;
+        if (bNou) rel.personatge_b = bNou;
         if (r.tipus) rel.tipus = r.tipus;
-        if (r.confianca !== undefined) rel.confianca = r.confianca;
-        if (r.tensio !== undefined) rel.tensio = r.tensio;
-        if (r.nota) {
-          if (!rel.historial) rel.historial = [];
-          rel.historial.push(`Cap.${capitol}: ${r.nota}`);
-          if (rel.historial.length > 4) rel.historial = rel.historial.slice(-4);
-        }
+        if (r.descripcio || r.nota) rel.descripcio = r.descripcio || r.nota;
+        if (r.coneixement_mutu !== undefined) rel.coneixement_mutu = !!r.coneixement_mutu;
+        if (r.evolucio) rel.evolucio = r.evolucio;
       } else {
         nkg.relacions.push({
-          origen: r.personatge_a,
-          desti: r.personatge_b,
-          tipus: r.tipus || 'coneix',
-          confianca: r.confianca || 5,
-          tensio: r.tensio || 0,
-          historial: r.nota ? [`Cap.${capitol}: ${r.nota}`] : []
+          personatge_a: aNou,
+          personatge_b: bNou,
+          tipus: r.tipus || 'desconegut',
+          descripcio: r.descripcio || r.nota || '',
+          coneixement_mutu: r.coneixement_mutu !== undefined ? !!r.coneixement_mutu : true,
+          evolucio: r.evolucio || ''
         });
       }
     });
@@ -14860,7 +16716,13 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
     if (!Array.isArray(nkg.timeline_accions)) nkg.timeline_accions = [];
     const novesAccions = dades.accions_consumades
       .filter(a => typeof a === 'string' && a.trim().length > 0)
-      .map(a => `C${capitol}E${escena}: ${a.trim()}`);
+      .map(a => normalitzarTimelineAccio({
+        capitol,
+        personatge: '',
+        accio: `E${escena}: ${a.trim()}`,
+        hora_aproximada: '',
+        ubicacio: ''
+      }));
     nkg.timeline_accions.push(...novesAccions);
     // Mantenim les últimes 20 accions per no saturar el context
     if (nkg.timeline_accions.length > 20) {
@@ -14921,7 +16783,7 @@ async function nkgActualitzarPostEscena(textEscena, capitol, escena, userConfig)
   const estatPersistent = Object.values(nkg.personatges).map(p => {
     const inv = Array.isArray(p.objectes_inventari) && p.objectes_inventari.length > 0 ? p.objectes_inventari.join(', ') : '(buit)';
     const desc = Array.isArray(p.objectes_descartats) && p.objectes_descartats.length > 0
-      ? p.objectes_descartats.slice(-3).map(o => `${o.objecte || '?'}@${o.ubicacio || '?'}`).join(' | ')
+      ? p.objectes_descartats.slice(-3).map(o => { const id = typeof o === 'string' ? o : (o && (o.id || o.objecte)) || '?'; const obj = (ESTAT._nkg && ESTAT._nkg.objectes && ESTAT._nkg.objectes[id]) || {}; return `${id}@${obj.ubicacio || obj.ubicacio_inicial || '?'}`; }).join(' | ')
       : '(cap)';
     return `- ${p.nom}: emoció=${p.estat_emocional || 'neutre'} | roba=${p.indumentaria_actual || '(sense dades)'} | inventari=${inv} | descartats=${desc}`;
   }).join('\n');
@@ -14997,15 +16859,13 @@ Si no hi ha fets nous ni canvis de relació, retorna els arrays buits [].`
     if (dades) nkgAplicarActualitzacions(dades, capitol, escena);
     else console.warn("NKG: No s'ha pogut parsejar la resposta d'actualització");
 
-    // C3: Detectar formulació temàtica explícita i actualitzar thematic_count
+    // C3: Detectar formulació temàtica explícita per control qualitatiu (el comptador es gestiona al construir el prompt)
     const theme = (nkg.macronarrativa && nkg.macronarrativa.theme) ? nkg.macronarrativa.theme : '';
     if (theme) {
       const hiHaFormulacio = await detectarFormulacioTematica(textEscena, theme, userConfig);
       if (hiHaFormulacio) {
-        nkg.macronarrativa.thematic_count = (nkg.macronarrativa.thematic_count || 0) + 1;
-        if (nkg.macronarrativa.thematic_count > 1) {
-          console.warn(`⚠️  ALERTA: El tema s'ha formulat explícitament ${nkg.macronarrativa.thematic_count} vegades. Màxim permès: 1.`);
-        }
+        const thematicMax = Number(nkg.macronarrativa.thematic_count_max || 3);
+        console.warn(`⚠️  ALERTA: el text del capítol formula el tema explícitament. Límit recomanat d'instruccions temàtiques: ${thematicMax}.`);
       }
     }
 
@@ -15248,7 +17108,7 @@ function buildNkgContextRevisio(idx, esborrany) {
     escaleta: null
   });
 
-  const timelineRecente = (ESTAT._nkg.timeline_accions || []).slice(-10).join('\n');
+  const timelineRecente = (ESTAT._nkg.timeline_accions || []).slice(-10).map(formatTimelineAccio).join('\n');
   const timelinePersonatges = (ESTAT._nkg.timeline_personatges || []).slice(-15).join('\n');
   const objectesRecents = Object.values(ESTAT._nkg.objectes || {})
     .slice(0, 20)
@@ -15517,10 +17377,10 @@ function construirMissioCapitol(idx) {
 
   // Tema i subtextualitat (thematic_count)
   lines.push(`TEMA I SUBTEXTUALITAT:
-Formulacions temàtiques explícites fins ara: ${thematicCount}/1
-${thematicCount >= 1
+Formulacions temàtiques explícites fins ara: ${thematicCount}/${Math.max(1, Number((nkg && nkg.macronarrativa && nkg.macronarrativa.thematic_count_max) || 3))}
+${thematicCount >= Math.max(1, Number((nkg && nkg.macronarrativa && nkg.macronarrativa.thematic_count_max) || 3))
     ? '— El tema NO pot ser formulat explícitament en aquest capítol.\n  Mostra\'l a través d\'acció, objectes o silenci. Mai verbalment.'
-    : '— Pots formular el tema explícitament UNA sola vegada si és el moment adequat.'}`);
+    : '— Encara pots formular el tema explícitament si és el moment adequat i no superes el límit configurat.'}`);
 
   // Ritme i densitat per intensitat
   lines.push(`RITME I DENSITAT (intensitat ${intensitat}/5):\n${buildRitmInstruccio(intensitat)}`);
@@ -15638,7 +17498,7 @@ async function extreureDadesRegistreIAvaluarSistema(idx, textCapitol, esRevisioS
       .join('\n');
 
     const timelineNKG = (ESTAT._nkg && Array.isArray(ESTAT._nkg.timeline_accions) && ESTAT._nkg.timeline_accions.length > 0)
-      ? '\nTIMELINE NKG (accions recents en ordre cronològic):\n- ' + ESTAT._nkg.timeline_accions.slice(-12).join('\n- ')
+      ? '\nTIMELINE NKG (accions recents en ordre cronològic):\n- ' + ESTAT._nkg.timeline_accions.slice(-12).map(formatTimelineAccio).join('\n- ')
       : '';
 
     contextRevisio = `
@@ -15748,14 +17608,17 @@ function renderitzarNKG() {
     html += `<strong>${escHtml(p.nom)}</strong>`;
     if (p.estat_emocional) html += ` — ${escHtml(p.estat_emocional)}`;
     if (p.ubicacio) html += ` | 📍 ${escHtml(p.ubicacio)}`;
-    if (p.objectius && p.objectius.length > 0) html += `<br>🎯 ${escHtml(p.objectius.join(', '))}`;
+    if (p.objectius && p.objectius.length > 0) { const objTxt = p.objectius.map((o, i) => normalitzarObjectiu(o, i, 1, nkgNormalitzarNom(p.nom || '')).descripcio).filter(Boolean).join(', '); html += `<br>🎯 ${escHtml(objTxt)}`; }
     html += '</div>';
   });
 
   if (nkg.relacions.length > 0) {
     html += `<h4 style="color:var(--accent2);margin:12px 0 8px;">🔗 Relacions (${nkg.relacions.length})</h4>`;
     nkg.relacions.forEach(r => {
-      html += `<div style="font-size:.82rem;padding:2px 0;">${escHtml(r.origen)} ↔ ${escHtml(r.desti)}: ${escHtml(r.tipus)} (⚡${r.tensio}/10)</div>`;
+      const a = r.personatge_a || r.origen || '';
+      const b = r.personatge_b || r.desti || '';
+      const evo = r.evolucio ? ` | evolució: ${r.evolucio}` : '';
+      html += `<div style="font-size:.82rem;padding:2px 0;">${escHtml(a)} ↔ ${escHtml(b)}: ${escHtml(r.tipus || 'desconegut')}${evo}</div>`;
     });
   }
 
