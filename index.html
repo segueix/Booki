@@ -4204,6 +4204,7 @@ function validarNKGComplet(nkg, capitolsEscaleta) {
     if (!p.limit_moral)        warnings.push(`${p.nom}: limit_moral buit`);
     if (!p.veu?.mai_diria || (Array.isArray(p.veu.mai_diria) && p.veu.mai_diria.length === 0)) warnings.push(`${p.nom}: veu.mai_diria buit`);
     if (!p.arc?.final_emocional) errors.push(`${p.nom}: arc.final_emocional buit`);
+    if (!String(p.motivacions_base?.necessitat_interna || '').trim()) errors.push(`${p.nom}: motivacions_base.necessitat_interna buida`);
   }
   for (const cap of (capitolsEscaleta || [])) {
     if (!cap.titol)           warnings.push(`Capítol ${cap.numero||'?'}: títol buit`);
@@ -8999,8 +9000,9 @@ function parseMotivacionsBase(text = '') {
   if (!src) return { desig_extern: '', necessitat_interna: '' };
   const mVull = src.match(/(?:^|[;|,.]\s*)(?:vull|desig(?:o)?):?\s*([^;|.\n]+)/i);
   const mNec = src.match(/(?:^|[;|,.]\s*)(?:necessit(?:o|a)t(?:\s+interna)?):?\s*([^;|.\n]+)/i);
-  const desig_extern = (mVull ? mVull[1] : src.split(/[;|\n]/)[0] || '').trim();
-  const necessitat_interna = (mNec ? mNec[1] : '').trim();
+  const partsSlash = src.split(/\s*\/\s*/).map(s => s.trim()).filter(Boolean);
+  const desig_extern = (mVull ? mVull[1] : partsSlash[0] || src.split(/[;|\n]/)[0] || '').trim();
+  const necessitat_interna = (mNec ? mNec[1] : partsSlash[1] || '').trim();
   return { desig_extern, necessitat_interna };
 }
 
@@ -16144,6 +16146,10 @@ CONFLICTE INTERN: [contradicció psicològica central]
 LÍMIT MORAL: [línia que no creuarà... o que acabarà creuant]
 VEU: registre: [forma de parlar] | mai_diria: [frase que mai diria] | quan_menteix: [comportament] | quan_es_sincer: [comportament]
 DESIG: [el que vol consciement] / [el que necessita inconsciement]
+
+IMPORTANT — "necessitat_interna" és OBLIGATÒRIA i no pot quedar buida.
+Defineix-la com una absència emocional (NO un objectiu narratiu) que expliqui reaccions desproporcionades sota pressió.
+Ha de ser coherent amb l'arc (inici_emocional → final_emocional) i amb el límit moral del personatge.
 
 Separa cada proposta amb "=== PROPOSTA [N] ===" (on N és el número, 1 a 3).
 Marca la proposta amb major tensió dramàtica com "=== PROPOSTA [N] (Recomanat) ===".
