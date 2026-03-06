@@ -1425,10 +1425,15 @@
   <h2>🧭 Fase 10.7 — Perspectiva i Cronologia</h2>
   <p>Definim el POV per capítol, la cronologia interna i la timeline d'accions perquè l'escriptura sigui consistent.</p>
   <div class="loader-wrap" id="loader-10-7"><span class="spinner"></span><span id="loader-10-7-text">Analitzant perspectiva i cronologia…</span></div>
+  <div class="btn-row" style="margin-top:14px;">
+    <button class="btn btn-secondary" onclick="hideCard('fase-10-7');showCard('fase-10-5');">← Tornar a Escaleta</button>
+    <button class="btn btn-ghost" onclick="iniciarFasePerspectivaCronologia()">🔄 Regenerar POV/Cronologia</button>
+  </div>
   <div id="perspectiva-crono-result" class="hidden">
     <div id="perspectiva-crono-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
       <button class="btn btn-secondary" onclick="hideCard('fase-10-7');showCard('fase-10-5');">← Tornar a Escaleta</button>
+      <button class="btn btn-ghost" onclick="iniciarFasePerspectivaCronologia()">🔄 Regenerar POV/Cronologia</button>
       <button class="btn btn-primary" id="btn-fase10-8" onclick="iniciarFaseVeuExemples()">Continuar → Veu i Exemples</button>
     </div>
   </div>
@@ -1446,6 +1451,7 @@
     <div id="nkg-faltants-cos" class="veu-result" style="margin-top:14px;"></div>
     <div class="btn-row" style="margin-top:24px;">
       <button class="btn btn-secondary" onclick="hideCard('fase-10-8');showCard('fase-10-7');">← Tornar a POV/Cronologia</button>
+      <button class="btn btn-ghost" onclick="iniciarFasePerspectivaCronologia()">🧭 Regenerar POV/Cronologia</button>
       <button class="btn btn-ghost" id="btn-autocompletar-nkg" onclick="autocompletarNKGFaltantsManual()">🧩 Completar dades faltants</button>
       <button class="btn btn-primary" id="btn-fase11" onclick="iniciarFase11()">Continuar → Escriptura</button>
     </div>
@@ -6745,6 +6751,27 @@ function injectarPerspectivaCronologia(data = {}) {
   ESTAT._nkg.timeline_accions = timeline;
 }
 
+function tePerspectivaCronologiaPreparada() {
+  const perspectiva = (((ESTAT._nkg || {}).context_creacio || {}).estil || {}).perspectiva || {};
+  const cronologia = (((ESTAT._nkg || {}).context_creacio || {}).cronologia || {});
+  const timeline = (ESTAT._nkg || {}).timeline_accions || [];
+  return Boolean(
+    perspectiva.tipus &&
+    Array.isArray(perspectiva.pov_per_capitol) && perspectiva.pov_per_capitol.length > 0 &&
+    Array.isArray(cronologia.per_capitol) && cronologia.per_capitol.length > 0 &&
+    Array.isArray(timeline) && timeline.length > 0
+  );
+}
+
+async function assegurarPerspectivaCronologiaPipeline(setStatus = null) {
+  if (tePerspectivaCronologiaPreparada()) return;
+  if (typeof setStatus === 'function') {
+    setStatus('Definint POV, cronologia interna i timeline d'accions...');
+  }
+  const data = await generarPerspectivaCronologia(USER_CONFIG);
+  injectarPerspectivaCronologia(data);
+}
+
 async function iniciarFasePerspectivaCronologia() {
   ESTAT.fase = 10.7;
   updateProgress(10.7);
@@ -6931,6 +6958,7 @@ async function iniciarFaseVeuExemples() {
   const loaderText = document.getElementById('loader-10-8-text');
   const onProgress = msg => { if (loaderText) loaderText.textContent = msg; };
   try {
+    await assegurarPerspectivaCronologiaPipeline(onProgress);
     const data = await generarVeuExemples(USER_CONFIG, onProgress);
     hideLoader('10-8');
     mostrarVeuExemples(ESTAT._nkg.personatges || {});
