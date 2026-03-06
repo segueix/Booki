@@ -84,6 +84,87 @@ Una peça entra aquí si compleix **tots** aquests punts:
 
 ---
 
+
+## Planning de migració `index.html` → `nkg_biblia.html` (fase a fase)
+
+> Objectiu: migrar només codi útil i estable, marcant cada fase com a feta.
+
+### Regla UX obligatòria (abans de començar)
+
+- [ ] **No mostrar selector d'autor a la pàgina principal**.
+- [ ] El selector/perfil d'autor s'ha d'activar **només després de clicar el botó de confirmar la clau API**.
+- [ ] Afegir check de regressió manual: en obrir l'app, sense confirmar API, no ha d'aparèixer cap selector d'autor.
+
+### Fase 0 — Base i esquelet del nou HTML
+
+- [ ] Deixar `nkg_biblia.html` amb estructura mínima de cards i navegació fins fase 10.8.
+- [ ] Portar només utilitats comunes imprescindibles (`escHtml`, `toast`, loaders, `showCard/hideCard`).
+- [ ] Definir `ESTAT` i `USER_CONFIG` mínims per al flux NKG+Bíblia.
+- [ ] Check: càrrega sense errors de consola en fred.
+
+### Fase 1 — Configuració API i gating de UI
+
+- [ ] Migrar bloc de configuració de proveïdor i claus API.
+- [ ] Implementar `guardarClausAPI` i estat de disponibilitat de models.
+- [ ] Aplicar gating: mostrar opcions d'autor/estil només després de confirmar API.
+- [ ] Check: flux UI correcte amb i sense API confirmada.
+
+### Fase 2 — Entrada narrativa mínima
+
+- [ ] Migrar les dades d'entrada necessàries (tema, sinopsi base, personatges inicials, món base).
+- [ ] Eliminar dependències de fases de redacció (11+).
+- [ ] Check: es pot arribar a crear NKG inicial sense cap funció de capítols.
+
+### Fase 3 — Construcció NKG (nucli)
+
+- [ ] Migrar `crearNKG` i normalitzadors essencials.
+- [ ] Migrar injectors de backstory/relacions/objectes/llocs/regles/perspectiva/cronologia.
+- [ ] Migrar validacions `detectarFaltantsNKG` i `validarNKGPreparatPerCapitol1`.
+- [ ] Check: NKG coherent serialitzable a JSON.
+
+### Fase 4 — Compleció guiada de faltants
+
+- [ ] Migrar `mostrarFaltantsNKG` amb botó per item.
+- [ ] Migrar `generarFaltantNKG` i mapatge `obtenirAccioGeneracioPerFaltant`.
+- [ ] Garantir que els botons desapareixen quan el faltant queda resolt.
+- [ ] Check: cada item es pot generar individualment sense trencar la resta.
+
+### Fase 5 — Backstory i graf de relacions robust
+
+- [ ] Migrar `generarBackstoryIRelacions` i `validarBackstoryIRelacions`.
+- [ ] Mantenir fallback local amb `construirGrafRelacionsMinim`.
+- [ ] Assegurar que mai es queda `relacions: []` si hi ha >=2 personatges.
+- [ ] Check: no apareix "Falta graf de relacions" després de generar/fallback.
+
+### Fase 6 — Perspectiva, cronologia i veu (fins 10.8)
+
+- [ ] Migrar `tePerspectivaCronologiaPreparada` + `assegurarPerspectivaCronologiaPipeline`.
+- [ ] Migrar fase 10.7 i 10.8 (sense entrar a redacció capítols).
+- [ ] Migrar compleció de veu/exemples només com a prerequisit NKG.
+- [ ] Check: en acabar 10.8, validació NKG completa en verd.
+
+### Fase 7 — Exportació NKG + Bíblia
+
+- [ ] Migrar exportadors mínims (`descarregarNKGiBiblia` i context necessari).
+- [ ] Verificar export JSON i consistència de camps.
+- [ ] Check: fitxer exportat usable i sense camps crítics buits.
+
+### Fase 8 — Neteja final i tancament
+
+- [ ] Eliminar codi mort i referències a fases 11+ del nou HTML.
+- [ ] Revisar duplicacions de UI/handlers.
+- [ ] Actualitzar aquest document marcant fases completades.
+- [ ] Check final: parseig net + smoke end-to-end fins NKG/Bíblia.
+
+### Criteri de "Fase feta"
+
+Una fase només es marca com feta si compleix:
+
+- [ ] Parseig JS net (`node --check`).
+- [ ] Sense `ReferenceError` a startup.
+- [ ] Prova manual del flux de la fase superada.
+- [ ] Documentació actualitzada en aquest fitxer.
+
 ## Protocol curt abans de merge
 
 - `node --check` del JS extret d'`index.html`
