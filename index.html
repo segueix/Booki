@@ -6969,81 +6969,107 @@ async function autocompletarNKGFaltantsManual() {
   showLoader('10-8');
   const loaderText = document.getElementById('loader-10-8-text');
   const setStatus = msg => { if (loaderText) loaderText.textContent = msg; };
-  let completats = 0;
+
+  const passos = [
+    {
+      id: 'backstory_relacions',
+      etiqueta: 'Backstory i relacions canòniques',
+      detecta: txt => txt.includes('backstory') || txt.includes('relacions'),
+      executar: async nkg => {
+        try {
+          await assegurarMinimPersonatgesPerRelacions(2, USER_CONFIG);
+          const d = await generarBackstoryIRelacions(USER_CONFIG);
+          if (d && d.backstory_canonic) nkg.macronarrativa.backstory_canonic = d.backstory_canonic;
+          if (Array.isArray(d && d.relacions)) nkg.relacions = d.relacions;
+        } catch (e) {
+          const minimal = construirBackstoryMinimalSenseRelacions();
+          nkg.macronarrativa.backstory_canonic = minimal.backstory_canonic;
+          nkg.relacions = minimal.relacions;
+        }
+      }
+    },
+    {
+      id: 'trets_immutables',
+      etiqueta: 'Trets immutables dels personatges',
+      detecta: txt => txt.includes('trets immutables'),
+      executar: async () => {
+        const onProgressIntern = msg => setStatus(`• ${msg}`);
+        await generarCompletarPersonatges(USER_CONFIG, onProgressIntern);
+      }
+    },
+    {
+      id: 'objectes_narratius',
+      etiqueta: 'Objectes narratius',
+      detecta: txt => txt.includes('objectes narratius'),
+      executar: async () => {
+        const d = await generarObjectesNarratius(USER_CONFIG);
+        injectarObjectesNarratius(d);
+      }
+    },
+    {
+      id: 'llocs_i_regles',
+      etiqueta: 'Mapa espacial i regles del món',
+      detecta: txt => txt.includes('mapa de llocs') || txt.includes('regles del món'),
+      executar: async () => {
+        const d = await generarMapaEspacialRegles(USER_CONFIG);
+        injectarMapaEspacialRegles(d);
+      }
+    },
+    {
+      id: 'perspectiva_cronologia',
+      etiqueta: 'Perspectiva i cronologia per capítol',
+      detecta: txt => txt.includes('pov per capítol') || txt.includes('cronologia') || txt.includes('tipus de perspectiva'),
+      executar: async () => {
+        const d = await generarPerspectivaCronologia(USER_CONFIG);
+        injectarPerspectivaCronologia(d);
+      }
+    },
+    {
+      id: 'veu_i_exemples',
+      etiqueta: 'Veu i exemples narratius',
+      detecta: txt => txt.includes('exemples narratius de veu') || txt.includes('vocabulari recurrent'),
+      executar: async () => {
+        const onProgressIntern = msg => setStatus(`• ${msg}`);
+        await generarVeuExemples(USER_CONFIG, onProgressIntern);
+      }
+    }
+  ];
 
   try {
     const nkg = ESTAT._nkg || {};
     const biblia = ESTAT.bibliaNarrativa || {};
-    const faltantsLlista = detectarFaltantsNKG(nkg, biblia);
-    const faltants = faltantsLlista.join(' | ').toLowerCase();
-    const totalFases = [
-      faltants.includes('backstory') || faltants.includes('relacions'),
-      faltants.includes('trets immutables'),
-      faltants.includes('objectes narratius'),
-      faltants.includes('mapa de llocs') || faltants.includes('regles del món'),
-      faltants.includes('pov per capítol') || faltants.includes('cronologia') || faltants.includes('tipus de perspectiva'),
-      faltants.includes('exemples narratius de veu') || faltants.includes('vocabulari recurrent')
-    ].filter(Boolean).length;
+    let completats = 0;
+    let intents = 0;
 
-    if (faltants.includes('backstory') || faltants.includes('relacions')) {
-      completats++;
-      setStatus(`[${completats}/${totalFases}] Generant backstory i relacions canòniques...`);
-      try {
-        await assegurarMinimPersonatgesPerRelacions(2, USER_CONFIG);
-        const d = await generarBackstoryIRelacions(USER_CONFIG);
-        if (d && d.backstory_canonic) nkg.macronarrativa.backstory_canonic = d.backstory_canonic;
-        if (Array.isArray(d && d.relacions)) nkg.relacions = d.relacions;
-      } catch (e) {
-        const minimal = construirBackstoryMinimalSenseRelacions();
-        nkg.macronarrativa.backstory_canonic = minimal.backstory_canonic;
-        nkg.relacions = minimal.relacions;
+    while (intents < 3) {
+      intents++;
+      const faltantsLlista = detectarFaltantsNKG(nkg, biblia);
+      const faltantsText = faltantsLlista.join(' | ').toLowerCase();
+      const pendentsAra = passos.filter(p => p.detecta(faltantsText));
+      if (pendentsAra.length === 0) break;
+
+      const totalPassos = pendentsAra.length;
+      for (let i = 0; i < pendentsAra.length; i++) {
+        const pas = pendentsAra[i];
+        completats++;
+        setStatus(`[${i + 1}/${totalPassos}] ${pas.etiqueta}...`);
+        await pas.executar(nkg);
+        mostrarFaltantsNKG();
       }
-      mostrarFaltantsNKG();
-    }
-    if (faltants.includes('trets immutables')) {
-      completats++;
-      setStatus(`[${completats}/${totalFases}] Completant trets immutables dels personatges...`);
-      const onProgressIntern = msg => setStatus(`[${completats}/${totalFases}] ${msg}`);
-      await generarCompletarPersonatges(USER_CONFIG, onProgressIntern);
-      mostrarFaltantsNKG();
-    }
-    if (faltants.includes('objectes narratius')) {
-      completats++;
-      setStatus(`[${completats}/${totalFases}] Generant objectes narratius...`);
-      const d = await generarObjectesNarratius(USER_CONFIG);
-      injectarObjectesNarratius(d);
-      mostrarFaltantsNKG();
-    }
-    if (faltants.includes('mapa de llocs') || faltants.includes('regles del món')) {
-      completats++;
-      setStatus(`[${completats}/${totalFases}] Generant mapa espacial i regles del món...`);
-      const d = await generarMapaEspacialRegles(USER_CONFIG);
-      injectarMapaEspacialRegles(d);
-      mostrarFaltantsNKG();
-    }
-    if (faltants.includes('pov per capítol') || faltants.includes('cronologia') || faltants.includes('tipus de perspectiva')) {
-      completats++;
-      setStatus(`[${completats}/${totalFases}] Generant perspectiva i cronologia...`);
-      const d = await generarPerspectivaCronologia(USER_CONFIG);
-      injectarPerspectivaCronologia(d);
-      mostrarFaltantsNKG();
-    }
-    if (faltants.includes('exemples narratius de veu') || faltants.includes('vocabulari recurrent')) {
-      completats++;
-      setStatus(`[${completats}/${totalFases}] Completant veu i exemples dels personatges...`);
-      const onProgressIntern = msg => setStatus(`[${completats}/${totalFases}] ${msg}`);
-      await generarVeuExemples(USER_CONFIG, onProgressIntern);
-      mostrarFaltantsNKG();
+
+      const restantsDespresPassada = detectarFaltantsNKG(nkg, biblia);
+      if (restantsDespresPassada.length === 0) break;
     }
 
-    mostrarVeuExemples(ESTAT._nkg.personatges || {});
+    setStatus('Preparant paquet final NKG + Bíblia...');
     mostrarFaltantsNKG();
+    mostrarVeuExemples(ESTAT._nkg.personatges || {});
 
     const faltantsRestants = detectarFaltantsNKG(nkg, biblia);
     if (faltantsRestants.length > 0) {
       toast(`Autocompleció finalitzada amb ${faltantsRestants.length} element(s) encara pendents.`);
     } else {
-      toast('Autocompleció NKG finalitzada. NKG complet!');
+      toast('Autocompleció NKG finalitzada. NKG i Bíblia preparats!');
     }
   } catch (err) {
     mostrarFaltantsNKG();
