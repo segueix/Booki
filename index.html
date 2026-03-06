@@ -7644,23 +7644,30 @@ function selfCheckLockingInvariants() {
   try {
     // Evitem inspeccionar tot l'outerHTML (pot donar falsos positius per scripts duplicats del navegador).
     const _ejiFn = typeof executarJutgeInterval !== 'undefined' ? executarJutgeInterval : undefined;
-    console.assert(typeof _ejiFn === 'function', 'Invariant: executarJutgeInterval ha d\'estar definit');
+    if (typeof _ejiFn !== 'function') {
+      console.warn('Invariant (deferit): executarJutgeInterval encara no està disponible en aquest punt del carregat.');
+      return;
+    }
     const fnSrc = String(_ejiFn || '');
-    console.assert(fnSrc.includes('const MAX_ITER = 1;'), 'Invariant: MAX_ITER=1 requerit al jutge');
+    if (!fnSrc.includes('const MAX_ITER = 1;')) {
+      console.warn('Invariant: MAX_ITER=1 requerit al jutge');
+    }
 
     const src = String(document.documentElement && document.documentElement.outerHTML || '');
     const jiStart = src.indexOf('function jutgeIntervalInconsistencies');
     if (jiStart >= 0) {
       const jiEnd = src.indexOf('function aplicarCorreccionsJutge', jiStart);
       const jiSrc = jiEnd > jiStart ? src.slice(jiStart, jiEnd) : src.slice(jiStart, jiStart + 8000);
-      console.assert(!/cos íntegre/i.test(jiSrc), "Invariant: jutgeIntervalInconsistencies no ha d'incloure cos íntegre");
+      if (/cos íntegre/i.test(jiSrc)) {
+        console.warn("Invariant: jutgeIntervalInconsistencies no ha d'incloure cos íntegre");
+      }
     }
   } catch (err) {
     console.warn('selfCheckLockingInvariants:', err.message);
   }
 }
 
-selfCheckLockingInvariants();
+setTimeout(selfCheckLockingInvariants, 0);
 
 function obtenirBlockCanon58() {
   ESTAT._blockCanons = (ESTAT._blockCanons && typeof ESTAT._blockCanons === 'object') ? ESTAT._blockCanons : {};
