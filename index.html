@@ -4372,10 +4372,6 @@ async function iniciarEscaletaSeqNou() {
   const resultWrap = document.getElementById('escaleta-nou-result');
   resultWrap.innerHTML = '';
 
-  // FUNCIÓ MENOR 2 — ratio diàleg per defecte basat en el perfil de l'autor
-  const autorPerfilEscaleta = (ESTAT.configuracio && ESTAT.configuracio.perfil_autor) || (ESTAT.estil && ESTAT.estil.to) || '';
-  const ratioDialegDefault = inferirRatioDialegPerAutor(autorPerfilEscaleta);
-
   for (let idx = 0; idx < n; idx++) {
     const capInfo = ESTAT._estructuraCapitols[idx];
     const loaderText = document.getElementById('loader-b6-text');
@@ -4413,12 +4409,9 @@ async function iniciarEscaletaSeqNou() {
       };
       ESTAT._escaletes.push(escaleta);
 
-      // Desar ganxo_final i ratio_dialeg a _estructuraCapitols
+      // Desar ganxo_final a _estructuraCapitols
       if (ESTAT._estructuraCapitols[idx]) {
         ESTAT._estructuraCapitols[idx].ganxo_final = ganxoFinal;
-        if (!ESTAT._estructuraCapitols[idx].ratio_dialeg) {
-          ESTAT._estructuraCapitols[idx].ratio_dialeg = normalitzarRatioDialeg(ratioDialegDefault, ESTAT._estructuraCapitols[idx] || {});
-        }
       }
       // Validar compatibilitat ganxo/intensitat
       if (ganxoFinal) {
@@ -6908,6 +6901,144 @@ async function assegurarTemperaturaEmocionalCapitols(userConfig, setStatus = nul
   if (typeof setStatus === 'function') setStatus('Calculant temperatura emocional per capítol...');
   const temperatures = await generarTemperaturaEmocionalCapitols(userConfig);
   if (temperatures.length > 0) aplicarTemperaturaEmocionalAEstructura(temperatures);
+  await assegurarRatioDialegCapitols(userConfig, setStatus);
+}
+
+
+
+function qualitatDialegPerTemperatura(temperatura = 3) {
+  const t = Number(temperatura);
+  if (t <= 3) return 'funcional';
+  if (t <= 5) return 'textura';
+  if (t <= 7) return 'permeable';
+  return 'fragil';
+}
+
+function inferirTipusDialegFallback(ctx = {}) {
+  const n = Number(ctx.nombre_personatges || 0);
+  const f = String(ctx.funcio || '').toLowerCase();
+  const temp = Number(ctx.temperatura_emocional || 3);
+  const conflicte = /(conflicte|xoc|enfront|discussi|judici|amenaça|ultimatum)/.test(f);
+  const revelacio = /(revela|confessa|veritat|admet|plora|ruptura|catarsi)/.test(f);
+  if (n <= 1) return /(fug|persec|cursa|lluita|assalt|escapa|accio)/.test(f) ? 'minim_accio' : 'minim_intern';
+  if (n >= 3) return 'dialeg_coral';
+  if (revelacio || temp >= 8) return 'dialeg_ruptura';
+  if (conflicte) return 'dialeg_intens';
+  return 'dialeg_contingut';
+}
+
+function normalitzarSortidaDialegCapitol(raw = {}, ctx = {}) {
+  const n = Math.max(1, Number(ctx.nombre_personatges || 1));
+  const conflicte = /(conflicte|xoc|enfront|discussi|judici|amenaça|ultimatum)/.test(String(ctx.funcio || '').toLowerCase());
+  const tipus = inferirTipusDialegFallback(Object.assign({}, ctx, { funcio: String(ctx.funcio || '') , tipus: raw.tipus_dialeg }));
+  let p = Math.round(Number(raw.percentatge_dialeg));
+  if (!Number.isFinite(p)) {
+    const perTipus = { minim_intern: 14, minim_accio: 8, dialeg_contingut: 30, dialeg_intens: 40, dialeg_coral: 48, dialeg_ruptura: 25 };
+    p = perTipus[tipus] || 30;
+  }
+  if (n <= 1) p = Math.min(p, 20);
+  if (n === 2 && conflicte) p = Math.max(p, 25);
+  p = Math.max(5, Math.min(55, p));
+  return {
+    capitol: Math.max(1, Number(raw.capitol || ctx.capitol || 1)),
+    percentatge_dialeg: p,
+    tipus_dialeg: tipus,
+    qualitat_dialeg: String(raw.qualitat_dialeg || '').trim() || qualitatDialegPerTemperatura(ctx.temperatura_emocional || 3),
+    notes: String(raw.notes || '').trim()
+  };
+}
+
+function construirContextDialegCapitols() {
+  return (ESTAT._estruturaCapitols || []).map((cap, idx) => {
+    const numero = Number(cap.numero || idx + 1);
+    const presents = Array.isArray(cap.personatges) ? cap.personatges.filter(Boolean) : [];
+    const pov = ((((ESTAT._nkg || {}).context_creacio || {}).estil || {}).perspectiva?.pov_per_capitol || []).find(x => Number(x.capitol) === numero);
+    const llistaPresents = presents.length > 0 ? presents : (pov?.personatge_pov ? [pov.personatge_pov] : []);
+    return {
+      capitol: numero,
+      titol: cap.titol || '',
+      pov: pov?.personatge_pov || '',
+      funcio: cap.resum || cap.funcio_narrativa || '',
+      temperatura_emocional: Number(cap.temperatura_emocional ?? 3),
+      personatges_presents: llistaPresents,
+      nombre_personatges: llistaPresents.length
+    };
+  });
+}
+
+async function generarRatioDialegCapitols(userConfig) {
+  const ctxCaps = construirContextDialegCapitols();
+  if (ctxCaps.length === 0) return [];
+  const txt = ctxCaps.map(c => `- Capítol ${c.capitol}: "${c.titol}" — POV: ${c.pov || '(sense POV)'}
+- Funció: ${c.funcio || '(sense funció)'}
+- Temperatura emocional: ${c.temperatura_emocional}/10
+- Personatges presents a l'escena: ${(c.personatges_presents || []).join(', ') || '(no definit)'}
+- Nombre de personatges: ${c.nombre_personatges}`).join('\n\n');
+  const prompt = `Aquesta és l'estructura de capítols amb la temperatura emocional assignada:
+
+${txt}
+
+Assigna un RATIO DE DIÀLEG i un TIPUS DE DIÀLEG a cada capítol.
+
+Taula de referència:
+  Personatge sol, reflexiu:          10-18%  |  minim_intern
+  Personatge sol, en acció:          5-10%   |  minim_accio
+  Dos personatges, tensió freda:     25-35%  |  dialeg_contingut
+  Dos personatges, conflicte obert:  35-45%  |  dialeg_intens
+  Grup, escena coral:                40-55%  |  dialeg_coral
+  Escena de revelació emocional:     20-30%  |  dialeg_ruptura
+
+Regles:
+- Un personatge sol NO pot tenir més de 20% de diàleg
+- Dos personatges en conflicte NO poden tenir menys de 25%
+- La temperatura emocional modula la QUALITAT del diàleg, no necessàriament la quantitat:
+  · Temp 0-3: Diàleg funcional.
+  · Temp 4-5: Diàleg amb textura.
+  · Temp 6-7: Diàleg permeable.
+  · Temp 8+: Diàleg fràgil.
+- NO tots els capítols poden tenir el mateix percentatge.
+- Variació mínima de 10 punts entre capítol amb menys i més diàleg.
+
+Retorna EXCLUSIVAMENT un array JSON:
+[{"capitol": 1, "percentatge_dialeg": N, "tipus_dialeg": "...", "qualitat_dialeg": "...", "notes": "..."}]`;
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  const msgs = [{ role: 'user', content: prompt }];
+  for (let intent = 1; intent <= 2; intent++) {
+    const raw = await callLLMMulti(msgs, 'Ets un editor de diàlegs literaris. Retorna només JSON vàlid en català.', Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 2600, model: models.modelArquitecte }), 'arquitectura');
+    const parsed = parseJsonRobust(raw);
+    const arr = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.ratios) ? parsed.ratios : []);
+    if (arr.length > 0) {
+      const out = ctxCaps.map((ctx, i) => normalitzarSortidaDialegCapitol(arr.find(x => Number(x.capitol) === ctx.capitol) || arr[i] || {}, ctx));
+      const min = Math.min(...out.map(o => o.percentatge_dialeg));
+      const max = Math.max(...out.map(o => o.percentatge_dialeg));
+      if ((max - min) < 10 && out.length > 1) {
+        const iMin = out.findIndex(o => o.percentatge_dialeg === min);
+        const iMax = out.findIndex(o => o.percentatge_dialeg === max);
+        out[iMin].percentatge_dialeg = Math.max(5, out[iMin].percentatge_dialeg - 5);
+        out[iMax].percentatge_dialeg = Math.min(55, out[iMax].percentatge_dialeg + 5);
+      }
+      return out;
+    }
+    msgs.push({ role: 'user', content: 'Resposta invàlida. Torna únicament un array JSON amb capitol, percentatge_dialeg, tipus_dialeg, qualitat_dialeg i notes.' });
+  }
+  return [];
+}
+
+function aplicarRatioDialegCapitols(ratios = []) {
+  const map = new Map((ratios || []).map(r => [Number(r.capitol), r]));
+  (ESTAT._estruturaCapitols || []).forEach((cap, idx) => {
+    const num = Number(cap.numero || idx + 1);
+    const r = map.get(num);
+    if (!r) return;
+    cap.ratio_dialeg = normalitzarRatioDialeg(r, cap);
+  });
+}
+
+async function assegurarRatioDialegCapitols(userConfig, setStatus = null) {
+  if (!Array.isArray(ESTAT._estruturaCapitols) || ESTAT._estruturaCapitols.length === 0) return;
+  if (typeof setStatus === 'function') setStatus('Assignant ratio de diàleg per capítol...');
+  const ratios = await generarRatioDialegCapitols(userConfig);
+  if (ratios.length > 0) aplicarRatioDialegCapitols(ratios);
 }
 
 
@@ -8350,23 +8481,24 @@ function construirSeccioProhibicions(idx) {
 
 // ─── Ratio diàleg / narració per autor ────────────────────────────────────────
 function normalitzarRatioDialeg(input, capInfo = {}) {
+  const tipusValids = ['minim_intern', 'minim_accio', 'dialeg_contingut', 'dialeg_intens', 'dialeg_coral', 'dialeg_ruptura'];
   if (input && typeof input === 'object') {
+    const p = Math.max(0, Math.min(60, Number(input.percentatge_dialeg)));
+    const tipus = tipusValids.includes(String(input.tipus_dialeg || '').trim()) ? String(input.tipus_dialeg).trim() : 'dialeg_contingut';
     return {
-      percentatge_dialeg: Math.max(0, Math.min(100, Number(input.percentatge_dialeg) || 35)),
-      tipus_dialeg: input.tipus_dialeg || 'funcional',
+      percentatge_dialeg: Number.isFinite(p) ? p : 30,
+      tipus_dialeg: tipus,
+      qualitat_dialeg: String(input.qualitat_dialeg || '').trim(),
       notes: String(input.notes || '').trim()
     };
   }
   const legacy = String(input || '').trim().toLowerCase();
-  if (legacy === 'alt') return { percentatge_dialeg: 65, tipus_dialeg: 'predominant', notes: 'Diàleg dominant.' };
-  if (legacy === 'baix') return { percentatge_dialeg: 15, tipus_dialeg: 'minim_intern', notes: 'Predomini narratiu amb diàleg mínim.' };
-  const intensity = Number(capInfo.intensity_level || 3);
+  if (legacy === 'alt') return { percentatge_dialeg: 45, tipus_dialeg: 'dialeg_coral', qualitat_dialeg: '', notes: 'Diàleg dominant en escena coral.' };
+  if (legacy === 'baix' || legacy === 'mig') return { percentatge_dialeg: 15, tipus_dialeg: 'minim_intern', qualitat_dialeg: '', notes: 'Predomini narratiu amb diàleg mínim.' };
   const relacional = ((capInfo.fil || '') + ' ' + (capInfo.titol || '')).toLowerCase();
   const confrontacio = /(confront|judici|discussi|xoc|enfrontament)/.test(relacional);
-  if (intensity >= 5) return { percentatge_dialeg: 8, tipus_dialeg: 'absent', notes: 'Capítol final o màxima tensió amb diàleg residual.' };
-  if (confrontacio) return { percentatge_dialeg: 35, tipus_dialeg: 'funcional', notes: 'Confrontació amb diàleg orientat a conflicte.' };
-  if (/(subtrama|relaci|silvia|parella)/.test(relacional)) return { percentatge_dialeg: 50, tipus_dialeg: 'equilibrat', notes: 'Subtrama relacional amb intercanvi sostingut.' };
-  return { percentatge_dialeg: 18, tipus_dialeg: 'minim_intern', notes: 'Capítol interior o de personatge sol.' };
+  if (confrontacio) return { percentatge_dialeg: 35, tipus_dialeg: 'dialeg_intens', qualitat_dialeg: '', notes: 'Confrontació amb diàleg orientat a conflicte.' };
+  return { percentatge_dialeg: 18, tipus_dialeg: 'minim_intern', qualitat_dialeg: '', notes: 'Capítol interior o de personatge sol.' };
 }
 
 function inferirRatioDialegPerAutor(autorPerfil) {
@@ -8724,7 +8856,7 @@ function construirBlocRitme(intensitat, ratioDialeg) {
   };
   const rr = normalitzarRatioDialeg(ratioDialeg || {});
   const blocRatio = `
-  Ratio diàleg: ${rr.percentatge_dialeg}% (${rr.tipus_dialeg}). ${rr.notes || ''}`;
+  Ratio diàleg: ${rr.percentatge_dialeg}% (${rr.tipus_dialeg}). Qualitat: ${rr.qualitat_dialeg || 'funcional'}. ${rr.notes || ''}`;
   return `RITME (intensitat ${intensitat}/5): ${ritmesBase[intensitat] || ''}${blocRatio}`;
 }
 
