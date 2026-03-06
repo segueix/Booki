@@ -5612,7 +5612,76 @@ function validarBackstoryIRelacions(dades, clausEsperades = []) {
     return true;
   });
 
+  const n = claus.size;
+  const parellesEsperades = n >= 2 ? (n * (n - 1)) / 2 : 0;
+  if (dades.relacions.length < parellesEsperades) return false;
+
   return relsOk;
+}
+
+async function generarPersonatgesMinimsPerRelacions(falten = 1, userConfig) {
+  const nkg = ESTAT._nkg || {};
+  const macro = nkg.macronarrativa || {};
+  const existents = Object.entries(nkg.personatges || {}).map(([id, p]) => ({ id, nom: p.nom || id }));
+  const payload = {
+    synopsis_core: macro.synopsis_core || '',
+    theme: macro.theme || '',
+    personatges_existents: existents,
+    personatges_a_crear: Math.max(1, Number(falten) || 1)
+  };
+  const systemPrompt = `Ets un editor narratiu. Necessito completar un mínim de personatges per poder generar relacions canòniques.
+Genera EXCLUSIVAMENT JSON vàlid:
+{
+  "personatges_nous": [
+    {
+      "id": "clau_snake_case",
+      "nom": "Nom Cognom",
+      "arc": {"inici_emocional":"...","final_emocional":"...","canvi_o_bloqueig":"..."},
+      "limit_moral": "...",
+      "veu": {"registre":"...","mai_diria":["..."],"quan_menteix":"...","quan_es_sincer":"..."},
+      "motivacions_base": {"desig_extern":"...","necessitat_interna":"..."},
+      "trets_immutables": {"edat_aproximada":"...","genere":"...","rol_narratiu":"secundari","relacio_protagonista":"...","aspecte_fisic":"...","ocupacio":"...","tret_definitori":"..."}
+    }
+  ]
+}
+REGLES: no repeteixis noms existents; genera personatges útils i coherents amb la sinopsi.`;
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  const msgs = [{ role: 'user', content: `Context:\n${JSON.stringify(payload, null, 2)}` }];
+  for (let i = 1; i <= 2; i++) {
+    const raw = await callLLMMulti(msgs, systemPrompt, Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 2200, model: models.modelArquitecte }), 'arquitectura');
+    const data = parseJsonRobust(raw);
+    if (data && Array.isArray(data.personatges_nous) && data.personatges_nous.length > 0) return data.personatges_nous;
+    msgs.push({ role: 'user', content: 'Resposta invàlida. Torna només JSON amb personatges_nous.' });
+  }
+  throw new Error('No s\'han pogut generar personatges mínims per relacions.');
+}
+
+async function assegurarMinimPersonatgesPerRelacions(minim = 2, userConfig) {
+  if (!ESTAT._nkg) nkgInicialitzar();
+  const nkg = ESTAT._nkg;
+  const total = Object.keys(nkg.personatges || {}).length;
+  if (total >= minim) return total;
+  const falten = minim - total;
+  const nous = await generarPersonatgesMinimsPerRelacions(falten, userConfig);
+  (nous || []).forEach(raw => {
+    const clau = nkgNormalitzarNom(raw.id || raw.nom || 'personatge_suport');
+    if (!clau || nkg.personatges[clau]) return;
+    nkg.personatges[clau] = {
+      nom: raw.nom || clau,
+      estat_fisic: inferirEstatFisicInicialDesDeArc(raw.arc || {}, raw.limit_moral || ''),
+      estat_emocional: inferirEstatEmocionalInicialDesDeArc(raw.arc || {}),
+      arc: raw.arc || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '' },
+      limit_moral: raw.limit_moral || '',
+      veu: normalitzarVeuAvancada(raw.veu || {}),
+      objectes_inventari: [], objectes_descartats: [], ubicacio: '',
+      motivacions_base: raw.motivacions_base || { desig_extern: '', necessitat_interna: '' },
+      objectius: [], secrets: [], viu: true, primera_aparicio: 0,
+      trets_immutables: raw.trets_immutables || null
+    };
+    if (!Array.isArray(ESTAT._personatgesSeleccionats)) ESTAT._personatgesSeleccionats = [];
+    if (!ESTAT._personatgesSeleccionats.includes(nkg.personatges[clau].nom)) ESTAT._personatgesSeleccionats.push(nkg.personatges[clau].nom);
+  });
+  return Object.keys(nkg.personatges || {}).length;
 }
 
 function mostrarBackstoryCanonic(backstoryCanonic = {}, relacions = []) {
@@ -5678,7 +5747,11 @@ async function generarBackstoryIRelacions(userConfig) {
     estat_emocional: p.estat_emocional || ''
   }));
 
-  if (personatges.length < 2) throw new Error('Calen almenys 2 personatges per generar relacions canòniques.');
+  if (personatges.length < 2) {
+    const total = await assegurarMinimPersonatgesPerRelacions(2, userConfig);
+    if (total < 2) throw new Error('Calen almenys 2 personatges per generar relacions canòniques.');
+    return await generarBackstoryIRelacions(userConfig);
+  }
 
   const resumInput = {
     synopsis_core: macro.synopsis_core || '',
@@ -5771,6 +5844,24 @@ ${JSON.stringify(resumInput, null, 2)}`
   throw new Error('No s\'ha pogut generar backstory canònic.');
 }
 
+function construirBackstoryMinimalSenseRelacions() {
+  const nkg = ESTAT._nkg || {};
+  const synopsis = (nkg.macronarrativa && nkg.macronarrativa.synopsis_core) || 'Situació inicial per desenvolupar';
+  return {
+    backstory_canonic: {
+      fets_previs: [{
+        id: 'fet_001',
+        descripcio: `Abans de l'inici de la novel·la: ${String(synopsis).slice(0, 180)}`,
+        personatges_implicats: Object.keys(nkg.personatges || {}).slice(0, 1),
+        data_aproximada: 'abans del capítol 1',
+        impacte_narratiu: 'estableix el punt de partida canònic'
+      }],
+      cronologia_previa: [{ ordre: 1, descripcio: 'Punt de partida del passat immediat.', any_aproximat: '' }]
+    },
+    relacions: []
+  };
+}
+
 async function iniciarFaseBackstoryRelacions() {
   ESTAT.fase = 9.45;
   updateProgress(9.45);
@@ -5782,6 +5873,21 @@ async function iniciarFaseBackstoryRelacions() {
 
   try {
     if (!ESTAT._nkg) nkgInicialitzar();
+    const totalPers = Object.keys((ESTAT._nkg && ESTAT._nkg.personatges) || {}).length;
+    if (totalPers < 2) {
+      const afegir = confirm('Hi ha menys de 2 personatges. Vols generar automàticament personatges de suport per poder crear relacions canòniques?');
+      if (afegir) {
+        await assegurarMinimPersonatgesPerRelacions(2, USER_CONFIG);
+      } else {
+        const minimal = construirBackstoryMinimalSenseRelacions();
+        ESTAT._nkg.macronarrativa.backstory_canonic = minimal.backstory_canonic;
+        ESTAT._nkg.relacions = minimal.relacions;
+        hideLoader('9-45');
+        mostrarBackstoryCanonic(minimal.backstory_canonic, minimal.relacions);
+        toast('Backstory mínim generat sense relacions. Pots continuar i completar relacions més endavant.');
+        return;
+      }
+    }
     const data = await generarBackstoryIRelacions(USER_CONFIG);
     ESTAT._nkg.macronarrativa.backstory_canonic = data.backstory_canonic;
     ESTAT._nkg.relacions = data.relacions;
@@ -6603,9 +6709,16 @@ async function autocompletarNKGFaltantsManual() {
     const faltants = detectarFaltantsNKG(nkg, biblia).join(' | ').toLowerCase();
 
     if (faltants.includes('backstory') || faltants.includes('relacions')) {
-      const d = await generarBackstoryIRelacions(USER_CONFIG);
-      if (d && d.backstory_canonic) nkg.macronarrativa.backstory_canonic = d.backstory_canonic;
-      if (Array.isArray(d && d.relacions)) nkg.relacions = d.relacions;
+      try {
+        await assegurarMinimPersonatgesPerRelacions(2, USER_CONFIG);
+        const d = await generarBackstoryIRelacions(USER_CONFIG);
+        if (d && d.backstory_canonic) nkg.macronarrativa.backstory_canonic = d.backstory_canonic;
+        if (Array.isArray(d && d.relacions)) nkg.relacions = d.relacions;
+      } catch (e) {
+        const minimal = construirBackstoryMinimalSenseRelacions();
+        nkg.macronarrativa.backstory_canonic = minimal.backstory_canonic;
+        nkg.relacions = minimal.relacions;
+      }
     }
     if (faltants.includes('trets immutables')) {
       const d = await generarCompletarPersonatges(USER_CONFIG);
