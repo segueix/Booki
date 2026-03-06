@@ -6392,7 +6392,7 @@ function obtenirCapitolsPovPersonatge(clau = '', p = null) {
   const pov = (((ESTAT._nkg || {}).context_creacio || {}).estil || {}).perspectiva || {};
   const llista = Array.isArray(pov.pov_per_capitol) ? pov.pov_per_capitol : [];
   return [...new Set(llista
-    .filter(x => nkgNormalitzarNom(x && x.personatge || '') === nom)
+    .filter(x => nkgNormalitzarNom(x && x.personatge_pov || '') === nom)
     .map(x => Number(x.capitol || 0))
     .filter(n => n > 0))].sort((a, b) => a - b);
 }
@@ -6794,14 +6794,120 @@ function normalitzarCronologiaNarrativa(raw = {}) {
   };
 }
 
-function normalitzarTimelineAccio(raw = {}) {
+
+function normalitzarTemperaturaEntrada(raw = {}, idx = 0) {
+  const r = raw || {};
   return {
-    capitol: Math.max(1, Number(raw.capitol) || 1),
-    personatge: nkgNormalitzarNom(raw.personatge || ''),
-    accio: String(raw.accio || '').trim(),
-    hora_aproximada: String(raw.hora_aproximada || '').trim(),
-    ubicacio: nkgNormalitzarNom(raw.ubicacio || '')
+    capitol: Math.max(1, Number(r.capitol) || (idx + 1)),
+    temperatura: Math.max(0, Math.min(10, Number(r.temperatura))),
+    justificacio: String(r.justificacio || '').trim()
   };
+}
+
+function resumWaypointsPerCapitol(capitol = 1) {
+  const nkg = ESTAT._nkg || {};
+  const noms = [];
+  Object.values(nkg.personatges || {}).forEach(p => {
+    const wps = Array.isArray(p?.arc?.waypoints) ? p.arc.waypoints : [];
+    if (wps.some(w => Number(w.capitol) === Number(capitol))) noms.push(p.nom || 'personatge');
+  });
+  return noms;
+}
+
+function construirResumCapitolsTemperatura() {
+  const perspectiva = (((ESTAT._nkg || {}).context_creacio || {}).estil || {}).perspectiva || {};
+  const pov = Array.isArray(perspectiva.pov_per_capitol) ? perspectiva.pov_per_capitol : [];
+  return (ESTAT._estructuraCapitols || []).map((cap, idx) => {
+    const numero = Number(cap.numero || idx + 1);
+    const p = pov.find(x => Number(x.capitol) === numero);
+    const nomsWp = resumWaypointsPerCapitol(numero);
+    return {
+      capitol: numero,
+      titol: cap.titol || '',
+      funcio: cap.resum || cap.funcio_narrativa || '',
+      intensitat: Number(cap.intensity_level || 3),
+      ganxo_tipus: cap.ganxo_final?.tipus || '',
+      ganxo_element: cap.ganxo_final?.element || '',
+      pov: p?.personatge_pov || '',
+      waypoints_capitol: nomsWp
+    };
+  });
+}
+
+async function generarTemperaturaEmocionalCapitols(userConfig) {
+  const capitols = construirResumCapitolsTemperatura();
+  if (!Array.isArray(capitols) || capitols.length === 0) return [];
+  const nkg = ESTAT._nkg || {};
+  const tema = nkg.macronarrativa?.theme || '';
+  const estilBase = ESTAT.estil?.desc || '';
+  const emocioFinal = nkg.macronarrativa?.ending?.emocio_final_lector || '';
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+
+  const llistaTxt = capitols.map(c => `- Capítol ${c.capitol}: "${c.titol}" — Funció: ${c.funcio || '(sense funció)'} — Intensitat: ${c.intensitat}/5
+  - Ganxo final: ${c.ganxo_tipus || '(sense)'} — Element: ${c.ganxo_element || '(sense)'}
+  - POV: ${c.pov || '(sense POV)'}
+  - Waypoints emocionals en aquest capítol: ${c.waypoints_capitol.length > 0 ? 'sí, ' + c.waypoints_capitol.join(', ') : 'no'}`).join('\n');
+
+  const prompt = `Aquesta és l'estructura de capítols de la novel·la:
+
+${llistaTxt}
+
+El tema de la novel·la és: "${tema}"
+L'estil base és: "${estilBase}"
+El final busca l'emoció: "${emocioFinal}"
+
+Assigna una TEMPERATURA EMOCIONAL de 0 a 10 a cada capítol.
+
+Escala:
+0-1: Glaçat. Contenció total. Prosa mecànica. Zero fissures.
+2-3: Fred. El to habitual de l'estil. Emoció per omissió.
+4-5: Temperat. Permís per a moments de calor humana: un gest inesperat, un diàleg no funcional, una observació sobre alguna cosa bella o trista.
+6-7: Càlid. Les defenses dels personatges baixen. El diàleg pot ser desordenat. El cos dels personatges parla.
+8-9: Calent. Ruptura emocional. El to pot trencar-se breument.
+10: Incandescent. Reservat per a UN SOL moment de tota l'obra.
+
+Regles:
+- La temperatura NO ha de seguir la intensitat narrativa.
+- La temperatura SEGUEIX la proximitat a la necessitat interna del personatge POV.
+- No més d'un capítol a 8+. Només un a 10 (o cap).
+- La corba ha de tenir alts i baixos, no ser ascendent constant.
+- El capítol final ha de tenir la temperatura coherent amb "${emocioFinal}", no necessàriament la més alta.
+
+Retorna EXCLUSIVAMENT un array JSON:
+[{"capitol": 1, "temperatura": N, "justificacio": "..."}]`;
+
+  const msgs = [{ role: 'user', content: prompt }];
+  for (let intent = 1; intent <= 2; intent++) {
+    const raw = await callLLMMulti(
+      msgs,
+      'Ets un editor d arquitectura emocional de novel·la. Retorna només JSON vàlid en català.',
+      Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 2600, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+    const parsed = parseJsonRobust(raw);
+    const arr = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.temperatures) ? parsed.temperatures : []);
+    if (arr.length > 0) return arr.map(normalitzarTemperaturaEntrada).filter(x => Number.isFinite(x.temperatura));
+    msgs.push({ role: 'user', content: 'Resposta invàlida. Torna EXCLUSIVAMENT un array JSON de capítol+temperatura+justificació.' });
+  }
+  return [];
+}
+
+function aplicarTemperaturaEmocionalAEstructura(temperatures = []) {
+  const perCap = new Map((temperatures || []).map(t => [Number(t.capitol), t]));
+  (ESTAT._estructuraCapitols || []).forEach((cap, idx) => {
+    const num = Number(cap.numero || idx + 1);
+    const t = perCap.get(num);
+    if (!t) return;
+    cap.temperatura_emocional = Math.max(0, Math.min(10, Number(t.temperatura)));
+    cap.temperatura_justificacio = String(t.justificacio || '').trim();
+  });
+}
+
+async function assegurarTemperaturaEmocionalCapitols(userConfig, setStatus = null) {
+  if (!Array.isArray(ESTAT._estruturaCapitols) || ESTAT._estruturaCapitols.length === 0) return;
+  if (typeof setStatus === 'function') setStatus('Calculant temperatura emocional per capítol...');
+  const temperatures = await generarTemperaturaEmocionalCapitols(userConfig);
+  if (temperatures.length > 0) aplicarTemperaturaEmocionalAEstructura(temperatures);
 }
 
 
@@ -6963,6 +7069,7 @@ async function assegurarPerspectivaCronologiaPipeline(setStatus = null) {
   }
   const data = await generarPerspectivaCronologia(USER_CONFIG);
   injectarPerspectivaCronologia(data);
+  await assegurarTemperaturaEmocionalCapitols(USER_CONFIG, setStatus);
 }
 
 async function iniciarFasePerspectivaCronologia() {
@@ -6975,6 +7082,7 @@ async function iniciarFasePerspectivaCronologia() {
   try {
     const data = await generarPerspectivaCronologia(USER_CONFIG);
     injectarPerspectivaCronologia(data);
+    await assegurarTemperaturaEmocionalCapitols(USER_CONFIG);
     hideLoader('10-7');
     mostrarPerspectivaCronologia(
       ESTAT._nkg.context_creacio.estil.perspectiva,
