@@ -7895,6 +7895,35 @@ function construirInstruccioCapitol(capitolNum, totalCapitols, nkg, capitolInfo)
   ].filter(Boolean).join('\n');
 }
 
+function payloadConteInstruccioTematicaExplicita(payload) {
+  if (!payload) return false;
+  const texts = [];
+  const afegir = x => { if (x) texts.push(String(x)); };
+  if (Array.isArray(payload.system)) payload.system.forEach(b => afegir(typeof b === 'string' ? b : b.text));
+  else afegir(payload.system);
+  (payload.messages || []).forEach(m => {
+    const c = m && m.content;
+    if (typeof c === 'string') afegir(c);
+    else if (Array.isArray(c)) c.forEach(b => afegir(typeof b === 'string' ? b : b.text));
+  });
+  const text = texts.join('\n').toLowerCase();
+  return /pots formular el tema explícitament|pots formular el tema explicitament|formular el tema explícitament una sola vegada|formular el tema explicitament una sola vegada/.test(text);
+}
+
+function registrarConsumInstruccioTematica(nkg, payload) {
+  if (!nkg || !nkg.macronarrativa) return;
+  const thematicMax = Math.max(1, Number(nkg.macronarrativa.thematic_count_max || 3));
+  if (nkg.macronarrativa.thematic_count === undefined || nkg.macronarrativa.thematic_count === null) {
+    nkg.macronarrativa.thematic_count = 0;
+  }
+  if (payloadConteInstruccioTematicaExplicita(payload)) {
+    nkg.macronarrativa.thematic_count += 1;
+    if (nkg.macronarrativa.thematic_count > thematicMax) {
+      console.warn(`⚠️  ALERTA: instrucció temàtica explícita consumida ${nkg.macronarrativa.thematic_count} vegades al capítol. Màxim recomanat: ${thematicMax}.`);
+    }
+  }
+}
+
 async function construirPayload(capitolNum, totalCapitols, nkg, biblia, capitolsGenerats, capitolInfo, autorPerfil) {
   const capInfo = capitolInfo ? Object.assign({ numero: capitolNum }, capitolInfo) : { numero: capitolNum };
 
@@ -8059,6 +8088,12 @@ async function generarCapitol(idx, intents = 0) {
   const cap = ESTAT._estructuraCapitols[idx];
   const titol = cap.titol || 'Capítol ' + (idx + 1);
   const capitolNum = idx + 1;
+  if (ESTAT._nkg && ESTAT._nkg.macronarrativa) {
+    ESTAT._nkg.macronarrativa.thematic_count = 0;
+    if (ESTAT._nkg.macronarrativa.thematic_count_max === undefined || ESTAT._nkg.macronarrativa.thematic_count_max === null) {
+      ESTAT._nkg.macronarrativa.thematic_count_max = 3;
+    }
+  }
   document.getElementById('capitol-actual-wrap').classList.add('hidden');
   document.getElementById('revisio-panel').classList.add('hidden');
   document.getElementById('checkpoint-intermedi-panel').classList.add('hidden');
@@ -8103,6 +8138,7 @@ async function generarCapitol(idx, intents = 0) {
     const modelConfig = seleccionarModel(capitolNum, totalCaps, cap.intensity_level || 3);
     const payload = await construirPayload(capitolNum, totalCaps, nkg, biblia, capitolsGenerats, cap, autorPerfil);
     Object.assign(payload, modelConfig);
+    registrarConsumInstruccioTematica(nkg, payload);
 
     // Generació — ruta per proveïdor
     const { proveidor: provCapitol } = getProviderAndModelPerRol(USER_CONFIG || {}, 'generacio');
@@ -16592,16 +16628,13 @@ Si no hi ha fets nous ni canvis de relació, retorna els arrays buits [].`
     if (dades) nkgAplicarActualitzacions(dades, capitol, escena);
     else console.warn("NKG: No s'ha pogut parsejar la resposta d'actualització");
 
-    // C3: Detectar formulació temàtica explícita i actualitzar thematic_count
+    // C3: Detectar formulació temàtica explícita per control qualitatiu (el comptador es gestiona al construir el prompt)
     const theme = (nkg.macronarrativa && nkg.macronarrativa.theme) ? nkg.macronarrativa.theme : '';
     if (theme) {
       const hiHaFormulacio = await detectarFormulacioTematica(textEscena, theme, userConfig);
       if (hiHaFormulacio) {
-        nkg.macronarrativa.thematic_count = (nkg.macronarrativa.thematic_count || 0) + 1;
         const thematicMax = Number(nkg.macronarrativa.thematic_count_max || 3);
-        if (nkg.macronarrativa.thematic_count > thematicMax) {
-          console.warn(`⚠️  ALERTA: El tema s'ha formulat explícitament ${nkg.macronarrativa.thematic_count} vegades. Màxim permès: ${thematicMax}.`);
-        }
+        console.warn(`⚠️  ALERTA: el text del capítol formula el tema explícitament. Límit recomanat d'instruccions temàtiques: ${thematicMax}.`);
       }
     }
 
