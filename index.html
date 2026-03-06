@@ -781,6 +781,8 @@
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="9.4">Relacions</div>
     <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="9.45">Backstory</div>
+    <div class="step-arrow">›</div>
     <div class="step-pill" data-step="9.5">Trames</div>
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="10">Estructura</div>
@@ -1269,6 +1271,24 @@
     <div id="relacions-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
       <button class="btn btn-secondary" onclick="hideCard('fase-9-4');showCard('fase-9-3');">← Tornar a Ferida/Arc</button>
+      <button class="btn btn-primary" onclick="iniciarFaseBackstoryRelacions()">🧩 Backstory canònic</button>
+    </div>
+  </div>
+</div>
+
+<!-- FASE 9.45: Backstory i Relacions Canòniques -->
+<div class="card hidden" id="fase-9-45">
+  <h2><span class="icon">🧩</span> Backstory i Relacions Canòniques</h2>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Construïm el passat canònic i el graf complet de relacions abans de dissenyar les trames.</p>
+  <div class="loader-wrap" id="loader-9-45">
+    <div class="spinner"></div>
+    <span id="loader-9-45-text">Generant backstory canònic i relacions...</span>
+  </div>
+
+  <div id="backstory-result" class="hidden">
+    <div id="backstory-cos" class="veu-result"></div>
+    <div class="btn-row" style="margin-top:24px;">
+      <button class="btn btn-secondary" onclick="hideCard('fase-9-45');showCard('fase-9-4');">← Tornar a Relacions</button>
       <button class="btn btn-primary" onclick="iniciarFaseTrames()">🕸️ Dissenyar Trames Opus</button>
     </div>
   </div>
@@ -2030,6 +2050,7 @@ function restaurarInterficieDesDeEstat() {
   if (fase >= 9.2 && ESTAT._perfilsPersonatges && Object.keys(ESTAT._perfilsPersonatges).length > 0) mostrarPerfilsPsicologics({ personatges: Object.values(ESTAT._perfilsPersonatges) });
   if (fase >= 9.3 && ESTAT._perfilsPersonatges && Object.keys(ESTAT._perfilsPersonatges).length > 0) mostrarFeridaArc({ personatges: Object.values(ESTAT._perfilsPersonatges) });
   if (fase >= 9.4 && ESTAT._matriuRelacional && ESTAT._matriuRelacional.length > 0) mostrarMatriuRelacional(ESTAT._matriuRelacional);
+  if (fase >= 9.45 && ESTAT._nkg && ESTAT._nkg.macronarrativa && ESTAT._nkg.macronarrativa.backstory_canonic) mostrarBackstoryCanonic(ESTAT._nkg.macronarrativa.backstory_canonic, ESTAT._nkg.relacions || []);
   if (fase >= 10 && ESTAT._estructuraCapitols.length > 0) mostrarEstructura('Reconstruït des de memòria (dades en JSON actiu)');
   if (fase >= 10.5 && ESTAT._escaletes.length > 0) {
     mostrarEscaleta(ESTAT._escaletes);
@@ -5390,6 +5411,210 @@ async function iniciarFaseRelacions() {
   } catch (err) {
     hideLoader('9-4');
     toast('Error en matriu relacional: ' + err.message);
+  }
+}
+
+function validarBackstoryIRelacions(dades, clausEsperades = []) {
+  if (!dades || typeof dades !== 'object') return false;
+  const bs = dades.backstory_canonic;
+  if (!bs || !Array.isArray(bs.fets_previs) || !Array.isArray(bs.cronologia_previa)) return false;
+  if (!Array.isArray(dades.relacions)) return false;
+
+  const claus = new Set((clausEsperades || []).map(c => nkgNormalitzarNom(c)).filter(Boolean));
+  const fetsOk = bs.fets_previs.every(f => f && f.id && f.descripcio && Array.isArray(f.personatges_implicats));
+  const cronoOk = bs.cronologia_previa.every(c => c && c.ordre !== undefined && c.descripcio);
+  if (!fetsOk || !cronoOk) return false;
+
+  const relsOk = dades.relacions.every(r => {
+    if (!r || !r.personatge_a || !r.personatge_b || !r.tipus) return false;
+    if (r.coneixement_mutu === undefined) return false;
+    if (claus.size > 0) {
+      const aOk = claus.has(nkgNormalitzarNom(r.personatge_a));
+      const bOk = claus.has(nkgNormalitzarNom(r.personatge_b));
+      if (!aOk || !bOk) return false;
+    }
+    return true;
+  });
+
+  return relsOk;
+}
+
+function mostrarBackstoryCanonic(backstoryCanonic = {}, relacions = []) {
+  const cos = document.getElementById('backstory-cos');
+  if (!cos) return;
+
+  const fets = Array.isArray(backstoryCanonic.fets_previs) ? backstoryCanonic.fets_previs : [];
+  const cronologia = Array.isArray(backstoryCanonic.cronologia_previa) ? backstoryCanonic.cronologia_previa : [];
+  const rels = Array.isArray(relacions) ? relacions : [];
+
+  const htmlFets = fets.map(f => `<div class="veu-card">
+    <div class="veu-card-nom">🧱 ${escHtml(String(f.id || 'fet'))}</div>
+    <div class="veu-card-camps">
+      <div><div class="veu-camp-label">Descripció</div><div class="veu-camp-val">${escHtml(String(f.descripcio || ''))}</div></div>
+      <div><div class="veu-camp-label">Personatges implicats</div><div class="veu-camp-val">${escHtml((f.personatges_implicats || []).join(', '))}</div></div>
+      <div><div class="veu-camp-label">Data aproximada</div><div class="veu-camp-val">${escHtml(String(f.data_aproximada || ''))}</div></div>
+      <div><div class="veu-camp-label">Impacte narratiu</div><div class="veu-camp-val">${escHtml(String(f.impacte_narratiu || ''))}</div></div>
+    </div>
+  </div>`).join('\n');
+
+  const htmlCrono = cronologia.map(c => `<div class="veu-card">
+    <div class="veu-card-nom">🕰️ Ordre ${escHtml(String(c.ordre || '?'))}</div>
+    <div class="veu-card-camps">
+      <div><div class="veu-camp-label">Descripció</div><div class="veu-camp-val">${escHtml(String(c.descripcio || ''))}</div></div>
+      <div><div class="veu-camp-label">Any aproximat</div><div class="veu-camp-val">${escHtml(String(c.any_aproximat || ''))}</div></div>
+    </div>
+  </div>`).join('\n');
+
+  const htmlRel = rels.slice(0, 18).map(r => `<div class="veu-card">
+    <div class="veu-card-nom">🔗 ${escHtml(String(r.personatge_a || ''))} ↔ ${escHtml(String(r.personatge_b || ''))}</div>
+    <div class="veu-card-camps">
+      <div><div class="veu-camp-label">Tipus</div><div class="veu-camp-val">${escHtml(String(r.tipus || 'desconegut'))}</div></div>
+      <div><div class="veu-camp-label">Coneixement mutu</div><div class="veu-camp-val">${r.coneixement_mutu ? 'Sí' : 'No'}</div></div>
+      <div><div class="veu-camp-label">Descripció</div><div class="veu-camp-val">${escHtml(String(r.descripcio || ''))}</div></div>
+      <div><div class="veu-camp-label">Evolució</div><div class="veu-camp-val">${escHtml(String(r.evolucio || ''))}</div></div>
+    </div>
+  </div>`).join('\n');
+
+  cos.innerHTML = `
+    <div class="veu-card"><div class="veu-card-nom">📌 Resum</div><div class="veu-card-camps">
+      <div><div class="veu-camp-label">Fets previs</div><div class="veu-camp-val">${fets.length}</div></div>
+      <div><div class="veu-camp-label">Entrades de cronologia</div><div class="veu-camp-val">${cronologia.length}</div></div>
+      <div><div class="veu-camp-label">Relacions generades</div><div class="veu-camp-val">${rels.length}</div></div>
+    </div></div>
+    ${htmlFets}
+    ${htmlCrono}
+    ${htmlRel}
+  `;
+
+  document.getElementById('backstory-result').classList.remove('hidden');
+}
+
+async function generarBackstoryIRelacions(userConfig) {
+  const nkg = ESTAT._nkg || {};
+  const macro = nkg.macronarrativa || {};
+  const personatgesObj = nkg.personatges || {};
+  const personatges = Object.entries(personatgesObj).map(([clau, p]) => ({
+    clau,
+    nom: p.nom || clau,
+    arc: p.arc || {},
+    limit_moral: p.limit_moral || '',
+    veu: p.veu || {},
+    estat_emocional: p.estat_emocional || ''
+  }));
+
+  if (personatges.length < 2) throw new Error('Calen almenys 2 personatges per generar relacions canòniques.');
+
+  const resumInput = {
+    synopsis_core: macro.synopsis_core || '',
+    theme: macro.theme || '',
+    ending: macro.ending || {},
+    personatges
+  };
+
+  const systemPrompt = `Ets un novel·lista expert en construcció de backstory. A partir de la sinopsi, el tema, el final previst i les fitxes de personatges, has de generar:
+
+1. BACKSTORY CANÒNIC: Els fets concrets que van passar ABANS que comenci la novel·la. Inclou:
+- Quina relació exacta tenien els personatges entre ells
+- Què va passar (el trauma, l'incident, la connexió original)
+- Quan va passar aproximadament
+- Quin impacte va tenir en cada personatge
+- Com van arribar a la situació actual
+
+2. GRAF DE RELACIONS: Per a cada parella de personatges, defineix:
+- El tipus de relació
+- Si es coneixen mútuament
+- Com evoluciona la relació durant la novel·la
+
+Respon EXCLUSIVAMENT amb un JSON vàlid amb aquesta estructura exacta, sense text addicional ni blocs de codi markdown:
+
+{
+  "backstory_canonic": {
+    "fets_previs": [
+      {
+        "id": "fet_001",
+        "descripcio": "...",
+        "personatges_implicats": ["clau_personatge_1", "clau_personatge_2"],
+        "data_aproximada": "...",
+        "impacte_narratiu": "..."
+      }
+    ],
+    "cronologia_previa": [
+      {
+        "ordre": 1,
+        "descripcio": "...",
+        "any_aproximat": "..."
+      }
+    ]
+  },
+  "relacions": [
+    {
+      "personatge_a": "clau_1",
+      "personatge_b": "clau_2",
+      "tipus": "victima_agressor",
+      "descripcio": "...",
+      "coneixement_mutu": true,
+      "evolucio": "..."
+    }
+  ]
+}
+
+REGLES:
+- Les claus de personatge han de coincidir EXACTAMENT amb les del NKG.
+- Genera relacions per a TOTES les parelles possibles (amb N personatges, hi ha N*(N-1)/2 parelles).
+- Els fets previs han de ser CONCRETS (noms, llocs, dates aproximades), mai genèrics.
+- La cronologia ha d'estar ordenada cronològicament.
+- Tot ha de ser coherent amb la sinopsi i el final previst.`;
+
+  const msgs = [{
+    role: 'user',
+    content: `Dades del NKG per a la fase de backstory i relacions canòniques:
+${JSON.stringify(resumInput, null, 2)}`
+  }];
+
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  const clauPersonatges = personatges.map(p => p.clau);
+
+  for (let intent = 1; intent <= 2; intent++) {
+    const raw = await callLLMMulti(
+      msgs,
+      systemPrompt,
+      Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 2600, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+
+    const dades = parseJsonRobust(raw);
+    if (validarBackstoryIRelacions(dades, clauPersonatges)) return dades;
+
+    if (intent === 2) throw new Error('Resposta invàlida a la fase Backstory i Relacions. Revisa el format JSON i torna-ho a provar.');
+    msgs.push({
+      role: 'user',
+      content: 'La resposta anterior no era vàlida o tenia camps incomplets. Torna a generar el JSON amb l\'estructura exacta i totes les parelles de personatges.'
+    });
+  }
+
+  throw new Error('No s\'ha pogut generar backstory canònic.');
+}
+
+async function iniciarFaseBackstoryRelacions() {
+  ESTAT.fase = 9.45;
+  updateProgress(9.45);
+  hideCard('fase-9-4');
+  showCard('fase-9-45');
+  document.getElementById('backstory-result').classList.add('hidden');
+  showLoader('9-45');
+  document.getElementById('loader-9-45-text').textContent = 'Generant backstory canònic i graf de relacions...';
+
+  try {
+    if (!ESTAT._nkg) nkgInicialitzar();
+    const data = await generarBackstoryIRelacions(USER_CONFIG);
+    ESTAT._nkg.macronarrativa.backstory_canonic = data.backstory_canonic;
+    ESTAT._nkg.relacions = data.relacions;
+    hideLoader('9-45');
+    mostrarBackstoryCanonic(data.backstory_canonic, data.relacions);
+    toast('Backstory canònic i relacions injectats al NKG.');
+  } catch (err) {
+    hideLoader('9-45');
+    toast('Error fase Backstory/Relacions: ' + err.message);
   }
 }
 
@@ -14131,6 +14356,10 @@ function crearNKG() {
         imatge_o_escena_final: "",
         veritat_que_es_revela: ""
       },
+      backstory_canonic: {
+        fets_previs: [],
+        cronologia_previa: []
+      },
       thematic_count: 0
     },
     threads: {
@@ -14143,14 +14372,14 @@ function crearNKG() {
     objectes: {},
     fets_canonics: [],
     esdeveniments: [],
-    relacions: [],
+    relacions: [], // { personatge_a, personatge_b, tipus, descripcio, coneixement_mutu, evolucio }
     timeline_accions: [], // Registre d'Accions Consumades (NKG CHRONOS): "C3E2: Maja entra al laboratori"
     timeline_objectes: [], // Registre de moviment d'objectes: C3E2: [Claus] Personatge A -> Personatge B (motiu)
     timeline_personatges: [], // Registre de canvis de personatge: ubicació/roba/estat per escena
     transicions_capitols: [], // Regles de pas capítol->capítol per evitar salts i pèrdua de continuïtat
     beats_gastats: [], // Registre de beats narratius consumits (anti-repetició dramàtica)
     ultima_actualitzacio: { capitol: 0, escena: 0 },
-    versio: 1
+    versio: 2
   };
 }
 
@@ -14605,6 +14834,7 @@ function nkgInicialitzar() {
   const prevMacro    = ESTAT._nkg?.macronarrativa;
   const prevThreads  = ESTAT._nkg?.threads;
   const prevPersonat = ESTAT._nkg?.personatges;
+  const prevRelacions = ESTAT._nkg?.relacions;
 
   ESTAT._nkg = crearNKG();
   const nkg = ESTAT._nkg;
@@ -14615,6 +14845,7 @@ function nkgInicialitzar() {
   }
   // Restaurar threads si existien
   if (prevThreads) nkg.threads = prevThreads;
+  if (Array.isArray(prevRelacions) && prevRelacions.length > 0) nkg.relacions = prevRelacions;
 
   // Poblar personatges des de l'elenc, preservant arc/limit_moral/veu si ja existien
   if (ESTAT._personatgesSeleccionats && ESTAT._personatgesSeleccionats.length > 0) {
@@ -14810,28 +15041,32 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
 
   if (dades.canvis_relacions) {
     dades.canvis_relacions.forEach(r => {
-      const existentIdx = nkg.relacions.findIndex(rel =>
-        (nkgNormalitzarNom(rel.origen) === nkgNormalitzarNom(r.personatge_a) && nkgNormalitzarNom(rel.desti) === nkgNormalitzarNom(r.personatge_b)) ||
-        (nkgNormalitzarNom(rel.origen) === nkgNormalitzarNom(r.personatge_b) && nkgNormalitzarNom(rel.desti) === nkgNormalitzarNom(r.personatge_a))
-      );
+      const aNou = r.personatge_a || r.origen || '';
+      const bNou = r.personatge_b || r.desti || '';
+      const existentIdx = nkg.relacions.findIndex(rel => {
+        const ra = rel.personatge_a || rel.origen || '';
+        const rb = rel.personatge_b || rel.desti || '';
+        return (
+          (nkgNormalitzarNom(ra) === nkgNormalitzarNom(aNou) && nkgNormalitzarNom(rb) === nkgNormalitzarNom(bNou)) ||
+          (nkgNormalitzarNom(ra) === nkgNormalitzarNom(bNou) && nkgNormalitzarNom(rb) === nkgNormalitzarNom(aNou))
+        );
+      });
       if (existentIdx >= 0) {
         const rel = nkg.relacions[existentIdx];
+        if (aNou) rel.personatge_a = aNou;
+        if (bNou) rel.personatge_b = bNou;
         if (r.tipus) rel.tipus = r.tipus;
-        if (r.confianca !== undefined) rel.confianca = r.confianca;
-        if (r.tensio !== undefined) rel.tensio = r.tensio;
-        if (r.nota) {
-          if (!rel.historial) rel.historial = [];
-          rel.historial.push(`Cap.${capitol}: ${r.nota}`);
-          if (rel.historial.length > 4) rel.historial = rel.historial.slice(-4);
-        }
+        if (r.descripcio || r.nota) rel.descripcio = r.descripcio || r.nota;
+        if (r.coneixement_mutu !== undefined) rel.coneixement_mutu = !!r.coneixement_mutu;
+        if (r.evolucio) rel.evolucio = r.evolucio;
       } else {
         nkg.relacions.push({
-          origen: r.personatge_a,
-          desti: r.personatge_b,
-          tipus: r.tipus || 'coneix',
-          confianca: r.confianca || 5,
-          tensio: r.tensio || 0,
-          historial: r.nota ? [`Cap.${capitol}: ${r.nota}`] : []
+          personatge_a: aNou,
+          personatge_b: bNou,
+          tipus: r.tipus || 'desconegut',
+          descripcio: r.descripcio || r.nota || '',
+          coneixement_mutu: r.coneixement_mutu !== undefined ? !!r.coneixement_mutu : true,
+          evolucio: r.evolucio || ''
         });
       }
     });
@@ -15755,7 +15990,10 @@ function renderitzarNKG() {
   if (nkg.relacions.length > 0) {
     html += `<h4 style="color:var(--accent2);margin:12px 0 8px;">🔗 Relacions (${nkg.relacions.length})</h4>`;
     nkg.relacions.forEach(r => {
-      html += `<div style="font-size:.82rem;padding:2px 0;">${escHtml(r.origen)} ↔ ${escHtml(r.desti)}: ${escHtml(r.tipus)} (⚡${r.tensio}/10)</div>`;
+      const a = r.personatge_a || r.origen || '';
+      const b = r.personatge_b || r.desti || '';
+      const evo = r.evolucio ? ` | evolució: ${r.evolucio}` : '';
+      html += `<div style="font-size:.82rem;padding:2px 0;">${escHtml(a)} ↔ ${escHtml(b)}: ${escHtml(r.tipus || 'desconegut')}${evo}</div>`;
     });
   }
 
