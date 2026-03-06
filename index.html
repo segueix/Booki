@@ -789,6 +789,8 @@
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="9.48">Objectes</div>
     <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="9.49">Mapa/Regles</div>
+    <div class="step-arrow">›</div>
     <div class="step-pill" data-step="9.5">Trames</div>
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="10">Estructura</div>
@@ -1349,6 +1351,24 @@
     <div id="objectes-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
       <button class="btn btn-secondary" onclick="hideCard('fase-9-48');showCard('fase-9-47');">← Tornar a Objectius/Secrets</button>
+      <button class="btn btn-primary" onclick="iniciarFaseMapaEspacialRegles()">🗺️ Mapa espacial i regles</button>
+    </div>
+  </div>
+</div>
+
+<!-- FASE 9.49: Mapa Espacial i Regles -->
+<div class="card hidden" id="fase-9-49">
+  <h2><span class="icon">🗺️</span> Mapa Espacial i Regles</h2>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Construïm el graf d'espais de la finca i regles operatives verificables.</p>
+  <div class="loader-wrap" id="loader-9-49">
+    <div class="spinner"></div>
+    <span id="loader-9-49-text">Generant mapa espacial i regles del món...</span>
+  </div>
+
+  <div id="mapa-regles-result" class="hidden">
+    <div id="mapa-regles-cos" class="veu-result"></div>
+    <div class="btn-row" style="margin-top:24px;">
+      <button class="btn btn-secondary" onclick="hideCard('fase-9-49');showCard('fase-9-48');">← Tornar a Objectes</button>
       <button class="btn btn-primary" onclick="iniciarFaseTrames()">🕸️ Dissenyar Trames Opus</button>
     </div>
   </div>
@@ -2114,6 +2134,7 @@ function restaurarInterficieDesDeEstat() {
   if (fase >= 9.46 && ESTAT._nkg && ESTAT._nkg.personatges && Object.keys(ESTAT._nkg.personatges).length > 0) mostrarCompletarPersonatges(Object.assign({}, ESTAT._nkg.personatges));
   if (fase >= 9.47 && ESTAT._nkg && ESTAT._nkg.personatges && Object.keys(ESTAT._nkg.personatges).length > 0) mostrarObjectiusSecrets(ESTAT._nkg.personatges);
   if (fase >= 9.48 && ESTAT._nkg && ESTAT._nkg.objectes) mostrarObjectesNarratius(ESTAT._nkg.objectes);
+  if (fase >= 9.49 && ESTAT._nkg && ESTAT._nkg.llocs) mostrarMapaRegles(ESTAT._nkg.llocs, ESTAT._nkg.mapa_adjacencies || [], (ESTAT.bibliaNarrativa && ESTAT.bibliaNarrativa.regles_mon) || []);
   if (fase >= 10 && ESTAT._estructuraCapitols.length > 0) mostrarEstructura('Reconstruït des de memòria (dades en JSON actiu)');
   if (fase >= 10.5 && ESTAT._escaletes.length > 0) {
     mostrarEscaleta(ESTAT._escaletes);
@@ -3109,7 +3130,7 @@ function _confirmarMonNouSilent() {
   const restriccionsMatch = monTriat.match(/RESTRICCIONS(?:\s+DEL\s+MÓN)?:[\s*#]*(.+)/i);
   if (restriccionsMatch) {
     ESTAT.bibliaNarrativa.regles_mon = restriccionsMatch[1]
-      .replace(/\*+/g, '').split(/[,;]/).map(s => s.trim()).filter(Boolean);
+      .replace(/\*+/g, '').split(/[,;]/).map(s => s.trim()).filter(Boolean).map((desc, i) => normalitzarReglaMon({ id: `regla_auto_${i+1}`, descripcio: desc, categoria: 'logistica', excepcions: null, afecta_personatges: [] }, i + 1));
   }
 
   // Lloc: extreu primer segment fins a punt o final de frase
@@ -3853,7 +3874,7 @@ async function confirmarMonNou() {
   const restriccionsMatch = monTriat.match(/RESTRICCIONS:\s*(.+)/i);
   const llocMatch = monTriat.match(/LLOC I ÈPOCA:\s*(.+)/i);
   if (restriccionsMatch) {
-    ESTAT.bibliaNarrativa.regles_mon = restriccionsMatch[1].split(/[,;]/).map(s => s.trim()).filter(Boolean);
+    ESTAT.bibliaNarrativa.regles_mon = restriccionsMatch[1].split(/[,;]/).map(s => s.trim()).filter(Boolean).map((desc, i) => normalitzarReglaMon({ id: `regla_auto_${i+1}`, descripcio: desc, categoria: 'logistica', excepcions: null, afecta_personatges: [] }, i + 1));
   }
   if (llocMatch) {
     ESTAT.bibliaNarrativa.llocs_importants = [{ nom: llocMatch[1].trim(), descripcio: monTriat.substring(0, 200) }];
@@ -6055,6 +6076,113 @@ async function iniciarFaseObjectesNarratius() {
   }
 }
 
+
+function mostrarMapaRegles(llocs = {}, mapaAdj = [], regles = []) {
+  const cos = document.getElementById('mapa-regles-cos');
+  if (!cos) return;
+  const llistat = Object.entries(llocs || {}).map(([id, raw]) => normalitzarLlocNarratiu(raw, id)).filter(Boolean);
+  const reglesNorm = (regles || []).map((r, i) => normalitzarReglaMon(r, i + 1)).filter(r => r.descripcio);
+  cos.innerHTML = `
+    <div class="veu-card"><div class="veu-card-nom">📍 Resum espacial</div><div class="veu-card-camps">
+      <div><div class="veu-camp-label">Llocs</div><div class="veu-camp-val">${llistat.length}</div></div>
+      <div><div class="veu-camp-label">Adjacències</div><div class="veu-camp-val">${(mapaAdj || []).length}</div></div>
+      <div><div class="veu-camp-label">Regles</div><div class="veu-camp-val">${reglesNorm.length}</div></div>
+    </div></div>
+    ${llistat.slice(0, 12).map(l => `<div class="veu-card"><div class="veu-card-nom">🏠 ${escHtml(l.nom)} (${escHtml(l.id)})</div><div class="veu-card-camps"><div><div class="veu-camp-label">Tipus</div><div class="veu-camp-val">${escHtml(l.tipus)}</div></div><div><div class="veu-camp-label">Connectat amb</div><div class="veu-camp-val">${escHtml((l.connectat_amb || []).join(', ') || '(cap)')}</div></div></div></div>`).join('\n')}
+  `;
+  document.getElementById('mapa-regles-result').classList.remove('hidden');
+}
+
+async function generarMapaEspacialRegles(userConfig) {
+  const nkg = ESTAT._nkg || {};
+  const payload = {
+    worldbuilding: ESTAT.worldbuilding || '',
+    synopsis: nkg.macronarrativa?.synopsis_core || '',
+    escaletes: ESTAT._escaletes || []
+  };
+  const systemPrompt = `Ets un arquitecte i dissenyador de producció cinematogràfica. A partir del worldbuilding narratiu, la sinopsi i les escaletes, has de crear el MAPA COMPLET de la finca i els seus espais, més les regles del món.
+
+Respon EXCLUSIVAMENT amb JSON vàlid:
+{
+  "llocs": {
+    "finca_pirineu": {
+      "id": "finca_pirineu", "nom": "...", "tipus": "edifici",
+      "descripcio_sensorial": "...", "parent": null,
+      "connectat_amb": ["jardi_exterior", "garatge"],
+      "sistemes_tecnics": ["domotica_central"],
+      "temperatura_base": "22°C interior regulat",
+      "accessibilitat": "tancada_clau",
+      "iluminacio": "artificial"
+    }
+  },
+  "mapa_adjacencies": [
+    {"de": "cuina", "a": "salo", "via": "porta oberta"}
+  ],
+  "regles_mon": [
+    {"id":"regla_01","descripcio":"...","categoria":"climatica","excepcions":null,"afecta_personatges":[]}
+  ]
+}
+
+REGLES:
+- Mínim 10 estances/zones.
+- Tota estança mencionada a les escaletes ha d'existir.
+- Mínim 12 regles cobrint totes les categories.
+- Regles específiques i verificables.`;
+  const msgs = [{ role: 'user', content: `Context:
+${JSON.stringify(payload, null, 2)}` }];
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  for (let intent = 1; intent <= 2; intent++) {
+    const raw = await callLLMMulti(msgs, systemPrompt, Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 4200, model: models.modelArquitecte }), 'arquitectura');
+    const parsed = parseJsonRobust(raw);
+    const valid = parsed && parsed.llocs && typeof parsed.llocs === 'object'
+      && Array.isArray(parsed.regles_mon) && Array.isArray(parsed.mapa_adjacencies);
+    if (valid) return parsed;
+    if (intent === 2) throw new Error('Resposta invàlida a la fase Mapa Espacial i Regles.');
+    msgs.push({ role: 'user', content: 'Resposta invàlida. Torna JSON estricte amb llocs + mapa_adjacencies + regles_mon.' });
+  }
+  throw new Error('No s\'ha pogut generar mapa i regles.');
+}
+
+function injectarMapaEspacialRegles(data = {}) {
+  const nkg = ESTAT._nkg || {};
+  if (!nkg.llocs || typeof nkg.llocs !== 'object') nkg.llocs = {};
+  Object.entries(data.llocs || {}).forEach(([id, raw]) => {
+    const l = normalitzarLlocNarratiu(raw, id);
+    if (l) nkg.llocs[l.id] = l;
+  });
+  nkg.mapa_adjacencies = Array.isArray(data.mapa_adjacencies)
+    ? data.mapa_adjacencies.map(e => ({ de: nkgNormalitzarNom(e.de || ''), a: nkgNormalitzarNom(e.a || ''), via: String(e.via || '').trim() || 'connexio' })).filter(e => e.de && e.a)
+    : [];
+  ESTAT.bibliaNarrativa.regles_mon = Array.isArray(data.regles_mon)
+    ? data.regles_mon.map((r, i) => normalitzarReglaMon(r, i + 1)).filter(r => r.descripcio)
+    : (ESTAT.bibliaNarrativa.regles_mon || []);
+  Object.values(nkg.llocs).forEach(loc => {
+    const extra = nkg.mapa_adjacencies.filter(e => e.de === loc.id).map(e => e.a);
+    loc.connectat_amb = [...new Set([...(loc.connectat_amb || []), ...extra])];
+  });
+}
+
+async function iniciarFaseMapaEspacialRegles() {
+  ESTAT.fase = 9.49;
+  updateProgress(9.49);
+  hideCard('fase-9-48');
+  showCard('fase-9-49');
+  document.getElementById('mapa-regles-result').classList.add('hidden');
+  showLoader('9-49');
+  try {
+    const data = await generarMapaEspacialRegles(USER_CONFIG);
+    injectarMapaEspacialRegles(data);
+    const llocsIds = Object.keys((ESTAT._nkg && ESTAT._nkg.llocs) || {});
+    if (llocsIds.length === 0) throw new Error('No s\'han injectat llocs al NKG.');
+    hideLoader('9-49');
+    mostrarMapaRegles(ESTAT._nkg.llocs || {}, ESTAT._nkg.mapa_adjacencies || [], ESTAT.bibliaNarrativa.regles_mon || []);
+    toast('Mapa espacial i regles injectats al NKG.');
+  } catch (err) {
+    hideLoader('9-49');
+    toast('Error fase Mapa Espacial i Regles: ' + err.message);
+  }
+}
+
 function mostrarEstilsParla(text) {
   const cos = document.getElementById('estils-cos');
   const blocs = parsejarBlocsEstilsParla(text);
@@ -7912,6 +8040,88 @@ function getObjectState(capitol = 1) {
   return out;
 }
 
+function normalitzarLlocNarratiu(raw = {}, fallbackId = '') {
+  const r = raw || {};
+  const id = nkgNormalitzarNom(String(r.id || fallbackId || r.nom || '').trim());
+  if (!id) return null;
+  const tipusValids = ['edifici', 'estança', 'exterior', 'zona_tecnica', 'vehicle'];
+  const accessValids = ['lliure', 'tancada_clau', 'oculta', 'exterior_exposat'];
+  const llumValida = ['natural', 'artificial', 'cap', 'mixta'];
+  return {
+    id,
+    nom: String(r.nom || id).trim(),
+    tipus: tipusValids.includes(r.tipus) ? r.tipus : 'estança',
+    descripcio_sensorial: String(r.descripcio_sensorial || '').trim(),
+    parent: r.parent ? nkgNormalitzarNom(String(r.parent)) : null,
+    connectat_amb: Array.isArray(r.connectat_amb) ? [...new Set(r.connectat_amb.map(x => nkgNormalitzarNom(String(x || ''))).filter(Boolean))] : [],
+    sistemes_tecnics: Array.isArray(r.sistemes_tecnics) ? r.sistemes_tecnics.map(x => String(x || '').trim()).filter(Boolean) : [],
+    temperatura_base: r.temperatura_base == null || String(r.temperatura_base).trim() === '' ? null : String(r.temperatura_base).trim(),
+    accessibilitat: accessValids.includes(r.accessibilitat) ? r.accessibilitat : 'lliure',
+    iluminacio: llumValida.includes(r.iluminacio) ? r.iluminacio : 'mixta'
+  };
+}
+
+function normalitzarReglaMon(raw = {}, idx = 1) {
+  const r = raw || {};
+  const cats = ['fisica', 'tecnologica', 'social', 'climatica', 'logistica'];
+  if (typeof r === 'string') {
+    return {
+      id: `regla_${String(idx).padStart(2, '0')}`,
+      descripcio: r,
+      categoria: 'logistica',
+      excepcions: null,
+      afecta_personatges: []
+    };
+  }
+  return {
+    id: String(r.id || `regla_${String(idx).padStart(2, '0')}`).trim(),
+    descripcio: String(r.descripcio || '').trim(),
+    categoria: cats.includes(r.categoria) ? r.categoria : 'logistica',
+    excepcions: r.excepcions == null || String(r.excepcions).trim() === '' ? null : String(r.excepcions).trim(),
+    afecta_personatges: Array.isArray(r.afecta_personatges) ? r.afecta_personatges.map(x => nkgNormalitzarNom(String(x || ''))).filter(Boolean) : []
+  };
+}
+
+function getAdjacentLocations(locId = '') {
+  const nkg = ESTAT._nkg || {};
+  const id = nkgNormalitzarNom(locId);
+  if (!id || !nkg.llocs || !nkg.llocs[id]) return [];
+  const directes = Array.isArray(nkg.llocs[id].connectat_amb) ? nkg.llocs[id].connectat_amb : [];
+  const graf = Array.isArray(nkg.mapa_adjacencies) ? nkg.mapa_adjacencies : [];
+  const edges = graf.flatMap(e => {
+    const de = nkgNormalitzarNom(e.de || '');
+    const a = nkgNormalitzarNom(e.a || '');
+    if (de === id && a) return [a];
+    if (a === id && de) return [de];
+    return [];
+  });
+  return [...new Set([...directes, ...edges])];
+}
+
+function canReach(personatge, origen, desti) {
+  const nkg = ESTAT._nkg || {};
+  const start = nkgNormalitzarNom(origen || '');
+  const goal = nkgNormalitzarNom(desti || '');
+  if (!start || !goal || !nkg.llocs || !nkg.llocs[start] || !nkg.llocs[goal]) return false;
+  const maxPassos = 30;
+  const q = [start];
+  const vist = new Set([start]);
+  let passos = 0;
+  while (q.length > 0 && passos < maxPassos) {
+    const cur = q.shift();
+    if (cur === goal) return true;
+    passos += 1;
+    getAdjacentLocations(cur).forEach(nx => {
+      if (vist.has(nx) || !nkg.llocs[nx]) return;
+      const acc = nkg.llocs[nx].accessibilitat || 'lliure';
+      if (acc === 'oculta') return;
+      vist.add(nx);
+      q.push(nx);
+    });
+  }
+  return false;
+}
+
 function sincronitzarReferenciesObjectesPersonatges() {
   const nkg = ESTAT._nkg || {};
   const pers = nkg.personatges || {};
@@ -8034,6 +8244,7 @@ async function generarFitxerContexte(nkg, biblia, capitolActual) {
     threads: nkg.threads,
     personatges: nkg.personatges,
     llocs: nkg.llocs,
+    mapa_adjacencies: nkg.mapa_adjacencies || [],
     objectes: nkg.objectes,
     fets_canonics: nkg.fets_canonics,
     esdeveniments: (nkg.esdeveniments || []).slice(-10),
@@ -9406,7 +9617,7 @@ function obrirBiblia() {
 
   let html = '';
   if (b.regles_mon && b.regles_mon.length > 0) {
-    html += `<h4 style="color:var(--accent2);margin:14px 0 8px">🌍 Regles del Món</h4><ul style="padding-left:18px">${b.regles_mon.map(r => `<li style="margin-bottom:4px">${r}</li>`).join('\n')}</ul>`;
+    html += `<h4 style="color:var(--accent2);margin:14px 0 8px">🌍 Regles del Món</h4><ul style="padding-left:18px">${b.regles_mon.map((r, i) => { const rr = normalitzarReglaMon(r, i + 1); return `<li style="margin-bottom:4px"><strong>${rr.id}</strong> (${rr.categoria}): ${rr.descripcio}</li>`; }).join('\n')}</ul>`;
   }
   if (b.llocs_importants && b.llocs_importants.length > 0) {
     html += `<h4 style="color:var(--accent2);margin:14px 0 8px">📍 Llocs Importants</h4><ul style="padding-left:18px">${b.llocs_importants.map(l => `<li style="margin-bottom:4px"><strong>${l.nom}</strong>: ${l.descripcio}</li>`).join('\n')}</ul>`;
@@ -12394,7 +12605,7 @@ function buildContextCapitolLegacy(idx, skipRegistre = false, estat = ESTAT) {
 
     if (biblia.regles_mon && biblia.regles_mon.length > 0) {
       bibliaLines.push('REGLES DEL MÓN (respecta-les sempre):');
-      biblia.regles_mon.forEach(r => bibliaLines.push('- ' + r));
+      biblia.regles_mon.forEach((r, i) => { const rr = normalitzarReglaMon(r, i + 1); bibliaLines.push(`- [${rr.categoria}] ${rr.descripcio}`); });
     }
 
     if (bibliaLines.length > 0) {
@@ -13447,7 +13658,7 @@ ${personatgesCtx}
 
 Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense markdown, sense text addicional):
 {
-  "regles_mon": ["regla del món 1", "regla del món 2"],
+  "regles_mon": [{"id":"regla_01","descripcio":"...","categoria":"logistica","excepcions":null,"afecta_personatges":[]}],
   "llocs_importants": [{"nom": "nom del lloc", "descripcio": "descripció breu del lloc i el seu paper"}],
   "objectes_clau": [{"nom": "nom de l'objecte", "significat": "significat narratiu o simbòlic"}],
   "fitxes_personatges": [
@@ -13476,7 +13687,7 @@ IMPORTANT: El JSON ha de ser COMPLET amb TOTS els personatges de l'elenc. Manté
 
   const dades = parseJsonRobust(response);
   if (dades) {
-    if (dades.regles_mon)         ESTAT.bibliaNarrativa.regles_mon         = dades.regles_mon;
+    if (dades.regles_mon)         ESTAT.bibliaNarrativa.regles_mon         = dades.regles_mon.map((r, i) => normalitzarReglaMon(r, i + 1)).filter(r => r.descripcio);
     if (dades.llocs_importants)   ESTAT.bibliaNarrativa.llocs_importants   = dades.llocs_importants;
     if (dades.objectes_clau)      ESTAT.bibliaNarrativa.objectes_clau      = dades.objectes_clau;
     if (dades.fitxes_personatges) ESTAT.bibliaNarrativa.fitxes_personatges = dades.fitxes_personatges;
@@ -15019,6 +15230,7 @@ function crearNKG() {
     },
     personatges: {},
     llocs: {},
+    mapa_adjacencies: [],
     objectes: {},
     fets_canonics: [],
     esdeveniments: [],
@@ -15029,7 +15241,7 @@ function crearNKG() {
     transicions_capitols: [], // Regles de pas capítol->capítol per evitar salts i pèrdua de continuïtat
     beats_gastats: [], // Registre de beats narratius consumits (anti-repetició dramàtica)
     ultima_actualitzacio: { capitol: 0, escena: 0 },
-    versio: 2
+    versio: 4
   };
 }
 
@@ -15529,6 +15741,7 @@ function nkgInicialitzar() {
   const prevThreads  = ESTAT._nkg?.threads;
   const prevPersonat = ESTAT._nkg?.personatges;
   const prevRelacions = ESTAT._nkg?.relacions;
+  const prevMapaAdj = ESTAT._nkg?.mapa_adjacencies;
 
   ESTAT._nkg = crearNKG();
   const nkg = ESTAT._nkg;
@@ -15540,6 +15753,7 @@ function nkgInicialitzar() {
   // Restaurar threads si existien
   if (prevThreads) nkg.threads = prevThreads;
   if (Array.isArray(prevRelacions) && prevRelacions.length > 0) nkg.relacions = prevRelacions;
+  if (Array.isArray(prevMapaAdj) && prevMapaAdj.length > 0) nkg.mapa_adjacencies = prevMapaAdj;
 
   // Poblar personatges des de l'elenc, preservant arc/limit_moral/veu si ja existien
   if (ESTAT._personatgesSeleccionats && ESTAT._personatgesSeleccionats.length > 0) {
@@ -15575,11 +15789,18 @@ function nkgInicialitzar() {
     const wbText = ESTAT.worldbuilding
       ? (typeof ESTAT.worldbuilding === 'string' ? ESTAT.worldbuilding : JSON.stringify(ESTAT.worldbuilding))
       : '';
-    nkg.llocs[clau] = {
+    nkg.llocs[clau] = normalitzarLlocNarratiu({
+      id: clau,
       nom: ESTAT.localitzacioTriada,
-      descripcio_sensorial: wbText.substring(0, 200),
-      ambient: ''
-    };
+      tipus: 'edifici',
+      descripcio_sensorial: wbText.substring(0, 220),
+      parent: null,
+      connectat_amb: [],
+      sistemes_tecnics: [],
+      temperatura_base: null,
+      accessibilitat: 'lliure',
+      iluminacio: 'mixta'
+    }, clau);
   }
 
   // Fet canònic inicial des de l'arc global
@@ -15700,10 +15921,10 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
 
   if (dades.nous_llocs) {
     dades.nous_llocs.forEach(ll => {
-      const clau = nkgNormalitzarNom(ll.nom);
-      if (!nkg.llocs[clau]) {
-        nkg.llocs[clau] = { nom: ll.nom, descripcio_sensorial: ll.descripcio_sensorial || '', ambient: ll.ambient || '' };
-      }
+      const lNorm = normalitzarLlocNarratiu(ll, ll && (ll.id || ll.nom));
+      if (!lNorm) return;
+      const ex = nkg.llocs[lNorm.id] ? normalitzarLlocNarratiu(nkg.llocs[lNorm.id], lNorm.id) : null;
+      nkg.llocs[lNorm.id] = Object.assign({}, ex || {}, lNorm);
     });
   }
 
