@@ -785,6 +785,8 @@
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="9.46">Completar personatges</div>
     <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="9.47">Objectius/Secrets</div>
+    <div class="step-arrow">›</div>
     <div class="step-pill" data-step="9.5">Trames</div>
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="10">Estructura</div>
@@ -1309,6 +1311,24 @@
     <div id="completar-personatges-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
       <button class="btn btn-secondary" onclick="hideCard('fase-9-46');showCard('fase-9-45');">← Tornar a Backstory</button>
+      <button class="btn btn-primary" onclick="iniciarFaseObjectiusSecrets()">🎯 Objectius i secrets</button>
+    </div>
+  </div>
+</div>
+
+<!-- FASE 9.47: Objectius i Secrets -->
+<div class="card hidden" id="fase-9-47">
+  <h2><span class="icon">🎯</span> Objectius i Secrets</h2>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Definim objectius accionables i secrets dramàtics per personatge abans de trames.</p>
+  <div class="loader-wrap" id="loader-9-47">
+    <div class="spinner"></div>
+    <span id="loader-9-47-text">Generant objectius i secrets...</span>
+  </div>
+
+  <div id="objectius-secrets-result" class="hidden">
+    <div id="objectius-secrets-cos" class="veu-result"></div>
+    <div class="btn-row" style="margin-top:24px;">
+      <button class="btn btn-secondary" onclick="hideCard('fase-9-47');showCard('fase-9-46');">← Tornar a Completar Personatges</button>
       <button class="btn btn-primary" onclick="iniciarFaseTrames()">🕸️ Dissenyar Trames Opus</button>
     </div>
   </div>
@@ -2072,6 +2092,7 @@ function restaurarInterficieDesDeEstat() {
   if (fase >= 9.4 && ESTAT._matriuRelacional && ESTAT._matriuRelacional.length > 0) mostrarMatriuRelacional(ESTAT._matriuRelacional);
   if (fase >= 9.45 && ESTAT._nkg && ESTAT._nkg.macronarrativa && ESTAT._nkg.macronarrativa.backstory_canonic) mostrarBackstoryCanonic(ESTAT._nkg.macronarrativa.backstory_canonic, ESTAT._nkg.relacions || []);
   if (fase >= 9.46 && ESTAT._nkg && ESTAT._nkg.personatges && Object.keys(ESTAT._nkg.personatges).length > 0) mostrarCompletarPersonatges(Object.assign({}, ESTAT._nkg.personatges));
+  if (fase >= 9.47 && ESTAT._nkg && ESTAT._nkg.personatges && Object.keys(ESTAT._nkg.personatges).length > 0) mostrarObjectiusSecrets(ESTAT._nkg.personatges);
   if (fase >= 10 && ESTAT._estructuraCapitols.length > 0) mostrarEstructura('Reconstruït des de memòria (dades en JSON actiu)');
   if (fase >= 10.5 && ESTAT._escaletes.length > 0) {
     mostrarEscaleta(ESTAT._escaletes);
@@ -3050,7 +3071,7 @@ function _confirmarPersonatgesNouSilent() {
   personatgesArr.forEach(p => {
     const clau = nkgNormalitzarNom(p.nom);
     const nomNet = p.nom.replace(/\s*\([^)]*\)/g, '').replace(/["'"]/g, '').trim();
-    if (clau) nkg.personatges[clau] = { nom: nomNet, estat_fisic: inferirEstatFisicInicialDesDeArc(p.arc, p.limit_moral), estat_emocional: inferirEstatEmocionalInicialDesDeArc(p.arc), arc: p.arc, limit_moral: p.limit_moral, veu: p.veu, objectes_inventari:[], objectes_descartats:[], ubicacio:'', objectius:[], secrets:[], viu:true, primera_aparicio:0, trets_immutables:null };
+    if (clau) nkg.personatges[clau] = { nom: nomNet, estat_fisic: inferirEstatFisicInicialDesDeArc(p.arc, p.limit_moral), estat_emocional: inferirEstatEmocionalInicialDesDeArc(p.arc), arc: p.arc, limit_moral: p.limit_moral, veu: p.veu, objectes_inventari:[], objectes_descartats:[], ubicacio:'', motivacions_base: parseMotivacionsBase(p.desig || ''), objectius:[], secrets:[], viu:true, primera_aparicio:0, trets_immutables:null };
   });
   ESTAT._personatgesSeleccionats = personatgesArr.map(p => p.nom);
   ESTAT._arcsResumitNou = personatgesArr.map(p => `${p.nom}: ${p.arc.inici_emocional||'?'} → ${p.arc.final_emocional||'?'}`).join('; ');
@@ -3654,6 +3675,7 @@ async function confirmarPersonatgesNou() {
         objectes_inventari: [],
         objectes_descartats: [],
         ubicacio: '',
+        motivacions_base: parseMotivacionsBase(p.desig || ''),
         objectius: [],
         secrets: [],
         viu: true,
@@ -5778,6 +5800,132 @@ async function iniciarFaseCompletarPersonatges() {
   }
 }
 
+function mostrarObjectiusSecrets(personatgesObj = {}) {
+  const cos = document.getElementById('objectius-secrets-cos');
+  if (!cos) return;
+  const cards = Object.entries(personatgesObj || {}).map(([clau, p]) => {
+    const obj = (Array.isArray(p.objectius) ? p.objectius : []).map((o, i) => normalitzarObjectiu(o, i, 1, clau));
+    const sec = (Array.isArray(p.secrets) ? p.secrets : []).map((x, i) => normalitzarSecret(x, i, clau));
+    return `<div class="veu-card">
+      <div class="veu-card-nom">🎭 ${escHtml(p.nom || clau)}</div>
+      <div class="veu-card-camps">
+        <div><div class="veu-camp-label">Objectius</div><div class="veu-camp-val">${escHtml(obj.map(o => `${o.id}: ${o.descripcio} [P${o.prioritat}]`).join(' · ') || '(cap)')}</div></div>
+        <div><div class="veu-camp-label">Secrets</div><div class="veu-camp-val">${escHtml(sec.map(s => `${s.id}: ${s.contingut}`).join(' · ') || '(cap)')}</div></div>
+      </div>
+    </div>`;
+  }).join('\n');
+  cos.innerHTML = cards || '<div class="veu-card"><div class="veu-card-camps">Sense dades.</div></div>';
+  document.getElementById('objectius-secrets-result').classList.remove('hidden');
+}
+
+function mergeObjectiusSecretsNKG(data = {}) {
+  const nkg = ESTAT._nkg || {};
+  const personatges = nkg.personatges || {};
+  const objPer = data.objectius_per_personatge || {};
+  const secPer = data.secrets_per_personatge || {};
+  Object.entries(personatges).forEach(([clau, p]) => {
+    const objs = Array.isArray(objPer[clau]) ? objPer[clau] : [];
+    const secs = Array.isArray(secPer[clau]) ? secPer[clau] : [];
+    p.objectius = objs.map((o, i) => normalitzarObjectiu(o, i, 1, clau)).filter(o => o.descripcio);
+    p.secrets = secs.map((x, i) => normalitzarSecret(x, i, clau)).filter(x => x.contingut);
+  });
+}
+
+async function generarObjectiusSecrets(userConfig) {
+  const nkg = ESTAT._nkg || {};
+  migrarMotivacionsBaseDesDeBiblia();
+  const estruct = (ESTAT._estructuraCapitols || []).map(c => ({
+    capitol: c.numero || c.capitol || 0,
+    titol: c.titol || '',
+    threads_advancing: c.threads_advancing || [],
+    threads_closing: c.threads_closing || []
+  }));
+  const userPayload = {
+    synopsis: nkg.macronarrativa?.synopsis_core || '',
+    backstory: nkg.macronarrativa?.backstory_canonic || {},
+    relacions: nkg.relacions || [],
+    personatges: nkg.personatges || {},
+    estructura_capitols: estruct
+  };
+
+  const systemPrompt = `Ets un guionista expert en estructura narrativa. A partir de la sinopsi, backstory, relacions, fitxes de personatges i estructura de capítols (amb els seus threads), has de generar:
+
+1. OBJECTIUS PER PERSONATGE: Cada personatge necessita entre 2 i 5 objectius concrets que el mouen. Cada objectiu ha de:
+- Derivar de les motivacions base (desig extern / necessitat interna)
+- Tenir un capítol d'activació (quan es posa en marxa)
+- Tenir un capítol de resolució (o null si queda obert)
+- Indicar què el bloqueja (obstacle concret o null)
+- Tenir una prioritat (1=vital, 5=secundari)
+
+2. SECRETS NARRATIUS: Cada personatge ha de tenir entre 1 i 3 secrets.
+
+Respon EXCLUSIVAMENT amb JSON vàlid:
+{
+  "objectius_per_personatge": {
+    "clau_personatge": [
+      {
+        "id": "obj_biel_01",
+        "descripcio": "...",
+        "prioritat": 1,
+        "actiu_des_de_capitol": 1,
+        "resolt_a_capitol": 13,
+        "bloquejat_per": "..."
+      }
+    ]
+  },
+  "secrets_per_personatge": {
+    "clau_personatge": [
+      {
+        "id": "sec_biel_01",
+        "contingut": "...",
+        "conegut_per": ["clau_1"],
+        "revelat_a_capitol": null,
+        "impacte_si_revelat": "..."
+      }
+    ]
+  }
+}
+
+REGLES:
+- Els objectius han de ser ACCIONABLES.
+- Els secrets han de crear TENSIÓ DRAMÀTICA real.
+- La resolució d'objectius ha de coincidir amb els threads_closing dels capítols.
+- Almenys un secret per personatge ha de ser desconegut pel protagonista.`;
+
+  const msgs = [{ role: 'user', content: `Context estructurat:
+${JSON.stringify(userPayload, null, 2)}` }];
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  for (let intent = 1; intent <= 2; intent++) {
+    const raw = await callLLMMulti(msgs, systemPrompt, Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 3200, model: models.modelArquitecte }), 'arquitectura');
+    const parsed = parseJsonRobust(raw);
+    if (parsed && parsed.objectius_per_personatge && parsed.secrets_per_personatge) return parsed;
+    if (intent === 2) throw new Error('Resposta invàlida a la fase Objectius i Secrets.');
+    msgs.push({ role: 'user', content: 'Resposta invàlida. Torna-ho a generar en JSON estricte.' });
+  }
+  throw new Error('No s\'ha pogut generar objectius i secrets.');
+}
+
+async function iniciarFaseObjectiusSecrets() {
+  ESTAT.fase = 9.47;
+  updateProgress(9.47);
+  hideCard('fase-9-46');
+  showCard('fase-9-47');
+  document.getElementById('objectius-secrets-result').classList.add('hidden');
+  showLoader('9-47');
+  try {
+    const data = await generarObjectiusSecrets(USER_CONFIG);
+    mergeObjectiusSecretsNKG(data);
+    const vista = getActiveObjectives(1);
+    if (!vista || typeof vista !== 'object') throw new Error('Vista activa invàlida després de la injecció.');
+    hideLoader('9-47');
+    mostrarObjectiusSecrets(ESTAT._nkg.personatges || {});
+    toast('Objectius i secrets injectats al NKG.');
+  } catch (err) {
+    hideLoader('9-47');
+    toast('Error fase Objectius i Secrets: ' + err.message);
+  }
+}
+
 function mostrarEstilsParla(text) {
   const cos = document.getElementById('estils-cos');
   const blocs = parsejarBlocsEstilsParla(text);
@@ -6937,7 +7085,7 @@ function construirBlocPersonatges(nkg, capitolsGenerats) {
   const arc = protagonista?.arc || {};
   const veu = protagonista?.veu || {};
 
-  const blocProt = `PROTAGONISTA — ${protagonista?.nom || ''}:\n  Arc: ${arc.inici_emocional || ''} → ${arc.final_emocional || ''}\n  Canvi: ${arc.canvi_o_bloqueig || ''}\n  Límit moral: ${protagonista?.limit_moral || ''}\n  Veu — Registre: ${veu.registre || ''}\n  Veu — Mai diria: "${veu.mai_diria || ''}"\n  Veu — Quan menteix: ${veu.quan_menteix || ''}\n  Veu — Quan és sincer: ${veu.quan_es_sincer || ''}\n  Estat emocional: ${protagonista?.estat_emocional || ''}\n  Ubicació: ${protagonista?.ubicacio || ''}\n  Objectius actuals: ${(protagonista?.objectius || []).join(' / ') || 'cap definit'}`;
+  const blocProt = `PROTAGONISTA — ${protagonista?.nom || ''}:\n  Arc: ${arc.inici_emocional || ''} → ${arc.final_emocional || ''}\n  Canvi: ${arc.canvi_o_bloqueig || ''}\n  Límit moral: ${protagonista?.limit_moral || ''}\n  Veu — Registre: ${veu.registre || ''}\n  Veu — Mai diria: "${veu.mai_diria || ''}"\n  Veu — Quan menteix: ${veu.quan_menteix || ''}\n  Veu — Quan és sincer: ${veu.quan_es_sincer || ''}\n  Estat emocional: ${protagonista?.estat_emocional || ''}\n  Ubicació: ${protagonista?.ubicacio || ''}\n  Objectius actuals: ${((protagonista?.objectius || []).map((o, i) => normalitzarObjectiu(o, i, 1, nkgNormalitzarNom(protagonista?.nom || 'prota')).descripcio).filter(Boolean).join(' / ')) || 'cap definit'}`;
 
   const blocsSecundaris = secundaris.length > 0
     ? secundaris.map(p => construirContextPersonatgeSecundari(p, capitolsGenerats)).join('\n\n')
@@ -7518,6 +7666,91 @@ function validarImmutablesPerExportCapitol1(nkg, capitolActual) {
   if (ambProblemes.length > 0) throw new Error(`Exportació bloquejada (capítol 1): completa els trets immutables de ${ambProblemes.join(', ')}.`);
 }
 
+function parseMotivacionsBase(text = '') {
+  const src = String(text || '').trim();
+  if (!src) return { desig_extern: '', necessitat_interna: '' };
+  const mVull = src.match(/(?:^|[;|,.]\s*)(?:vull|desig(?:o)?):?\s*([^;|.\n]+)/i);
+  const mNec = src.match(/(?:^|[;|,.]\s*)(?:necessit(?:o|a)t(?:\s+interna)?):?\s*([^;|.\n]+)/i);
+  const desig_extern = (mVull ? mVull[1] : src.split(/[;|\n]/)[0] || '').trim();
+  const necessitat_interna = (mNec ? mNec[1] : '').trim();
+  return { desig_extern, necessitat_interna };
+}
+
+function normalitzarObjectiu(raw, idx = 0, capitol = 1, clau = 'pers') {
+  if (typeof raw === 'string') {
+    return {
+      id: `obj_${clau}_${String(idx + 1).padStart(2, '0')}`,
+      descripcio: raw,
+      prioritat: 3,
+      actiu_des_de_capitol: capitol,
+      resolt_a_capitol: null,
+      bloquejat_per: null
+    };
+  }
+  const r = raw || {};
+  return {
+    id: String(r.id || `obj_${clau}_${String(idx + 1).padStart(2, '0')}`).trim(),
+    descripcio: String(r.descripcio || '').trim(),
+    prioritat: Math.max(1, Math.min(5, Number(r.prioritat) || 3)),
+    actiu_des_de_capitol: Math.max(1, Number(r.actiu_des_de_capitol) || capitol || 1),
+    resolt_a_capitol: (r.resolt_a_capitol === null || r.resolt_a_capitol === undefined || r.resolt_a_capitol === '') ? null : Math.max(1, Number(r.resolt_a_capitol) || null),
+    bloquejat_per: (r.bloquejat_per === null || r.bloquejat_per === undefined || String(r.bloquejat_per).trim() === '') ? null : String(r.bloquejat_per).trim()
+  };
+}
+
+function normalitzarSecret(raw, idx = 0, clau = 'pers') {
+  if (typeof raw === 'string') {
+    return {
+      id: `sec_${clau}_${String(idx + 1).padStart(2, '0')}`,
+      contingut: raw,
+      conegut_per: [clau],
+      revelat_a_capitol: null,
+      impacte_si_revelat: ''
+    };
+  }
+  const r = raw || {};
+  return {
+    id: String(r.id || `sec_${clau}_${String(idx + 1).padStart(2, '0')}`).trim(),
+    contingut: String(r.contingut || '').trim(),
+    conegut_per: Array.isArray(r.conegut_per) ? r.conegut_per.map(x => String(x || '').trim()).filter(Boolean) : [clau],
+    revelat_a_capitol: (r.revelat_a_capitol === null || r.revelat_a_capitol === undefined || r.revelat_a_capitol === '') ? null : Math.max(1, Number(r.revelat_a_capitol) || null),
+    impacte_si_revelat: String(r.impacte_si_revelat || '').trim()
+  };
+}
+
+function migrarMotivacionsBaseDesDeBiblia() {
+  if (!ESTAT._nkg || !ESTAT._nkg.personatges) return;
+  const fitxes = (ESTAT.bibliaNarrativa && Array.isArray(ESTAT.bibliaNarrativa.fitxes_personatges)) ? ESTAT.bibliaNarrativa.fitxes_personatges : [];
+  Object.entries(ESTAT._nkg.personatges).forEach(([clau, p]) => {
+    const fitxa = fitxes.find(f => nkgNormalitzarNom(f && f.nom || '') === clau);
+    const baseTxt = fitxa && fitxa.motivacions ? fitxa.motivacions : '';
+    const parsed = parseMotivacionsBase(baseTxt);
+    const actual = p.motivacions_base || { desig_extern: '', necessitat_interna: '' };
+    p.motivacions_base = {
+      desig_extern: actual.desig_extern || parsed.desig_extern || '',
+      necessitat_interna: actual.necessitat_interna || parsed.necessitat_interna || ''
+    };
+    p.objectius = Array.isArray(p.objectius) ? p.objectius.map((o, i) => normalitzarObjectiu(o, i, 1, clau)).filter(o => o.descripcio) : [];
+    p.secrets = Array.isArray(p.secrets) ? p.secrets.map((x, i) => normalitzarSecret(x, i, clau)).filter(x => x.contingut) : [];
+  });
+}
+
+function getActiveObjectives(capitol = 1) {
+  const cap = Math.max(1, Number(capitol) || 1);
+  const out = {};
+  const personatges = (ESTAT._nkg && ESTAT._nkg.personatges) ? ESTAT._nkg.personatges : {};
+  Object.entries(personatges).forEach(([clau, p]) => {
+    const objectius = (Array.isArray(p.objectius) ? p.objectius : [])
+      .map((o, i) => normalitzarObjectiu(o, i, 1, clau))
+      .filter(o => o.descripcio && o.actiu_des_de_capitol <= cap && (o.resolt_a_capitol === null || o.resolt_a_capitol > cap));
+    const secrets_no_revelats = (Array.isArray(p.secrets) ? p.secrets : [])
+      .map((x, i) => normalitzarSecret(x, i, clau))
+      .filter(x => x.contingut && (x.revelat_a_capitol === null || x.revelat_a_capitol > cap));
+    out[clau] = { objectius, secrets_no_revelats };
+  });
+  return out;
+}
+
 function assegurarPersonatgesNKGMinims(nkg, biblia) {
   if (!nkg || typeof nkg !== 'object') return;
   if (!nkg.personatges || typeof nkg.personatges !== 'object') nkg.personatges = {};
@@ -7535,7 +7768,7 @@ function assegurarPersonatgesNKGMinims(nkg, biblia) {
       arc: fp.arc || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '' },
       limit_moral: fp.limit_moral || '',
       veu: fp.veu || { registre: '', mai_diria: '', quan_menteix: '', quan_es_sincer: '' },
-      objectes_inventari: [], objectes_descartats: [], ubicacio: '', objectius: [], secrets: [], viu: true, primera_aparicio: 0, trets_immutables: null
+      objectes_inventari: [], objectes_descartats: [], ubicacio: '', motivacions_base: { desig_extern: '', necessitat_interna: '' }, objectius: [], secrets: [], viu: true, primera_aparicio: 0, trets_immutables: null
     };
   });
 }
@@ -7546,6 +7779,7 @@ async function generarFitxerContexte(nkg, biblia, capitolActual) {
       nkg.macronarrativa.synopsis_core = normalitzarSynopsisPerNKG(nkg.macronarrativa.synopsis_core);
     }
     assegurarPersonatgesNKGMinims(nkg, biblia);
+    migrarMotivacionsBaseDesDeBiblia();
   } catch (e) { console.warn('Normalització export NKG:', e.message); }
   validarImmutablesPerExportCapitol1(nkg, capitolActual);
 
@@ -7599,6 +7833,7 @@ async function generarFitxerContexte(nkg, biblia, capitolActual) {
     timeline_objectes: (nkg.timeline_objectes || []).slice(-20),
     timeline_personatges: (nkg.timeline_personatges || []).slice(-20),
     beats_gastats: nkg.beats_gastats || [],
+    vista_filtrada_capitol: getActiveObjectives(capitolActual),
     context_creacio: {
       tematica: ESTAT.tematica || '',
       estil: ESTAT.estil || {},
@@ -14797,6 +15032,7 @@ async function garantirTretsImmutablesPersonatge(nom, userConfig = USER_CONFIG) 
       objectes_inventari: [],
       objectes_descartats: [],
       ubicacio: '',
+      motivacions_base: { desig_extern: '', necessitat_interna: '' },
       objectius: [],
       secrets: [],
       viu: true,
@@ -14876,7 +15112,7 @@ function nkgQueryEscenaContext(escenaSpec) {
         if (p.indumentaria_actual) desc += ` | Roba: ${p.indumentaria_actual}`;
         if (p.objectes_inventari && p.objectes_inventari.length > 0) desc += ` | Inventari: ${p.objectes_inventari.join(', ')}`;
         if (p.ubicacio) desc += ` | A: ${p.ubicacio}`;
-        if (p.objectius && p.objectius.length > 0) desc += ` | Vol: ${p.objectius[0]}`;
+        if (p.objectius && p.objectius.length > 0) { const o = normalitzarObjectiu(p.objectius[0], 0, 1, nkgNormalitzarNom(nom)); desc += ` | Vol: ${o.descripcio}`; }
         let passiuEmocional = p.passiu_emocional || '';
         if (!passiuEmocional && Array.isArray(p.traumes) && p.traumes.length > 0) passiuEmocional = p.traumes[0];
         if (!passiuEmocional && Array.isArray(p.pors) && p.pors.length > 0) passiuEmocional = p.pors[0];
@@ -14886,7 +15122,7 @@ function nkgQueryEscenaContext(escenaSpec) {
           if (fitxa) passiuEmocional = fitxa.secrets || fitxa.estat_actual || '';
         }
         if (passiuEmocional) desc += ` | Passiu emocional latent: ${passiuEmocional}`;
-        if (p.secrets && p.secrets.length > 0) desc += ` | Amaga: ${p.secrets[0]}`;
+        if (p.secrets && p.secrets.length > 0) { const sec = normalitzarSecret(p.secrets[0], 0, nkgNormalitzarNom(nom)); desc += ` | Amaga: ${sec.contingut}`; }
         parts.push(desc);
 
         if (p.relacions) {
@@ -15091,8 +15327,9 @@ function nkgInicialitzar() {
           objectes_inventari:   ex?.objectes_inventari   || [],
           objectes_descartats:  ex?.objectes_descartats  || [],
           ubicacio:             ex?.ubicacio             || '',
-          objectius:            ex?.objectius            || [],
-          secrets:              ex?.secrets              || [],
+          motivacions_base:     ex?.motivacions_base     || { desig_extern: '', necessitat_interna: '' },
+          objectius:            Array.isArray(ex?.objectius) ? ex.objectius.map((o, i) => normalitzarObjectiu(o, i, 1, clau)) : [],
+          secrets:              Array.isArray(ex?.secrets) ? ex.secrets.map((x, i) => normalitzarSecret(x, i, clau)) : [],
           viu:                  ex?.viu !== undefined     ? ex.viu : true,
           primera_aparicio:     ex?.primera_aparicio     || 0,
           trets_immutables:     ex?.trets_immutables     || null
@@ -15160,8 +15397,9 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
           objectes_descartats: Array.isArray(p.objectes_descartats) ? p.objectes_descartats : [],
           ubicacio: p.ubicacio || '',
           historial_ubicacions: p.ubicacio ? [{ capitol, escena, ubicacio: p.ubicacio }] : [],
-          objectius: p.nous_objectius || [],
-          secrets: p.nous_secrets || [],
+          motivacions_base: parseMotivacionsBase(''),
+          objectius: Array.isArray(p.nous_objectius) ? p.nous_objectius.map((o, i) => normalitzarObjectiu(o, i, capitol, clau)) : [],
+          secrets: Array.isArray(p.nous_secrets) ? p.nous_secrets.map((x, i) => normalitzarSecret(x, i, clau)) : [],
           viu: p.viu !== undefined ? p.viu : true,
           primera_aparicio: capitol,
           trets_immutables: null
@@ -15183,11 +15421,20 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
         if (p.ubicacio) ex.ubicacio = p.ubicacio;
         if (p.viu !== undefined) ex.viu = p.viu;
         if (p.nous_objectius) {
-          p.nous_objectius.forEach(o => { if (!ex.objectius.includes(o)) ex.objectius.push(o); });
-          if (ex.objectius.length > 2) ex.objectius = ex.objectius.slice(-2);
+          const existIds = new Set((ex.objectius || []).map((o, i) => normalitzarObjectiu(o, i, capitol, clau).id));
+          p.nous_objectius.forEach((o, i) => {
+            const obj = normalitzarObjectiu(o, i, capitol, clau);
+            if (obj.descripcio && !existIds.has(obj.id)) ex.objectius.push(obj);
+          });
+          if (ex.objectius.length > 8) ex.objectius = ex.objectius.slice(-8);
         }
         if (p.nous_secrets) {
-          p.nous_secrets.forEach(s => { if (!ex.secrets.includes(s)) ex.secrets.push(s); });
+          const existIds = new Set((ex.secrets || []).map((x, i) => normalitzarSecret(x, i, clau).id));
+          p.nous_secrets.forEach((sec, i) => {
+            const sObj = normalitzarSecret(sec, i, clau);
+            if (sObj.contingut && !existIds.has(sObj.id)) ex.secrets.push(sObj);
+          });
+          if (ex.secrets.length > 6) ex.secrets = ex.secrets.slice(-6);
         }
         if (p.te_escena_autonoma) {
           if (!ex.autonomia_escenes) ex.autonomia_escenes = [];
@@ -16210,7 +16457,7 @@ function renderitzarNKG() {
     html += `<strong>${escHtml(p.nom)}</strong>`;
     if (p.estat_emocional) html += ` — ${escHtml(p.estat_emocional)}`;
     if (p.ubicacio) html += ` | 📍 ${escHtml(p.ubicacio)}`;
-    if (p.objectius && p.objectius.length > 0) html += `<br>🎯 ${escHtml(p.objectius.join(', '))}`;
+    if (p.objectius && p.objectius.length > 0) { const objTxt = p.objectius.map((o, i) => normalitzarObjectiu(o, i, 1, nkgNormalitzarNom(p.nom || '')).descripcio).filter(Boolean).join(', '); html += `<br>🎯 ${escHtml(objTxt)}`; }
     html += '</div>';
   });
 
