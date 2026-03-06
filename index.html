@@ -3731,7 +3731,7 @@ async function confirmarPersonatgesNou() {
     const nomMatch = line.match(/^NOM:\s*(.+)/i);
     if (nomMatch) {
       if (current) personatgesArr.push(current);
-      current = { nom: nomMatch[1].trim(), arc: {inici_emocional:'',final_emocional:'',canvi_o_bloqueig:''}, limit_moral: '', veu: {registre:'',mai_diria:[],quan_menteix:'',quan_es_sincer:'',exemples_narratius:[],vocabulari_recurrent:[],vocabulari_prohibit:[],longitud_frases:'mitjanes'} };
+      current = { nom: nomMatch[1].trim(), arc: {inici_emocional:'',final_emocional:'',canvi_o_bloqueig:'',waypoints:[]}, limit_moral: '', veu: {registre:'',mai_diria:[],quan_menteix:'',quan_es_sincer:'',exemples_narratius:[],vocabulari_recurrent:[],vocabulari_prohibit:[],longitud_frases:'mitjanes'} };
     }
     if (current) {
       if (/^ARC:/i.test(line)) current.arc = parseArc(line);
@@ -5709,7 +5709,7 @@ Genera EXCLUSIVAMENT JSON vàlid:
     {
       "id": "clau_snake_case",
       "nom": "Nom Cognom",
-      "arc": {"inici_emocional":"...","final_emocional":"...","canvi_o_bloqueig":"..."},
+      "arc": {"inici_emocional":"...","final_emocional":"...","canvi_o_bloqueig":"...","waypoints":[]},
       "limit_moral": "...",
       "veu": {"registre":"...","mai_diria":["..."],"quan_menteix":"...","quan_es_sincer":"..."},
       "motivacions_base": {"desig_extern":"...","necessitat_interna":"..."},
@@ -5743,7 +5743,7 @@ async function assegurarMinimPersonatgesPerRelacions(minim = 2, userConfig) {
       nom: raw.nom || clau,
       estat_fisic: inferirEstatFisicInicialDesDeArc(raw.arc || {}, raw.limit_moral || ''),
       estat_emocional: inferirEstatEmocionalInicialDesDeArc(raw.arc || {}),
-      arc: raw.arc || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '' },
+      arc: raw.arc || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '', waypoints: [] },
       limit_moral: raw.limit_moral || '',
       veu: normalitzarVeuAvancada(raw.veu || {}),
       objectes_inventari: [], objectes_descartats: [], ubicacio: '',
@@ -6377,6 +6377,124 @@ async function generarObjectiusSecrets(userConfig, onProgress) {
   return resultatTotal;
 }
 
+
+function obtenirCapitolsAparicioPersonatge(clau = '', p = null) {
+  const nom = nkgNormalitzarNom((p && p.nom) || clau || '');
+  const caps = (ESTAT._estructuraCapitols || [])
+    .map(c => ({ numero: Number(c.numero || c.capitol || 0), personatges: Array.isArray(c.personatges) ? c.personatges : [] }))
+    .filter(c => c.numero > 0)
+    .filter(c => c.personatges.some(n => nkgNormalitzarNom(n) === nom));
+  return [...new Set(caps.map(c => c.numero))].sort((a, b) => a - b);
+}
+
+function obtenirCapitolsPovPersonatge(clau = '', p = null) {
+  const nom = nkgNormalitzarNom((p && p.nom) || clau || '');
+  const pov = (((ESTAT._nkg || {}).context_creacio || {}).estil || {}).perspectiva || {};
+  const llista = Array.isArray(pov.pov_per_capitol) ? pov.pov_per_capitol : [];
+  return [...new Set(llista
+    .filter(x => nkgNormalitzarNom(x && x.personatge || '') === nom)
+    .map(x => Number(x.capitol || 0))
+    .filter(n => n > 0))].sort((a, b) => a - b);
+}
+
+function esProtagonistaPersonatge(p = {}) {
+  const rol = String((p.trets_immutables && p.trets_immutables.rol_narratiu) || '').toLowerCase();
+  return rol.includes('protagonista');
+}
+
+function validarDistribucioWaypoints(waypoints = [], capitolsAparicio = [], totalCapitols = 1, minims = 1) {
+  let ordenats = (Array.isArray(waypoints) ? waypoints : []).slice().sort((a, b) => a.capitol - b.capitol);
+  if (ordenats.length < minims) {
+    const candidats = (capitolsAparicio || []).filter(c => c > 1);
+    while (ordenats.length < minims && candidats.length > 0) {
+      const c = candidats[Math.min(ordenats.length, candidats.length - 1)];
+      ordenats.push({ capitol: c, estat: 'El conflicte intern canvia de qualitat i altera la seva resposta sota pressió.', senyal_visible: 'S interromp a mitja frase, manté un silenci massa llarg i executa un gest defensiu repetit.' });
+    }
+  }
+  ordenats = ordenats.slice(0, 5);
+  if (ordenats.length > 0) {
+    const limitFinal = Math.max(2, Number(totalCapitols || 1) - 1);
+    if (ordenats[0].capitol <= 1) ordenats[0].capitol = Math.max(2, (capitolsAparicio.find(c => c > 1) || 2));
+    if (ordenats[ordenats.length - 1].capitol > limitFinal) {
+      const alternatiu = [...(capitolsAparicio || [])].reverse().find(c => c <= limitFinal);
+      ordenats[ordenats.length - 1].capitol = alternatiu || limitFinal;
+    }
+  }
+  return ordenats.sort((a, b) => a.capitol - b.capitol);
+}
+
+async function generarWaypointsArcPersonatges(userConfig, onProgress) {
+  const nkg = ESTAT._nkg || {};
+  const personatges = nkg.personatges || {};
+  const claus = Object.keys(personatges);
+  if (claus.length === 0) return {};
+
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  const totalCapitols = Math.max(1, Number(ESTAT._nombreCapitols || (ESTAT._estructuraCapitols || []).length || 1));
+  const resultat = {};
+
+  for (const clau of claus) {
+    const p = personatges[clau] || {};
+    const capitolsAparicio = obtenirCapitolsAparicioPersonatge(clau, p);
+    const capitolsPov = obtenirCapitolsPovPersonatge(clau, p);
+    const minims = esProtagonistaPersonatge(p) ? 3 : 1;
+    const maxims = esProtagonistaPersonatge(p) ? 5 : 3;
+
+    if (capitolsAparicio.length === 0) continue;
+    if (onProgress) onProgress(`Definint waypoints emocionals: ${p.nom || clau}...`);
+
+    const prompt = `L'arc del personatge ${p.nom || clau} va de "${p.arc?.inici_emocional || ''}" a "${p.arc?.final_emocional || ''}".
+El canvi és: "${p.arc?.canvi_o_bloqueig || ''}".
+La seva necessitat interna és: "${p.motivacions_base?.necessitat_interna || ''}".
+
+La novel·la té ${totalCapitols} capítols. El personatge apareix als capítols: ${capitolsAparicio.join(', ')}.
+El personatge és POV als capítols: ${capitolsPov.join(', ') || '(cap)'}.
+
+Defineix entre ${minims} i ${maxims} WAYPOINTS EMOCIONALS: moments concrets on l'estat intern del personatge canvia de qualitat.
+
+Cada waypoint ha de contenir:
+- "capitol": número del capítol on es produeix
+- "estat": descripció interna del canvi (instrucció per al model, no text de la novel·la)
+- "senyal_visible": com es MOSTRA físicament o conductual al text (no com s'explica ni com es pensa)
+
+Regles:
+- Els waypoints han d'estar distribuïts al llarg de la novel·la, no concentrats al final
+- Almenys un waypoint ha de tocar la "necessitat_interna" directament
+- El senyal_visible ha de ser concret i cinematogràfic: una acció, un gest, un canvi de conducta observable. MAI un pensament.
+- El primer waypoint NO pot ser al primer capítol
+- L'últim waypoint ha de ser almenys 1-2 capítols ABANS del final
+- Cap senyal_visible pot contenir: "sent que", "pensa que", "s'adona que"
+- Els capítols dels waypoints han de coincidir amb capítols on el personatge apareix
+
+Retorna EXCLUSIVAMENT un array JSON de waypoints.`;
+
+    try {
+      const raw = await callLLMMulti(
+        [{ role: 'user', content: prompt }],
+        'Ets un editor d arc de personatge. Retorna només JSON vàlid en català.',
+        Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 1200, model: models.modelArquitecte }),
+        'arquitectura'
+      );
+      const parsed = parseJsonRobust(raw);
+      const arr = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.waypoints) ? parsed.waypoints : []);
+      const normalitzats = arr.map((w, i) => normalitzarWaypointEmocional(w, i, totalCapitols, capitolsAparicio));
+      const valids = normalitzats.filter(w => capitolsAparicio.includes(Number(w.capitol)) && String(w.estat || '').trim() && String(w.senyal_visible || '').trim());
+      resultat[clau] = validarDistribucioWaypoints(valids, capitolsAparicio, totalCapitols, minims);
+    } catch (err) {
+      console.warn(`Waypoints fallits per ${p.nom || clau}:`, err.message);
+      resultat[clau] = validarDistribucioWaypoints([], capitolsAparicio, totalCapitols, minims);
+    }
+  }
+
+  Object.entries(resultat).forEach(([clau, waypoints]) => {
+    if (!personatges[clau]) return;
+    const arcActual = personatges[clau].arc || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '', waypoints: [] };
+    personatges[clau].arc = Object.assign({}, arcActual, { waypoints: Array.isArray(waypoints) ? waypoints : [] });
+  });
+
+  return resultat;
+}
+
 async function iniciarFaseObjectiusSecrets() {
   ESTAT.fase = 9.47;
   updateProgress(9.47);
@@ -6388,6 +6506,7 @@ async function iniciarFaseObjectiusSecrets() {
   const onProgress = msg => { if (loaderText) loaderText.textContent = msg; };
   try {
     const data = await generarObjectiusSecrets(USER_CONFIG, onProgress);
+    await generarWaypointsArcPersonatges(USER_CONFIG, onProgress);
     const vista = getActiveObjectives(1);
     hideLoader('9-47');
     mostrarObjectiusSecrets(ESTAT._nkg.personatges || {});
@@ -9048,6 +9167,21 @@ function normalitzarSecret(raw, idx = 0, clau = 'pers') {
   };
 }
 
+
+function normalitzarWaypointEmocional(raw, idx = 0, capMax = 1, capsValids = []) {
+  const r = raw || {};
+  const prohibits = /(sent que|pensa que|s'adona que)/i;
+  const capMinim = Math.max(2, Number(capsValids[0]) || 2);
+  const capLimit = Math.max(capMinim, Number(capMax) || capMinim);
+  const capitolRaw = Number(r.capitol) || Number(capsValids[idx]) || capMinim;
+  const capitol = Math.max(capMinim, Math.min(capLimit, capitolRaw));
+  const estat = String(r.estat || '').trim();
+  let senyal = String(r.senyal_visible || '').trim();
+  if (prohibits.test(senyal)) senyal = 'Fa una pausa massa llarga abans de respondre i canvia de tema amb un gest sec.';
+  if (!senyal) senyal = 'Evita la mirada, es queda immòbil un instant i altera un hàbit que mantenia sempre.';
+  return { capitol, estat, senyal_visible: senyal };
+}
+
 function normalitzarObjecteNarratiu(raw = {}, fallbackId = '') {
   const r = raw || {};
   const idBase = String(r.id || fallbackId || r.nom || '').trim();
@@ -9257,7 +9391,7 @@ function assegurarPersonatgesNKGMinims(nkg, biblia) {
       nom,
       estat_fisic: inferirEstatFisicInicialDesDeArc(fp.arc, fp.limit_moral),
       estat_emocional: inferirEstatEmocionalInicialDesDeArc(fp.arc),
-      arc: fp.arc || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '' },
+      arc: fp.arc || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '', waypoints: [] },
       limit_moral: fp.limit_moral || '',
       veu: fp.veu || { registre: '', mai_diria: [], quan_menteix: '', quan_es_sincer: '', exemples_narratius: [], vocabulari_recurrent: [], vocabulari_prohibit: [], longitud_frases: 'mitjanes' },
       objectes_inventari: [], objectes_descartats: [], ubicacio: '', motivacions_base: { desig_extern: '', necessitat_interna: '' }, objectius: [], secrets: [], viu: true, primera_aparicio: 0, trets_immutables: null
@@ -14766,7 +14900,7 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense markdown, sense text addicio
       "motivacions": "motivació principal (1 frase)",
       "secrets": "secret principal o buit",
       "estat_actual": "estat breu (1 frase)",
-      "arc": {"inici_emocional": "...", "final_emocional": "...", "canvi_o_bloqueig": "..."},
+      "arc": {"inici_emocional": "...", "final_emocional": "...", "canvi_o_bloqueig": "...", "waypoints": []},
       "limit_moral": "...",
       "veu": {"registre": "...", "mai_diria": "...", "quan_menteix": "...", "quan_es_sincer": "..."}
     }
@@ -16598,7 +16732,7 @@ async function garantirTretsImmutablesPersonatge(nom, userConfig = USER_CONFIG) 
       nom,
       estat_fisic: inferirEstatFisicInicialDesDeArc({}, ''),
       estat_emocional: inferirEstatEmocionalInicialDesDeArc({}),
-      arc: { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '' },
+      arc: { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '', waypoints: [] },
       limit_moral: '',
       veu: { registre: '', mai_diria: [], quan_menteix: '', quan_es_sincer: '', exemples_narratius: [], vocabulari_recurrent: [], vocabulari_prohibit: [], longitud_frases: 'mitjanes' },
       objectes_inventari: [],
@@ -16912,7 +17046,7 @@ function nkgInicialitzar() {
           nom: ex?.nom || nomNet,
           estat_fisic:          ex?.estat_fisic          || inferirEstatFisicInicialDesDeArc(ex?.arc || {}, ex?.limit_moral || ''),
           estat_emocional:      ex?.estat_emocional      || inferirEstatEmocionalInicialDesDeArc(ex?.arc || {}),
-          arc:                  ex?.arc                  || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '' },
+          arc:                  ex?.arc                  || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '', waypoints: [] },
           limit_moral:          ex?.limit_moral          || '',
           veu:                  ex?.veu                  || { registre: '', mai_diria: [], quan_menteix: '', quan_es_sincer: '', exemples_narratius: [], vocabulari_recurrent: [], vocabulari_prohibit: [], longitud_frases: 'mitjanes' },
           objectes_inventari:   ex?.objectes_inventari   || [],
@@ -16989,7 +17123,7 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
           nom: p.nom,
           estat_fisic: '',
           estat_emocional: p.estat_emocional || '',
-          arc: { inici_emocional: p.arc?.inici_emocional || '', final_emocional: p.arc?.final_emocional || '', canvi_o_bloqueig: p.arc?.canvi_o_bloqueig || '' },
+          arc: { inici_emocional: p.arc?.inici_emocional || '', final_emocional: p.arc?.final_emocional || '', canvi_o_bloqueig: p.arc?.canvi_o_bloqueig || '', waypoints: Array.isArray(p.arc?.waypoints) ? p.arc.waypoints : [] },
           limit_moral: p.limit_moral || '',
           veu: normalitzarVeuAvancada({
             registre: p.veu?.registre || '',
