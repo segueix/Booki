@@ -8970,6 +8970,9 @@ function fusionarCampPersonatgeValor(actual, nou) {
 }
 
 function validarImmutablesPerExportCapitol1(nkg, capitolActual) {
+  // Abans de la fase d'escriptura (fase < 11), permetem exportar NKG+Bíblia encara que
+  // faltin trets immutables complets: és precisament un punt de control per revisar-los.
+  if (Number(ESTAT && ESTAT.fase || 0) < 11) return;
   if ((capitolActual || 1) !== 1) return;
   const personatges = Object.values((nkg && nkg.personatges) || {});
   const camps = ['edat_aproximada', 'genere', 'rol_narratiu', 'relacio_protagonista', 'aspecte_fisic', 'ocupacio', 'tret_definitori'];
