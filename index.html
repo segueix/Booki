@@ -7115,13 +7115,46 @@ function assegurarPersonatgesNKGMinims(nkg, biblia) {
   });
 }
 
-function generarFitxerContexte(nkg, biblia, capitolActual) {
+async function generarFitxerContexte(nkg, biblia, capitolActual) {
   try {
     if (nkg && nkg.macronarrativa) {
       nkg.macronarrativa.synopsis_core = normalitzarSynopsisPerNKG(nkg.macronarrativa.synopsis_core);
     }
     assegurarPersonatgesNKGMinims(nkg, biblia);
   } catch (e) { console.warn('Normalització export NKG:', e.message); }
+
+  const estructuraCapitols = ESTAT._estructuraCapitols || [];
+  const idxCapitol = Math.max(0, Math.min((capitolActual || 1) - 1, Math.max(0, estructuraCapitols.length - 1)));
+  const capInfo = estructuraCapitols[idxCapitol] || { numero: capitolActual };
+  const capGenerats = (ESTAT._capitols_generats || []).slice(0, idxCapitol);
+  const totalCapitols = estructuraCapitols.length || Math.max(capitolActual || 1, 1);
+  const autorPerfil = (ESTAT.configuracio && ESTAT.configuracio.perfil_autor) || (ESTAT.estil && ESTAT.estil.to) || '';
+
+  let promptCapitol = null;
+  try {
+    const payload = await construirPayload(capitolActual, totalCapitols, nkg || {}, biblia || {}, capGenerats, capInfo, autorPerfil);
+    const systemPrompt = Array.isArray(payload.system)
+      ? payload.system.map(b => (typeof b === 'string' ? b : b.text || '')).join('\n\n').trim()
+      : String(payload.system || '').trim();
+    const userPrompt = (payload.messages || [])
+      .filter(m => m && m.role === 'user')
+      .map(m => {
+        if (typeof m.content === 'string') return m.content;
+        if (Array.isArray(m.content)) return m.content.map(b => (typeof b === 'string' ? b : b.text || '')).join('');
+        return '';
+      })
+      .filter(Boolean)
+      .join('\n\n')
+      .trim();
+    promptCapitol = {
+      capitol: capitolActual,
+      titol: capInfo.titol || '',
+      system_prompt: systemPrompt,
+      user_prompt: userPrompt
+    };
+  } catch (e) {
+    console.warn('Export NKG + prompt: no s\'ha pogut construir el payload del capítol.', e.message);
+  }
 
   const contingut = {
     exportat_en_capitol: capitolActual,
@@ -7157,17 +7190,18 @@ function generarFitxerContexte(nkg, biblia, capitolActual) {
       objectes_clau: biblia.objectes_clau,
       fets_canonics: biblia.fets_canonics,
       fitxes_personatges: biblia.fitxes_personatges || []
-    }
+    },
+    prompt_capitol: promptCapitol
   };
   const nomFitxer = `NKG_Biblia_Cap${capitolActual}_${Date.now()}.json`;
   descarregarFitxer(JSON.stringify(contingut, null, 2), nomFitxer, 'application/json');
 }
 
-function descarregarNKGiBiblia() {
+async function descarregarNKGiBiblia() {
   const capitolActual = (ESTAT._capitolActual || 0) + 1;
   const nkg = ESTAT._nkg || {};
   const biblia = ESTAT.bibliaNarrativa || {};
-  generarFitxerContexte(nkg, biblia, capitolActual);
+  await generarFitxerContexte(nkg, biblia, capitolActual);
 }
 
 async function generarDocumentFinal(capitolsGenerats, capitolsEscaleta, nkg, configuracio) {
