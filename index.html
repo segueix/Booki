@@ -5339,6 +5339,18 @@ async function iniciarFasePsicologia() {
     const dades = await generarPerfilsPsicologics(USER_CONFIG);
     hideLoader('9-2');
     mostrarPerfilsPsicologics(dades);
+
+    // Reportar faltants de psicologia
+    const faltantsPsico = [];
+    const noms = (ESTAT._personatgesSeleccionats || []).filter(Boolean);
+    noms.forEach(nom => {
+      const p = ESTAT._perfilsPersonatges && ESTAT._perfilsPersonatges[nom];
+      if (!p || !p.perfil_psicologic) faltantsPsico.push(`${nom}: falta perfil psicològic`);
+      if (!p || !p.ferida_nuclear) faltantsPsico.push(`${nom}: falta ferida nuclear`);
+    });
+    if (faltantsPsico.length > 0) {
+      toast(`Avís: ${faltantsPsico.length} camp(s) psicològics pendents. ${faltantsPsico.slice(0, 3).join('; ')}${faltantsPsico.length > 3 ? '...' : ''}`);
+    }
   } catch (err) {
     hideLoader('9-2');
     toast("Error en l'anàlisi psicològica: " + err.message);
@@ -5893,7 +5905,19 @@ async function iniciarFaseBackstoryRelacions() {
     ESTAT._nkg.relacions = data.relacions;
     hideLoader('9-45');
     mostrarBackstoryCanonic(data.backstory_canonic, data.relacions);
-    toast('Backstory canònic i relacions injectats al NKG.');
+
+    // Reportar faltants immediats
+    const faltantsBack = [];
+    if (!data.backstory_canonic || !Array.isArray(data.backstory_canonic.fets_previs) || data.backstory_canonic.fets_previs.length === 0) faltantsBack.push('Falten fets previs');
+    if (!Array.isArray(data.relacions) || data.relacions.length === 0) faltantsBack.push('Falta graf de relacions');
+    const nPers = Object.keys((ESTAT._nkg && ESTAT._nkg.personatges) || {}).length;
+    const parellesEsperades = nPers >= 2 ? (nPers * (nPers - 1)) / 2 : 0;
+    if (data.relacions && data.relacions.length < parellesEsperades) faltantsBack.push(`Relacions incompletes: ${data.relacions.length}/${parellesEsperades}`);
+    if (faltantsBack.length > 0) {
+      toast(`Avís backstory: ${faltantsBack.join('; ')}`);
+    } else {
+      toast('Backstory canònic i relacions injectats al NKG.');
+    }
   } catch (err) {
     hideLoader('9-45');
     toast('Error fase Backstory/Relacions: ' + err.message);
@@ -5904,15 +5928,26 @@ function mostrarCompletarPersonatges(personatgesObj = {}) {
   const cos = document.getElementById('completar-personatges-cos');
   if (!cos) return;
   const items = Object.entries(personatgesObj || {});
+  const campVal = (val, campNom) => {
+    const v = String(val || '').trim();
+    if (!v) return `<div class="veu-camp-val" style="color:var(--warning);font-style:italic;">pendent</div>`;
+    return `<div class="veu-camp-val">${escHtml(v)}</div>`;
+  };
   cos.innerHTML = items.map(([clau, p]) => {
     const t = p.trets_immutables || {};
+    const faltants = [];
+    if (!t.aspecte_fisic) faltants.push('aspecte_fisic');
+    if (!t.ocupacio) faltants.push('ocupacio');
+    if (!t.tret_definitori) faltants.push('tret_definitori');
+    const badgeFaltant = faltants.length > 0 ? ` <span style="color:var(--warning);font-size:.72rem;font-weight:normal;">(${faltants.length} camp${faltants.length > 1 ? 's' : ''} pendent${faltants.length > 1 ? 's' : ''})</span>` : ' <span style="color:var(--success);font-size:.72rem;font-weight:normal;">complet</span>';
     return `<div class="veu-card">
-      <div class="veu-card-nom">👤 ${escHtml(p.nom || clau)} <span style="font-size:.78rem;color:var(--text2)">(${escHtml(clau)})</span></div>
+      <div class="veu-card-nom">👤 ${escHtml(p.nom || clau)}${badgeFaltant} <span style="font-size:.78rem;color:var(--text2)">(${escHtml(clau)})</span></div>
       <div class="veu-card-camps">
-        <div><div class="veu-camp-label">Estat emocional inicial</div><div class="veu-camp-val">${escHtml(String(p.estat_emocional || ''))}</div></div>
-        <div><div class="veu-camp-label">Estat físic inicial</div><div class="veu-camp-val">${escHtml(String(p.estat_fisic || ''))}</div></div>
-        <div><div class="veu-camp-label">Ocupació</div><div class="veu-camp-val">${escHtml(String(t.ocupacio || ''))}</div></div>
-        <div><div class="veu-camp-label">Tret definitori</div><div class="veu-camp-val">${escHtml(String(t.tret_definitori || ''))}</div></div>
+        <div><div class="veu-camp-label">Estat emocional inicial</div>${campVal(p.estat_emocional)}</div>
+        <div><div class="veu-camp-label">Estat físic inicial</div>${campVal(p.estat_fisic)}</div>
+        <div><div class="veu-camp-label">Ocupació</div>${campVal(t.ocupacio)}</div>
+        <div><div class="veu-camp-label">Tret definitori</div>${campVal(t.tret_definitori)}</div>
+        <div><div class="veu-camp-label">Aspecte físic</div>${campVal(t.aspecte_fisic)}</div>
       </div>
     </div>`;
   }).join('\n');
@@ -5948,13 +5983,14 @@ function mergeCompletarPersonatgesNKG(personatgesCompletats = {}) {
   });
 }
 
-async function generarCompletarPersonatges(userConfig) {
+async function generarCompletarPersonatgesBloc(claus, userConfig) {
   const nkg = ESTAT._nkg || {};
-  const personatges = nkg.personatges || {};
+  const personatgesBloc = {};
+  claus.forEach(c => { if (nkg.personatges && nkg.personatges[c]) personatgesBloc[c] = nkg.personatges[c]; });
   const resum = {
     synopsis_core: nkg.macronarrativa?.synopsis_core || '',
     backstory_canonic: nkg.macronarrativa?.backstory_canonic || {},
-    personatges
+    personatges: personatgesBloc
   };
 
   const systemPrompt = `Ets un novel·lista expert en creació de personatges. A partir de la sinopsi, el backstory canònic i les fitxes parcials, has de COMPLETAR la informació que falta de cada personatge.
@@ -6007,15 +6043,64 @@ ${JSON.stringify(resum, null, 2)}` }];
     const raw = await callLLMMulti(
       msgs,
       systemPrompt,
-      Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 2600, model: models.modelArquitecte }),
+      Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 1600, model: models.modelArquitecte }),
       'arquitectura'
     );
     const data = parseJsonRobust(raw);
     if (data && data.personatges_completats && typeof data.personatges_completats === 'object') return data.personatges_completats;
-    if (intent === 2) throw new Error('Resposta invàlida a la fase Completar Personatges.');
+    if (intent === 2) return {};
     msgs.push({ role: 'user', content: 'Resposta invàlida. Retorna només JSON vàlid amb la clau personatges_completats.' });
   }
-  throw new Error('No s\'ha pogut completar fitxes de personatges.');
+  return {};
+}
+
+async function generarCompletarPersonatges(userConfig, onProgress) {
+  const nkg = ESTAT._nkg || {};
+  const personatges = nkg.personatges || {};
+  const claus = Object.keys(personatges);
+  if (claus.length === 0) throw new Error('No hi ha personatges al NKG.');
+
+  const CHUNK = 2;
+  const resultat = {};
+
+  for (let i = 0; i < claus.length; i += CHUNK) {
+    const bloc = claus.slice(i, i + CHUNK);
+    const nomsBloc = bloc.map(c => (personatges[c] && personatges[c].nom) || c).join(', ');
+    if (onProgress) onProgress(`Completant personatges ${i + 1}-${Math.min(i + CHUNK, claus.length)} de ${claus.length}: ${nomsBloc}...`);
+
+    try {
+      const parcial = await generarCompletarPersonatgesBloc(bloc, userConfig);
+      Object.assign(resultat, parcial);
+
+      // Merge progressiu: apliquem cada bloc immediatament al NKG
+      mergeCompletarPersonatgesNKG(parcial);
+    } catch (err) {
+      console.warn(`Error completant bloc [${nomsBloc}]:`, err.message);
+    }
+  }
+
+  // Verificar faltants i fer retries individuals
+  const faltants = claus.filter(c => {
+    const p = nkg.personatges[c];
+    const t = p && p.trets_immutables;
+    return !t || !t.aspecte_fisic || !t.ocupacio || !t.tret_definitori;
+  });
+  if (faltants.length > 0 && onProgress) {
+    onProgress(`Reintentant ${faltants.length} personatge(s) amb dades incompletes...`);
+  }
+  for (const clau of faltants) {
+    const nom = (personatges[clau] && personatges[clau].nom) || clau;
+    if (onProgress) onProgress(`Reintentant: ${nom}...`);
+    try {
+      const parcial = await generarCompletarPersonatgesBloc([clau], userConfig);
+      Object.assign(resultat, parcial);
+      mergeCompletarPersonatgesNKG(parcial);
+    } catch (err) {
+      console.warn(`Retry fallit per ${nom}:`, err.message);
+    }
+  }
+
+  return resultat;
 }
 
 async function iniciarFaseCompletarPersonatges() {
@@ -6025,17 +6110,38 @@ async function iniciarFaseCompletarPersonatges() {
   showCard('fase-9-46');
   document.getElementById('completar-personatges-result').classList.add('hidden');
   showLoader('9-46');
-  document.getElementById('loader-9-46-text').textContent = 'Completant trets immutables i estats inicials...';
+  const loaderText = document.getElementById('loader-9-46-text');
+  loaderText.textContent = 'Completant trets immutables i estats inicials...';
+
+  const onProgress = msg => { if (loaderText) loaderText.textContent = msg; };
 
   try {
-    const data = await generarCompletarPersonatges(USER_CONFIG);
-    mergeCompletarPersonatgesNKG(data);
+    const data = await generarCompletarPersonatges(USER_CONFIG, onProgress);
     hideLoader('9-46');
     mostrarCompletarPersonatges(ESTAT._nkg.personatges || {});
-    toast('Fitxes de personatge completades i sincronitzades per al capítol 1.');
+
+    // Mostrar faltants immediatament
+    const faltantsPersonatges = [];
+    Object.entries(ESTAT._nkg.personatges || {}).forEach(([clau, p]) => {
+      const t = p.trets_immutables || {};
+      if (!t.aspecte_fisic) faltantsPersonatges.push(`${p.nom || clau}: falta aspecte_fisic`);
+      if (!t.ocupacio) faltantsPersonatges.push(`${p.nom || clau}: falta ocupacio`);
+      if (!t.tret_definitori) faltantsPersonatges.push(`${p.nom || clau}: falta tret_definitori`);
+    });
+    if (faltantsPersonatges.length > 0) {
+      toast(`Avís: ${faltantsPersonatges.length} camp(s) pendents. ${faltantsPersonatges.slice(0, 3).join('; ')}${faltantsPersonatges.length > 3 ? '...' : ''}`);
+    } else {
+      toast('Fitxes de personatge completades i sincronitzades per al capítol 1.');
+    }
   } catch (err) {
     hideLoader('9-46');
-    toast('Error fase Completar Personatges: ' + err.message);
+    // Mostrar igualment el que s'ha generat fins ara
+    if (ESTAT._nkg && ESTAT._nkg.personatges && Object.keys(ESTAT._nkg.personatges).length > 0) {
+      mostrarCompletarPersonatges(ESTAT._nkg.personatges);
+      toast('Error parcial: ' + err.message + '. Es mostra el que s\'ha generat.');
+    } else {
+      toast('Error fase Completar Personatges: ' + err.message);
+    }
   }
 }
 
@@ -6070,9 +6176,10 @@ function mergeObjectiusSecretsNKG(data = {}) {
   });
 }
 
-async function generarObjectiusSecrets(userConfig) {
+async function generarObjectiusSecretsBloc(claus, userConfig) {
   const nkg = ESTAT._nkg || {};
-  migrarMotivacionsBaseDesDeBiblia();
+  const personatgesBloc = {};
+  claus.forEach(c => { if (nkg.personatges && nkg.personatges[c]) personatgesBloc[c] = nkg.personatges[c]; });
   const estruct = (ESTAT._estructuraCapitols || []).map(c => ({
     capitol: c.numero || c.capitol || 0,
     titol: c.titol || '',
@@ -6083,7 +6190,7 @@ async function generarObjectiusSecrets(userConfig) {
     synopsis: nkg.macronarrativa?.synopsis_core || '',
     backstory: nkg.macronarrativa?.backstory_canonic || {},
     relacions: nkg.relacions || [],
-    personatges: nkg.personatges || {},
+    personatges: personatgesBloc,
     estructura_capitols: estruct
   };
 
@@ -6135,13 +6242,59 @@ REGLES:
 ${JSON.stringify(userPayload, null, 2)}` }];
   const models = getModelConfig(userConfig || USER_CONFIG || {});
   for (let intent = 1; intent <= 2; intent++) {
-    const raw = await callLLMMulti(msgs, systemPrompt, Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 3200, model: models.modelArquitecte }), 'arquitectura');
+    const raw = await callLLMMulti(msgs, systemPrompt, Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 2000, model: models.modelArquitecte }), 'arquitectura');
     const parsed = parseJsonRobust(raw);
     if (parsed && parsed.objectius_per_personatge && parsed.secrets_per_personatge) return parsed;
-    if (intent === 2) throw new Error('Resposta invàlida a la fase Objectius i Secrets.');
+    if (intent === 2) return { objectius_per_personatge: {}, secrets_per_personatge: {} };
     msgs.push({ role: 'user', content: 'Resposta invàlida. Torna-ho a generar en JSON estricte.' });
   }
-  throw new Error('No s\'ha pogut generar objectius i secrets.');
+  return { objectius_per_personatge: {}, secrets_per_personatge: {} };
+}
+
+async function generarObjectiusSecrets(userConfig, onProgress) {
+  const nkg = ESTAT._nkg || {};
+  migrarMotivacionsBaseDesDeBiblia();
+  const claus = Object.keys(nkg.personatges || {});
+  if (claus.length === 0) throw new Error('No hi ha personatges al NKG.');
+
+  const CHUNK = 2;
+  const resultatTotal = { objectius_per_personatge: {}, secrets_per_personatge: {} };
+
+  for (let i = 0; i < claus.length; i += CHUNK) {
+    const bloc = claus.slice(i, i + CHUNK);
+    const nomsBloc = bloc.map(c => (nkg.personatges[c] && nkg.personatges[c].nom) || c).join(', ');
+    if (onProgress) onProgress(`Generant objectius i secrets ${i + 1}-${Math.min(i + CHUNK, claus.length)} de ${claus.length}: ${nomsBloc}...`);
+
+    try {
+      const parcial = await generarObjectiusSecretsBloc(bloc, userConfig);
+      Object.assign(resultatTotal.objectius_per_personatge, parcial.objectius_per_personatge || {});
+      Object.assign(resultatTotal.secrets_per_personatge, parcial.secrets_per_personatge || {});
+      // Merge progressiu
+      mergeObjectiusSecretsNKG(parcial);
+    } catch (err) {
+      console.warn(`Error objectius/secrets bloc [${nomsBloc}]:`, err.message);
+    }
+  }
+
+  // Retry individual per faltants
+  const faltants = claus.filter(c => {
+    const p = nkg.personatges[c];
+    return !p || !Array.isArray(p.objectius) || p.objectius.length === 0;
+  });
+  for (const clau of faltants) {
+    const nom = (nkg.personatges[clau] && nkg.personatges[clau].nom) || clau;
+    if (onProgress) onProgress(`Reintentant objectius: ${nom}...`);
+    try {
+      const parcial = await generarObjectiusSecretsBloc([clau], userConfig);
+      Object.assign(resultatTotal.objectius_per_personatge, parcial.objectius_per_personatge || {});
+      Object.assign(resultatTotal.secrets_per_personatge, parcial.secrets_per_personatge || {});
+      mergeObjectiusSecretsNKG(parcial);
+    } catch (err) {
+      console.warn(`Retry objectius fallit per ${nom}:`, err.message);
+    }
+  }
+
+  return resultatTotal;
 }
 
 async function iniciarFaseObjectiusSecrets() {
@@ -6151,17 +6304,34 @@ async function iniciarFaseObjectiusSecrets() {
   showCard('fase-9-47');
   document.getElementById('objectius-secrets-result').classList.add('hidden');
   showLoader('9-47');
+  const loaderText = document.getElementById('loader-9-47-text');
+  const onProgress = msg => { if (loaderText) loaderText.textContent = msg; };
   try {
-    const data = await generarObjectiusSecrets(USER_CONFIG);
-    mergeObjectiusSecretsNKG(data);
+    const data = await generarObjectiusSecrets(USER_CONFIG, onProgress);
     const vista = getActiveObjectives(1);
-    if (!vista || typeof vista !== 'object') throw new Error('Vista activa invàlida després de la injecció.');
     hideLoader('9-47');
     mostrarObjectiusSecrets(ESTAT._nkg.personatges || {});
-    toast('Objectius i secrets injectats al NKG.');
+
+    // Reportar faltants
+    const faltantsObj = [];
+    Object.entries(ESTAT._nkg.personatges || {}).forEach(([clau, p]) => {
+      if (!Array.isArray(p.objectius) || p.objectius.length === 0) faltantsObj.push(`${p.nom || clau}: falten objectius`);
+      if (!Array.isArray(p.secrets) || p.secrets.length === 0) faltantsObj.push(`${p.nom || clau}: falten secrets`);
+    });
+    if (faltantsObj.length > 0) {
+      toast(`Avís: ${faltantsObj.length} camp(s) pendents. ${faltantsObj.slice(0, 3).join('; ')}${faltantsObj.length > 3 ? '...' : ''}`);
+    } else {
+      toast('Objectius i secrets injectats al NKG.');
+    }
   } catch (err) {
     hideLoader('9-47');
-    toast('Error fase Objectius i Secrets: ' + err.message);
+    // Mostrar el que s'hagi generat
+    if (ESTAT._nkg && ESTAT._nkg.personatges) {
+      mostrarObjectiusSecrets(ESTAT._nkg.personatges);
+      toast('Error parcial en Objectius i Secrets: ' + err.message);
+    } else {
+      toast('Error fase Objectius i Secrets: ' + err.message);
+    }
   }
 }
 
@@ -6266,7 +6436,13 @@ async function iniciarFaseObjectesNarratius() {
     if (!snap || Object.keys(snap).length === 0) throw new Error('No s\'ha pogut construir l\'estat d\'objectes.');
     hideLoader('9-48');
     mostrarObjectesNarratius(ESTAT._nkg.objectes || {});
-    toast('Objectes narratius injectats al NKG.');
+
+    const nObj = Object.keys(ESTAT._nkg.objectes || {}).length;
+    if (nObj < 8) {
+      toast(`Avís: només s'han generat ${nObj} objectes (mínim recomanat: 8).`);
+    } else {
+      toast('Objectes narratius injectats al NKG.');
+    }
   } catch (err) {
     hideLoader('9-48');
     toast('Error fase Objectes Narratius: ' + err.message);
@@ -6373,7 +6549,15 @@ async function iniciarFaseMapaEspacialRegles() {
     if (llocsIds.length === 0) throw new Error('No s\'han injectat llocs al NKG.');
     hideLoader('9-49');
     mostrarMapaRegles(ESTAT._nkg.llocs || {}, ESTAT._nkg.mapa_adjacencies || [], ESTAT.bibliaNarrativa.regles_mon || []);
-    toast('Mapa espacial i regles injectats al NKG.');
+
+    const faltantsMapa = [];
+    if (llocsIds.length < 3) faltantsMapa.push(`Només ${llocsIds.length} llocs (mínim: 3)`);
+    if (!Array.isArray(ESTAT.bibliaNarrativa.regles_mon) || ESTAT.bibliaNarrativa.regles_mon.length === 0) faltantsMapa.push('Falten regles del món');
+    if (faltantsMapa.length > 0) {
+      toast(`Avís mapa: ${faltantsMapa.join('; ')}`);
+    } else {
+      toast('Mapa espacial i regles injectats al NKG.');
+    }
   } catch (err) {
     hideLoader('9-49');
     toast('Error fase Mapa Espacial i Regles: ' + err.message);
@@ -6579,7 +6763,18 @@ async function iniciarFasePerspectivaCronologia() {
     );
     document.getElementById('perspectiva-crono-result').classList.remove('hidden');
     document.getElementById('btn-fase10-8').classList.remove('hidden');
-    toast('Perspectiva i cronologia injectades al NKG.');
+
+    const faltantsPersp = [];
+    const persp = ((ESTAT._nkg.context_creacio || {}).estil || {}).perspectiva || {};
+    const crono = (ESTAT._nkg.context_creacio || {}).cronologia || {};
+    if (!persp.tipus) faltantsPersp.push('Falta tipus de perspectiva');
+    if (!Array.isArray(persp.pov_per_capitol) || persp.pov_per_capitol.length === 0) faltantsPersp.push('Falta POV per capítol');
+    if (!Array.isArray(crono.per_capitol) || crono.per_capitol.length === 0) faltantsPersp.push('Falta cronologia per capítol');
+    if (faltantsPersp.length > 0) {
+      toast(`Avís perspectiva: ${faltantsPersp.join('; ')}`);
+    } else {
+      toast('Perspectiva i cronologia injectades al NKG.');
+    }
   } catch (err) {
     hideLoader('10-7');
     toast('Error fase Perspectiva i Cronologia: ' + err.message);
@@ -6622,13 +6817,18 @@ function mostrarVeuExemples(personatges = {}) {
   }).join('\n');
 }
 
-async function generarVeuExemples(userConfig) {
+async function generarVeuExemplesBloc(claus, userConfig) {
   const nkg = ESTAT._nkg || {};
+  const personatgesBloc = {};
+  claus.forEach(c => {
+    const p = nkg.personatges && nkg.personatges[c];
+    if (p) personatgesBloc[c] = { nom: p.nom, veu: p.veu || {}, arc: p.arc || {}, ocupacio: p.trets_immutables?.ocupacio || '' };
+  });
   const payload = {
     sinopsi: nkg.macronarrativa?.synopsis_core || '',
     tema: nkg.macronarrativa?.theme || '',
     estil: (nkg.context_creacio || {}).estil || ESTAT.estil || {},
-    personatges: Object.fromEntries(Object.entries(nkg.personatges || {}).map(([k, p]) => [k, { nom: p.nom, veu: p.veu || {}, arc: p.arc || {}, ocupacio: p.trets_immutables?.ocupacio || '' }]))
+    personatges: personatgesBloc
   };
   const systemPrompt = `Ets un estilista literari expert en veu narrativa.
 A partir de les fitxes de veu dels personatges, la sinopsi, el tema i l'estil definit, has de generar per a cada personatge:
@@ -6653,13 +6853,56 @@ Respon EXCLUSIVAMENT amb JSON vàlid:
 ${JSON.stringify(payload, null, 2)}` }];
   const models = getModelConfig(userConfig || USER_CONFIG || {});
   for (let intent = 1; intent <= 2; intent++) {
-    const raw = await callLLMMulti(msgs, systemPrompt, Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 3600, model: models.modelArquitecte }), 'arquitectura');
+    const raw = await callLLMMulti(msgs, systemPrompt, Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 2000, model: models.modelArquitecte }), 'arquitectura');
     const parsed = parseJsonRobust(raw);
     if (parsed && parsed.veus_completades && typeof parsed.veus_completades === 'object') return parsed;
-    if (intent === 2) throw new Error('Resposta invàlida a Veu i Exemples.');
+    if (intent === 2) return { veus_completades: {} };
     msgs.push({ role: 'user', content: 'Resposta invàlida. Torna JSON estricte amb veus_completades.' });
   }
-  throw new Error('No s\'ha pogut completar la veu dels personatges.');
+  return { veus_completades: {} };
+}
+
+async function generarVeuExemples(userConfig, onProgress) {
+  const nkg = ESTAT._nkg || {};
+  const claus = Object.keys(nkg.personatges || {});
+  if (claus.length === 0) throw new Error('No hi ha personatges al NKG.');
+
+  const CHUNK = 2;
+  const resultatTotal = { veus_completades: {} };
+
+  for (let i = 0; i < claus.length; i += CHUNK) {
+    const bloc = claus.slice(i, i + CHUNK);
+    const nomsBloc = bloc.map(c => (nkg.personatges[c] && nkg.personatges[c].nom) || c).join(', ');
+    if (onProgress) onProgress(`Generant veu i exemples ${i + 1}-${Math.min(i + CHUNK, claus.length)} de ${claus.length}: ${nomsBloc}...`);
+
+    try {
+      const parcial = await generarVeuExemplesBloc(bloc, userConfig);
+      Object.assign(resultatTotal.veus_completades, parcial.veus_completades || {});
+      // Injectar progressivament
+      injectarVeuExemples(parcial);
+    } catch (err) {
+      console.warn(`Error generant veu bloc [${nomsBloc}]:`, err.message);
+    }
+  }
+
+  // Retry individual per faltants
+  const faltants = claus.filter(c => {
+    const veu = normalitzarVeuAvancada((nkg.personatges[c] && nkg.personatges[c].veu) || {});
+    return !Array.isArray(veu.exemples_narratius) || veu.exemples_narratius.length < 2;
+  });
+  for (const clau of faltants) {
+    const nom = (nkg.personatges[clau] && nkg.personatges[clau].nom) || clau;
+    if (onProgress) onProgress(`Reintentant veu: ${nom}...`);
+    try {
+      const parcial = await generarVeuExemplesBloc([clau], userConfig);
+      Object.assign(resultatTotal.veus_completades, parcial.veus_completades || {});
+      injectarVeuExemples(parcial);
+    } catch (err) {
+      console.warn(`Retry veu fallit per ${nom}:`, err.message);
+    }
+  }
+
+  return resultatTotal;
 }
 
 function injectarVeuExemples(data = {}) {
@@ -6685,17 +6928,38 @@ async function iniciarFaseVeuExemples() {
   showCard('fase-10-8');
   document.getElementById('veu-exemples-result').classList.add('hidden');
   showLoader('10-8');
+  const loaderText = document.getElementById('loader-10-8-text');
+  const onProgress = msg => { if (loaderText) loaderText.textContent = msg; };
   try {
-    const data = await generarVeuExemples(USER_CONFIG);
-    injectarVeuExemples(data);
+    const data = await generarVeuExemples(USER_CONFIG, onProgress);
     hideLoader('10-8');
     mostrarVeuExemples(ESTAT._nkg.personatges || {});
     mostrarFaltantsNKG();
     document.getElementById('veu-exemples-result').classList.remove('hidden');
-    toast('Veu i exemples completats.');
+
+    // Reportar faltants de veu immediatament
+    const faltantsVeu = [];
+    Object.entries(ESTAT._nkg.personatges || {}).forEach(([clau, p]) => {
+      const veu = normalitzarVeuAvancada(p.veu || {});
+      if (!Array.isArray(veu.exemples_narratius) || veu.exemples_narratius.length < 2) faltantsVeu.push(`${p.nom || clau}: falten exemples narratius`);
+      if (!Array.isArray(veu.vocabulari_recurrent) || veu.vocabulari_recurrent.length < 3) faltantsVeu.push(`${p.nom || clau}: falta vocabulari recurrent`);
+    });
+    if (faltantsVeu.length > 0) {
+      toast(`Avís: ${faltantsVeu.length} camp(s) de veu pendents. ${faltantsVeu.slice(0, 3).join('; ')}${faltantsVeu.length > 3 ? '...' : ''}`);
+    } else {
+      toast('Veu i exemples completats.');
+    }
   } catch (err) {
     hideLoader('10-8');
-    toast('Error fase Veu i Exemples: ' + err.message);
+    // Mostrar igualment el que s'ha generat fins ara
+    if (ESTAT._nkg && ESTAT._nkg.personatges) {
+      mostrarVeuExemples(ESTAT._nkg.personatges);
+      mostrarFaltantsNKG();
+      document.getElementById('veu-exemples-result').classList.remove('hidden');
+      toast('Error parcial en Veu i Exemples: ' + err.message);
+    } else {
+      toast('Error fase Veu i Exemples: ' + err.message);
+    }
   }
 }
 
@@ -6703,12 +6967,27 @@ async function autocompletarNKGFaltantsManual() {
   const btn = document.getElementById('btn-autocompletar-nkg');
   if (btn) btn.disabled = true;
   showLoader('10-8');
+  const loaderText = document.getElementById('loader-10-8-text');
+  const setStatus = msg => { if (loaderText) loaderText.textContent = msg; };
+  let completats = 0;
+
   try {
     const nkg = ESTAT._nkg || {};
     const biblia = ESTAT.bibliaNarrativa || {};
-    const faltants = detectarFaltantsNKG(nkg, biblia).join(' | ').toLowerCase();
+    const faltantsLlista = detectarFaltantsNKG(nkg, biblia);
+    const faltants = faltantsLlista.join(' | ').toLowerCase();
+    const totalFases = [
+      faltants.includes('backstory') || faltants.includes('relacions'),
+      faltants.includes('trets immutables'),
+      faltants.includes('objectes narratius'),
+      faltants.includes('mapa de llocs') || faltants.includes('regles del món'),
+      faltants.includes('pov per capítol') || faltants.includes('cronologia') || faltants.includes('tipus de perspectiva'),
+      faltants.includes('exemples narratius de veu') || faltants.includes('vocabulari recurrent')
+    ].filter(Boolean).length;
 
     if (faltants.includes('backstory') || faltants.includes('relacions')) {
+      completats++;
+      setStatus(`[${completats}/${totalFases}] Generant backstory i relacions canòniques...`);
       try {
         await assegurarMinimPersonatgesPerRelacions(2, USER_CONFIG);
         const d = await generarBackstoryIRelacions(USER_CONFIG);
@@ -6719,32 +6998,55 @@ async function autocompletarNKGFaltantsManual() {
         nkg.macronarrativa.backstory_canonic = minimal.backstory_canonic;
         nkg.relacions = minimal.relacions;
       }
+      mostrarFaltantsNKG();
     }
     if (faltants.includes('trets immutables')) {
-      const d = await generarCompletarPersonatges(USER_CONFIG);
-      mergeCompletarPersonatgesNKG(d);
+      completats++;
+      setStatus(`[${completats}/${totalFases}] Completant trets immutables dels personatges...`);
+      const onProgressIntern = msg => setStatus(`[${completats}/${totalFases}] ${msg}`);
+      await generarCompletarPersonatges(USER_CONFIG, onProgressIntern);
+      mostrarFaltantsNKG();
     }
     if (faltants.includes('objectes narratius')) {
+      completats++;
+      setStatus(`[${completats}/${totalFases}] Generant objectes narratius...`);
       const d = await generarObjectesNarratius(USER_CONFIG);
       injectarObjectesNarratius(d);
+      mostrarFaltantsNKG();
     }
     if (faltants.includes('mapa de llocs') || faltants.includes('regles del món')) {
+      completats++;
+      setStatus(`[${completats}/${totalFases}] Generant mapa espacial i regles del món...`);
       const d = await generarMapaEspacialRegles(USER_CONFIG);
       injectarMapaEspacialRegles(d);
+      mostrarFaltantsNKG();
     }
     if (faltants.includes('pov per capítol') || faltants.includes('cronologia') || faltants.includes('tipus de perspectiva')) {
+      completats++;
+      setStatus(`[${completats}/${totalFases}] Generant perspectiva i cronologia...`);
       const d = await generarPerspectivaCronologia(USER_CONFIG);
       injectarPerspectivaCronologia(d);
+      mostrarFaltantsNKG();
     }
     if (faltants.includes('exemples narratius de veu') || faltants.includes('vocabulari recurrent')) {
-      const d = await generarVeuExemples(USER_CONFIG);
-      injectarVeuExemples(d);
+      completats++;
+      setStatus(`[${completats}/${totalFases}] Completant veu i exemples dels personatges...`);
+      const onProgressIntern = msg => setStatus(`[${completats}/${totalFases}] ${msg}`);
+      await generarVeuExemples(USER_CONFIG, onProgressIntern);
+      mostrarFaltantsNKG();
     }
 
     mostrarVeuExemples(ESTAT._nkg.personatges || {});
     mostrarFaltantsNKG();
-    toast('Autocompleció NKG finalitzada. Revisa i continua manualment.');
+
+    const faltantsRestants = detectarFaltantsNKG(nkg, biblia);
+    if (faltantsRestants.length > 0) {
+      toast(`Autocompleció finalitzada amb ${faltantsRestants.length} element(s) encara pendents.`);
+    } else {
+      toast('Autocompleció NKG finalitzada. NKG complet!');
+    }
   } catch (err) {
+    mostrarFaltantsNKG();
     toast('Error autocompletant NKG: ' + err.message);
   } finally {
     hideLoader('10-8');
