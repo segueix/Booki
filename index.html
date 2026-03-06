@@ -797,6 +797,8 @@
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="10.5">Escaleta</div>
     <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="10.7">POV/Cronologia</div>
+    <div class="step-arrow">›</div>
     <div class="step-pill" data-step="11">Capítols</div>
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="12">Control d'Arcs</div>
@@ -1413,7 +1415,21 @@
   <p>Opus genera l'escaleta detallada per escenes de tots els capítols, incloent objectiu de paraules i funció narrativa de cada escena.</p>
   <div class="loader-wrap" id="loader-10-5"><span class="spinner"></span><span id="loader-10-5-text">Generant escaleta…</span></div>
   <div id="escaleta-result"></div>
-  <button class="btn hidden" id="btn-fase11" onclick="iniciarFase11()">Continuar → Escriptura</button>
+  <button class="btn hidden" id="btn-fase10-7" onclick="iniciarFasePerspectivaCronologia()">Continuar → Perspectiva i Cronologia</button>
+</div>
+
+<!-- FASE 10.7: Perspectiva i Cronologia -->
+<div class="card hidden" id="fase-10-7">
+  <h2>🧭 Fase 10.7 — Perspectiva i Cronologia</h2>
+  <p>Definim el POV per capítol, la cronologia interna i la timeline d'accions perquè l'escriptura sigui consistent.</p>
+  <div class="loader-wrap" id="loader-10-7"><span class="spinner"></span><span id="loader-10-7-text">Analitzant perspectiva i cronologia…</span></div>
+  <div id="perspectiva-crono-result" class="hidden">
+    <div id="perspectiva-crono-cos" class="veu-result"></div>
+    <div class="btn-row" style="margin-top:24px;">
+      <button class="btn btn-secondary" onclick="hideCard('fase-10-7');showCard('fase-10-5');">← Tornar a Escaleta</button>
+      <button class="btn btn-primary" id="btn-fase11" onclick="iniciarFase11()">Continuar → Escriptura</button>
+    </div>
+  </div>
 </div>
 
 <!-- FASE 11: Escriptura de capítols (Sonnet + registre) -->
@@ -2138,7 +2154,15 @@ function restaurarInterficieDesDeEstat() {
   if (fase >= 10 && ESTAT._estructuraCapitols.length > 0) mostrarEstructura('Reconstruït des de memòria (dades en JSON actiu)');
   if (fase >= 10.5 && ESTAT._escaletes.length > 0) {
     mostrarEscaleta(ESTAT._escaletes);
-    document.getElementById('btn-fase11').classList.remove('hidden');
+    document.getElementById('btn-fase10-7').classList.remove('hidden');
+  }
+  if (fase >= 10.7 && ESTAT._nkg && ESTAT._nkg.context_creacio && ESTAT._nkg.context_creacio.cronologia) {
+    mostrarPerspectivaCronologia(
+      (ESTAT._nkg.context_creacio.estil && ESTAT._nkg.context_creacio.estil.perspectiva) || {},
+      ESTAT._nkg.context_creacio.cronologia || {},
+      ESTAT._nkg.timeline_accions || []
+    );
+    document.getElementById('perspectiva-crono-result').classList.remove('hidden');
   }
   if (fase >= 11) {
     renderLlistaCapitols();
@@ -6183,6 +6207,211 @@ async function iniciarFaseMapaEspacialRegles() {
   }
 }
 
+function normalitzarPerspectivaNarrativa(raw = {}) {
+  const tipusValids = ['primera_persona', 'tercera_limitada', 'tercera_omniscient', 'alternada'];
+  const tipus = tipusValids.includes(raw.tipus) ? raw.tipus : 'tercera_limitada';
+  const pov = Array.isArray(raw.pov_per_capitol) ? raw.pov_per_capitol : [];
+  return {
+    tipus,
+    pov_per_capitol: pov.map(e => ({
+      capitol: Math.max(1, Number(e.capitol) || 1),
+      personatge_pov: nkgNormalitzarNom(e.personatge_pov || ''),
+      justificacio: String(e.justificacio || '').trim()
+    })).filter(e => e.personatge_pov),
+    restriccions_informacio: String(raw.restriccions_informacio || '').trim()
+  };
+}
+
+function normalitzarCronologiaNarrativa(raw = {}) {
+  const momentsValids = ['matinada', 'mati', 'migdia', 'tarda', 'vespre', 'nit'];
+  const perCapitol = Array.isArray(raw.per_capitol) ? raw.per_capitol : [];
+  return {
+    data_inici_historia: String(raw.data_inici_historia || '').trim(),
+    duracio_total_estimada: String(raw.duracio_total_estimada || '').trim(),
+    per_capitol: perCapitol.map(e => ({
+      capitol: Math.max(1, Number(e.capitol) || 1),
+      data_ficticia: String(e.data_ficticia || '').trim(),
+      duracio_capitol: String(e.duracio_capitol || '').trim(),
+      moment_del_dia: momentsValids.includes(String(e.moment_del_dia || '').trim()) ? String(e.moment_del_dia).trim() : 'tarda',
+      ubicacio_principal: nkgNormalitzarNom(e.ubicacio_principal || '')
+    }))
+  };
+}
+
+function normalitzarTimelineAccio(raw = {}) {
+  return {
+    capitol: Math.max(1, Number(raw.capitol) || 1),
+    personatge: nkgNormalitzarNom(raw.personatge || ''),
+    accio: String(raw.accio || '').trim(),
+    hora_aproximada: String(raw.hora_aproximada || '').trim(),
+    ubicacio: nkgNormalitzarNom(raw.ubicacio || '')
+  };
+}
+
+
+function formatTimelineAccio(entry = {}) {
+  if (!entry) return '';
+  if (typeof entry === 'string') return entry;
+  const cap = entry.capitol ? `C${entry.capitol}` : 'C?';
+  const pers = entry.personatge ? ` ${entry.personatge}` : '';
+  const ubi = entry.ubicacio ? ` @${entry.ubicacio}` : '';
+  const hora = entry.hora_aproximada ? ` (${entry.hora_aproximada})` : '';
+  return `${cap}:${pers} ${entry.accio || ''}${hora}${ubi}`.trim();
+}
+function validarCronologiaPerCapitol(cronologia = {}) {
+  const ordreMoment = { matinada: 0, mati: 1, migdia: 2, tarda: 3, vespre: 4, nit: 5 };
+  const llista = (cronologia.per_capitol || []).slice().sort((a, b) => a.capitol - b.capitol);
+  let ultimaData = '';
+  let ultimMoment = -1;
+  for (const c of llista) {
+    if (!c.data_ficticia) continue;
+    const dataActualTs = Date.parse(c.data_ficticia);
+    const dataUltimaTs = Date.parse(ultimaData);
+    if (ultimaData && !Number.isNaN(dataActualTs) && !Number.isNaN(dataUltimaTs) && dataActualTs < dataUltimaTs) {
+      throw new Error(`Cronologia invàlida: Cap.${c.capitol} retrocedeix en data (${c.data_ficticia} < ${ultimaData}).`);
+    }
+    const ordre = ordreMoment[c.moment_del_dia] ?? 0;
+    if (c.data_ficticia === ultimaData && ordre + 1 < ultimMoment) {
+      throw new Error(`Cronologia invàlida: salt de moment del dia il·lògic a Cap.${c.capitol}.`);
+    }
+    ultimaData = c.data_ficticia;
+    ultimMoment = ordre;
+  }
+  return true;
+}
+
+function mostrarPerspectivaCronologia(perspectiva = {}, cronologia = {}, timeline = []) {
+  const cos = document.getElementById('perspectiva-crono-cos');
+  if (!cos) return;
+  const pov = Array.isArray(perspectiva.pov_per_capitol) ? perspectiva.pov_per_capitol : [];
+  const perCap = Array.isArray(cronologia.per_capitol) ? cronologia.per_capitol : [];
+  cos.innerHTML = `
+    <div class="veu-card"><div class="veu-card-nom">👁️ Perspectiva</div><div class="veu-card-camps">
+      <div><div class="veu-camp-label">Tipus</div><div class="veu-camp-val">${escHtml(perspectiva.tipus || 'tercera_limitada')}</div></div>
+      <div><div class="veu-camp-label">POV definits</div><div class="veu-camp-val">${pov.length}</div></div>
+      <div><div class="veu-camp-label">Restriccions</div><div class="veu-camp-val">${escHtml(perspectiva.restriccions_informacio || '(cap)')}</div></div>
+    </div></div>
+    <div class="veu-card"><div class="veu-card-nom">🗓️ Cronologia interna</div><div class="veu-card-camps">
+      <div><div class="veu-camp-label">Inici</div><div class="veu-camp-val">${escHtml(cronologia.data_inici_historia || '')}</div></div>
+      <div><div class="veu-camp-label">Durada estimada</div><div class="veu-camp-val">${escHtml(cronologia.duracio_total_estimada || '')}</div></div>
+      <div><div class="veu-camp-label">Entrades capítol</div><div class="veu-camp-val">${perCap.length}</div></div>
+    </div></div>
+    <div class="veu-card"><div class="veu-card-nom">⏱️ Timeline accions</div><div class="veu-card-camps">
+      <div><div class="veu-camp-label">Entrades</div><div class="veu-camp-val">${timeline.length}</div></div>
+    </div></div>
+  `;
+}
+
+async function generarPerspectivaCronologia(userConfig) {
+  const nkg = ESTAT._nkg || {};
+  const payload = {
+    estructura_capitols: ESTAT._estructuraCapitols || [],
+    escaletes: ESTAT._escaletes || [],
+    synopsis: nkg.macronarrativa?.synopsis_core || '',
+    personatges: nkg.personatges || {},
+    llocs_ids: Object.keys(nkg.llocs || {})
+  };
+  const systemPrompt = `Ets un editor literari expert en estructura temporal i punt de vista.
+A partir de l'estructura de capítols (amb funcions, threads i escaletes),
+la sinopsi, i les fitxes de personatges, has de definir:
+
+1. PERSPECTIVA NARRATIVA:
+   - Tipus de narrador global
+   - Per a cada capítol: quin personatge és el POV (punt de vista),
+     és a dir, a través dels ulls de qui viu el lector aquella escena
+   - Quina informació pot conèixer el narrador i quina no
+
+2. CRONOLOGIA INTERNA:
+   - Data fictícia d'inici de la novel·la
+   - Per a cada capítol: data, durada, moment del dia, ubicació
+     principal
+   - La seqüència ha de ser temporalment lògica
+
+3. TIMELINE D'ACCIONS:
+   - Per a cada capítol, les accions principals de cada personatge
+     amb hora aproximada i ubicació. Això serveix perquè el model
+     sàpiga on és CADA personatge a CADA moment, fins i tot si no
+     és el POV del capítol.
+
+Respon EXCLUSIVAMENT amb JSON vàlid:
+{
+  "perspectiva": {
+    "tipus": "tercera_limitada",
+    "pov_per_capitol": [
+      {"capitol": 1, "personatge_pov": "biel_santamaria", "justificacio": "..."}
+    ],
+    "restriccions_informacio": "..."
+  },
+  "cronologia": {
+    "data_inici_historia": "...",
+    "duracio_total_estimada": "...",
+    "per_capitol": [
+      {"capitol": 1, "data_ficticia": "...", "duracio_capitol": "...", "moment_del_dia": "vespre", "ubicacio_principal": "pis_barcelona_biel"}
+    ]
+  },
+  "timeline_accions": [
+    {"capitol": 1, "personatge": "biel_santamaria", "accio": "...", "hora_aproximada": "21:00", "ubicacio": "pis_barcelona_biel"}
+  ]
+}
+
+REGLES:
+- El POV ha de coincidir amb el focus narratiu de l'escaleta.
+- La cronologia ha de ser CONTÍNUA.
+- Cada personatge ha de tenir almenys 1 entrada de timeline per capítol on apareix.
+- Les ubicacions de la timeline han de coincidir amb els IDs del mapa de llocs.`;
+
+  const msgs = [{ role: 'user', content: `Context:\n${JSON.stringify(payload, null, 2)}` }];
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  for (let intent = 1; intent <= 2; intent++) {
+    const raw = await callLLMMulti(msgs, systemPrompt, Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 3600, model: models.modelArquitecte }), 'arquitectura');
+    const parsed = parseJsonRobust(raw);
+    if (parsed && parsed.perspectiva && parsed.cronologia && Array.isArray(parsed.timeline_accions)) return parsed;
+    if (intent === 2) throw new Error('Resposta invàlida a Perspectiva i Cronologia.');
+    msgs.push({ role: 'user', content: 'Resposta invàlida. Torna JSON estricte amb perspectiva + cronologia + timeline_accions.' });
+  }
+  throw new Error('No s\'ha pogut generar perspectiva i cronologia.');
+}
+
+function injectarPerspectivaCronologia(data = {}) {
+  if (!ESTAT._nkg) ESTAT._nkg = crearNKG();
+  if (!ESTAT._nkg.context_creacio || typeof ESTAT._nkg.context_creacio !== 'object') ESTAT._nkg.context_creacio = {};
+  if (!ESTAT._nkg.context_creacio.estil || typeof ESTAT._nkg.context_creacio.estil !== 'object') ESTAT._nkg.context_creacio.estil = {};
+  const perspectiva = normalitzarPerspectivaNarrativa(data.perspectiva || {});
+  const cronologia = normalitzarCronologiaNarrativa(data.cronologia || {});
+  validarCronologiaPerCapitol(cronologia);
+  const llocsIds = new Set(Object.keys(ESTAT._nkg.llocs || {}));
+  const timeline = (Array.isArray(data.timeline_accions) ? data.timeline_accions : [])
+    .map(normalitzarTimelineAccio)
+    .filter(a => a.personatge && a.accio && (!a.ubicacio || llocsIds.size === 0 || llocsIds.has(a.ubicacio)));
+  ESTAT._nkg.context_creacio.estil.perspectiva = perspectiva;
+  ESTAT._nkg.context_creacio.cronologia = cronologia;
+  ESTAT._nkg.timeline_accions = timeline;
+}
+
+async function iniciarFasePerspectivaCronologia() {
+  ESTAT.fase = 10.7;
+  updateProgress(10.7);
+  hideCard('fase-10-5');
+  showCard('fase-10-7');
+  document.getElementById('perspectiva-crono-result').classList.add('hidden');
+  showLoader('10-7');
+  try {
+    const data = await generarPerspectivaCronologia(USER_CONFIG);
+    injectarPerspectivaCronologia(data);
+    hideLoader('10-7');
+    mostrarPerspectivaCronologia(
+      ESTAT._nkg.context_creacio.estil.perspectiva,
+      ESTAT._nkg.context_creacio.cronologia,
+      ESTAT._nkg.timeline_accions || []
+    );
+    document.getElementById('perspectiva-crono-result').classList.remove('hidden');
+    toast('Perspectiva i cronologia injectades al NKG.');
+  } catch (err) {
+    hideLoader('10-7');
+    toast('Error fase Perspectiva i Cronologia: ' + err.message);
+  }
+}
+
 function mostrarEstilsParla(text) {
   const cos = document.getElementById('estils-cos');
   const blocs = parsejarBlocsEstilsParla(text);
@@ -6543,7 +6772,7 @@ async function iniciarFaseEscaleta() {
     ESTAT._escaletes = totsResultats;
     hideLoader('10-5');
     mostrarEscaleta(totsResultats);
-    document.getElementById('btn-fase11').classList.remove('hidden');
+    document.getElementById('btn-fase10-7').classList.remove('hidden');
   } catch (e) {
     hideLoader('10-5');
     toast('Error generant escaleta: ' + e.message);
@@ -8235,11 +8464,16 @@ async function generarFitxerContexte(nkg, biblia, capitolActual) {
     console.warn('Export NKG + prompt: no s\'ha pogut construir el payload del capítol.', e.message);
   }
 
+  const perspectivaCtx = ((nkg.context_creacio || {}).estil || {}).perspectiva || {};
+  const cronologiaCtx = (nkg.context_creacio || {}).cronologia || { per_capitol: [] };
+  const povCapitolActual = (perspectivaCtx.pov_per_capitol || []).find(p => Number(p.capitol) === Number(capitolActual));
+
   const contingut = {
     exportat_en_capitol: capitolActual,
     exportat_a: new Date().toISOString(),
     fase_actual: ESTAT.fase || null,
     mode_creacio: ESTAT._modeCreacio || 'guiat',
+    pov_capitol_actual: povCapitolActual || null,
     macronarrativa: nkg.macronarrativa,
     threads: nkg.threads,
     personatges: nkg.personatges,
@@ -8249,7 +8483,10 @@ async function generarFitxerContexte(nkg, biblia, capitolActual) {
     fets_canonics: nkg.fets_canonics,
     esdeveniments: (nkg.esdeveniments || []).slice(-10),
     relacions: nkg.relacions || [],
-    timeline_accions: (nkg.timeline_accions || []).slice(-20),
+    timeline_accions: (nkg.timeline_accions || []).filter(a => {
+      if (!a || typeof a === 'string') return true;
+      return Number(a.capitol || 0) <= Number(capitolActual || 0);
+    }).slice(-40),
     timeline_objectes: (nkg.timeline_objectes || []).slice(-20),
     timeline_personatges: (nkg.timeline_personatges || []).slice(-20),
     beats_gastats: nkg.beats_gastats || [],
@@ -8257,7 +8494,12 @@ async function generarFitxerContexte(nkg, biblia, capitolActual) {
     snapshot_objectes_capitol: getObjectState(capitolActual),
     context_creacio: {
       tematica: ESTAT.tematica || '',
-      estil: ESTAT.estil || {},
+      estil: Object.assign({}, ESTAT.estil || {}, {
+        perspectiva: perspectivaCtx || normalitzarPerspectivaNarrativa(ESTAT.estil?.perspectiva || {})
+      }),
+      cronologia: cronologiaCtx || { data_inici_historia: '', duracio_total_estimada: '', per_capitol: [] },
+      cronologia_acumulada_capitol: ((cronologiaCtx.per_capitol || []))
+        .filter(c => Number(c.capitol || 0) <= Number(capitolActual || 0)),
       final_text: ESTAT._finalNouText || '',
       tema_text: ESTAT._temaNouText || '',
       worldbuilding: ESTAT.worldbuilding || '',
@@ -13228,7 +13470,7 @@ async function revisarCapitol(textCapitol, idx, userConfig) {
 
     if (Array.isArray(nkg.timeline_accions) && nkg.timeline_accions.length > 0) {
       parts.push('ÚLTIMES ACCIONS CONSUMADES (detecta regressió si el capítol les torna a narrar):\n' +
-        nkg.timeline_accions.slice(-10).map(a => `• ${a}`).join('\n'));
+        nkg.timeline_accions.slice(-10).map(a => `• ${formatTimelineAccio(a)}`).join('\n'));
     }
 
     if (Array.isArray(nkg.fets_canonics) && nkg.fets_canonics.length > 0) {
@@ -15203,7 +15445,7 @@ OBLIGATORI: Fusiona plot i drama intern. El camp "detonant_emocional_escena" ha 
 }
 
 // ═══════════════════════════════════════════════════════════
-//  NKG v4: Narrative Knowledge Graph
+//  NKG v5: Narrative Knowledge Graph
 // ═══════════════════════════════════════════════════════════
 
 function crearNKG() {
@@ -15235,13 +15477,27 @@ function crearNKG() {
     fets_canonics: [],
     esdeveniments: [],
     relacions: [], // { personatge_a, personatge_b, tipus, descripcio, coneixement_mutu, evolucio }
-    timeline_accions: [], // Registre d'Accions Consumades (NKG CHRONOS): "C3E2: Maja entra al laboratori"
+    timeline_accions: [], // [{ capitol, personatge, accio, hora_aproximada, ubicacio }]
     timeline_objectes: [], // Registre de moviment d'objectes: C3E2: [Claus] Personatge A -> Personatge B (motiu)
     timeline_personatges: [], // Registre de canvis de personatge: ubicació/roba/estat per escena
+    context_creacio: {
+      estil: {
+        perspectiva: {
+          tipus: 'tercera_limitada',
+          pov_per_capitol: [],
+          restriccions_informacio: ''
+        }
+      },
+      cronologia: {
+        data_inici_historia: '',
+        duracio_total_estimada: '',
+        per_capitol: []
+      }
+    },
     transicions_capitols: [], // Regles de pas capítol->capítol per evitar salts i pèrdua de continuïtat
     beats_gastats: [], // Registre de beats narratius consumits (anti-repetició dramàtica)
     ultima_actualitzacio: { capitol: 0, escena: 0 },
-    versio: 4
+    versio: 5
   };
 }
 
@@ -15698,6 +15954,19 @@ function obtenirUltimesEscenes(n, capitolActual, escenaActual) {
 
 function nkgGenerarContextMinim(escenaSpec) {
   const parts = [];
+  const cap = Math.max(1, Number(escenaSpec && escenaSpec.capitol) || 1);
+
+  const perspectiva = ESTAT._nkg?.context_creacio?.estil?.perspectiva || {};
+  const pov = (perspectiva.pov_per_capitol || []).find(p => Number(p.capitol) === cap);
+  const cronCap = (ESTAT._nkg?.context_creacio?.cronologia?.per_capitol || []).find(c => Number(c.capitol) === cap);
+  const timelineCap = (ESTAT._nkg?.timeline_accions || []).filter(a => Number((a && a.capitol) || 0) === cap).slice(0, 12);
+  if (pov || cronCap || timelineCap.length > 0) {
+    parts.push('BLOQ POV/CRONOLOGIA INTERNA:');
+    if (perspectiva.tipus) parts.push(`- Tipus narrador: ${perspectiva.tipus}`);
+    if (pov) parts.push(`- POV capítol ${cap}: ${pov.personatge_pov}${pov.justificacio ? ` (${pov.justificacio})` : ''}`);
+    if (cronCap) parts.push(`- Cronologia capítol ${cap}: ${cronCap.data_ficticia || '?'} · ${cronCap.moment_del_dia || '?'} · ${cronCap.ubicacio_principal || '?'}`);
+    if (timelineCap.length > 0) parts.push('- Timeline accions capítol:\n' + timelineCap.map(a => `  • ${formatTimelineAccio(a)}`).join('\n'));
+  }
 
   // CAPA 1: Estat viu del NKG (~200-300 tokens)
   const contextNKG = nkgQueryEscenaContext(escenaSpec);
@@ -15742,6 +16011,8 @@ function nkgInicialitzar() {
   const prevPersonat = ESTAT._nkg?.personatges;
   const prevRelacions = ESTAT._nkg?.relacions;
   const prevMapaAdj = ESTAT._nkg?.mapa_adjacencies;
+  const prevContextCreacio = ESTAT._nkg?.context_creacio;
+  const prevTimelineAccions = ESTAT._nkg?.timeline_accions;
 
   ESTAT._nkg = crearNKG();
   const nkg = ESTAT._nkg;
@@ -15754,6 +16025,8 @@ function nkgInicialitzar() {
   if (prevThreads) nkg.threads = prevThreads;
   if (Array.isArray(prevRelacions) && prevRelacions.length > 0) nkg.relacions = prevRelacions;
   if (Array.isArray(prevMapaAdj) && prevMapaAdj.length > 0) nkg.mapa_adjacencies = prevMapaAdj;
+  if (prevContextCreacio && typeof prevContextCreacio === 'object') nkg.context_creacio = prevContextCreacio;
+  if (Array.isArray(prevTimelineAccions) && prevTimelineAccions.length > 0) nkg.timeline_accions = prevTimelineAccions;
 
   // Poblar personatges des de l'elenc, preservant arc/limit_moral/veu si ja existien
   if (ESTAT._personatgesSeleccionats && ESTAT._personatgesSeleccionats.length > 0) {
@@ -16022,7 +16295,13 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
     if (!Array.isArray(nkg.timeline_accions)) nkg.timeline_accions = [];
     const novesAccions = dades.accions_consumades
       .filter(a => typeof a === 'string' && a.trim().length > 0)
-      .map(a => `C${capitol}E${escena}: ${a.trim()}`);
+      .map(a => normalitzarTimelineAccio({
+        capitol,
+        personatge: '',
+        accio: `E${escena}: ${a.trim()}`,
+        hora_aproximada: '',
+        ubicacio: ''
+      }));
     nkg.timeline_accions.push(...novesAccions);
     // Mantenim les últimes 20 accions per no saturar el context
     if (nkg.timeline_accions.length > 20) {
@@ -16410,7 +16689,7 @@ function buildNkgContextRevisio(idx, esborrany) {
     escaleta: null
   });
 
-  const timelineRecente = (ESTAT._nkg.timeline_accions || []).slice(-10).join('\n');
+  const timelineRecente = (ESTAT._nkg.timeline_accions || []).slice(-10).map(formatTimelineAccio).join('\n');
   const timelinePersonatges = (ESTAT._nkg.timeline_personatges || []).slice(-15).join('\n');
   const objectesRecents = Object.values(ESTAT._nkg.objectes || {})
     .slice(0, 20)
@@ -16800,7 +17079,7 @@ async function extreureDadesRegistreIAvaluarSistema(idx, textCapitol, esRevisioS
       .join('\n');
 
     const timelineNKG = (ESTAT._nkg && Array.isArray(ESTAT._nkg.timeline_accions) && ESTAT._nkg.timeline_accions.length > 0)
-      ? '\nTIMELINE NKG (accions recents en ordre cronològic):\n- ' + ESTAT._nkg.timeline_accions.slice(-12).join('\n- ')
+      ? '\nTIMELINE NKG (accions recents en ordre cronològic):\n- ' + ESTAT._nkg.timeline_accions.slice(-12).map(formatTimelineAccio).join('\n- ')
       : '';
 
     contextRevisio = `
