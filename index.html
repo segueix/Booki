@@ -1427,10 +1427,11 @@
   <div class="loader-wrap" id="loader-10-7"><span class="spinner"></span><span id="loader-10-7-text">Analitzant perspectiva i cronologia…</span></div>
   <div id="perspectiva-crono-result" class="hidden">
     <div id="perspectiva-crono-cos" class="veu-result"></div>
-    <div class="btn-row" style="margin-top:24px;">
-      <button class="btn btn-secondary" onclick="hideCard('fase-10-7');showCard('fase-10-5');">← Tornar a Escaleta</button>
-      <button class="btn btn-primary" id="btn-fase10-8" onclick="iniciarFaseVeuExemples()">Continuar → Veu i Exemples</button>
-    </div>
+  </div>
+  <div class="btn-row" style="margin-top:24px;">
+    <button class="btn btn-secondary" onclick="hideCard('fase-10-7');showCard('fase-10-5');">← Tornar a Escaleta</button>
+    <button class="btn btn-ghost" onclick="iniciarFasePerspectivaCronologia()">🔄 Regenerar POV/Cronologia</button>
+    <button class="btn btn-primary hidden" id="btn-fase10-8" onclick="iniciarFaseVeuExemples()">Continuar → Veu i Exemples</button>
   </div>
 </div>
 
@@ -1446,7 +1447,9 @@
     <div id="nkg-faltants-cos" class="veu-result" style="margin-top:14px;"></div>
     <div class="btn-row" style="margin-top:24px;">
       <button class="btn btn-secondary" onclick="hideCard('fase-10-8');showCard('fase-10-7');">← Tornar a POV/Cronologia</button>
+      <button class="btn btn-ghost" onclick="iniciarFasePerspectivaCronologia()">🧭 Regenerar POV/Cronologia</button>
       <button class="btn btn-ghost" id="btn-autocompletar-nkg" onclick="autocompletarNKGFaltantsManual()">🧩 Completar dades faltants</button>
+      <button class="btn btn-ghost" onclick="descarregarNKGiBiblia()">⬇ NKG + Bíblia</button>
       <button class="btn btn-primary" id="btn-fase11" onclick="iniciarFase11()">Continuar → Escriptura</button>
     </div>
   </div>
@@ -4248,6 +4251,56 @@ function detectarFaltantsNKG(nkg = {}, biblia = {}) {
   return errors;
 }
 
+
+function obtenirAccioGeneracioPerFaltant(faltant = '') {
+  const f = String(faltant || '').toLowerCase();
+  if (f.includes('backstory') || f.includes('graf de relacions')) return { id: 'backstory_relacions', label: 'Generar' };
+  if (f.includes('trets immutables')) return { id: 'trets_immutables', label: 'Generar' };
+  if (f.includes('objectes narratius')) return { id: 'objectes_narratius', label: 'Generar' };
+  if (f.includes('mapa de llocs') || f.includes('regles del món')) return { id: 'llocs_regles', label: 'Generar' };
+  if (f.includes('tipus de perspectiva') || f.includes('pov per capítol') || f.includes('cronologia per capítol')) return { id: 'perspectiva_cronologia', label: 'Generar' };
+  if (f.includes('exemples narratius de veu') || f.includes('vocabulari recurrent')) return { id: 'veu_exemples', label: 'Generar' };
+  return null;
+}
+
+async function generarFaltantNKG(itemId, btnEl = null) {
+  const btn = btnEl || null;
+  if (btn) btn.disabled = true;
+  const nkg = ESTAT._nkg || {};
+  try {
+    if (itemId === 'backstory_relacions') {
+      await assegurarMinimPersonatgesPerRelacions(2, USER_CONFIG);
+      let data = null;
+      try {
+        data = await generarBackstoryIRelacions(USER_CONFIG);
+      } catch (err) {
+        console.warn('Generació LLM relacions fallida; aplicant graf mínim local.', err.message);
+        data = construirBackstoryMinimalSenseRelacions();
+      }
+      if (data && data.backstory_canonic) nkg.macronarrativa.backstory_canonic = data.backstory_canonic;
+      if (Array.isArray(data && data.relacions)) nkg.relacions = data.relacions;
+    } else if (itemId === 'trets_immutables') {
+      await generarCompletarPersonatges(USER_CONFIG);
+    } else if (itemId === 'objectes_narratius') {
+      const d = await generarObjectesNarratius(USER_CONFIG);
+      injectarObjectesNarratius(d);
+    } else if (itemId === 'llocs_regles') {
+      const d = await generarMapaEspacialRegles(USER_CONFIG);
+      injectarMapaEspacialRegles(d);
+    } else if (itemId === 'perspectiva_cronologia') {
+      const d = await generarPerspectivaCronologia(USER_CONFIG);
+      injectarPerspectivaCronologia(d);
+    } else if (itemId === 'veu_exemples') {
+      await generarVeuExemples(USER_CONFIG);
+    }
+    mostrarVeuExemples((ESTAT._nkg && ESTAT._nkg.personatges) || {});
+    mostrarFaltantsNKG();
+  } catch (err) {
+    toast("No s'ha pogut generar aquest element: " + err.message);
+    if (btn) btn.disabled = false;
+  }
+}
+
 function mostrarFaltantsNKG() {
   const cos = document.getElementById('nkg-faltants-cos');
   if (!cos) return;
@@ -4256,7 +4309,14 @@ function mostrarFaltantsNKG() {
     cos.innerHTML = '<div class="veu-card"><div class="veu-card-nom">✅ NKG complet</div><div class="veu-camp-val">Ja tens totes les dades necessàries per començar la novel·la.</div></div>';
     return;
   }
-  cos.innerHTML = `<div class="veu-card"><div class="veu-card-nom">⚠️ Dades pendents al NKG</div><ul style="padding-left:18px;margin-top:8px;">${faltants.map(f => `<li>${escHtml(f)}</li>`).join('')}</ul></div>`;
+  const itemsHtml = faltants.map((f, idx) => {
+    const accio = obtenirAccioGeneracioPerFaltant(f);
+    const boto = accio
+      ? `<button class="btn btn-ghost" style="padding:4px 10px;font-size:.76rem;" onclick="generarFaltantNKG('${accio.id}', this)">${escHtml(accio.label)}</button>`
+      : '';
+    return `<li style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;"><span>${escHtml(f)}</span>${boto}</li>`;
+  }).join('');
+  cos.innerHTML = `<div class="veu-card"><div class="veu-card-nom">⚠️ Dades pendents al NKG</div><ul style="padding-left:18px;margin-top:8px;">${itemsHtml}</ul></div>`;
 }
 
 function mostrarResumNKGiTransicio(nkg, capitolsEscaleta, validacio, modeCreacio) {
@@ -5856,21 +5916,40 @@ ${JSON.stringify(resumInput, null, 2)}`
   throw new Error('No s\'ha pogut generar backstory canònic.');
 }
 
+function construirGrafRelacionsMinim() {
+  const claus = Object.keys((ESTAT._nkg && ESTAT._nkg.personatges) || {});
+  const rels = [];
+  for (let i = 0; i < claus.length; i++) {
+    for (let j = i + 1; j < claus.length; j++) {
+      rels.push({
+        personatge_a: claus[i],
+        personatge_b: claus[j],
+        tipus: 'vincle_indefinit',
+        descripcio: 'Relació canònica inicial pendent de detall fi.',
+        coneixement_mutu: true,
+        evolucio: 'Evoluciona segons els esdeveniments de la novel·la.'
+      });
+    }
+  }
+  return rels;
+}
+
 function construirBackstoryMinimalSenseRelacions() {
   const nkg = ESTAT._nkg || {};
   const synopsis = (nkg.macronarrativa && nkg.macronarrativa.synopsis_core) || 'Situació inicial per desenvolupar';
+  const relacionsMinimes = construirGrafRelacionsMinim();
   return {
     backstory_canonic: {
       fets_previs: [{
         id: 'fet_001',
         descripcio: `Abans de l'inici de la novel·la: ${String(synopsis).slice(0, 180)}`,
-        personatges_implicats: Object.keys(nkg.personatges || {}).slice(0, 1),
+        personatges_implicats: Object.keys(nkg.personatges || {}).slice(0, 2),
         data_aproximada: 'abans del capítol 1',
         impacte_narratiu: 'estableix el punt de partida canònic'
       }],
       cronologia_previa: [{ ordre: 1, descripcio: 'Punt de partida del passat immediat.', any_aproximat: '' }]
     },
-    relacions: []
+    relacions: relacionsMinimes
   };
 }
 
@@ -5896,7 +5975,7 @@ async function iniciarFaseBackstoryRelacions() {
         ESTAT._nkg.relacions = minimal.relacions;
         hideLoader('9-45');
         mostrarBackstoryCanonic(minimal.backstory_canonic, minimal.relacions);
-        toast('Backstory mínim generat sense relacions. Pots continuar i completar relacions més endavant.');
+        toast('Backstory mínim generat amb graf de relacions bàsic. Pots refinar-lo més endavant.');
         return;
       }
     }
@@ -6745,6 +6824,27 @@ function injectarPerspectivaCronologia(data = {}) {
   ESTAT._nkg.timeline_accions = timeline;
 }
 
+function tePerspectivaCronologiaPreparada() {
+  const perspectiva = (((ESTAT._nkg || {}).context_creacio || {}).estil || {}).perspectiva || {};
+  const cronologia = (((ESTAT._nkg || {}).context_creacio || {}).cronologia || {});
+  const timeline = (ESTAT._nkg || {}).timeline_accions || [];
+  return Boolean(
+    perspectiva.tipus &&
+    Array.isArray(perspectiva.pov_per_capitol) && perspectiva.pov_per_capitol.length > 0 &&
+    Array.isArray(cronologia.per_capitol) && cronologia.per_capitol.length > 0 &&
+    Array.isArray(timeline) && timeline.length > 0
+  );
+}
+
+async function assegurarPerspectivaCronologiaPipeline(setStatus = null) {
+  if (tePerspectivaCronologiaPreparada()) return;
+  if (typeof setStatus === 'function') {
+    setStatus("Definint POV, cronologia interna i timeline d'accions...");
+  }
+  const data = await generarPerspectivaCronologia(USER_CONFIG);
+  injectarPerspectivaCronologia(data);
+}
+
 async function iniciarFasePerspectivaCronologia() {
   ESTAT.fase = 10.7;
   updateProgress(10.7);
@@ -6931,6 +7031,7 @@ async function iniciarFaseVeuExemples() {
   const loaderText = document.getElementById('loader-10-8-text');
   const onProgress = msg => { if (loaderText) loaderText.textContent = msg; };
   try {
+    await assegurarPerspectivaCronologiaPipeline(onProgress);
     const data = await generarVeuExemples(USER_CONFIG, onProgress);
     hideLoader('10-8');
     mostrarVeuExemples(ESTAT._nkg.personatges || {});
@@ -6969,81 +7070,99 @@ async function autocompletarNKGFaltantsManual() {
   showLoader('10-8');
   const loaderText = document.getElementById('loader-10-8-text');
   const setStatus = msg => { if (loaderText) loaderText.textContent = msg; };
-  let completats = 0;
+
+  const passos = [
+    {
+      etiqueta: 'Backstory i relacions canòniques',
+      detecta: txt => txt.includes('backstory') || txt.includes('relacions'),
+      executar: async nkg => {
+        try {
+          await assegurarMinimPersonatgesPerRelacions(2, USER_CONFIG);
+          const d = await generarBackstoryIRelacions(USER_CONFIG);
+          if (d && d.backstory_canonic) nkg.macronarrativa.backstory_canonic = d.backstory_canonic;
+          if (Array.isArray(d && d.relacions)) nkg.relacions = d.relacions;
+        } catch (e) {
+          const minimal = construirBackstoryMinimalSenseRelacions();
+          nkg.macronarrativa.backstory_canonic = minimal.backstory_canonic;
+          nkg.relacions = minimal.relacions;
+        }
+      }
+    },
+    {
+      etiqueta: 'Trets immutables dels personatges',
+      detecta: txt => txt.includes('trets immutables'),
+      executar: async () => {
+        const onProgressIntern = msg => setStatus(`• ${msg}`);
+        await generarCompletarPersonatges(USER_CONFIG, onProgressIntern);
+      }
+    },
+    {
+      etiqueta: 'Objectes narratius',
+      detecta: txt => txt.includes('objectes narratius'),
+      executar: async () => {
+        const d = await generarObjectesNarratius(USER_CONFIG);
+        injectarObjectesNarratius(d);
+      }
+    },
+    {
+      etiqueta: 'Mapa espacial i regles del món',
+      detecta: txt => txt.includes('mapa de llocs') || txt.includes('regles del món'),
+      executar: async () => {
+        const d = await generarMapaEspacialRegles(USER_CONFIG);
+        injectarMapaEspacialRegles(d);
+      }
+    },
+    {
+      etiqueta: 'Perspectiva i cronologia per capítol',
+      detecta: txt => txt.includes('pov per capítol') || txt.includes('cronologia') || txt.includes('tipus de perspectiva'),
+      executar: async () => {
+        const d = await generarPerspectivaCronologia(USER_CONFIG);
+        injectarPerspectivaCronologia(d);
+      }
+    },
+    {
+      etiqueta: 'Veu i exemples narratius',
+      detecta: txt => txt.includes('exemples narratius de veu') || txt.includes('vocabulari recurrent'),
+      executar: async () => {
+        const onProgressIntern = msg => setStatus(`• ${msg}`);
+        await generarVeuExemples(USER_CONFIG, onProgressIntern);
+      }
+    }
+  ];
 
   try {
     const nkg = ESTAT._nkg || {};
     const biblia = ESTAT.bibliaNarrativa || {};
-    const faltantsLlista = detectarFaltantsNKG(nkg, biblia);
-    const faltants = faltantsLlista.join(' | ').toLowerCase();
-    const totalFases = [
-      faltants.includes('backstory') || faltants.includes('relacions'),
-      faltants.includes('trets immutables'),
-      faltants.includes('objectes narratius'),
-      faltants.includes('mapa de llocs') || faltants.includes('regles del món'),
-      faltants.includes('pov per capítol') || faltants.includes('cronologia') || faltants.includes('tipus de perspectiva'),
-      faltants.includes('exemples narratius de veu') || faltants.includes('vocabulari recurrent')
-    ].filter(Boolean).length;
+    let intents = 0;
 
-    if (faltants.includes('backstory') || faltants.includes('relacions')) {
-      completats++;
-      setStatus(`[${completats}/${totalFases}] Generant backstory i relacions canòniques...`);
-      try {
-        await assegurarMinimPersonatgesPerRelacions(2, USER_CONFIG);
-        const d = await generarBackstoryIRelacions(USER_CONFIG);
-        if (d && d.backstory_canonic) nkg.macronarrativa.backstory_canonic = d.backstory_canonic;
-        if (Array.isArray(d && d.relacions)) nkg.relacions = d.relacions;
-      } catch (e) {
-        const minimal = construirBackstoryMinimalSenseRelacions();
-        nkg.macronarrativa.backstory_canonic = minimal.backstory_canonic;
-        nkg.relacions = minimal.relacions;
+    while (intents < 3) {
+      intents++;
+      const faltantsLlista = detectarFaltantsNKG(nkg, biblia);
+      const faltantsText = faltantsLlista.join(' | ').toLowerCase();
+      const pendentsAra = passos.filter(p => p.detecta(faltantsText));
+      if (pendentsAra.length === 0) break;
+
+      const totalPassos = pendentsAra.length;
+      for (let i = 0; i < pendentsAra.length; i++) {
+        const pas = pendentsAra[i];
+        setStatus(`[${i + 1}/${totalPassos}] ${pas.etiqueta}...`);
+        await pas.executar(nkg);
+        mostrarFaltantsNKG();
       }
-      mostrarFaltantsNKG();
-    }
-    if (faltants.includes('trets immutables')) {
-      completats++;
-      setStatus(`[${completats}/${totalFases}] Completant trets immutables dels personatges...`);
-      const onProgressIntern = msg => setStatus(`[${completats}/${totalFases}] ${msg}`);
-      await generarCompletarPersonatges(USER_CONFIG, onProgressIntern);
-      mostrarFaltantsNKG();
-    }
-    if (faltants.includes('objectes narratius')) {
-      completats++;
-      setStatus(`[${completats}/${totalFases}] Generant objectes narratius...`);
-      const d = await generarObjectesNarratius(USER_CONFIG);
-      injectarObjectesNarratius(d);
-      mostrarFaltantsNKG();
-    }
-    if (faltants.includes('mapa de llocs') || faltants.includes('regles del món')) {
-      completats++;
-      setStatus(`[${completats}/${totalFases}] Generant mapa espacial i regles del món...`);
-      const d = await generarMapaEspacialRegles(USER_CONFIG);
-      injectarMapaEspacialRegles(d);
-      mostrarFaltantsNKG();
-    }
-    if (faltants.includes('pov per capítol') || faltants.includes('cronologia') || faltants.includes('tipus de perspectiva')) {
-      completats++;
-      setStatus(`[${completats}/${totalFases}] Generant perspectiva i cronologia...`);
-      const d = await generarPerspectivaCronologia(USER_CONFIG);
-      injectarPerspectivaCronologia(d);
-      mostrarFaltantsNKG();
-    }
-    if (faltants.includes('exemples narratius de veu') || faltants.includes('vocabulari recurrent')) {
-      completats++;
-      setStatus(`[${completats}/${totalFases}] Completant veu i exemples dels personatges...`);
-      const onProgressIntern = msg => setStatus(`[${completats}/${totalFases}] ${msg}`);
-      await generarVeuExemples(USER_CONFIG, onProgressIntern);
-      mostrarFaltantsNKG();
+
+      const restantsDespresPassada = detectarFaltantsNKG(nkg, biblia);
+      if (restantsDespresPassada.length === 0) break;
     }
 
-    mostrarVeuExemples(ESTAT._nkg.personatges || {});
+    setStatus('Preparant paquet final NKG + Bíblia...');
     mostrarFaltantsNKG();
+    mostrarVeuExemples(ESTAT._nkg.personatges || {});
 
     const faltantsRestants = detectarFaltantsNKG(nkg, biblia);
     if (faltantsRestants.length > 0) {
       toast(`Autocompleció finalitzada amb ${faltantsRestants.length} element(s) encara pendents.`);
     } else {
-      toast('Autocompleció NKG finalitzada. NKG complet!');
+      toast('Autocompleció NKG finalitzada. NKG i Bíblia preparats!');
     }
   } catch (err) {
     mostrarFaltantsNKG();
@@ -7448,7 +7567,7 @@ async function iniciarFase11() {
 
   const chkNKG = validarNKGPreparatPerCapitol1(ESTAT._nkg || {}, ESTAT.bibliaNarrativa || {});
   if (!chkNKG.ok) {
-    toast('Falten dades al NKG. Et porto a la fase de compleció perquè puguis autogenerar-les i continuar manualment.');
+    toast('Falten dades al NKG. Et porto a la fase de compleció perquè puguis autogenerar-les o descarregar NKG + Bíblia.');
     console.error('NKG incomplet abans del capítol 1:', chkNKG.errors);
     ESTAT.fase = 10.8;
     updateProgress(10.8);
@@ -7590,23 +7709,30 @@ function selfCheckLockingInvariants() {
   try {
     // Evitem inspeccionar tot l'outerHTML (pot donar falsos positius per scripts duplicats del navegador).
     const _ejiFn = typeof executarJutgeInterval !== 'undefined' ? executarJutgeInterval : undefined;
-    console.assert(typeof _ejiFn === 'function', 'Invariant: executarJutgeInterval ha d\'estar definit');
+    if (typeof _ejiFn !== 'function') {
+      console.warn('Invariant (deferit): executarJutgeInterval encara no està disponible en aquest punt del carregat.');
+      return;
+    }
     const fnSrc = String(_ejiFn || '');
-    console.assert(fnSrc.includes('const MAX_ITER = 1;'), 'Invariant: MAX_ITER=1 requerit al jutge');
+    if (!fnSrc.includes('const MAX_ITER = 1;')) {
+      console.warn('Invariant: MAX_ITER=1 requerit al jutge');
+    }
 
     const src = String(document.documentElement && document.documentElement.outerHTML || '');
     const jiStart = src.indexOf('function jutgeIntervalInconsistencies');
     if (jiStart >= 0) {
       const jiEnd = src.indexOf('function aplicarCorreccionsJutge', jiStart);
       const jiSrc = jiEnd > jiStart ? src.slice(jiStart, jiEnd) : src.slice(jiStart, jiStart + 8000);
-      console.assert(!/cos íntegre/i.test(jiSrc), "Invariant: jutgeIntervalInconsistencies no ha d'incloure cos íntegre");
+      if (/cos íntegre/i.test(jiSrc)) {
+        console.warn("Invariant: jutgeIntervalInconsistencies no ha d'incloure cos íntegre");
+      }
     }
   } catch (err) {
     console.warn('selfCheckLockingInvariants:', err.message);
   }
 }
 
-selfCheckLockingInvariants();
+setTimeout(selfCheckLockingInvariants, 0);
 
 function obtenirBlockCanon58() {
   ESTAT._blockCanons = (ESTAT._blockCanons && typeof ESTAT._blockCanons === 'object') ? ESTAT._blockCanons : {};
@@ -8845,6 +8971,9 @@ function fusionarCampPersonatgeValor(actual, nou) {
 }
 
 function validarImmutablesPerExportCapitol1(nkg, capitolActual) {
+  // Abans de la fase d'escriptura (fase < 11), permetem exportar NKG+Bíblia encara que
+  // faltin trets immutables complets: és precisament un punt de control per revisar-los.
+  if (Number(ESTAT && ESTAT.fase || 0) < 11) return;
   if ((capitolActual || 1) !== 1) return;
   const personatges = Object.values((nkg && nkg.personatges) || {});
   const camps = ['edat_aproximada', 'genere', 'rol_narratiu', 'relacio_protagonista', 'aspecte_fisic', 'ocupacio', 'tret_definitori'];

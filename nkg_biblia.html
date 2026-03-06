@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="ca">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Booki · NKG + Bíblia (Fase 0)</title>
+  <style>
+    :root {
+      --bg:#0f1115; --surface:#151a24; --surface2:#1c2330; --text:#e8edf7; --text2:#9aa4b6;
+      --border:#2b3548; --accent:#7c6cff; --ok:#2eb67d; --warn:#f59e0b; --error:#ef4444;
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:Inter,system-ui,Arial,sans-serif; }
+    .app { max-width:1100px; margin:0 auto; padding:20px; }
+    .title { margin:0 0 8px; }
+    .subtitle { margin:0 0 16px; color:var(--text2); }
+    .step-row { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 14px; }
+    .pill { border:1px solid var(--border); background:var(--surface2); color:var(--text2); padding:5px 9px; border-radius:999px; font-size:.78rem; }
+    .pill.active { border-color:var(--accent); color:#fff; background:#27204f; }
+    .card { display:none; border:1px solid var(--border); border-radius:12px; background:var(--surface); padding:16px; margin-bottom:12px; }
+    .card.active { display:block; }
+    .card h2 { margin:0 0 8px; font-size:1.05rem; }
+    .card p { margin:0 0 10px; color:var(--text2); }
+    .btn-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    .btn { border:1px solid var(--border); border-radius:8px; background:var(--surface2); color:var(--text); padding:8px 12px; cursor:pointer; }
+    .btn:hover { border-color:var(--accent); }
+    .btn-primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+    .loader-wrap { display:none; align-items:center; gap:8px; margin:8px 0; color:var(--text2); font-size:.9rem; }
+    .spinner { width:14px; height:14px; border:2px solid #51607a; border-top-color:#fff; border-radius:50%; animation:spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .toast-wrap { position:fixed; right:12px; bottom:12px; z-index:9999; display:flex; flex-direction:column; gap:8px; }
+    .toast { background:#101520; border:1px solid var(--border); border-left:4px solid var(--accent); color:#dbe6ff; padding:10px 12px; border-radius:8px; min-width:260px; max-width:440px; font-size:.9rem; }
+    .toast.ok { border-left-color:var(--ok); }
+    .toast.warn { border-left-color:var(--warn); }
+    .toast.error { border-left-color:var(--error); }
+    .small { font-size:.82rem; color:var(--text2); }
+    .field-label { display:block; margin:8px 0 4px; font-size:.86rem; color:var(--text2); }
+    .input, .select { width:100%; max-width:520px; background:#0f1520; color:var(--text); border:1px solid var(--border); border-radius:8px; padding:8px 10px; }
+    .hidden { display:none !important; }
+    code { background:#0c111a; border:1px solid var(--border); padding:1px 5px; border-radius:6px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1 class="title">📚 Booki · NKG + Bíblia</h1>
+    <p class="subtitle">Fase 0+1 implementades: esquelet navegable 0 → 10.8 + configuració API amb gating d'autor.</p>
+
+    <div class="step-row" id="fase-pills"></div>
+
+    <section class="card active" id="fase-0">
+      <h2>Fase 0 — Configuració mínima</h2>
+      <p>Aquesta versió no inclou redacció de capítols. Només pipeline fins NKG + Bíblia.</p>
+      <div class="small">Regla UX futura: el selector d'autor només després de confirmar API.</div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="anarAFase('fase-1')">Continuar</button>
+      </div>
+    </section>
+
+    <section class="card" id="fase-1">
+      <h2>Fase 1 — Configuració API i gating d'autor</h2>
+      <p>Confirma la clau API. El selector d'autor només apareix després d'aquesta confirmació.</p>
+
+      <label class="field-label" for="config-provider">Proveïdor</label>
+      <select class="select" id="config-provider" onchange="actualitzarConfigProvider()">
+        <option value="anthropic">Anthropic</option>
+        <option value="openai">OpenAI</option>
+        <option value="gemini">Gemini</option>
+      </select>
+
+      <label class="field-label" id="api-key-label" for="api-key-input">Clau API</label>
+      <input class="input" id="api-key-input" type="password" placeholder="Enganxa aquí la clau API" />
+
+      <div class="btn-row">
+        <button class="btn" onclick="guardarClausAPI()">Confirmar clau API</button>
+      </div>
+
+      <div id="autor-wrap" class="hidden" style="margin-top:10px;">
+        <label class="field-label" for="autor-select">Autor de referència</label>
+        <select class="select" id="autor-select">
+          <option value="Stieg Larsson">Stieg Larsson</option>
+          <option value="Mercè Rodoreda">Mercè Rodoreda</option>
+          <option value="Ursula K. Le Guin">Ursula K. Le Guin</option>
+          <option value="Haruki Murakami">Haruki Murakami</option>
+        </select>
+        <div class="small">Aquest camp només es mostra després de confirmar API (regla UX).</div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn" onclick="anarAFase('fase-0')">Enrere</button>
+        <button class="btn btn-primary" onclick="anarAFase('fase-2')">Continuar</button>
+      </div>
+    </section>
+    <section class="card" id="fase-2"><h2>Fase 2 — Personatges/Món</h2><p>Placeholder de migració.</p><div class="btn-row"><button class="btn" onclick="anarAFase('fase-1')">Enrere</button><button class="btn btn-primary" onclick="anarAFase('fase-3')">Continuar</button></div></section>
+    <section class="card" id="fase-3"><h2>Fase 3 — Trames</h2><p>Placeholder de migració.</p><div class="btn-row"><button class="btn" onclick="anarAFase('fase-2')">Enrere</button><button class="btn btn-primary" onclick="anarAFase('fase-4')">Continuar</button></div></section>
+    <section class="card" id="fase-4"><h2>Fase 4 — Estructura</h2><p>Placeholder de migració.</p><div class="btn-row"><button class="btn" onclick="anarAFase('fase-3')">Enrere</button><button class="btn btn-primary" onclick="anarAFase('fase-5')">Continuar</button></div></section>
+    <section class="card" id="fase-5"><h2>Fase 5 — Escaleta</h2><p>Placeholder de migració.</p><div class="btn-row"><button class="btn" onclick="anarAFase('fase-4')">Enrere</button><button class="btn btn-primary" onclick="anarAFase('fase-6')">Continuar</button></div></section>
+    <section class="card" id="fase-6"><h2>Fase 6 — Backstory/Relacions</h2><p>Placeholder de migració.</p><div class="btn-row"><button class="btn" onclick="anarAFase('fase-5')">Enrere</button><button class="btn btn-primary" onclick="anarAFase('fase-7')">Continuar</button></div></section>
+    <section class="card" id="fase-7"><h2>Fase 7 — Objectes/Llocs/Regles</h2><p>Placeholder de migració.</p><div class="btn-row"><button class="btn" onclick="anarAFase('fase-6')">Enrere</button><button class="btn btn-primary" onclick="anarAFase('fase-8')">Continuar</button></div></section>
+    <section class="card" id="fase-8"><h2>Fase 8 — Perspectiva/Cronologia</h2><p>Placeholder de migració.</p><div class="btn-row"><button class="btn" onclick="anarAFase('fase-7')">Enrere</button><button class="btn btn-primary" onclick="anarAFase('fase-9')">Continuar</button></div></section>
+    <section class="card" id="fase-9"><h2>Fase 9 — Validació NKG</h2><p>Placeholder de migració.</p><div class="btn-row"><button class="btn" onclick="anarAFase('fase-8')">Enrere</button><button class="btn btn-primary" onclick="anarAFase('fase-10-8')">Continuar</button></div></section>
+
+    <section class="card" id="fase-10-8">
+      <h2>Fase 10.8 — NKG + Bíblia llestos</h2>
+      <p>Final del flux slim. Aquí quedarà l'exportació NKG + Bíblia quan es migri la lògica.</p>
+      <div class="loader-wrap" id="loader-10-8"><span class="spinner"></span><span id="loader-10-8-text">Preparant...</span></div>
+      <div class="btn-row">
+        <button class="btn" onclick="showLoader('10-8'); setTimeout(()=>{ hideLoader('10-8'); toast('Loader de prova OK', 'ok'); }, 700)">Provar loader</button>
+        <button class="btn" onclick="toast('Escapat HTML: ' + escHtml('<script>alert(1)</script>'))">Provar escHtml</button>
+        <button class="btn" onclick="toast('Navegació i estat mínim operatius', 'ok')">Provar toast</button>
+      </div>
+    </section>
+
+    <p class="small">Utilitats incloses en Fase 0+1: <code>escHtml</code>, <code>toast</code>, <code>showLoader/hideLoader</code>, <code>showCard/hideCard</code>, <code>actualitzarConfigProvider</code>, <code>guardarClausAPI</code>, estat <code>ESTAT</code>/<code>USER_CONFIG</code> mínim.</p>
+  </div>
+
+  <div class="toast-wrap" id="toast-wrap"></div>
+
+  <script>
+    // Estat mínim per al flux NKG + Bíblia
+    const USER_CONFIG = {
+      provider: 'anthropic',
+      apiKey: '',
+      fluxAutomatic: false
+    };
+
+    const ESTAT = {
+      fase: 0,
+      _apiConfirmada: false,
+      _nkg: {
+        macronarrativa: {},
+        personatges: {},
+        relacions: [],
+        objectes: {},
+        llocs: {},
+        context_creacio: { estil: { perspectiva: {} }, cronologia: { per_capitol: [] } }
+      },
+      autorRef: '',
+      bibliaNarrativa: {
+        regles_mon: [],
+        llocs_importants: [],
+        objectes_clau: [],
+        fets_canonics: [],
+        fitxes_personatges: []
+      }
+    };
+
+    const FASES = ['fase-0','fase-1','fase-2','fase-3','fase-4','fase-5','fase-6','fase-7','fase-8','fase-9','fase-10-8'];
+
+    function escHtml(txt) {
+      return String(txt ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    function toast(msg, tipus = '') {
+      const wrap = document.getElementById('toast-wrap');
+      if (!wrap) return;
+      const el = document.createElement('div');
+      el.className = `toast ${tipus || ''}`.trim();
+      el.textContent = String(msg || '');
+      wrap.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transition = 'opacity .25s ease';
+        setTimeout(() => el.remove(), 260);
+      }, 2800);
+    }
+
+    function showLoader(sufix) {
+      const el = document.getElementById(`loader-${sufix}`);
+      if (el) el.style.display = 'inline-flex';
+    }
+
+    function hideLoader(sufix) {
+      const el = document.getElementById(`loader-${sufix}`);
+      if (el) el.style.display = 'none';
+    }
+
+
+    function actualitzarConfigProvider() {
+      const provider = document.getElementById('config-provider')?.value || 'anthropic';
+      USER_CONFIG.provider = provider;
+      const lbl = document.getElementById('api-key-label');
+      if (lbl) lbl.textContent = `Clau API (${provider})`;
+    }
+
+    function guardarClausAPI() {
+      const apiKey = (document.getElementById('api-key-input')?.value || '').trim();
+      if (!apiKey) {
+        toast('Introdueix una clau API abans de confirmar.', 'warn');
+        return;
+      }
+      USER_CONFIG.apiKey = apiKey;
+      ESTAT._apiConfirmada = true;
+      const autorWrap = document.getElementById('autor-wrap');
+      if (autorWrap) autorWrap.classList.remove('hidden');
+      const autorSelect = document.getElementById('autor-select');
+      ESTAT.autorRef = autorSelect ? autorSelect.value : '';
+      toast("Clau API confirmada. Selector d'autor activat.", "ok");
+    }
+
+    function showCard(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('active');
+      pintarPills(id);
+    }
+
+    function hideCard(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('active');
+    }
+
+    function anarAFase(id) {
+      FASES.forEach(hideCard);
+      showCard(id);
+      ESTAT.fase = id;
+    }
+
+    function pintarPills(activa) {
+      const wrap = document.getElementById('fase-pills');
+      if (!wrap) return;
+      wrap.innerHTML = FASES.map(f => {
+        const label = f.replace('fase-', 'Fase ');
+        const cls = `pill ${f === activa ? 'active' : ''}`;
+        return `<button class="${cls}" onclick="anarAFase('${f}')">${escHtml(label)}</button>`;
+      }).join('');
+    }
+
+    // Check de càrrega en fred
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        pintarPills('fase-0');
+        actualitzarConfigProvider();
+        const autorWrap = document.getElementById('autor-wrap');
+        if (autorWrap) autorWrap.classList.add('hidden');
+        anarAFase('fase-0');
+        console.log('[nkg_biblia] cold-start OK');
+      } catch (err) {
+        console.error('[nkg_biblia] cold-start ERROR:', err.message);
+      }
+    });
+  </script>
+</body>
+</html>
