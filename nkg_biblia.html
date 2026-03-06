@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ca">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Booki · Versió NKG + Bíblia</title>
+  <style>
+    :root {
+      --bg:#0f1115;--card:#161a22;--muted:#9aa3b2;--text:#e8edf7;--border:#293142;
+      --accent:#7c6cff;--ok:#2eb67d;--warn:#f59e0b;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,Arial,sans-serif;line-height:1.45}
+    .wrap{max-width:1100px;margin:0 auto;padding:24px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:14px}
+    h1{margin:0 0 6px 0;font-size:1.5rem}
+    h2{margin:0 0 8px 0;font-size:1.05rem}
+    p,li{color:var(--muted)}
+    code{background:#0d1017;border:1px solid var(--border);padding:2px 6px;border-radius:6px;color:#d6deff}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    .btn{border:1px solid var(--border);background:#1c2230;color:var(--text);padding:8px 12px;border-radius:8px;cursor:pointer}
+    .btn:hover{border-color:var(--accent)}
+    .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+    .tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.75rem;border:1px solid var(--border);color:var(--muted)}
+    .ok{color:var(--ok)} .warn{color:var(--warn)}
+    pre{white-space:pre-wrap;background:#0d1017;border:1px solid var(--border);border-radius:10px;padding:12px;color:#c6d0e2;overflow:auto}
+    .phase-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:8px}
+    .phase{border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:#121723;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>📚 Booki — Versió NKG + Bíblia (slim)</h1>
+      <p>Aquest fitxer és la base per tenir una versió separada que <strong>només arriba fins la creació del NKG i la Bíblia</strong>, sense tota la part de redacció de capítols i revisió final.</p>
+      <div class="row">
+        <span class="tag">Objectiu: reduir codi sobrant</span>
+        <span class="tag">Abast: fase 0 → fase 10.8</span>
+        <span class="tag">Sortida final: NKG + Bíblia exportables</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>✅ Definició d'abast funcional (versió slim)</h2>
+      <div class="phase-grid">
+        <div class="phase">Fase 0 · Configuració</div>
+        <div class="phase">Fases 1–9 · Base narrativa</div>
+        <div class="phase">Fase 10 · Estructura</div>
+        <div class="phase">Fase 10.5 · Escaleta</div>
+        <div class="phase">Fase 10.7 · POV/Cronologia</div>
+        <div class="phase">Fase 10.8 · Veu + compleció NKG</div>
+      </div>
+      <p class="ok"><strong>Inclòs:</strong> generar, completar i validar NKG + Bíblia.</p>
+      <p class="warn"><strong>Exclòs:</strong> fase 11+, redacció de capítols, jutge d’interval, reescriptures i flux de manuscrit.</p>
+    </div>
+
+    <div class="card">
+      <h2>🧩 Protocol de transferència de codi funcional</h2>
+      <ol>
+        <li>Copiar a aquest fitxer només funcions que passin verificació mínima.</li>
+        <li>Mantenir cada mòdul amb responsabilitat única.</li>
+        <li>Eliminar dependències de fases 11+ abans de donar per bo un trasllat.</li>
+        <li>Validar amb <code>node --check</code> i prova manual del flux fins exportar NKG+Bíblia.</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>🛠️ Zona de migració (plantilla)</h2>
+      <p>Espai preparat per anar movent-hi les funcions estables de <code>index.html</code>. Aquest fitxer queda com a base de treball independent del monòlit.</p>
+      <pre id="log-migracio">[Inicialitzat] Fitxer nkg_biblia.html creat.
+[Següent pas] Transferir bloc de CONFIG + ESTAT + utilitats pures.
+[Següent pas] Transferir pipeline fins Fase 10.8 i exportació NKG+Bíblia.</pre>
+      <div class="row">
+        <button class="btn" onclick="afegirLog('Checklist: copiar utilitats de normalització/validació')">Afegir checkpoint</button>
+        <button class="btn" onclick="afegirLog('Checklist: portar validarNKGPreparatPerCapitol1 + detectarFaltantsNKG')">Checkpoint NKG</button>
+        <button class="btn btn-primary" onclick="window.location.href='index.html'">Obrir app completa</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function afegirLog(msg) {
+      const el = document.getElementById('log-migracio');
+      const ts = new Date().toLocaleString('ca-ES');
+      el.textContent += `\n[${ts}] ${msg}`;
+    }
+  </script>
+</body>
+</html>
