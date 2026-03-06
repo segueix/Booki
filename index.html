@@ -1449,6 +1449,7 @@
       <button class="btn btn-secondary" onclick="hideCard('fase-10-8');showCard('fase-10-7');">← Tornar a POV/Cronologia</button>
       <button class="btn btn-ghost" onclick="iniciarFasePerspectivaCronologia()">🧭 Regenerar POV/Cronologia</button>
       <button class="btn btn-ghost" id="btn-autocompletar-nkg" onclick="autocompletarNKGFaltantsManual()">🧩 Completar dades faltants</button>
+      <button class="btn btn-ghost" onclick="descarregarNKGiBiblia()">⬇ NKG + Bíblia</button>
       <button class="btn btn-primary" id="btn-fase11" onclick="iniciarFase11()">Continuar → Escriptura</button>
     </div>
   </div>
@@ -7566,7 +7567,7 @@ async function iniciarFase11() {
 
   const chkNKG = validarNKGPreparatPerCapitol1(ESTAT._nkg || {}, ESTAT.bibliaNarrativa || {});
   if (!chkNKG.ok) {
-    toast('Falten dades al NKG. Et porto a la fase de compleció perquè puguis autogenerar-les i continuar manualment.');
+    toast('Falten dades al NKG. Et porto a la fase de compleció perquè puguis autogenerar-les o descarregar NKG + Bíblia.');
     console.error('NKG incomplet abans del capítol 1:', chkNKG.errors);
     ESTAT.fase = 10.8;
     updateProgress(10.8);
