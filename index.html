@@ -783,6 +783,8 @@
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="9.45">Backstory</div>
     <div class="step-arrow">›</div>
+    <div class="step-pill" data-step="9.46">Completar personatges</div>
+    <div class="step-arrow">›</div>
     <div class="step-pill" data-step="9.5">Trames</div>
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="10">Estructura</div>
@@ -1289,6 +1291,24 @@
     <div id="backstory-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
       <button class="btn btn-secondary" onclick="hideCard('fase-9-45');showCard('fase-9-4');">← Tornar a Relacions</button>
+      <button class="btn btn-primary" onclick="iniciarFaseCompletarPersonatges()">🧬 Completar personatges</button>
+    </div>
+  </div>
+</div>
+
+<!-- FASE 9.46: Completar Personatges -->
+<div class="card hidden" id="fase-9-46">
+  <h2><span class="icon">🧬</span> Completar Personatges</h2>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Omplim trets immutables i estats inicials perquè les fitxes quedin completes abans de trames.</p>
+  <div class="loader-wrap" id="loader-9-46">
+    <div class="spinner"></div>
+    <span id="loader-9-46-text">Completant fitxes de personatge...</span>
+  </div>
+
+  <div id="completar-personatges-result" class="hidden">
+    <div id="completar-personatges-cos" class="veu-result"></div>
+    <div class="btn-row" style="margin-top:24px;">
+      <button class="btn btn-secondary" onclick="hideCard('fase-9-46');showCard('fase-9-45');">← Tornar a Backstory</button>
       <button class="btn btn-primary" onclick="iniciarFaseTrames()">🕸️ Dissenyar Trames Opus</button>
     </div>
   </div>
@@ -2051,6 +2071,7 @@ function restaurarInterficieDesDeEstat() {
   if (fase >= 9.3 && ESTAT._perfilsPersonatges && Object.keys(ESTAT._perfilsPersonatges).length > 0) mostrarFeridaArc({ personatges: Object.values(ESTAT._perfilsPersonatges) });
   if (fase >= 9.4 && ESTAT._matriuRelacional && ESTAT._matriuRelacional.length > 0) mostrarMatriuRelacional(ESTAT._matriuRelacional);
   if (fase >= 9.45 && ESTAT._nkg && ESTAT._nkg.macronarrativa && ESTAT._nkg.macronarrativa.backstory_canonic) mostrarBackstoryCanonic(ESTAT._nkg.macronarrativa.backstory_canonic, ESTAT._nkg.relacions || []);
+  if (fase >= 9.46 && ESTAT._nkg && ESTAT._nkg.personatges && Object.keys(ESTAT._nkg.personatges).length > 0) mostrarCompletarPersonatges(Object.assign({}, ESTAT._nkg.personatges));
   if (fase >= 10 && ESTAT._estructuraCapitols.length > 0) mostrarEstructura('Reconstruït des de memòria (dades en JSON actiu)');
   if (fase >= 10.5 && ESTAT._escaletes.length > 0) {
     mostrarEscaleta(ESTAT._escaletes);
@@ -3029,7 +3050,7 @@ function _confirmarPersonatgesNouSilent() {
   personatgesArr.forEach(p => {
     const clau = nkgNormalitzarNom(p.nom);
     const nomNet = p.nom.replace(/\s*\([^)]*\)/g, '').replace(/["'"]/g, '').trim();
-    if (clau) nkg.personatges[clau] = { nom: nomNet, estat_fisic:'', estat_emocional:'neutre', arc: p.arc, limit_moral: p.limit_moral, veu: p.veu, objectes_inventari:[], objectes_descartats:[], ubicacio:'', objectius:[], secrets:[], viu:true, primera_aparicio:0, trets_immutables:null };
+    if (clau) nkg.personatges[clau] = { nom: nomNet, estat_fisic: inferirEstatFisicInicialDesDeArc(p.arc, p.limit_moral), estat_emocional: inferirEstatEmocionalInicialDesDeArc(p.arc), arc: p.arc, limit_moral: p.limit_moral, veu: p.veu, objectes_inventari:[], objectes_descartats:[], ubicacio:'', objectius:[], secrets:[], viu:true, primera_aparicio:0, trets_immutables:null };
   });
   ESTAT._personatgesSeleccionats = personatgesArr.map(p => p.nom);
   ESTAT._arcsResumitNou = personatgesArr.map(p => `${p.nom}: ${p.arc.inici_emocional||'?'} → ${p.arc.final_emocional||'?'}`).join('; ');
@@ -3625,8 +3646,8 @@ async function confirmarPersonatgesNou() {
     if (clau) {
       nkg.personatges[clau] = {
         nom: p.nom,
-        estat_fisic: '',
-        estat_emocional: 'neutre',
+        estat_fisic: inferirEstatFisicInicialDesDeArc(p.arc, p.limit_moral),
+        estat_emocional: inferirEstatEmocionalInicialDesDeArc(p.arc),
         arc: p.arc,
         limit_moral: p.limit_moral,
         veu: p.veu,
@@ -5618,6 +5639,145 @@ async function iniciarFaseBackstoryRelacions() {
   }
 }
 
+function mostrarCompletarPersonatges(personatgesObj = {}) {
+  const cos = document.getElementById('completar-personatges-cos');
+  if (!cos) return;
+  const items = Object.entries(personatgesObj || {});
+  cos.innerHTML = items.map(([clau, p]) => {
+    const t = p.trets_immutables || {};
+    return `<div class="veu-card">
+      <div class="veu-card-nom">👤 ${escHtml(p.nom || clau)} <span style="font-size:.78rem;color:var(--text2)">(${escHtml(clau)})</span></div>
+      <div class="veu-card-camps">
+        <div><div class="veu-camp-label">Estat emocional inicial</div><div class="veu-camp-val">${escHtml(String(p.estat_emocional || ''))}</div></div>
+        <div><div class="veu-camp-label">Estat físic inicial</div><div class="veu-camp-val">${escHtml(String(p.estat_fisic || ''))}</div></div>
+        <div><div class="veu-camp-label">Ocupació</div><div class="veu-camp-val">${escHtml(String(t.ocupacio || ''))}</div></div>
+        <div><div class="veu-camp-label">Tret definitori</div><div class="veu-camp-val">${escHtml(String(t.tret_definitori || ''))}</div></div>
+      </div>
+    </div>`;
+  }).join('\n');
+  document.getElementById('completar-personatges-result').classList.remove('hidden');
+}
+
+function mergeCompletarPersonatgesNKG(personatgesCompletats = {}) {
+  const nkg = ESTAT._nkg || {};
+  if (!nkg.personatges || typeof nkg.personatges !== 'object') return;
+  Object.entries(personatgesCompletats || {}).forEach(([clau, data]) => {
+    const p = nkg.personatges[clau];
+    if (!p || !data || typeof data !== 'object') return;
+    const t = p.trets_immutables && typeof p.trets_immutables === 'object' ? p.trets_immutables : {};
+    const tn = data.trets_immutables || {};
+    p.trets_immutables = {
+      edat_aproximada: fusionarCampPersonatgeValor(t.edat_aproximada, tn.edat_aproximada) || t.edat_aproximada || 'No determinat',
+      genere: fusionarCampPersonatgeValor(t.genere, tn.genere) || t.genere || 'No determinat',
+      rol_narratiu: fusionarCampPersonatgeValor(t.rol_narratiu, tn.rol_narratiu) || t.rol_narratiu || 'No determinat',
+      relacio_protagonista: fusionarCampPersonatgeValor(t.relacio_protagonista, tn.relacio_protagonista) || t.relacio_protagonista || 'No determinada',
+      aspecte_fisic: fusionarCampPersonatgeValor(t.aspecte_fisic, tn.aspecte_fisic) || t.aspecte_fisic || 'No determinat',
+      ocupacio: fusionarCampPersonatgeValor(t.ocupacio, tn.ocupacio) || t.ocupacio || 'No determinat',
+      tret_definitori: fusionarCampPersonatgeValor(t.tret_definitori, tn.tret_definitori) || t.tret_definitori || 'No determinat'
+    };
+
+    const emoInicial = String(data.estat_emocional_inicial || '').trim();
+    const fisicInicial = String(data.estat_fisic_inicial || '').trim();
+    if (!teValorPlaceholder(emoInicial)) p.estat_emocional = emoInicial;
+    if (!teValorPlaceholder(fisicInicial)) p.estat_fisic = fisicInicial;
+    if (teValorPlaceholder(p.estat_emocional)) p.estat_emocional = inferirEstatEmocionalInicialDesDeArc(p.arc || {});
+    if (teValorPlaceholder(p.estat_fisic) || String(p.estat_fisic || '').trim().toLowerCase() === 'neutre') {
+      p.estat_fisic = inferirEstatFisicInicialDesDeArc(p.arc || {}, p.limit_moral || '');
+    }
+  });
+}
+
+async function generarCompletarPersonatges(userConfig) {
+  const nkg = ESTAT._nkg || {};
+  const personatges = nkg.personatges || {};
+  const resum = {
+    synopsis_core: nkg.macronarrativa?.synopsis_core || '',
+    backstory_canonic: nkg.macronarrativa?.backstory_canonic || {},
+    personatges
+  };
+
+  const systemPrompt = `Ets un novel·lista expert en creació de personatges. A partir de la sinopsi, el backstory canònic i les fitxes parcials, has de COMPLETAR la informació que falta de cada personatge.
+
+Per a cada personatge, genera:
+
+1. TRETS IMMUTABLES complets:
+- edat_aproximada: un número o rang creïble (p.ex. "38" o "35-40")
+- genere: si no està definit, dedueix-lo del context
+- rol_narratiu: (protagonista, antagonista, deuteragonista, secundari)
+- relacio_protagonista: relació concreta amb el protagonista
+- aspecte_fisic: 2-3 frases amb detalls visuals concrets i memorables
+- ocupacio: professió o activitat principal
+- tret_definitori: UN detall únic que el diferencia (un gest, una marca, un objecte que sempre porta, un hàbit)
+
+2. ESTATS INICIALS (inici de la novel·la):
+- estat_emocional: coherent amb arc.inici_emocional, però ampliat amb matís
+- estat_fisic: condició física concreta a l'inici de la història
+
+Respon EXCLUSIVAMENT amb JSON vàlid:
+{
+  "personatges_completats": {
+    "clau_personatge": {
+      "trets_immutables": {
+        "edat_aproximada": "...",
+        "genere": "...",
+        "rol_narratiu": "...",
+        "relacio_protagonista": "...",
+        "aspecte_fisic": "...",
+        "ocupacio": "...",
+        "tret_definitori": "..."
+      },
+      "estat_emocional_inicial": "...",
+      "estat_fisic_inicial": "..."
+    }
+  }
+}
+
+REGLES:
+- Les claus han de coincidir amb les del NKG.
+- L'aspecte físic ha de servir per a descripcions literàries (no una fitxa policial).
+- El tret definitori ha de ser ÚNIC per personatge i visualment potent.
+- Tot ha de ser coherent amb el backstory i la sinopsi.`;
+
+  const msgs = [{ role: 'user', content: `Dades actuals del NKG (sinopsi + backstory + fitxes):
+${JSON.stringify(resum, null, 2)}` }];
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+
+  for (let intent = 1; intent <= 2; intent++) {
+    const raw = await callLLMMulti(
+      msgs,
+      systemPrompt,
+      Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 2600, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+    const data = parseJsonRobust(raw);
+    if (data && data.personatges_completats && typeof data.personatges_completats === 'object') return data.personatges_completats;
+    if (intent === 2) throw new Error('Resposta invàlida a la fase Completar Personatges.');
+    msgs.push({ role: 'user', content: 'Resposta invàlida. Retorna només JSON vàlid amb la clau personatges_completats.' });
+  }
+  throw new Error('No s\'ha pogut completar fitxes de personatges.');
+}
+
+async function iniciarFaseCompletarPersonatges() {
+  ESTAT.fase = 9.46;
+  updateProgress(9.46);
+  hideCard('fase-9-45');
+  showCard('fase-9-46');
+  document.getElementById('completar-personatges-result').classList.add('hidden');
+  showLoader('9-46');
+  document.getElementById('loader-9-46-text').textContent = 'Completant trets immutables i estats inicials...';
+
+  try {
+    const data = await generarCompletarPersonatges(USER_CONFIG);
+    mergeCompletarPersonatgesNKG(data);
+    hideLoader('9-46');
+    mostrarCompletarPersonatges(ESTAT._nkg.personatges || {});
+    toast('Fitxes de personatge completades i sincronitzades per al capítol 1.');
+  } catch (err) {
+    hideLoader('9-46');
+    toast('Error fase Completar Personatges: ' + err.message);
+  }
+}
+
 function mostrarEstilsParla(text) {
   const cos = document.getElementById('estils-cos');
   const blocs = parsejarBlocsEstilsParla(text);
@@ -7318,6 +7478,46 @@ function normalitzarSynopsisPerNKG(text) {
   return s;
 }
 
+
+function inferirEstatEmocionalInicialDesDeArc(arc = {}) {
+  const inici = String(arc && arc.inici_emocional || '').trim();
+  return inici || 'en alerta continguda';
+}
+
+function inferirEstatFisicInicialDesDeArc(arc = {}, limitMoral = '') {
+  const txt = `${String(arc?.inici_emocional || '')} ${String(arc?.canvi_o_bloqueig || '')} ${String(limitMoral || '')}`.toLowerCase();
+  if (/ferit|lesi|cicatriu|dolor|coix|trencat/.test(txt)) return 'amb seqüeles físiques visibles';
+  if (/esgot|fatig|insomni|ansietat|estr[eè]s|p[àa]nic/.test(txt)) return 'fatigat, amb son irregular i tensió muscular';
+  if (/addic|alcohol|drog|abstin/.test(txt)) return 'fràgil físicament, amb tremolor intermitent';
+  return 'cansat però funcional';
+}
+
+function teValorPlaceholder(v = '') {
+  const txt = String(v || '').trim().toLowerCase();
+  return !txt || txt === 'desconeguda' || txt === 'desconegut' || txt === 'no determinat' || txt === 'no determinada' || txt === 'pendent';
+}
+
+function fusionarCampPersonatgeValor(actual, nou) {
+  return teValorPlaceholder(actual) && !teValorPlaceholder(nou) ? String(nou).trim() : actual;
+}
+
+function validarImmutablesPerExportCapitol1(nkg, capitolActual) {
+  if ((capitolActual || 1) !== 1) return;
+  const personatges = Object.values((nkg && nkg.personatges) || {});
+  const camps = ['edat_aproximada', 'genere', 'rol_narratiu', 'relacio_protagonista', 'aspecte_fisic', 'ocupacio', 'tret_definitori'];
+  const ambProblemes = [];
+  personatges.forEach(p => {
+    const t = p && p.trets_immutables;
+    if (!t || typeof t !== 'object') {
+      ambProblemes.push((p && p.nom) || 'personatge sense nom');
+      return;
+    }
+    const invalid = camps.some(c => teValorPlaceholder(t[c]));
+    if (invalid) ambProblemes.push(p.nom || 'personatge sense nom');
+  });
+  if (ambProblemes.length > 0) throw new Error(`Exportació bloquejada (capítol 1): completa els trets immutables de ${ambProblemes.join(', ')}.`);
+}
+
 function assegurarPersonatgesNKGMinims(nkg, biblia) {
   if (!nkg || typeof nkg !== 'object') return;
   if (!nkg.personatges || typeof nkg.personatges !== 'object') nkg.personatges = {};
@@ -7330,8 +7530,8 @@ function assegurarPersonatgesNKGMinims(nkg, biblia) {
     if (!clau) return;
     nkg.personatges[clau] = {
       nom,
-      estat_fisic: '',
-      estat_emocional: 'neutre',
+      estat_fisic: inferirEstatFisicInicialDesDeArc(fp.arc, fp.limit_moral),
+      estat_emocional: inferirEstatEmocionalInicialDesDeArc(fp.arc),
       arc: fp.arc || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '' },
       limit_moral: fp.limit_moral || '',
       veu: fp.veu || { registre: '', mai_diria: '', quan_menteix: '', quan_es_sincer: '' },
@@ -7347,6 +7547,7 @@ async function generarFitxerContexte(nkg, biblia, capitolActual) {
     }
     assegurarPersonatgesNKGMinims(nkg, biblia);
   } catch (e) { console.warn('Normalització export NKG:', e.message); }
+  validarImmutablesPerExportCapitol1(nkg, capitolActual);
 
   const estructuraCapitols = ESTAT._estructuraCapitols || [];
   const idxCapitol = Math.max(0, Math.min((capitolActual || 1) - 1, Math.max(0, estructuraCapitols.length - 1)));
@@ -7426,7 +7627,11 @@ async function descarregarNKGiBiblia() {
   const capitolActual = (ESTAT._capitolActual || 0) + 1;
   const nkg = ESTAT._nkg || {};
   const biblia = ESTAT.bibliaNarrativa || {};
-  await generarFitxerContexte(nkg, biblia, capitolActual);
+  try {
+    await generarFitxerContexte(nkg, biblia, capitolActual);
+  } catch (err) {
+    toast(err.message || 'No s\'ha pogut exportar NKG + Bíblia.');
+  }
 }
 
 async function generarDocumentFinal(capitolsGenerats, capitolsEscaleta, nkg, configuracio) {
@@ -14509,7 +14714,9 @@ function serialitzarTretsImmutables(trets) {
   const genere = trets.genere || 'No determinat';
   const rol = trets.rol_narratiu || 'No determinat';
   const relacio = trets.relacio_protagonista || 'No determinada';
-  return `[IDENTITAT FIXA — NO MODIFICABLE] ${genere}, ${edat}, ${rol}. Relació amb protagonista: ${relacio}. [FI IDENTITAT FIXA]`;
+  const ocupacio = trets.ocupacio || 'No determinada';
+  const tret = trets.tret_definitori || 'No determinat';
+  return `[IDENTITAT FIXA — NO MODIFICABLE] ${genere}, ${edat}, ${rol}. Relació amb protagonista: ${relacio}. Ocupació: ${ocupacio}. Tret definitori: ${tret}. [FI IDENTITAT FIXA]`;
 }
 
 async function extreureTretsImmutablesPersonatge(nom, userConfig = USER_CONFIG) {
@@ -14534,7 +14741,10 @@ Retorna EXCLUSIVAMENT JSON vàlid amb aquesta estructura:
   "edat_aproximada": "...",
   "genere": "...",
   "rol_narratiu": "...",
-  "relacio_protagonista": "..."
+  "relacio_protagonista": "...",
+  "aspecte_fisic": "...",
+  "ocupacio": "...",
+  "tret_definitori": "..."
 }
 
 No incloguis cap camp addicional.`
@@ -14553,7 +14763,10 @@ No incloguis cap camp addicional.`
       edat_aproximada: String(parsed.edat_aproximada || 'No determinat').trim(),
       genere: String(parsed.genere || 'No determinat').trim(),
       rol_narratiu: String(parsed.rol_narratiu || 'No determinat').trim(),
-      relacio_protagonista: String(parsed.relacio_protagonista || 'No determinada').trim()
+      relacio_protagonista: String(parsed.relacio_protagonista || 'No determinada').trim(),
+      aspecte_fisic: String(parsed.aspecte_fisic || 'No determinat').trim(),
+      ocupacio: String(parsed.ocupacio || 'No determinat').trim(),
+      tret_definitori: String(parsed.tret_definitori || 'No determinat').trim()
     };
   } catch (err) {
     console.warn(`Trets immutables: no s'ha pogut extreure ${nom}:`, err.message);
@@ -14561,7 +14774,10 @@ No incloguis cap camp addicional.`
       edat_aproximada: 'No determinat',
       genere: 'No determinat',
       rol_narratiu: 'No determinat',
-      relacio_protagonista: 'No determinada'
+      relacio_protagonista: 'No determinada',
+      aspecte_fisic: 'No determinat',
+      ocupacio: 'No determinat',
+      tret_definitori: 'No determinat'
     };
   }
 }
@@ -14573,8 +14789,8 @@ async function garantirTretsImmutablesPersonatge(nom, userConfig = USER_CONFIG) 
   if (!ESTAT._nkg.personatges[clau]) {
     ESTAT._nkg.personatges[clau] = {
       nom,
-      estat_fisic: '',
-      estat_emocional: 'neutre',
+      estat_fisic: inferirEstatFisicInicialDesDeArc({}, ''),
+      estat_emocional: inferirEstatEmocionalInicialDesDeArc({}),
       arc: { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '' },
       limit_moral: '',
       veu: { registre: '', mai_diria: '', quan_menteix: '', quan_es_sincer: '' },
@@ -14589,7 +14805,18 @@ async function garantirTretsImmutablesPersonatge(nom, userConfig = USER_CONFIG) 
     };
   }
   const p = ESTAT._nkg.personatges[clau];
-  if (p.trets_immutables && typeof p.trets_immutables === 'object') return p.trets_immutables;
+  if (p.trets_immutables && typeof p.trets_immutables === 'object') {
+    p.trets_immutables = {
+      edat_aproximada: p.trets_immutables.edat_aproximada || 'No determinat',
+      genere: p.trets_immutables.genere || 'No determinat',
+      rol_narratiu: p.trets_immutables.rol_narratiu || 'No determinat',
+      relacio_protagonista: p.trets_immutables.relacio_protagonista || 'No determinada',
+      aspecte_fisic: p.trets_immutables.aspecte_fisic || 'No determinat',
+      ocupacio: p.trets_immutables.ocupacio || 'No determinat',
+      tret_definitori: p.trets_immutables.tret_definitori || 'No determinat'
+    };
+    return p.trets_immutables;
+  }
   const trets = await extreureTretsImmutablesPersonatge(nom, userConfig);
   p.trets_immutables = trets;
   return trets;
@@ -14856,8 +15083,8 @@ function nkgInicialitzar() {
         const ex = prevPersonat?.[clau];
         nkg.personatges[clau] = {
           nom: ex?.nom || nomNet,
-          estat_fisic:          ex?.estat_fisic          || '',
-          estat_emocional:      ex?.estat_emocional      || 'neutre',
+          estat_fisic:          ex?.estat_fisic          || inferirEstatFisicInicialDesDeArc(ex?.arc || {}, ex?.limit_moral || ''),
+          estat_emocional:      ex?.estat_emocional      || inferirEstatEmocionalInicialDesDeArc(ex?.arc || {}),
           arc:                  ex?.arc                  || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '' },
           limit_moral:          ex?.limit_moral          || '',
           veu:                  ex?.veu                  || { registre: '', mai_diria: '', quan_menteix: '', quan_es_sincer: '' },
