@@ -4214,6 +4214,35 @@ function validarNKGComplet(nkg, capitolsEscaleta) {
   return { valid: true, errors: [], warnings };
 }
 
+function validarNKGPreparatPerCapitol1(nkg, biblia = {}) {
+  const errors = [];
+  if (!nkg) return { ok: false, errors: ['NKG no inicialitzat.'] };
+  const bs = nkg.macronarrativa && nkg.macronarrativa.backstory_canonic;
+  if (!bs || !Array.isArray(bs.fets_previs) || bs.fets_previs.length === 0) errors.push('Falten fets previs de backstory canònic.');
+  if (!Array.isArray(nkg.relacions) || nkg.relacions.length === 0) errors.push('Falta graf de relacions.');
+  if (!nkg.objectes || Object.keys(nkg.objectes).length === 0) errors.push('Falten objectes narratius.');
+  if (!nkg.llocs || Object.keys(nkg.llocs).length < 3) errors.push('Mapa de llocs insuficient.');
+  if (!Array.isArray(biblia.regles_mon) || biblia.regles_mon.length === 0) errors.push('Falten regles del món.');
+
+  const perspectiva = (((nkg.context_creacio || {}).estil || {}).perspectiva || {});
+  const cronologia = ((nkg.context_creacio || {}).cronologia || {});
+  if (!perspectiva.tipus) errors.push('Falta tipus de perspectiva narrativa.');
+  if (!Array.isArray(perspectiva.pov_per_capitol) || perspectiva.pov_per_capitol.length === 0) errors.push('Falta POV per capítol.');
+  if (!Array.isArray(cronologia.per_capitol) || cronologia.per_capitol.length === 0) errors.push('Falta cronologia per capítol.');
+
+  const pers = Object.values(nkg.personatges || {});
+  if (pers.length === 0) errors.push('No hi ha personatges al NKG.');
+  pers.forEach(p => {
+    const t = p.trets_immutables || {};
+    if (!t.aspecte_fisic || !t.ocupacio || !t.tret_definitori) errors.push(`${p.nom || 'Personatge'} sense trets immutables complets.`);
+    const veu = normalitzarVeuAvancada(p.veu || {});
+    if (!Array.isArray(veu.exemples_narratius) || veu.exemples_narratius.length < 2) errors.push(`${p.nom || 'Personatge'} sense exemples narratius de veu.`);
+    if (!Array.isArray(veu.vocabulari_recurrent) || veu.vocabulari_recurrent.length < 3) errors.push(`${p.nom || 'Personatge'} sense vocabulari recurrent suficient.`);
+  });
+
+  return { ok: errors.length === 0, errors };
+}
+
 function mostrarResumNKGiTransicio(nkg, capitolsEscaleta, validacio, modeCreacio) {
   const wrap     = document.getElementById('nkg-transicio-wrap');
   const resumDiv = document.getElementById('nkg-resum-text');
@@ -6939,6 +6968,13 @@ async function iniciarFase11() {
     return;
   }
 
+  const chkNKG = validarNKGPreparatPerCapitol1(ESTAT._nkg || {}, ESTAT.bibliaNarrativa || {});
+  if (!chkNKG.ok) {
+    toast('NKG incomplet abans del capítol 1: ' + chkNKG.errors.slice(0, 2).join(' | '));
+    console.error('NKG incomplet abans del capítol 1:', chkNKG.errors);
+    return;
+  }
+
   // Comprova sessió interrompuda
   const sessioExistent = carregarEstatSessio();
   if (sessioExistent && sessioExistent.totalCapitols === ESTAT._estructuraCapitols.length) {
@@ -7679,10 +7715,10 @@ function construirContextPersonatgeSecundari(personatge, capitolsGenerats) {
   const veu = personatge.veu || {};
 
   if (aparicions === 0) {
-    return `${nom} [primera aparició]:\n  Funció: ${arc.inici_emocional || ''}\n  Límit moral: ${personatge.limit_moral || ''}\n  Mai diria: "${veu.mai_diria || ''}"`;
+    return `${nom} [primera aparició]:\n  Funció: ${arc.inici_emocional || ''}\n  Límit moral: ${personatge.limit_moral || ''}\n  Mai diria: "${veuMaiDiriaText(veu)}"`;
   }
 
-  const base = `${nom} [${aparicions} aparició${aparicions > 1 ? 's' : ''} anterior${aparicions > 1 ? 's' : ''}]:\n  Arc: ${arc.inici_emocional || ''} → ${arc.final_emocional || ''}\n  Conflicte intern: ${arc.canvi_o_bloqueig || ''}\n  Límit moral: ${personatge.limit_moral || ''}\n  Veu — Registre: ${veu.registre || ''}\n  Veu — Mai diria: "${veu.mai_diria || ''}"\n  Veu — Quan menteix: ${veu.quan_menteix || ''}\n  Estat emocional actual: ${personatge.estat_emocional || ''}\n  Ubicació actual: ${personatge.ubicacio || ''}`;
+  const base = `${nom} [${aparicions} aparició${aparicions > 1 ? 's' : ''} anterior${aparicions > 1 ? 's' : ''}]:\n  Arc: ${arc.inici_emocional || ''} → ${arc.final_emocional || ''}\n  Conflicte intern: ${arc.canvi_o_bloqueig || ''}\n  Límit moral: ${personatge.limit_moral || ''}\n  Veu — Registre: ${veu.registre || ''}\n  Veu — Mai diria: "${veuMaiDiriaText(veu)}"\n  Veu — Quan menteix: ${veu.quan_menteix || ''}\n  Estat emocional actual: ${personatge.estat_emocional || ''}\n  Ubicació actual: ${personatge.ubicacio || ''}`;
 
   if (aparicions === 1) return base;
 
@@ -7726,7 +7762,7 @@ function construirBlocPersonatges(nkg, capitolsGenerats) {
   const arc = protagonista?.arc || {};
   const veu = protagonista?.veu || {};
 
-  const blocProt = `PROTAGONISTA — ${protagonista?.nom || ''}:\n  Arc: ${arc.inici_emocional || ''} → ${arc.final_emocional || ''}\n  Canvi: ${arc.canvi_o_bloqueig || ''}\n  Límit moral: ${protagonista?.limit_moral || ''}\n  Veu — Registre: ${veu.registre || ''}\n  Veu — Mai diria: "${veu.mai_diria || ''}"\n  Veu — Quan menteix: ${veu.quan_menteix || ''}\n  Veu — Quan és sincer: ${veu.quan_es_sincer || ''}\n  Estat emocional: ${protagonista?.estat_emocional || ''}\n  Ubicació: ${protagonista?.ubicacio || ''}\n  Objectius actuals: ${((protagonista?.objectius || []).map((o, i) => normalitzarObjectiu(o, i, 1, nkgNormalitzarNom(protagonista?.nom || 'prota')).descripcio).filter(Boolean).join(' / ')) || 'cap definit'}`;
+  const blocProt = `PROTAGONISTA — ${protagonista?.nom || ''}:\n  Arc: ${arc.inici_emocional || ''} → ${arc.final_emocional || ''}\n  Canvi: ${arc.canvi_o_bloqueig || ''}\n  Límit moral: ${protagonista?.limit_moral || ''}\n  Veu — Registre: ${veu.registre || ''}\n  Veu — Mai diria: "${veuMaiDiriaText(veu)}"\n  Veu — Quan menteix: ${veu.quan_menteix || ''}\n  Veu — Quan és sincer: ${veu.quan_es_sincer || ''}\n  Estat emocional: ${protagonista?.estat_emocional || ''}\n  Ubicació: ${protagonista?.ubicacio || ''}\n  Objectius actuals: ${((protagonista?.objectius || []).map((o, i) => normalitzarObjectiu(o, i, 1, nkgNormalitzarNom(protagonista?.nom || 'prota')).descripcio).filter(Boolean).join(' / ')) || 'cap definit'}`;
 
   const blocsSecundaris = secundaris.length > 0
     ? secundaris.map(p => construirContextPersonatgeSecundari(p, capitolsGenerats)).join('\n\n')
@@ -16308,7 +16344,16 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
           estat_emocional: p.estat_emocional || '',
           arc: { inici_emocional: p.arc?.inici_emocional || '', final_emocional: p.arc?.final_emocional || '', canvi_o_bloqueig: p.arc?.canvi_o_bloqueig || '' },
           limit_moral: p.limit_moral || '',
-          veu: { registre: p.veu?.registre || '', mai_diria: p.veu?.mai_diria || '', quan_menteix: p.veu?.quan_menteix || '', quan_es_sincer: p.veu?.quan_es_sincer || '' },
+          veu: normalitzarVeuAvancada({
+            registre: p.veu?.registre || '',
+            mai_diria: p.veu?.mai_diria || [],
+            quan_menteix: p.veu?.quan_menteix || '',
+            quan_es_sincer: p.veu?.quan_es_sincer || '',
+            exemples_narratius: p.veu?.exemples_narratius || [],
+            vocabulari_recurrent: p.veu?.vocabulari_recurrent || [],
+            vocabulari_prohibit: p.veu?.vocabulari_prohibit || [],
+            longitud_frases: p.veu?.longitud_frases || 'mitjanes'
+          }),
           objectes_inventari: Array.isArray(p.objectes_inventari) ? p.objectes_inventari.map(ref => resoldreIdObjecte(nkg, ref)).filter(Boolean) : [],
           objectes_descartats: Array.isArray(p.objectes_descartats) ? p.objectes_descartats.map(ref => resoldreIdObjecte(nkg, (ref && ref.objecte) || ref)).filter(Boolean) : [],
           ubicacio: p.ubicacio || '',
