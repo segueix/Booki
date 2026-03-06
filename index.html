@@ -6902,6 +6902,7 @@ async function assegurarTemperaturaEmocionalCapitols(userConfig, setStatus = nul
   const temperatures = await generarTemperaturaEmocionalCapitols(userConfig);
   if (temperatures.length > 0) aplicarTemperaturaEmocionalAEstructura(temperatures);
   await assegurarRatioDialegCapitols(userConfig, setStatus);
+  await assegurarCostEmocionalCapitols(userConfig, setStatus);
 }
 
 
@@ -7039,6 +7040,122 @@ async function assegurarRatioDialegCapitols(userConfig, setStatus = null) {
   if (typeof setStatus === 'function') setStatus('Assignant ratio de diàleg per capítol...');
   const ratios = await generarRatioDialegCapitols(userConfig);
   if (ratios.length > 0) aplicarRatioDialegCapitols(ratios);
+}
+
+function normalitzarCostEmocional(raw = {}, ctx = {}) {
+  const r = raw || {};
+  const prohibit = /(sent|pensa|s'adona)/i;
+  let manifestacio = String(r.manifestacio || '').trim();
+  if (!manifestacio || prohibit.test(manifestacio)) {
+    manifestacio = 'Trenca un hàbit visible del capítol, evita el contacte visual i altera una acció que feia sempre de manera automàtica.';
+  }
+  const arrossegament = String(r.arrossegament || '').trim() || 'Al capítol següent evita repetir l acció que havia fet sempre, i això condiciona una decisió observable.';
+  return {
+    personatge: String(r.personatge || ctx.pov || '').trim(),
+    que_perd: String(r.que_perd || '').trim() || 'Perd una certesa operativa que li permetia actuar sense dubte.',
+    manifestacio,
+    duracio: String(r.duracio || '').trim() || 'del detonant fins al tancament del capítol',
+    arrossegament
+  };
+}
+
+function construirContextCostEmocionalCapitols() {
+  const tipusValid = new Set(['cliffhanger_revelacio', 'ganxo_emocional']);
+  const perspectiva = (((ESTAT._nkg || {}).context_creacio || {}).estil || {}).perspectiva || {};
+  const povs = Array.isArray(perspectiva.pov_per_capitol) ? perspectiva.pov_per_capitol : [];
+  const personatges = ((ESTAT._nkg || {}).personatges || {});
+
+  return (ESTAT._estruturaCapitols || []).map((cap, idx) => {
+    const numero = Number(cap.numero || idx + 1);
+    const ganxoTipus = String(cap?.ganxo_final?.tipus || '').trim();
+    if (!tipusValid.has(ganxoTipus)) return null;
+    const pov = povs.find(p => Number(p.capitol) === numero)?.personatge_pov || '';
+    const p = pov ? personatges[pov] : null;
+    const necessitat = String(p?.motivacions_base?.necessitat_interna || '').trim();
+    const waypoints = Array.isArray(p?.arc?.waypoints) ? p.arc.waypoints : [];
+    const wpCap = waypoints.filter(w => Number(w.capitol) === numero);
+    const wpText = wpCap.length > 0
+      ? `sí, ${wpCap.map(w => `${w.estat || ''} / ${w.senyal_visible || ''}`).join(' | ')}`
+      : 'no';
+    return {
+      capitol: numero,
+      idx,
+      titol: cap.titol || '',
+      pov,
+      necessitat_interna: necessitat,
+      ganxo_tipus: ganxoTipus,
+      ganxo_element: String(cap?.ganxo_final?.element || '').trim(),
+      waypoint_detall: wpText,
+      limit_moral: String(p?.limit_moral || '').trim()
+    };
+  }).filter(Boolean);
+}
+
+async function generarCostEmocionalPerCapitol(ctx, userConfig) {
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  const prompt = `Capítol ${ctx.capitol}: "${ctx.titol}"
+POV: ${ctx.pov || '(sense POV)'}
+Necessitat interna del POV: "${ctx.necessitat_interna || ''}"
+Ganxo final: ${ctx.ganxo_tipus} — Element: "${ctx.ganxo_element || ''}"
+Waypoint emocional en aquest capítol: ${ctx.waypoint_detall}
+
+Defineix el COST EMOCIONAL d'aquest capítol.
+
+El cost emocional és el PREU que el personatge paga per la revelació
+o el descobriment que conté el capítol. No és una reacció emocional —
+és un canvi en el comportament que persisteix.
+
+Camps a retornar:
+- "personatge"
+- "que_perd"
+- "manifestacio"
+- "duracio"
+- "arrossegament"
+
+Regles:
+- La manifestació ha de ser FÍSICA o CONDUCTUAL, mai cognitiva
+- L'arrossegament garanteix que el cost no s'oblida entre capítols
+- Si el capítol toca la necessitat interna del personatge, el cost ha de ser proporcionalment més alt
+- El cost NO pot contradir el límit moral del personatge: "${ctx.limit_moral || ''}"
+- manifestacio no pot contenir "sent", "pensa", "s'adona"
+- arrossegament ha de ser verificable al prompt del capítol següent
+
+Retorna EXCLUSIVAMENT un objecte JSON.`;
+
+  const msgs = [{ role: 'user', content: prompt }];
+  for (let intent = 1; intent <= 2; intent++) {
+    const raw = await callLLMMulti(
+      msgs,
+      'Ets un editor de continuïtat emocional. Retorna només JSON vàlid en català.',
+      Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 900, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+    const parsed = parseJsonRobust(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const n = normalitzarCostEmocional(parsed, ctx);
+      if (!/(sent|pensa|s'adona)/i.test(n.manifestacio) && n.arrossegament) return n;
+    }
+    msgs.push({ role: 'user', content: 'Resposta invàlida. Torna únicament un objecte JSON amb personatge, que_perd, manifestacio, duracio i arrossegament.' });
+  }
+  return normalitzarCostEmocional({}, ctx);
+}
+
+async function assegurarCostEmocionalCapitols(userConfig, setStatus = null) {
+  const ctxCaps = construirContextCostEmocionalCapitols();
+  if (ctxCaps.length === 0) return;
+  if (typeof setStatus === 'function') setStatus('Calculant cost emocional dels capítols amb revelació...');
+
+  ESTAT._escaletes = Array.isArray(ESTAT._escaletes) ? ESTAT._escaletes : [];
+
+  for (const ctx of ctxCaps) {
+    const cost = await generarCostEmocionalPerCapitol(ctx, userConfig);
+    if (ESTAT._escaletes[ctx.idx]) {
+      ESTAT._escaletes[ctx.idx].cost_emocional = cost;
+    }
+    if (ESTAT._estruturaCapitols[ctx.idx]) {
+      ESTAT._estruturaCapitols[ctx.idx].cost_emocional = cost;
+    }
+  }
 }
 
 
