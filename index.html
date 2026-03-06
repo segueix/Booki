@@ -1425,17 +1425,13 @@
   <h2>🧭 Fase 10.7 — Perspectiva i Cronologia</h2>
   <p>Definim el POV per capítol, la cronologia interna i la timeline d'accions perquè l'escriptura sigui consistent.</p>
   <div class="loader-wrap" id="loader-10-7"><span class="spinner"></span><span id="loader-10-7-text">Analitzant perspectiva i cronologia…</span></div>
-  <div class="btn-row" style="margin-top:14px;">
-    <button class="btn btn-secondary" onclick="hideCard('fase-10-7');showCard('fase-10-5');">← Tornar a Escaleta</button>
-    <button class="btn btn-ghost" onclick="iniciarFasePerspectivaCronologia()">🔄 Regenerar POV/Cronologia</button>
-  </div>
   <div id="perspectiva-crono-result" class="hidden">
     <div id="perspectiva-crono-cos" class="veu-result"></div>
-    <div class="btn-row" style="margin-top:24px;">
-      <button class="btn btn-secondary" onclick="hideCard('fase-10-7');showCard('fase-10-5');">← Tornar a Escaleta</button>
-      <button class="btn btn-ghost" onclick="iniciarFasePerspectivaCronologia()">🔄 Regenerar POV/Cronologia</button>
-      <button class="btn btn-primary" id="btn-fase10-8" onclick="iniciarFaseVeuExemples()">Continuar → Veu i Exemples</button>
-    </div>
+  </div>
+  <div class="btn-row" style="margin-top:24px;">
+    <button class="btn btn-secondary" onclick="hideCard('fase-10-7');showCard('fase-10-5');">← Tornar a Escaleta</button>
+    <button class="btn btn-ghost" onclick="iniciarFasePerspectivaCronologia()">🔄 Regenerar POV/Cronologia</button>
+    <button class="btn btn-primary hidden" id="btn-fase10-8" onclick="iniciarFaseVeuExemples()">Continuar → Veu i Exemples</button>
   </div>
 </div>
 
@@ -7000,7 +6996,6 @@ async function autocompletarNKGFaltantsManual() {
 
   const passos = [
     {
-      id: 'backstory_relacions',
       etiqueta: 'Backstory i relacions canòniques',
       detecta: txt => txt.includes('backstory') || txt.includes('relacions'),
       executar: async nkg => {
@@ -7017,7 +7012,6 @@ async function autocompletarNKGFaltantsManual() {
       }
     },
     {
-      id: 'trets_immutables',
       etiqueta: 'Trets immutables dels personatges',
       detecta: txt => txt.includes('trets immutables'),
       executar: async () => {
@@ -7026,7 +7020,6 @@ async function autocompletarNKGFaltantsManual() {
       }
     },
     {
-      id: 'objectes_narratius',
       etiqueta: 'Objectes narratius',
       detecta: txt => txt.includes('objectes narratius'),
       executar: async () => {
@@ -7035,7 +7028,6 @@ async function autocompletarNKGFaltantsManual() {
       }
     },
     {
-      id: 'llocs_i_regles',
       etiqueta: 'Mapa espacial i regles del món',
       detecta: txt => txt.includes('mapa de llocs') || txt.includes('regles del món'),
       executar: async () => {
@@ -7044,7 +7036,6 @@ async function autocompletarNKGFaltantsManual() {
       }
     },
     {
-      id: 'perspectiva_cronologia',
       etiqueta: 'Perspectiva i cronologia per capítol',
       detecta: txt => txt.includes('pov per capítol') || txt.includes('cronologia') || txt.includes('tipus de perspectiva'),
       executar: async () => {
@@ -7053,7 +7044,6 @@ async function autocompletarNKGFaltantsManual() {
       }
     },
     {
-      id: 'veu_i_exemples',
       etiqueta: 'Veu i exemples narratius',
       detecta: txt => txt.includes('exemples narratius de veu') || txt.includes('vocabulari recurrent'),
       executar: async () => {
@@ -7066,7 +7056,6 @@ async function autocompletarNKGFaltantsManual() {
   try {
     const nkg = ESTAT._nkg || {};
     const biblia = ESTAT.bibliaNarrativa || {};
-    let completats = 0;
     let intents = 0;
 
     while (intents < 3) {
@@ -7079,7 +7068,6 @@ async function autocompletarNKGFaltantsManual() {
       const totalPassos = pendentsAra.length;
       for (let i = 0; i < pendentsAra.length; i++) {
         const pas = pendentsAra[i];
-        completats++;
         setStatus(`[${i + 1}/${totalPassos}] ${pas.etiqueta}...`);
         await pas.executar(nkg);
         mostrarFaltantsNKG();
