@@ -1640,6 +1640,88 @@ const CLAU_STAGE_CHECKPOINTS = 'booki_stage_checkpoints_v1';
 const MAX_SNAPSHOTS = 6;
 const CHECKPOINT_STAGE_KEYS = ['premise', 'structure', 'characters', 'world', 'chapterOutline', 'nkg', 'bible'];
 
+
+// --- RENDERER (UI only) ---
+const Renderer = {
+  show(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('hidden');
+  },
+  hide(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+  },
+  setText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text == null ? '' : String(text);
+  },
+  renderResumeButtonVisibility(hasSavedData) {
+    const btn = document.getElementById('btn-reprendre');
+    if (btn) btn.classList.toggle('hidden', !hasSavedData);
+  },
+  renderFase1Start() {
+    updateProgress(1);
+    showCard('fase-1');
+    showLoader(1);
+  },
+  renderFase1Result(textResponse) {
+    hideLoader(1);
+    renderPremisses(textResponse);
+  },
+  renderFase1Error() {
+    hideLoader(1);
+  },
+  renderEscaletaStart() {
+    updateProgress(20);
+    showCard('fase-20');
+    setTimeout(() => document.getElementById('fase-20')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+    showLoader('20');
+    this.setText('loader-20-text', 'Opus generant escaleta per escenes…');
+  },
+  renderEscaletaProgress(capsInfo, waiting = false) {
+    if (waiting) {
+      this.setText('loader-20-text', `⏳ Esperant per al rate limit de Gemini… (caps. ${capsInfo})`);
+      return;
+    }
+    this.setText('loader-20-text', `Generant escaleta: capítols ${capsInfo}…`);
+  },
+  renderEscaletaDone(totsResultats) {
+    hideLoader('20');
+    mostrarEscaleta(totsResultats);
+    this.show('btn-fase21');
+  },
+  renderEscaletaError() {
+    hideLoader('20');
+  },
+  renderDiagnosticPanel(force = false) {
+    const panel = document.getElementById('diag-panel');
+    if (!panel) return;
+    if (!force && panel.classList.contains('hidden')) return;
+    const sm = stageEnsureRegistry();
+    const currentStageKey = sm.currentStage || 'idea';
+    const currentStageState = (sm.stages && sm.stages[currentStageKey]) || {};
+    const latestCheckpoint = checkpointGetLatestValid();
+
+    this.setText('diag-current-stage', currentStageKey);
+    this.setText('diag-last-ok', sm.lastSuccessfulStage || '-');
+    this.setText('diag-request-id', currentStageState.requestId || '-');
+    this.setText('diag-model', currentStageState.modelUsed || stageInferModelUsed(currentStageKey));
+    this.setText('diag-elapsed', formatElapsed(stageElapsedMs(currentStageState)));
+    this.setText('diag-retries', Number(currentStageState.retries || 0));
+    this.setText('diag-error-code', currentStageState.errorCode || '-');
+    this.setText('diag-error-message', currentStageState.errorMessage || '-');
+    this.setText('diag-checkpoint', latestCheckpoint ? `${latestCheckpoint.stageKey} @ ${latestCheckpoint.savedAtISO}` : 'cap');
+
+    const ul = document.getElementById('diag-trace-log');
+    if (!ul) return;
+    const log = Array.isArray(sm.traceLog) ? sm.traceLog.slice(-8).reverse() : [];
+    ul.innerHTML = log.map(it => {
+      const msg = [it.atISO, it.eventType, it.stageKey, it.requestId || '-', it.errorCode || '-', it.message || ''].filter(Boolean).join(' · ');
+      return `<li>${escHtml(msg)}</li>`;
+    }).join('') || '<li>(sense events encara)</li>';
+  }
+};
+
 function checkpointDeepClone(value) {
   try {
     return JSON.parse(JSON.stringify(value));
@@ -1880,9 +1962,7 @@ function guardarProjecteLocal() {
 function comprovarProjecteGuardat() {
   const guardat = localStorage.getItem(CLAU_PROJECTE_ACTUAL);
   const checkpoint = checkpointGetLatestValid();
-  if (guardat || checkpoint) {
-    document.getElementById('btn-reprendre').classList.remove('hidden');
-  }
+  Renderer.renderResumeButtonVisibility(!!(guardat || checkpoint));
 }
 
 function aplicarSnapshotProjecte(dades) {
@@ -2677,7 +2757,7 @@ function stagePushTrace(eventType, stageKey, payload = {}) {
   sm.traceLog.push(entry);
   if (sm.traceLog.length > 60) sm.traceLog = sm.traceLog.slice(-60);
   appStateSet('runtime.stageMachine', sm, `stageTrace:${eventType}:${stageKey}`);
-  renderDiagnosticPanel();
+  Renderer.renderDiagnosticPanel();
 }
 
 function stageElapsedMs(stageState) {
@@ -2695,44 +2775,15 @@ function formatElapsed(ms) {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-function updateDiagField(id, value) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = value == null || value === '' ? '-' : String(value);
-}
-
 function renderDiagnosticPanel(force = false) {
-  const panel = document.getElementById('diag-panel');
-  if (!panel) return;
-  if (!force && panel.classList.contains('hidden')) return;
-  const sm = stageEnsureRegistry();
-  const currentStageKey = sm.currentStage || 'idea';
-  const currentStageState = (sm.stages && sm.stages[currentStageKey]) || {};
-  const latestCheckpoint = checkpointGetLatestValid();
-  updateDiagField('diag-current-stage', currentStageKey);
-  updateDiagField('diag-last-ok', sm.lastSuccessfulStage || '-');
-  updateDiagField('diag-request-id', currentStageState.requestId || '-');
-  updateDiagField('diag-model', currentStageState.modelUsed || stageInferModelUsed(currentStageKey));
-  updateDiagField('diag-elapsed', formatElapsed(stageElapsedMs(currentStageState)));
-  updateDiagField('diag-retries', Number(currentStageState.retries || 0));
-  updateDiagField('diag-error-code', currentStageState.errorCode || '-');
-  updateDiagField('diag-error-message', currentStageState.errorMessage || '-');
-  updateDiagField('diag-checkpoint', latestCheckpoint ? `${latestCheckpoint.stageKey} @ ${latestCheckpoint.savedAtISO}` : 'cap');
-
-  const ul = document.getElementById('diag-trace-log');
-  if (ul) {
-    const log = Array.isArray(sm.traceLog) ? sm.traceLog.slice(-8).reverse() : [];
-    ul.innerHTML = log.map(it => {
-      const msg = [it.atISO, it.eventType, it.stageKey, it.requestId || '-', it.errorCode || '-', it.message || ''].filter(Boolean).join(' · ');
-      return `<li>${escHtml(msg)}</li>`;
-    }).join('') || '<li>(sense events encara)</li>';
-  }
+  Renderer.renderDiagnosticPanel(force);
 }
 
 function toggleDiagnosticPanel() {
   const panel = document.getElementById('diag-panel');
   if (!panel) return;
   panel.classList.toggle('hidden');
-  if (!panel.classList.contains('hidden')) renderDiagnosticPanel(true);
+  if (!panel.classList.contains('hidden')) Renderer.renderDiagnosticPanel(true);
 }
 
 function stageEnsureRegistry() {
@@ -3382,16 +3433,13 @@ async function iniciarFase1() {
   appStateSet('data.ideaTheme', sel, 'iniciarFase1');
   stageOk('idea', { requestId: `idea-${Date.now()}` });
   setFase(1);
-  updateProgress(1);
-  showCard('fase-1');
-  showLoader(1);
+  Renderer.renderFase1Start();
 
   try {
     await runStage('premise', async () => {
       const res = await fase1_premisses(sel, [], USER_CONFIG);
       ESTAT.history = res.history;
-      hideLoader(1);
-      renderPremisses(res.response);
+      Renderer.renderFase1Result(res.response);
       appStateSet('data.premise', {
         selected: ESTAT.premissaTriada || null,
         options: Array.isArray(ESTAT._premissaLista) ? ESTAT._premissaLista.slice() : []
@@ -3400,7 +3448,7 @@ async function iniciarFase1() {
       validateInput: () => validarInputStage('premise', { ideaTheme: ESTAT.tematica })
     });
   } catch (err) {
-    hideLoader(1);
+    Renderer.renderFase1Error();
     toast('Error: ' + err.message);
   }
 }
@@ -8692,11 +8740,7 @@ function mostrarEstructura(text) {
 // ═══════════════════════════════════════════════════════════
 async function iniciarFaseEscaleta() {
   setFase(20);
-  updateProgress(20);
-  showCard('fase-20');
-  setTimeout(() => document.getElementById('fase-20')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
-  showLoader('20');
-  document.getElementById('loader-20-text').textContent = 'Opus generant escaleta per escenes…';
+  Renderer.renderEscaletaStart();
   try {
     const totsResultats = await runStage('chapterOutline', async () => {
       const caps = ESTAT._estructuraCapitols;
@@ -8705,15 +8749,12 @@ async function iniciarFaseEscaleta() {
       for (let offset = 0; offset < caps.length; offset += BLOC) {
         const bloc = caps.slice(offset, offset + BLOC);
         const capsInfo = `${offset + 1}-${Math.min(offset + BLOC, caps.length)} de ${caps.length}`;
-        document.getElementById('loader-20-text').textContent =
-          `Generant escaleta: capítols ${capsInfo}…`;
+        Renderer.renderEscaletaProgress(capsInfo, false);
 
         if (offset > 0) {
-          document.getElementById('loader-20-text').textContent =
-            `⏳ Esperant per al rate limit de Gemini… (caps. ${capsInfo})`;
+          Renderer.renderEscaletaProgress(capsInfo, true);
           await new Promise(r => setTimeout(r, 8000));
-          document.getElementById('loader-20-text').textContent =
-            `Generant escaleta: capítols ${capsInfo}…`;
+          Renderer.renderEscaletaProgress(capsInfo, false);
         }
 
         const res = await generarEscaletaBloc(bloc, offset, USER_CONFIG);
@@ -8752,9 +8793,7 @@ async function iniciarFaseEscaleta() {
     });
 
     ESTAT._escaletes = totsResultats;
-    hideLoader('20');
-    mostrarEscaleta(totsResultats);
-    document.getElementById('btn-fase21').classList.remove('hidden');
+    Renderer.renderEscaletaDone(totsResultats);
     appStateSet('data.chapterOutline', {
       total: totsResultats.length,
       escaletes: totsResultats
@@ -8762,7 +8801,7 @@ async function iniciarFaseEscaleta() {
     checkpointSaveStage('chapterOutline', 'iniciarFaseEscaleta:postData');
     if (ESTAT._nkg) stageOk('nkg', { requestId: `nkg-ready-${Date.now()}` });
   } catch (e) {
-    hideLoader('20');
+    Renderer.renderEscaletaError();
     toast('Error generant escaleta: ' + e.message);
   }
 }
@@ -20058,8 +20097,8 @@ document.addEventListener('DOMContentLoaded', function() {
   comprovarProjecteGuardat();
   // Actualitzar visibilitat dels botons de config segons si hi ha projecte actiu
   actualitzarVisibilitatBotonsConfig();
-  renderDiagnosticPanel(true);
-  setInterval(() => renderDiagnosticPanel(), 1200);
+  Renderer.renderDiagnosticPanel(true);
+  setInterval(() => Renderer.renderDiagnosticPanel(), 1200);
 });
 
 </script>
