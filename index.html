@@ -2208,7 +2208,13 @@ const AppState = {
   },
   runtime: {
     userConfig: null,
-    startedAtISO: new Date().toISOString()
+    startedAtISO: new Date().toISOString(),
+    stageMachine: {
+      currentStage: 'idea',
+      lastSuccessfulStage: null,
+      requestSeq: 0,
+      stages: {}
+    }
   },
   data: {
     ideaTheme: '',
@@ -2278,6 +2284,103 @@ function setBibliaNarrativa(biblia, reason = '') {
   appStateSet('legacy.bibliaNarrativa', biblia, reason || 'setBibliaNarrativa');
   appStateSet('data.bible', biblia, reason || 'setBibliaNarrativa:data');
 }
+
+
+const STAGE_KEYS = ['idea', 'premise', 'structure', 'characters', 'world', 'chapterOutline', 'nkg', 'bible'];
+
+function crearEstatStageBase() {
+  return {
+    status: 'idle',
+    startedAt: null,
+    finishedAt: null,
+    requestId: null,
+    errorCode: null,
+    errorMessage: null,
+    retries: 0
+  };
+}
+
+function stageEnsureRegistry() {
+  const sm = AppState.runtime.stageMachine || {};
+  if (!sm.stages || typeof sm.stages !== 'object') sm.stages = {};
+  STAGE_KEYS.forEach(k => {
+    if (!sm.stages[k]) sm.stages[k] = crearEstatStageBase();
+  });
+  if (!sm.currentStage) sm.currentStage = 'idea';
+  if (!('lastSuccessfulStage' in sm)) sm.lastSuccessfulStage = null;
+  if (!Number.isFinite(sm.requestSeq)) sm.requestSeq = 0;
+  AppState.runtime.stageMachine = sm;
+  return sm;
+}
+
+function stageStart(stageKey, meta = {}) {
+  const sm = stageEnsureRegistry();
+  if (!STAGE_KEYS.includes(stageKey)) return null;
+  const now = new Date().toISOString();
+  const prev = sm.stages[stageKey] || crearEstatStageBase();
+  sm.requestSeq = Number(sm.requestSeq || 0) + 1;
+  const retries = prev.startedAt ? Number(prev.retries || 0) + 1 : Number(prev.retries || 0);
+  const requestId = meta.requestId || `${stageKey}-${sm.requestSeq}-${Date.now()}`;
+  sm.stages[stageKey] = {
+    status: 'running',
+    startedAt: now,
+    finishedAt: null,
+    requestId,
+    errorCode: null,
+    errorMessage: null,
+    retries
+  };
+  sm.currentStage = stageKey;
+  appStateSet('runtime.stageMachine', sm, `stageStart:${stageKey}`);
+  return requestId;
+}
+
+function stageOk(stageKey, meta = {}) {
+  const sm = stageEnsureRegistry();
+  if (!STAGE_KEYS.includes(stageKey)) return;
+  const now = new Date().toISOString();
+  const prev = sm.stages[stageKey] || crearEstatStageBase();
+  sm.stages[stageKey] = Object.assign({}, prev, {
+    status: 'ok',
+    finishedAt: now,
+    requestId: meta.requestId || prev.requestId || null,
+    errorCode: null,
+    errorMessage: null
+  });
+  sm.currentStage = stageKey;
+  sm.lastSuccessfulStage = stageKey;
+  appStateSet('runtime.stageMachine', sm, `stageOk:${stageKey}`);
+}
+
+function stageError(stageKey, err, meta = {}) {
+  const sm = stageEnsureRegistry();
+  if (!STAGE_KEYS.includes(stageKey)) return;
+  const now = new Date().toISOString();
+  const prev = sm.stages[stageKey] || crearEstatStageBase();
+  sm.stages[stageKey] = Object.assign({}, prev, {
+    status: 'error',
+    finishedAt: now,
+    requestId: meta.requestId || prev.requestId || null,
+    errorCode: meta.errorCode || err?.code || 'STAGE_ERROR',
+    errorMessage: String(meta.errorMessage || err?.message || 'Error desconegut')
+  });
+  sm.currentStage = stageKey;
+  appStateSet('runtime.stageMachine', sm, `stageError:${stageKey}`);
+}
+
+async function runStage(stageKey, fn) {
+  const requestId = stageStart(stageKey);
+  try {
+    const result = await fn(requestId);
+    stageOk(stageKey, { requestId });
+    return result;
+  } catch (err) {
+    stageError(stageKey, err, { requestId });
+    throw err;
+  }
+}
+
+stageEnsureRegistry();
 
 // ═══════════════════════════════════════════════════════════
 //  CONFIGURACIÓ
@@ -2687,16 +2790,24 @@ async function iniciarFase1() {
 
   ESTAT.tematica = sel;
   ESTAT.history  = [];
+  appStateSet('data.ideaTheme', sel, 'iniciarFase1');
+  stageOk('idea', { requestId: `idea-${Date.now()}` });
   setFase(1);
   updateProgress(1);
   showCard('fase-1');
   showLoader(1);
 
   try {
-    const res = await fase1_premisses(sel, [], USER_CONFIG);
-    ESTAT.history = res.history;
-    hideLoader(1);
-    renderPremisses(res.response);
+    await runStage('premise', async () => {
+      const res = await fase1_premisses(sel, [], USER_CONFIG);
+      ESTAT.history = res.history;
+      hideLoader(1);
+      renderPremisses(res.response);
+      appStateSet('data.premise', {
+        selected: ESTAT.premissaTriada || null,
+        options: Array.isArray(ESTAT._premissaLista) ? ESTAT._premissaLista.slice() : []
+      }, 'iniciarFase1:premise');
+    });
   } catch (err) {
     hideLoader(1);
     toast('Error: ' + err.message);
@@ -3041,6 +3152,7 @@ function _confirmarMonNouSilent() {
   const idx = ESTAT._idxMonNou;
   if (idx === null || idx === undefined || !ESTAT._monNouLlista?.[idx]) return;
   const monTriat = ESTAT._monNouLlista[idx];
+
   ESTAT.worldbuilding = monTriat;
   ESTAT._monNouText = monTriat;
 
@@ -3055,7 +3167,6 @@ function _confirmarMonNouSilent() {
   const llocMatch = monTriat.match(/LLOC I ÈPOCA:[\s*]*(.*)/i);
   if (llocMatch) {
     const llocRaw = llocMatch[1].replace(/\*+/g, '').trim();
-    // Nom curt: primera frase (fins al primer punt o 80 chars)
     const nomCurt = (llocRaw.split(/\.\s/)[0] || llocRaw).substring(0, 120).trim();
     ESTAT.localitzacioTriada = nomCurt;
     ESTAT.bibliaNarrativa.llocs_importants = [{ nom: nomCurt, descripcio: llocRaw.substring(0, 300) }];
@@ -3564,6 +3675,9 @@ async function confirmarPersonatgesNou() {
   }
   const propText = ESTAT._personatgesNouPropostes[idx];
 
+  try {
+    await runStage('characters', async () => {
+
   // Parsejar personatges
   const personatgesLines = propText.split('\n');
   const personatgesArr = [];
@@ -3665,6 +3779,16 @@ async function confirmarPersonatgesNou() {
   } catch (err) {
     hideLoader('b4');
     toast('Error generant món: ' + err.message);
+    throw err;
+  }
+
+      appStateSet('data.characters', {
+        selectedNames: Array.isArray(ESTAT._personatgesSeleccionats) ? ESTAT._personatgesSeleccionats.slice() : [],
+        profiles: personatgesArr
+      }, 'confirmarPersonatgesNou');
+    });
+  } catch (err) {
+    toast('Error confirmant personatges: ' + err.message);
   }
 }
 
@@ -3788,7 +3912,10 @@ async function confirmarMonNou() {
     return;
   }
   const monTriat = ESTAT._monNouLlista[idx];
-  ESTAT.worldbuilding = monTriat;
+
+  try {
+    await runStage('world', async () => {
+      ESTAT.worldbuilding = monTriat;
   ESTAT._monNouText = monTriat;
 
   // Parsejar restriccions i lloc
@@ -3816,6 +3943,13 @@ async function confirmarMonNou() {
   } catch (err) {
     hideLoader('b5');
     toast('Error generant estructura: ' + err.message);
+    throw err;
+  }
+
+      appStateSet('data.world', { text: monTriat }, 'confirmarMonNou');
+    });
+  } catch (err) {
+    toast('Error confirmant món: ' + err.message);
   }
 }
 
@@ -3954,6 +4088,9 @@ async function confirmarEstructuraNou() {
   }
   const caps = ESTAT._estructuresNouOpcions[idx];
 
+  try {
+    await runStage('structure', async () => {
+
   ESTAT._estructuraCapitols = caps.map(c => ({
     numero: c.numero,
     titol: c.titol,
@@ -3984,6 +4121,15 @@ async function confirmarEstructuraNou() {
   setTimeout(() => document.getElementById('fase-b6')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   showLoader('b6');
   await iniciarEscaletaSeqNou();
+
+      appStateSet('data.structure', {
+        chapters: ESTAT._estructuraCapitols.map(c => ({ numero: c.numero, titol: c.titol, intensity_level: c.intensity_level })),
+        chapterCount: ESTAT._estructuraCapitols.length
+      }, 'confirmarEstructuraNou');
+    });
+  } catch (err) {
+    toast('Error confirmant estructura: ' + err.message);
+  }
 }
 
 // ─── Ganxos narratius de capítol (Prompt E) ───────────────────────────────────
@@ -4214,12 +4360,14 @@ function mostrarResumNKGiTransicio(nkg, capitolsEscaleta, validacio, modeCreacio
   resumDiv.textContent = `════════════════════════════════════════\nNKG COMPLET — Llest per a exportació\n════════════════════════════════════════\nTema:        ${nkg.macronarrativa?.theme || '—'}\nFinal:       ${nkg.macronarrativa?.ending?.emocio_final_lector || '—'}\nPersonatges: ${personatgesNoms || '(cap)'}\nCapítols:    ${(capitolsEscaleta||[]).length} · Intensitats: ${intensitats}\nFils oberts: ${filsOberts}\n${avisos}\n════════════════════════════════════════`;
   botonsDiv.innerHTML = '';
   if (validacio.errors.length > 0) {
+    stageError('nkg', { message: validacio.errors.join(' | '), code: 'NKG_VALIDATION' });
     const errDiv = document.createElement('div');
     errDiv.style.cssText = 'color:#e55;font-size:.88rem;margin-bottom:8px;';
     errDiv.textContent = `❌ Errors bloquejants: ${validacio.errors.join(' | ')}`;
     botonsDiv.parentNode.insertBefore(errDiv, botonsDiv);
     document.getElementById('btn-fase23-nou')?.classList.remove('hidden');
   } else {
+    stageOk('nkg', { requestId: `nkg-valid-${Date.now()}` });
     const btnExport = document.createElement('button');
     btnExport.className = 'btn btn-primary';
     btnExport.textContent = '⬇ Exportar NKG + Bíblia';
@@ -7946,6 +8094,7 @@ async function iniciarFaseEscaleta() {
   showLoader('20');
   document.getElementById('loader-20-text').textContent = 'Opus generant escaleta per escenes…';
   try {
+    await runStage('chapterOutline', async () => {
     const caps = ESTAT._estructuraCapitols;
     const BLOC = 4; // Reduït de 5 a 4 per donar més marge
     let totsResultats = [];
@@ -8003,6 +8152,12 @@ async function iniciarFaseEscaleta() {
     hideLoader('20');
     mostrarEscaleta(totsResultats);
     document.getElementById('btn-fase21').classList.remove('hidden');
+    appStateSet('data.chapterOutline', {
+      total: totsResultats.length,
+      escaletes: totsResultats
+    }, 'iniciarFaseEscaleta');
+    if (ESTAT._nkg) stageOk('nkg', { requestId: `nkg-ready-${Date.now()}` });
+  });
   } catch (e) {
     hideLoader('20');
     toast('Error generant escaleta: ' + e.message);
@@ -9861,7 +10016,14 @@ async function descarregarNKGiBiblia() {
   const nkg = ESTAT._nkg || {};
   const biblia = ESTAT.bibliaNarrativa || {};
   try {
+    if (nkg && Object.keys(nkg).length > 0) stageOk('nkg', { requestId: `nkg-export-${Date.now()}` });
+    if (biblia && Object.keys(biblia).length > 0) stageOk('bible', { requestId: `bible-export-${Date.now()}` });
     await generarFitxerContexte(nkg, biblia, capitolActual);
+    appStateMerge('data.exportMeta', {
+      lastExportAtISO: new Date().toISOString(),
+      exportCount: Number((AppState.data.exportMeta && AppState.data.exportMeta.exportCount) || 0) + 1,
+      lastFormat: 'json'
+    }, 'descarregarNKGiBiblia');
   } catch (err) {
     toast(err.message || 'No s\'ha pogut exportar NKG + Bíblia.');
   }
@@ -11195,8 +11357,11 @@ async function regenerarBibliaNarrativa() {
   const btn = document.getElementById('btn-regenerar-biblia');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Regenerant…'; }
   try {
-    await inicialitzarBiblia(USER_CONFIG);
-    await completarBibliaPersonatges(USER_CONFIG);
+    await runStage('bible', async () => {
+      await inicialitzarBiblia(USER_CONFIG);
+      await completarBibliaPersonatges(USER_CONFIG);
+      appStateSet('data.bible', ESTAT.bibliaNarrativa || null, 'regenerarBibliaNarrativa');
+    });
     obrirBiblia();
     toast('✓ Bíblia Narrativa regenerada.');
   } catch (err) {
