@@ -11724,7 +11724,9 @@ function analitzarRespostaGenerica(respostaJSON, proveidor) {
       throw new Error('Gemini ha bloquejat la resposta per filtres de seguretat extrems. Prova amb un fragment menys sensible.');
     }
     const parts = firstCandidate && firstCandidate.content ? firstCandidate.content.parts : [];
-    text = Array.isArray(parts) ? parts.map(p => (p && p.text) ? p.text : '').join('\n') : '';
+    // Filtrar parts de "thinking" (Gemini 2.5+ models) — només agafar contingut real
+    const contentParts = Array.isArray(parts) ? parts.filter(p => p && p.text && !p.thought) : [];
+    text = contentParts.map(p => p.text).join('\n');
     textIncomplet = !!(firstCandidate && firstCandidate.finishReason === 'MAX_TOKENS');
 
   } else {
@@ -12156,7 +12158,12 @@ async function callGemini(messages, systemPrompt, apiKey, model, maxTokens, extr
     encodeURIComponent(finalModel) + ':generateContent?key=' + encodeURIComponent(apiKey);
 
   const genConfig = { maxOutputTokens: maxTokens };
-  if (extraConfig && extraConfig.responseMimeType) genConfig.responseMimeType = extraConfig.responseMimeType;
+  // Forçar JSON output si el system prompt ho demana o si s'ha especificat explícitament
+  if (extraConfig && extraConfig.responseMimeType) {
+    genConfig.responseMimeType = extraConfig.responseMimeType;
+  } else if (systemPrompt && /respon\s+(exclusivament|només|únicament)\s+(amb\s+)?json|retorna\s+(només|exclusivament)\s+json/i.test(systemPrompt)) {
+    genConfig.responseMimeType = 'application/json';
+  }
 
   const payload = {
     contents:         buildGeminiContents(messages),
@@ -12196,9 +12203,15 @@ async function callGeminiWithFinishReason(messages, systemPrompt, apiKey, model,
   const endpoint   = PROVIDER_DEFAULTS.gemini.apiUrlBase + '/' +
     encodeURIComponent(finalModel) + ':generateContent?key=' + encodeURIComponent(apiKey);
 
+  const genConfig = { maxOutputTokens: maxTokens };
+  // Forçar JSON output si el system prompt ho demana
+  if (systemPrompt && /respon\s+(exclusivament|només|únicament)\s+(amb\s+)?json|retorna\s+(només|exclusivament)\s+json/i.test(systemPrompt)) {
+    genConfig.responseMimeType = 'application/json';
+  }
+
   const payload = {
     contents:         buildGeminiContents(messages),
-    generationConfig: { maxOutputTokens: maxTokens },
+    generationConfig: genConfig,
     safetySettings: [
       { category: "HARM_CATEGORY_HARASSMENT",        threshold: "BLOCK_NONE" },
       { category: "HARM_CATEGORY_HATE_SPEECH",        threshold: "BLOCK_NONE" },
