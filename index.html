@@ -3731,7 +3731,7 @@ async function confirmarPersonatgesNou() {
     const nomMatch = line.match(/^NOM:\s*(.+)/i);
     if (nomMatch) {
       if (current) personatgesArr.push(current);
-      current = { nom: nomMatch[1].trim(), arc: {inici_emocional:'',final_emocional:'',canvi_o_bloqueig:''}, limit_moral: '', veu: {registre:'',mai_diria:[],quan_menteix:'',quan_es_sincer:'',exemples_narratius:[],vocabulari_recurrent:[],vocabulari_prohibit:[],longitud_frases:'mitjanes'} };
+      current = { nom: nomMatch[1].trim(), arc: {inici_emocional:'',final_emocional:'',canvi_o_bloqueig:'',waypoints:[]}, limit_moral: '', veu: {registre:'',mai_diria:[],quan_menteix:'',quan_es_sincer:'',exemples_narratius:[],vocabulari_recurrent:[],vocabulari_prohibit:[],longitud_frases:'mitjanes'} };
     }
     if (current) {
       if (/^ARC:/i.test(line)) current.arc = parseArc(line);
@@ -4204,6 +4204,7 @@ function validarNKGComplet(nkg, capitolsEscaleta) {
     if (!p.limit_moral)        warnings.push(`${p.nom}: limit_moral buit`);
     if (!p.veu?.mai_diria || (Array.isArray(p.veu.mai_diria) && p.veu.mai_diria.length === 0)) warnings.push(`${p.nom}: veu.mai_diria buit`);
     if (!p.arc?.final_emocional) errors.push(`${p.nom}: arc.final_emocional buit`);
+    if (!String(p.motivacions_base?.necessitat_interna || '').trim()) errors.push(`${p.nom}: motivacions_base.necessitat_interna buida`);
   }
   for (const cap of (capitolsEscaleta || [])) {
     if (!cap.titol)           warnings.push(`Capítol ${cap.numero||'?'}: títol buit`);
@@ -4371,10 +4372,6 @@ async function iniciarEscaletaSeqNou() {
   const resultWrap = document.getElementById('escaleta-nou-result');
   resultWrap.innerHTML = '';
 
-  // FUNCIÓ MENOR 2 — ratio diàleg per defecte basat en el perfil de l'autor
-  const autorPerfilEscaleta = (ESTAT.configuracio && ESTAT.configuracio.perfil_autor) || (ESTAT.estil && ESTAT.estil.to) || '';
-  const ratioDialegDefault = inferirRatioDialegPerAutor(autorPerfilEscaleta);
-
   for (let idx = 0; idx < n; idx++) {
     const capInfo = ESTAT._estructuraCapitols[idx];
     const loaderText = document.getElementById('loader-b6-text');
@@ -4412,12 +4409,9 @@ async function iniciarEscaletaSeqNou() {
       };
       ESTAT._escaletes.push(escaleta);
 
-      // Desar ganxo_final i ratio_dialeg a _estructuraCapitols
+      // Desar ganxo_final a _estructuraCapitols
       if (ESTAT._estructuraCapitols[idx]) {
         ESTAT._estructuraCapitols[idx].ganxo_final = ganxoFinal;
-        if (!ESTAT._estructuraCapitols[idx].ratio_dialeg) {
-          ESTAT._estructuraCapitols[idx].ratio_dialeg = normalitzarRatioDialeg(ratioDialegDefault, ESTAT._estructuraCapitols[idx] || {});
-        }
       }
       // Validar compatibilitat ganxo/intensitat
       if (ganxoFinal) {
@@ -5708,7 +5702,7 @@ Genera EXCLUSIVAMENT JSON vàlid:
     {
       "id": "clau_snake_case",
       "nom": "Nom Cognom",
-      "arc": {"inici_emocional":"...","final_emocional":"...","canvi_o_bloqueig":"..."},
+      "arc": {"inici_emocional":"...","final_emocional":"...","canvi_o_bloqueig":"...","waypoints":[]},
       "limit_moral": "...",
       "veu": {"registre":"...","mai_diria":["..."],"quan_menteix":"...","quan_es_sincer":"..."},
       "motivacions_base": {"desig_extern":"...","necessitat_interna":"..."},
@@ -5742,7 +5736,7 @@ async function assegurarMinimPersonatgesPerRelacions(minim = 2, userConfig) {
       nom: raw.nom || clau,
       estat_fisic: inferirEstatFisicInicialDesDeArc(raw.arc || {}, raw.limit_moral || ''),
       estat_emocional: inferirEstatEmocionalInicialDesDeArc(raw.arc || {}),
-      arc: raw.arc || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '' },
+      arc: raw.arc || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '', waypoints: [] },
       limit_moral: raw.limit_moral || '',
       veu: normalitzarVeuAvancada(raw.veu || {}),
       objectes_inventari: [], objectes_descartats: [], ubicacio: '',
@@ -6376,6 +6370,124 @@ async function generarObjectiusSecrets(userConfig, onProgress) {
   return resultatTotal;
 }
 
+
+function obtenirCapitolsAparicioPersonatge(clau = '', p = null) {
+  const nom = nkgNormalitzarNom((p && p.nom) || clau || '');
+  const caps = (ESTAT._estructuraCapitols || [])
+    .map(c => ({ numero: Number(c.numero || c.capitol || 0), personatges: Array.isArray(c.personatges) ? c.personatges : [] }))
+    .filter(c => c.numero > 0)
+    .filter(c => c.personatges.some(n => nkgNormalitzarNom(n) === nom));
+  return [...new Set(caps.map(c => c.numero))].sort((a, b) => a - b);
+}
+
+function obtenirCapitolsPovPersonatge(clau = '', p = null) {
+  const nom = nkgNormalitzarNom((p && p.nom) || clau || '');
+  const pov = (((ESTAT._nkg || {}).context_creacio || {}).estil || {}).perspectiva || {};
+  const llista = Array.isArray(pov.pov_per_capitol) ? pov.pov_per_capitol : [];
+  return [...new Set(llista
+    .filter(x => nkgNormalitzarNom(x && x.personatge_pov || '') === nom)
+    .map(x => Number(x.capitol || 0))
+    .filter(n => n > 0))].sort((a, b) => a - b);
+}
+
+function esProtagonistaPersonatge(p = {}) {
+  const rol = String((p.trets_immutables && p.trets_immutables.rol_narratiu) || '').toLowerCase();
+  return rol.includes('protagonista');
+}
+
+function validarDistribucioWaypoints(waypoints = [], capitolsAparicio = [], totalCapitols = 1, minims = 1) {
+  let ordenats = (Array.isArray(waypoints) ? waypoints : []).slice().sort((a, b) => a.capitol - b.capitol);
+  if (ordenats.length < minims) {
+    const candidats = (capitolsAparicio || []).filter(c => c > 1);
+    while (ordenats.length < minims && candidats.length > 0) {
+      const c = candidats[Math.min(ordenats.length, candidats.length - 1)];
+      ordenats.push({ capitol: c, estat: 'El conflicte intern canvia de qualitat i altera la seva resposta sota pressió.', senyal_visible: 'S interromp a mitja frase, manté un silenci massa llarg i executa un gest defensiu repetit.' });
+    }
+  }
+  ordenats = ordenats.slice(0, 5);
+  if (ordenats.length > 0) {
+    const limitFinal = Math.max(2, Number(totalCapitols || 1) - 1);
+    if (ordenats[0].capitol <= 1) ordenats[0].capitol = Math.max(2, (capitolsAparicio.find(c => c > 1) || 2));
+    if (ordenats[ordenats.length - 1].capitol > limitFinal) {
+      const alternatiu = [...(capitolsAparicio || [])].reverse().find(c => c <= limitFinal);
+      ordenats[ordenats.length - 1].capitol = alternatiu || limitFinal;
+    }
+  }
+  return ordenats.sort((a, b) => a.capitol - b.capitol);
+}
+
+async function generarWaypointsArcPersonatges(userConfig, onProgress) {
+  const nkg = ESTAT._nkg || {};
+  const personatges = nkg.personatges || {};
+  const claus = Object.keys(personatges);
+  if (claus.length === 0) return {};
+
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  const totalCapitols = Math.max(1, Number(ESTAT._nombreCapitols || (ESTAT._estructuraCapitols || []).length || 1));
+  const resultat = {};
+
+  for (const clau of claus) {
+    const p = personatges[clau] || {};
+    const capitolsAparicio = obtenirCapitolsAparicioPersonatge(clau, p);
+    const capitolsPov = obtenirCapitolsPovPersonatge(clau, p);
+    const minims = esProtagonistaPersonatge(p) ? 3 : 1;
+    const maxims = esProtagonistaPersonatge(p) ? 5 : 3;
+
+    if (capitolsAparicio.length === 0) continue;
+    if (onProgress) onProgress(`Definint waypoints emocionals: ${p.nom || clau}...`);
+
+    const prompt = `L'arc del personatge ${p.nom || clau} va de "${p.arc?.inici_emocional || ''}" a "${p.arc?.final_emocional || ''}".
+El canvi és: "${p.arc?.canvi_o_bloqueig || ''}".
+La seva necessitat interna és: "${p.motivacions_base?.necessitat_interna || ''}".
+
+La novel·la té ${totalCapitols} capítols. El personatge apareix als capítols: ${capitolsAparicio.join(', ')}.
+El personatge és POV als capítols: ${capitolsPov.join(', ') || '(cap)'}.
+
+Defineix entre ${minims} i ${maxims} WAYPOINTS EMOCIONALS: moments concrets on l'estat intern del personatge canvia de qualitat.
+
+Cada waypoint ha de contenir:
+- "capitol": número del capítol on es produeix
+- "estat": descripció interna del canvi (instrucció per al model, no text de la novel·la)
+- "senyal_visible": com es MOSTRA físicament o conductual al text (no com s'explica ni com es pensa)
+
+Regles:
+- Els waypoints han d'estar distribuïts al llarg de la novel·la, no concentrats al final
+- Almenys un waypoint ha de tocar la "necessitat_interna" directament
+- El senyal_visible ha de ser concret i cinematogràfic: una acció, un gest, un canvi de conducta observable. MAI un pensament.
+- El primer waypoint NO pot ser al primer capítol
+- L'últim waypoint ha de ser almenys 1-2 capítols ABANS del final
+- Cap senyal_visible pot contenir: "sent que", "pensa que", "s'adona que"
+- Els capítols dels waypoints han de coincidir amb capítols on el personatge apareix
+
+Retorna EXCLUSIVAMENT un array JSON de waypoints.`;
+
+    try {
+      const raw = await callLLMMulti(
+        [{ role: 'user', content: prompt }],
+        'Ets un editor d arc de personatge. Retorna només JSON vàlid en català.',
+        Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 1200, model: models.modelArquitecte }),
+        'arquitectura'
+      );
+      const parsed = parseJsonRobust(raw);
+      const arr = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.waypoints) ? parsed.waypoints : []);
+      const normalitzats = arr.map((w, i) => normalitzarWaypointEmocional(w, i, totalCapitols, capitolsAparicio));
+      const valids = normalitzats.filter(w => capitolsAparicio.includes(Number(w.capitol)) && String(w.estat || '').trim() && String(w.senyal_visible || '').trim());
+      resultat[clau] = validarDistribucioWaypoints(valids, capitolsAparicio, totalCapitols, minims);
+    } catch (err) {
+      console.warn(`Waypoints fallits per ${p.nom || clau}:`, err.message);
+      resultat[clau] = validarDistribucioWaypoints([], capitolsAparicio, totalCapitols, minims);
+    }
+  }
+
+  Object.entries(resultat).forEach(([clau, waypoints]) => {
+    if (!personatges[clau]) return;
+    const arcActual = personatges[clau].arc || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '', waypoints: [] };
+    personatges[clau].arc = Object.assign({}, arcActual, { waypoints: Array.isArray(waypoints) ? waypoints : [] });
+  });
+
+  return resultat;
+}
+
 async function iniciarFaseObjectiusSecrets() {
   ESTAT.fase = 9.47;
   updateProgress(9.47);
@@ -6387,6 +6499,7 @@ async function iniciarFaseObjectiusSecrets() {
   const onProgress = msg => { if (loaderText) loaderText.textContent = msg; };
   try {
     const data = await generarObjectiusSecrets(USER_CONFIG, onProgress);
+    await generarWaypointsArcPersonatges(USER_CONFIG, onProgress);
     const vista = getActiveObjectives(1);
     hideLoader('9-47');
     mostrarObjectiusSecrets(ESTAT._nkg.personatges || {});
@@ -6674,14 +6787,375 @@ function normalitzarCronologiaNarrativa(raw = {}) {
   };
 }
 
-function normalitzarTimelineAccio(raw = {}) {
+
+function normalitzarTemperaturaEntrada(raw = {}, idx = 0) {
+  const r = raw || {};
   return {
-    capitol: Math.max(1, Number(raw.capitol) || 1),
-    personatge: nkgNormalitzarNom(raw.personatge || ''),
-    accio: String(raw.accio || '').trim(),
-    hora_aproximada: String(raw.hora_aproximada || '').trim(),
-    ubicacio: nkgNormalitzarNom(raw.ubicacio || '')
+    capitol: Math.max(1, Number(r.capitol) || (idx + 1)),
+    temperatura: Math.max(0, Math.min(10, Number(r.temperatura))),
+    justificacio: String(r.justificacio || '').trim()
   };
+}
+
+function resumWaypointsPerCapitol(capitol = 1) {
+  const nkg = ESTAT._nkg || {};
+  const noms = [];
+  Object.values(nkg.personatges || {}).forEach(p => {
+    const wps = Array.isArray(p?.arc?.waypoints) ? p.arc.waypoints : [];
+    if (wps.some(w => Number(w.capitol) === Number(capitol))) noms.push(p.nom || 'personatge');
+  });
+  return noms;
+}
+
+function construirResumCapitolsTemperatura() {
+  const perspectiva = (((ESTAT._nkg || {}).context_creacio || {}).estil || {}).perspectiva || {};
+  const pov = Array.isArray(perspectiva.pov_per_capitol) ? perspectiva.pov_per_capitol : [];
+  return (ESTAT._estructuraCapitols || []).map((cap, idx) => {
+    const numero = Number(cap.numero || idx + 1);
+    const p = pov.find(x => Number(x.capitol) === numero);
+    const nomsWp = resumWaypointsPerCapitol(numero);
+    return {
+      capitol: numero,
+      titol: cap.titol || '',
+      funcio: cap.resum || cap.funcio_narrativa || '',
+      intensitat: Number(cap.intensity_level || 3),
+      ganxo_tipus: cap.ganxo_final?.tipus || '',
+      ganxo_element: cap.ganxo_final?.element || '',
+      pov: p?.personatge_pov || '',
+      waypoints_capitol: nomsWp
+    };
+  });
+}
+
+async function generarTemperaturaEmocionalCapitols(userConfig) {
+  const capitols = construirResumCapitolsTemperatura();
+  if (!Array.isArray(capitols) || capitols.length === 0) return [];
+  const nkg = ESTAT._nkg || {};
+  const tema = nkg.macronarrativa?.theme || '';
+  const estilBase = ESTAT.estil?.desc || '';
+  const emocioFinal = nkg.macronarrativa?.ending?.emocio_final_lector || '';
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+
+  const llistaTxt = capitols.map(c => `- Capítol ${c.capitol}: "${c.titol}" — Funció: ${c.funcio || '(sense funció)'} — Intensitat: ${c.intensitat}/5
+  - Ganxo final: ${c.ganxo_tipus || '(sense)'} — Element: ${c.ganxo_element || '(sense)'}
+  - POV: ${c.pov || '(sense POV)'}
+  - Waypoints emocionals en aquest capítol: ${c.waypoints_capitol.length > 0 ? 'sí, ' + c.waypoints_capitol.join(', ') : 'no'}`).join('\n');
+
+  const prompt = `Aquesta és l'estructura de capítols de la novel·la:
+
+${llistaTxt}
+
+El tema de la novel·la és: "${tema}"
+L'estil base és: "${estilBase}"
+El final busca l'emoció: "${emocioFinal}"
+
+Assigna una TEMPERATURA EMOCIONAL de 0 a 10 a cada capítol.
+
+Escala:
+0-1: Glaçat. Contenció total. Prosa mecànica. Zero fissures.
+2-3: Fred. El to habitual de l'estil. Emoció per omissió.
+4-5: Temperat. Permís per a moments de calor humana: un gest inesperat, un diàleg no funcional, una observació sobre alguna cosa bella o trista.
+6-7: Càlid. Les defenses dels personatges baixen. El diàleg pot ser desordenat. El cos dels personatges parla.
+8-9: Calent. Ruptura emocional. El to pot trencar-se breument.
+10: Incandescent. Reservat per a UN SOL moment de tota l'obra.
+
+Regles:
+- La temperatura NO ha de seguir la intensitat narrativa.
+- La temperatura SEGUEIX la proximitat a la necessitat interna del personatge POV.
+- No més d'un capítol a 8+. Només un a 10 (o cap).
+- La corba ha de tenir alts i baixos, no ser ascendent constant.
+- El capítol final ha de tenir la temperatura coherent amb "${emocioFinal}", no necessàriament la més alta.
+
+Retorna EXCLUSIVAMENT un array JSON:
+[{"capitol": 1, "temperatura": N, "justificacio": "..."}]`;
+
+  const msgs = [{ role: 'user', content: prompt }];
+  for (let intent = 1; intent <= 2; intent++) {
+    const raw = await callLLMMulti(
+      msgs,
+      'Ets un editor d arquitectura emocional de novel·la. Retorna només JSON vàlid en català.',
+      Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 2600, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+    const parsed = parseJsonRobust(raw);
+    const arr = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.temperatures) ? parsed.temperatures : []);
+    if (arr.length > 0) return arr.map(normalitzarTemperaturaEntrada).filter(x => Number.isFinite(x.temperatura));
+    msgs.push({ role: 'user', content: 'Resposta invàlida. Torna EXCLUSIVAMENT un array JSON de capítol+temperatura+justificació.' });
+  }
+  return [];
+}
+
+function aplicarTemperaturaEmocionalAEstructura(temperatures = []) {
+  const perCap = new Map((temperatures || []).map(t => [Number(t.capitol), t]));
+  (ESTAT._estructuraCapitols || []).forEach((cap, idx) => {
+    const num = Number(cap.numero || idx + 1);
+    const t = perCap.get(num);
+    if (!t) return;
+    cap.temperatura_emocional = Math.max(0, Math.min(10, Number(t.temperatura)));
+    cap.temperatura_justificacio = String(t.justificacio || '').trim();
+  });
+}
+
+async function assegurarTemperaturaEmocionalCapitols(userConfig, setStatus = null) {
+  if (!Array.isArray(ESTAT._estruturaCapitols) || ESTAT._estruturaCapitols.length === 0) return;
+  if (typeof setStatus === 'function') setStatus('Calculant temperatura emocional per capítol...');
+  const temperatures = await generarTemperaturaEmocionalCapitols(userConfig);
+  if (temperatures.length > 0) aplicarTemperaturaEmocionalAEstructura(temperatures);
+  await assegurarRatioDialegCapitols(userConfig, setStatus);
+  await assegurarCostEmocionalCapitols(userConfig, setStatus);
+}
+
+
+
+function qualitatDialegPerTemperatura(temperatura = 3) {
+  const t = Number(temperatura);
+  if (t <= 3) return 'funcional';
+  if (t <= 5) return 'textura';
+  if (t <= 7) return 'permeable';
+  return 'fragil';
+}
+
+function inferirTipusDialegFallback(ctx = {}) {
+  const n = Number(ctx.nombre_personatges || 0);
+  const f = String(ctx.funcio || '').toLowerCase();
+  const temp = Number(ctx.temperatura_emocional || 3);
+  const conflicte = /(conflicte|xoc|enfront|discussi|judici|amenaça|ultimatum)/.test(f);
+  const revelacio = /(revela|confessa|veritat|admet|plora|ruptura|catarsi)/.test(f);
+  if (n <= 1) return /(fug|persec|cursa|lluita|assalt|escapa|accio)/.test(f) ? 'minim_accio' : 'minim_intern';
+  if (n >= 3) return 'dialeg_coral';
+  if (revelacio || temp >= 8) return 'dialeg_ruptura';
+  if (conflicte) return 'dialeg_intens';
+  return 'dialeg_contingut';
+}
+
+function normalitzarSortidaDialegCapitol(raw = {}, ctx = {}) {
+  const n = Math.max(1, Number(ctx.nombre_personatges || 1));
+  const conflicte = /(conflicte|xoc|enfront|discussi|judici|amenaça|ultimatum)/.test(String(ctx.funcio || '').toLowerCase());
+  const tipus = inferirTipusDialegFallback(Object.assign({}, ctx, { funcio: String(ctx.funcio || '') , tipus: raw.tipus_dialeg }));
+  let p = Math.round(Number(raw.percentatge_dialeg));
+  if (!Number.isFinite(p)) {
+    const perTipus = { minim_intern: 14, minim_accio: 8, dialeg_contingut: 30, dialeg_intens: 40, dialeg_coral: 48, dialeg_ruptura: 25 };
+    p = perTipus[tipus] || 30;
+  }
+  if (n <= 1) p = Math.min(p, 20);
+  if (n === 2 && conflicte) p = Math.max(p, 25);
+  p = Math.max(5, Math.min(55, p));
+  return {
+    capitol: Math.max(1, Number(raw.capitol || ctx.capitol || 1)),
+    percentatge_dialeg: p,
+    tipus_dialeg: tipus,
+    qualitat_dialeg: String(raw.qualitat_dialeg || '').trim() || qualitatDialegPerTemperatura(ctx.temperatura_emocional || 3),
+    notes: String(raw.notes || '').trim()
+  };
+}
+
+function construirContextDialegCapitols() {
+  return (ESTAT._estruturaCapitols || []).map((cap, idx) => {
+    const numero = Number(cap.numero || idx + 1);
+    const presents = Array.isArray(cap.personatges) ? cap.personatges.filter(Boolean) : [];
+    const pov = ((((ESTAT._nkg || {}).context_creacio || {}).estil || {}).perspectiva?.pov_per_capitol || []).find(x => Number(x.capitol) === numero);
+    const llistaPresents = presents.length > 0 ? presents : (pov?.personatge_pov ? [pov.personatge_pov] : []);
+    return {
+      capitol: numero,
+      titol: cap.titol || '',
+      pov: pov?.personatge_pov || '',
+      funcio: cap.resum || cap.funcio_narrativa || '',
+      temperatura_emocional: Number(cap.temperatura_emocional ?? 3),
+      personatges_presents: llistaPresents,
+      nombre_personatges: llistaPresents.length
+    };
+  });
+}
+
+async function generarRatioDialegCapitols(userConfig) {
+  const ctxCaps = construirContextDialegCapitols();
+  if (ctxCaps.length === 0) return [];
+  const txt = ctxCaps.map(c => `- Capítol ${c.capitol}: "${c.titol}" — POV: ${c.pov || '(sense POV)'}
+- Funció: ${c.funcio || '(sense funció)'}
+- Temperatura emocional: ${c.temperatura_emocional}/10
+- Personatges presents a l'escena: ${(c.personatges_presents || []).join(', ') || '(no definit)'}
+- Nombre de personatges: ${c.nombre_personatges}`).join('\n\n');
+  const prompt = `Aquesta és l'estructura de capítols amb la temperatura emocional assignada:
+
+${txt}
+
+Assigna un RATIO DE DIÀLEG i un TIPUS DE DIÀLEG a cada capítol.
+
+Taula de referència:
+  Personatge sol, reflexiu:          10-18%  |  minim_intern
+  Personatge sol, en acció:          5-10%   |  minim_accio
+  Dos personatges, tensió freda:     25-35%  |  dialeg_contingut
+  Dos personatges, conflicte obert:  35-45%  |  dialeg_intens
+  Grup, escena coral:                40-55%  |  dialeg_coral
+  Escena de revelació emocional:     20-30%  |  dialeg_ruptura
+
+Regles:
+- Un personatge sol NO pot tenir més de 20% de diàleg
+- Dos personatges en conflicte NO poden tenir menys de 25%
+- La temperatura emocional modula la QUALITAT del diàleg, no necessàriament la quantitat:
+  · Temp 0-3: Diàleg funcional.
+  · Temp 4-5: Diàleg amb textura.
+  · Temp 6-7: Diàleg permeable.
+  · Temp 8+: Diàleg fràgil.
+- NO tots els capítols poden tenir el mateix percentatge.
+- Variació mínima de 10 punts entre capítol amb menys i més diàleg.
+
+Retorna EXCLUSIVAMENT un array JSON:
+[{"capitol": 1, "percentatge_dialeg": N, "tipus_dialeg": "...", "qualitat_dialeg": "...", "notes": "..."}]`;
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  const msgs = [{ role: 'user', content: prompt }];
+  for (let intent = 1; intent <= 2; intent++) {
+    const raw = await callLLMMulti(msgs, 'Ets un editor de diàlegs literaris. Retorna només JSON vàlid en català.', Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 2600, model: models.modelArquitecte }), 'arquitectura');
+    const parsed = parseJsonRobust(raw);
+    const arr = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.ratios) ? parsed.ratios : []);
+    if (arr.length > 0) {
+      const out = ctxCaps.map((ctx, i) => normalitzarSortidaDialegCapitol(arr.find(x => Number(x.capitol) === ctx.capitol) || arr[i] || {}, ctx));
+      const min = Math.min(...out.map(o => o.percentatge_dialeg));
+      const max = Math.max(...out.map(o => o.percentatge_dialeg));
+      if ((max - min) < 10 && out.length > 1) {
+        const iMin = out.findIndex(o => o.percentatge_dialeg === min);
+        const iMax = out.findIndex(o => o.percentatge_dialeg === max);
+        out[iMin].percentatge_dialeg = Math.max(5, out[iMin].percentatge_dialeg - 5);
+        out[iMax].percentatge_dialeg = Math.min(55, out[iMax].percentatge_dialeg + 5);
+      }
+      return out;
+    }
+    msgs.push({ role: 'user', content: 'Resposta invàlida. Torna únicament un array JSON amb capitol, percentatge_dialeg, tipus_dialeg, qualitat_dialeg i notes.' });
+  }
+  return [];
+}
+
+function aplicarRatioDialegCapitols(ratios = []) {
+  const map = new Map((ratios || []).map(r => [Number(r.capitol), r]));
+  (ESTAT._estruturaCapitols || []).forEach((cap, idx) => {
+    const num = Number(cap.numero || idx + 1);
+    const r = map.get(num);
+    if (!r) return;
+    cap.ratio_dialeg = normalitzarRatioDialeg(r, cap);
+  });
+}
+
+async function assegurarRatioDialegCapitols(userConfig, setStatus = null) {
+  if (!Array.isArray(ESTAT._estruturaCapitols) || ESTAT._estruturaCapitols.length === 0) return;
+  if (typeof setStatus === 'function') setStatus('Assignant ratio de diàleg per capítol...');
+  const ratios = await generarRatioDialegCapitols(userConfig);
+  if (ratios.length > 0) aplicarRatioDialegCapitols(ratios);
+}
+
+function normalitzarCostEmocional(raw = {}, ctx = {}) {
+  const r = raw || {};
+  const prohibit = /(sent|pensa|s'adona)/i;
+  let manifestacio = String(r.manifestacio || '').trim();
+  if (!manifestacio || prohibit.test(manifestacio)) {
+    manifestacio = 'Trenca un hàbit visible del capítol, evita el contacte visual i altera una acció que feia sempre de manera automàtica.';
+  }
+  const arrossegament = String(r.arrossegament || '').trim() || 'Al capítol següent evita repetir l acció que havia fet sempre, i això condiciona una decisió observable.';
+  return {
+    personatge: String(r.personatge || ctx.pov || '').trim(),
+    que_perd: String(r.que_perd || '').trim() || 'Perd una certesa operativa que li permetia actuar sense dubte.',
+    manifestacio,
+    duracio: String(r.duracio || '').trim() || 'del detonant fins al tancament del capítol',
+    arrossegament
+  };
+}
+
+function construirContextCostEmocionalCapitols() {
+  const tipusValid = new Set(['cliffhanger_revelacio', 'ganxo_emocional']);
+  const perspectiva = (((ESTAT._nkg || {}).context_creacio || {}).estil || {}).perspectiva || {};
+  const povs = Array.isArray(perspectiva.pov_per_capitol) ? perspectiva.pov_per_capitol : [];
+  const personatges = ((ESTAT._nkg || {}).personatges || {});
+
+  return (ESTAT._estruturaCapitols || []).map((cap, idx) => {
+    const numero = Number(cap.numero || idx + 1);
+    const ganxoTipus = String(cap?.ganxo_final?.tipus || '').trim();
+    if (!tipusValid.has(ganxoTipus)) return null;
+    const pov = povs.find(p => Number(p.capitol) === numero)?.personatge_pov || '';
+    const p = pov ? personatges[pov] : null;
+    const necessitat = String(p?.motivacions_base?.necessitat_interna || '').trim();
+    const waypoints = Array.isArray(p?.arc?.waypoints) ? p.arc.waypoints : [];
+    const wpCap = waypoints.filter(w => Number(w.capitol) === numero);
+    const wpText = wpCap.length > 0
+      ? `sí, ${wpCap.map(w => `${w.estat || ''} / ${w.senyal_visible || ''}`).join(' | ')}`
+      : 'no';
+    return {
+      capitol: numero,
+      idx,
+      titol: cap.titol || '',
+      pov,
+      necessitat_interna: necessitat,
+      ganxo_tipus: ganxoTipus,
+      ganxo_element: String(cap?.ganxo_final?.element || '').trim(),
+      waypoint_detall: wpText,
+      limit_moral: String(p?.limit_moral || '').trim()
+    };
+  }).filter(Boolean);
+}
+
+async function generarCostEmocionalPerCapitol(ctx, userConfig) {
+  const models = getModelConfig(userConfig || USER_CONFIG || {});
+  const prompt = `Capítol ${ctx.capitol}: "${ctx.titol}"
+POV: ${ctx.pov || '(sense POV)'}
+Necessitat interna del POV: "${ctx.necessitat_interna || ''}"
+Ganxo final: ${ctx.ganxo_tipus} — Element: "${ctx.ganxo_element || ''}"
+Waypoint emocional en aquest capítol: ${ctx.waypoint_detall}
+
+Defineix el COST EMOCIONAL d'aquest capítol.
+
+El cost emocional és el PREU que el personatge paga per la revelació
+o el descobriment que conté el capítol. No és una reacció emocional —
+és un canvi en el comportament que persisteix.
+
+Camps a retornar:
+- "personatge"
+- "que_perd"
+- "manifestacio"
+- "duracio"
+- "arrossegament"
+
+Regles:
+- La manifestació ha de ser FÍSICA o CONDUCTUAL, mai cognitiva
+- L'arrossegament garanteix que el cost no s'oblida entre capítols
+- Si el capítol toca la necessitat interna del personatge, el cost ha de ser proporcionalment més alt
+- El cost NO pot contradir el límit moral del personatge: "${ctx.limit_moral || ''}"
+- manifestacio no pot contenir "sent", "pensa", "s'adona"
+- arrossegament ha de ser verificable al prompt del capítol següent
+
+Retorna EXCLUSIVAMENT un objecte JSON.`;
+
+  const msgs = [{ role: 'user', content: prompt }];
+  for (let intent = 1; intent <= 2; intent++) {
+    const raw = await callLLMMulti(
+      msgs,
+      'Ets un editor de continuïtat emocional. Retorna només JSON vàlid en català.',
+      Object.assign({}, userConfig || USER_CONFIG || {}, { maxTokens: 900, model: models.modelArquitecte }),
+      'arquitectura'
+    );
+    const parsed = parseJsonRobust(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const n = normalitzarCostEmocional(parsed, ctx);
+      if (!/(sent|pensa|s'adona)/i.test(n.manifestacio) && n.arrossegament) return n;
+    }
+    msgs.push({ role: 'user', content: 'Resposta invàlida. Torna únicament un objecte JSON amb personatge, que_perd, manifestacio, duracio i arrossegament.' });
+  }
+  return normalitzarCostEmocional({}, ctx);
+}
+
+async function assegurarCostEmocionalCapitols(userConfig, setStatus = null) {
+  const ctxCaps = construirContextCostEmocionalCapitols();
+  if (ctxCaps.length === 0) return;
+  if (typeof setStatus === 'function') setStatus('Calculant cost emocional dels capítols amb revelació...');
+
+  ESTAT._escaletes = Array.isArray(ESTAT._escaletes) ? ESTAT._escaletes : [];
+
+  for (const ctx of ctxCaps) {
+    const cost = await generarCostEmocionalPerCapitol(ctx, userConfig);
+    if (ESTAT._escaletes[ctx.idx]) {
+      ESTAT._escaletes[ctx.idx].cost_emocional = cost;
+    }
+    if (ESTAT._estruturaCapitols[ctx.idx]) {
+      ESTAT._estruturaCapitols[ctx.idx].cost_emocional = cost;
+    }
+  }
 }
 
 
@@ -6843,6 +7317,7 @@ async function assegurarPerspectivaCronologiaPipeline(setStatus = null) {
   }
   const data = await generarPerspectivaCronologia(USER_CONFIG);
   injectarPerspectivaCronologia(data);
+  await assegurarTemperaturaEmocionalCapitols(USER_CONFIG, setStatus);
 }
 
 async function iniciarFasePerspectivaCronologia() {
@@ -6855,6 +7330,7 @@ async function iniciarFasePerspectivaCronologia() {
   try {
     const data = await generarPerspectivaCronologia(USER_CONFIG);
     injectarPerspectivaCronologia(data);
+    await assegurarTemperaturaEmocionalCapitols(USER_CONFIG);
     hideLoader('10-7');
     mostrarPerspectivaCronologia(
       ESTAT._nkg.context_creacio.estil.perspectiva,
@@ -8122,23 +8598,24 @@ function construirSeccioProhibicions(idx) {
 
 // ─── Ratio diàleg / narració per autor ────────────────────────────────────────
 function normalitzarRatioDialeg(input, capInfo = {}) {
+  const tipusValids = ['minim_intern', 'minim_accio', 'dialeg_contingut', 'dialeg_intens', 'dialeg_coral', 'dialeg_ruptura'];
   if (input && typeof input === 'object') {
+    const p = Math.max(0, Math.min(60, Number(input.percentatge_dialeg)));
+    const tipus = tipusValids.includes(String(input.tipus_dialeg || '').trim()) ? String(input.tipus_dialeg).trim() : 'dialeg_contingut';
     return {
-      percentatge_dialeg: Math.max(0, Math.min(100, Number(input.percentatge_dialeg) || 35)),
-      tipus_dialeg: input.tipus_dialeg || 'funcional',
+      percentatge_dialeg: Number.isFinite(p) ? p : 30,
+      tipus_dialeg: tipus,
+      qualitat_dialeg: String(input.qualitat_dialeg || '').trim(),
       notes: String(input.notes || '').trim()
     };
   }
   const legacy = String(input || '').trim().toLowerCase();
-  if (legacy === 'alt') return { percentatge_dialeg: 65, tipus_dialeg: 'predominant', notes: 'Diàleg dominant.' };
-  if (legacy === 'baix') return { percentatge_dialeg: 15, tipus_dialeg: 'minim_intern', notes: 'Predomini narratiu amb diàleg mínim.' };
-  const intensity = Number(capInfo.intensity_level || 3);
+  if (legacy === 'alt') return { percentatge_dialeg: 45, tipus_dialeg: 'dialeg_coral', qualitat_dialeg: '', notes: 'Diàleg dominant en escena coral.' };
+  if (legacy === 'baix' || legacy === 'mig') return { percentatge_dialeg: 15, tipus_dialeg: 'minim_intern', qualitat_dialeg: '', notes: 'Predomini narratiu amb diàleg mínim.' };
   const relacional = ((capInfo.fil || '') + ' ' + (capInfo.titol || '')).toLowerCase();
   const confrontacio = /(confront|judici|discussi|xoc|enfrontament)/.test(relacional);
-  if (intensity >= 5) return { percentatge_dialeg: 8, tipus_dialeg: 'absent', notes: 'Capítol final o màxima tensió amb diàleg residual.' };
-  if (confrontacio) return { percentatge_dialeg: 35, tipus_dialeg: 'funcional', notes: 'Confrontació amb diàleg orientat a conflicte.' };
-  if (/(subtrama|relaci|silvia|parella)/.test(relacional)) return { percentatge_dialeg: 50, tipus_dialeg: 'equilibrat', notes: 'Subtrama relacional amb intercanvi sostingut.' };
-  return { percentatge_dialeg: 18, tipus_dialeg: 'minim_intern', notes: 'Capítol interior o de personatge sol.' };
+  if (confrontacio) return { percentatge_dialeg: 35, tipus_dialeg: 'dialeg_intens', qualitat_dialeg: '', notes: 'Confrontació amb diàleg orientat a conflicte.' };
+  return { percentatge_dialeg: 18, tipus_dialeg: 'minim_intern', qualitat_dialeg: '', notes: 'Capítol interior o de personatge sol.' };
 }
 
 function inferirRatioDialegPerAutor(autorPerfil) {
@@ -8496,7 +8973,7 @@ function construirBlocRitme(intensitat, ratioDialeg) {
   };
   const rr = normalitzarRatioDialeg(ratioDialeg || {});
   const blocRatio = `
-  Ratio diàleg: ${rr.percentatge_dialeg}% (${rr.tipus_dialeg}). ${rr.notes || ''}`;
+  Ratio diàleg: ${rr.percentatge_dialeg}% (${rr.tipus_dialeg}). Qualitat: ${rr.qualitat_dialeg || 'funcional'}. ${rr.notes || ''}`;
   return `RITME (intensitat ${intensitat}/5): ${ritmesBase[intensitat] || ''}${blocRatio}`;
 }
 
@@ -8999,8 +9476,9 @@ function parseMotivacionsBase(text = '') {
   if (!src) return { desig_extern: '', necessitat_interna: '' };
   const mVull = src.match(/(?:^|[;|,.]\s*)(?:vull|desig(?:o)?):?\s*([^;|.\n]+)/i);
   const mNec = src.match(/(?:^|[;|,.]\s*)(?:necessit(?:o|a)t(?:\s+interna)?):?\s*([^;|.\n]+)/i);
-  const desig_extern = (mVull ? mVull[1] : src.split(/[;|\n]/)[0] || '').trim();
-  const necessitat_interna = (mNec ? mNec[1] : '').trim();
+  const partsSlash = src.split(/\s*\/\s*/).map(s => s.trim()).filter(Boolean);
+  const desig_extern = (mVull ? mVull[1] : partsSlash[0] || src.split(/[;|\n]/)[0] || '').trim();
+  const necessitat_interna = (mNec ? mNec[1] : partsSlash[1] || '').trim();
   return { desig_extern, necessitat_interna };
 }
 
@@ -9044,6 +9522,21 @@ function normalitzarSecret(raw, idx = 0, clau = 'pers') {
     revelat_a_capitol: (r.revelat_a_capitol === null || r.revelat_a_capitol === undefined || r.revelat_a_capitol === '') ? null : Math.max(1, Number(r.revelat_a_capitol) || null),
     impacte_si_revelat: String(r.impacte_si_revelat || '').trim()
   };
+}
+
+
+function normalitzarWaypointEmocional(raw, idx = 0, capMax = 1, capsValids = []) {
+  const r = raw || {};
+  const prohibits = /(sent que|pensa que|s'adona que)/i;
+  const capMinim = Math.max(2, Number(capsValids[0]) || 2);
+  const capLimit = Math.max(capMinim, Number(capMax) || capMinim);
+  const capitolRaw = Number(r.capitol) || Number(capsValids[idx]) || capMinim;
+  const capitol = Math.max(capMinim, Math.min(capLimit, capitolRaw));
+  const estat = String(r.estat || '').trim();
+  let senyal = String(r.senyal_visible || '').trim();
+  if (prohibits.test(senyal)) senyal = 'Fa una pausa massa llarga abans de respondre i canvia de tema amb un gest sec.';
+  if (!senyal) senyal = 'Evita la mirada, es queda immòbil un instant i altera un hàbit que mantenia sempre.';
+  return { capitol, estat, senyal_visible: senyal };
 }
 
 function normalitzarObjecteNarratiu(raw = {}, fallbackId = '') {
@@ -9255,7 +9748,7 @@ function assegurarPersonatgesNKGMinims(nkg, biblia) {
       nom,
       estat_fisic: inferirEstatFisicInicialDesDeArc(fp.arc, fp.limit_moral),
       estat_emocional: inferirEstatEmocionalInicialDesDeArc(fp.arc),
-      arc: fp.arc || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '' },
+      arc: fp.arc || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '', waypoints: [] },
       limit_moral: fp.limit_moral || '',
       veu: fp.veu || { registre: '', mai_diria: [], quan_menteix: '', quan_es_sincer: '', exemples_narratius: [], vocabulari_recurrent: [], vocabulari_prohibit: [], longitud_frases: 'mitjanes' },
       objectes_inventari: [], objectes_descartats: [], ubicacio: '', motivacions_base: { desig_extern: '', necessitat_interna: '' }, objectius: [], secrets: [], viu: true, primera_aparicio: 0, trets_immutables: null
@@ -14764,7 +15257,7 @@ Retorna EXCLUSIVAMENT un objecte JSON vàlid (sense markdown, sense text addicio
       "motivacions": "motivació principal (1 frase)",
       "secrets": "secret principal o buit",
       "estat_actual": "estat breu (1 frase)",
-      "arc": {"inici_emocional": "...", "final_emocional": "...", "canvi_o_bloqueig": "..."},
+      "arc": {"inici_emocional": "...", "final_emocional": "...", "canvi_o_bloqueig": "...", "waypoints": []},
       "limit_moral": "...",
       "veu": {"registre": "...", "mai_diria": "...", "quan_menteix": "...", "quan_es_sincer": "..."}
     }
@@ -16145,6 +16638,10 @@ LÍMIT MORAL: [línia que no creuarà... o que acabarà creuant]
 VEU: registre: [forma de parlar] | mai_diria: [frase que mai diria] | quan_menteix: [comportament] | quan_es_sincer: [comportament]
 DESIG: [el que vol consciement] / [el que necessita inconsciement]
 
+IMPORTANT — "necessitat_interna" és OBLIGATÒRIA i no pot quedar buida.
+Defineix-la com una absència emocional (NO un objectiu narratiu) que expliqui reaccions desproporcionades sota pressió.
+Ha de ser coherent amb l'arc (inici_emocional → final_emocional) i amb el límit moral del personatge.
+
 Separa cada proposta amb "=== PROPOSTA [N] ===" (on N és el número, 1 a 3).
 Marca la proposta amb major tensió dramàtica com "=== PROPOSTA [N] (Recomanat) ===".
 Al final de cada proposta, afegeix: TENSIÓ ENTRE PERSONATGES: [com xoquen els arcs entre ells]`
@@ -16592,7 +17089,7 @@ async function garantirTretsImmutablesPersonatge(nom, userConfig = USER_CONFIG) 
       nom,
       estat_fisic: inferirEstatFisicInicialDesDeArc({}, ''),
       estat_emocional: inferirEstatEmocionalInicialDesDeArc({}),
-      arc: { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '' },
+      arc: { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '', waypoints: [] },
       limit_moral: '',
       veu: { registre: '', mai_diria: [], quan_menteix: '', quan_es_sincer: '', exemples_narratius: [], vocabulari_recurrent: [], vocabulari_prohibit: [], longitud_frases: 'mitjanes' },
       objectes_inventari: [],
@@ -16906,7 +17403,7 @@ function nkgInicialitzar() {
           nom: ex?.nom || nomNet,
           estat_fisic:          ex?.estat_fisic          || inferirEstatFisicInicialDesDeArc(ex?.arc || {}, ex?.limit_moral || ''),
           estat_emocional:      ex?.estat_emocional      || inferirEstatEmocionalInicialDesDeArc(ex?.arc || {}),
-          arc:                  ex?.arc                  || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '' },
+          arc:                  ex?.arc                  || { inici_emocional: '', final_emocional: '', canvi_o_bloqueig: '', waypoints: [] },
           limit_moral:          ex?.limit_moral          || '',
           veu:                  ex?.veu                  || { registre: '', mai_diria: [], quan_menteix: '', quan_es_sincer: '', exemples_narratius: [], vocabulari_recurrent: [], vocabulari_prohibit: [], longitud_frases: 'mitjanes' },
           objectes_inventari:   ex?.objectes_inventari   || [],
@@ -16983,7 +17480,7 @@ function nkgAplicarActualitzacions(dades, capitol, escena) {
           nom: p.nom,
           estat_fisic: '',
           estat_emocional: p.estat_emocional || '',
-          arc: { inici_emocional: p.arc?.inici_emocional || '', final_emocional: p.arc?.final_emocional || '', canvi_o_bloqueig: p.arc?.canvi_o_bloqueig || '' },
+          arc: { inici_emocional: p.arc?.inici_emocional || '', final_emocional: p.arc?.final_emocional || '', canvi_o_bloqueig: p.arc?.canvi_o_bloqueig || '', waypoints: Array.isArray(p.arc?.waypoints) ? p.arc.waypoints : [] },
           limit_moral: p.limit_moral || '',
           veu: normalitzarVeuAvancada({
             registre: p.veu?.registre || '',
