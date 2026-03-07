@@ -1,0 +1,21 @@
+name: Convertir Usuaris a IDs
+
+on:
+  workflow_dispatch:
+
+jobs:
+  convertir:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar codi
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Executar script de conversió
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY_SERVER }}
+        run: node scripts/convert_csv.js
