@@ -2466,6 +2466,126 @@ async function runStage(stageKey, fn, options = {}) {
 
 stageEnsureRegistry();
 
+
+// ═══════════════════════════════════════════════════════════
+//  INTERNAL MODULE — Parser
+// ═══════════════════════════════════════════════════════════
+const Parser = {
+  json(rawText, expectedKeys = []) {
+    return parseJsonRobust(rawText, expectedKeys);
+  },
+
+  estructuraCompletar(rawText) {
+    const data = this.json(rawText, ['capitols']) || {};
+    if (!Array.isArray(data.capitols)) return [];
+    return data.capitols.map(cap => ({
+      numero:                 cap.numero,
+      titol:                  cap.titol,
+      text:                   JSON.stringify(cap),
+      personatges:            cap.personatges || [],
+      fil:                    cap.fil_principal || '',
+      toRitme:                cap.to_ritme || '',
+      prefiguracionsPlantar:  cap.prefiguracions_a_plantar || [],
+      prefiguracionsRecollir: cap.prefiguracions_a_recollir || [],
+      resum:                  cap.resum || '',
+      connexioAnterior:       cap.connexio_anterior || '',
+      connexioSeguent:        cap.connexio_seguent || ''
+    }));
+  },
+
+  escaletaBloc(rawText) {
+    const parsed = this.json(rawText) || {};
+    return Array.isArray(parsed.escaletes) ? parsed.escaletes : null;
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+//  INTERNAL MODULE — ApiClient
+// ═══════════════════════════════════════════════════════════
+const ApiClient = {
+  async requestText({ msgs, systemPrompt, config, roleTag = 'generacio' }) {
+    return await callLLMMulti(msgs, systemPrompt, config, roleTag);
+  },
+
+  async requestEscaletaBloc({ prompt, userConfig, modelId }) {
+    const models = getModelConfig(userConfig);
+    const model = modelId || models.modelArquitecte;
+    const cfg = Object.assign({}, userConfig, {
+      maxTokens: capsMaxTokens(model, 5000),
+      model
+    });
+    const response = await this.requestText({
+      msgs: [{ role: 'user', content: prompt }],
+      systemPrompt: "Ets un dramaturg expert en narrativa i estructura d'escenes.",
+      config: cfg,
+      roleTag: 'arquitectura'
+    });
+    return { response };
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+//  INTERNAL MODULE — PromptBuilder
+// ═══════════════════════════════════════════════════════════
+const PromptBuilder = {
+  buildEscaletaBlocPrompt({ brief, capsText, corbaTensio, arcMoralCtx }) {
+    return `Ets un dramaturg expert. Genera una escaleta detallada per escenes per als capítols següents de la novel·la.
+
+BRIEF:
+${brief}
+
+CAPÍTOLS A ESCALETEJAR:
+${capsText}
+
+ESCENES PER CAPÍTOL (adapta al ritme del capítol):
+- Genera entre 5 i 8 escenes per a aquest capítol. (No menys de 5).
+- Capítols d'exposició/respiració (nivell tensió ≤4): 5-6 escenes (~650 paraules/escena). Aprofita per desplegar el món, explorar relacions i construir subtexte emocional.
+- Capítols de desenvolupament (nivell tensió 5-7): 6-7 escenes (~700 paraules/escena). Alterna acció i respiració; cada escena ha de capgirar o complicar la situació anterior.
+- Capítols de clímax/acció (nivell tensió ≥8): 7-8 escenes (~550 paraules/escena, ritme ràpid). REGLA CRÍTICA: En els clímaxs, crea SEMPRE una escena de beat "introspecció" per a la PRESA DE DECISIÓ (mostrant el cost físic/mental), separada i prèvia a l'escena d'"acció" posterior.
+- Capítol final/resolució: 5-6 escenes (~750 paraules/escena, ritme pausat). Dóna espai per tancar fils secundaris i deixar una ressonància emocional duradora.
+
+TOTAL OBJECTIU: ~3.500-5.000 paraules per capítol. La novel·la completa ha de fer entre 60.000 i 100.000 paraules (12-22 capítols × ~4.000 paraules).
+
+CORBA DE TENSIÓ (per orientar el ritme de cada capítol):
+${corbaTensio.length > 0 ? corbaTensio.map(t => `Cap.${t.capitol}: nivell ${t.nivell} (${t.tipus})`).join(', ') : '(no disponible)'}${arcMoralCtx}
+
+Cada escena ha d'incloure (camps OBLIGATORIS, res més):
+- nom: títol breu (3-5 paraules)
+- paraules_objectiu: nombre enter
+- funcio_narrativa: 1 frase curta (màxim 10 paraules)
+- personatges: array de noms
+- beat_narratiu: "diàleg" | "acció" | "introspecció" | "descripció"
+- REGLA DE DIÀLEG: Com a mínim el 50% de les escenes d'un capítol han de tenir el "beat_narratiu" fixat a "diàleg". Prioritza sempre la interacció verbal.
+- Cada escena ha de tenir un objectiu físic (avançar en la trama) i un objectiu emocional o reflexiu (introspecció, record, subtrama).
+
+NO incloguis emocio_entrada, emocio_sortida ni punt_inflexio per estalviar espai.
+
+REGLA DE PROFUNDITAT DELS SECUNDARIS:
+- Cada personatge secundari ha de tenir almenys 1 escena cada 4 capítols on actuï per iniciativa pròpia (no com a reacció al protagonista).
+- En aquestes escenes, el secundari ha de mostrar un desig, por o contradicció que NO estigui directament relacionada amb la trama principal.
+- Indica al camp "funcio_narrativa" quan una escena és d'"autonomia del secundari" amb el tag [AUTONOMIA: Nom].
+
+Retorna EXCLUSIVAMENT JSON vàlid:
+{
+  "escaletes": [
+    {
+      "capitol": 1,
+      "titol": "títol del capítol",
+      "escenes": [
+        {
+          "nom": "nom breu",
+          "paraules_objectiu": 450,
+          "funcio_narrativa": "frase curta",
+          "personatges": ["nom1"],
+          "beat_narratiu": "diàleg"
+        }
+      ]
+    }
+  ]
+}`;
+  }
+};
+
 // ═══════════════════════════════════════════════════════════
 //  CONFIGURACIÓ
 // ═══════════════════════════════════════════════════════════
@@ -7988,21 +8108,8 @@ async function iniciarFase10() {
       document.getElementById('loader-19-text').textContent = `🔵 Completant capítols ${ESTAT._estructuraCapitols.length + 1}-${capsEsperats}…`;
       try {
         const completRes = await completarEstructuraCapitols(ESTAT._estructuraCapitols, capsEsperats, USER_CONFIG);
-        const completDades = parseJsonRobust(completRes.response);
-        if (completDades && Array.isArray(completDades.capitols) && completDades.capitols.length > 0) {
-          const nousCapitols = completDades.capitols.map(cap => ({
-            numero:                 cap.numero,
-            titol:                  cap.titol,
-            text:                   JSON.stringify(cap),
-            personatges:            cap.personatges || [],
-            fil:                    cap.fil_principal || '',
-            toRitme:                cap.to_ritme || '',
-            prefiguracionsPlantar:  cap.prefiguracions_a_plantar || [],
-            prefiguracionsRecollir: cap.prefiguracions_a_recollir || [],
-            resum:                  cap.resum || '',
-            connexioAnterior:       cap.connexio_anterior || '',
-            connexioSeguent:        cap.connexio_seguent || ''
-          }));
+        const nousCapitols = Parser.estructuraCompletar(completRes.response);
+        if (nousCapitols.length > 0) {
           ESTAT._estructuraCapitols = ESTAT._estructuraCapitols.concat(nousCapitols);
           ESTAT._nombreCapitols = ESTAT._estructuraCapitols.length;
           console.log(`Estructura completada: ${ESTAT._estructuraCapitols.length} capítols`);
@@ -8225,19 +8332,19 @@ async function iniciarFaseEscaleta() {
         }
 
         const res = await generarEscaletaBloc(bloc, offset, USER_CONFIG);
-        const parsed = parseJsonRobust(res.response);
+        const escaletesBloc = Parser.escaletaBloc(res.response);
 
-        if (parsed && parsed.escaletes) {
-          acumulat = acumulat.concat(parsed.escaletes);
+        if (escaletesBloc) {
+          acumulat = acumulat.concat(escaletesBloc);
           const esperats = bloc.length;
-          const rebuts = parsed.escaletes.length;
+          const rebuts = escaletesBloc.length;
           if (rebuts < esperats) {
             console.warn(`Escaleta bloc incomplet: ${rebuts}/${esperats}. Completant capítols que falten...`);
             const capsFaltants = bloc.slice(rebuts);
             try {
               const retryRes = await generarEscaletaBloc(capsFaltants, offset + rebuts, USER_CONFIG);
-              const retryParsed = parseJsonRobust(retryRes.response);
-              if (retryParsed && retryParsed.escaletes) acumulat = acumulat.concat(retryParsed.escaletes);
+              const retryEscaletes = Parser.escaletaBloc(retryRes.response);
+              if (retryEscaletes) acumulat = acumulat.concat(retryEscaletes);
             } catch (retryErr) {
               console.warn('Retry escaleta: ' + retryErr.message);
             }
@@ -8246,8 +8353,8 @@ async function iniciarFaseEscaleta() {
           console.warn(`Escaleta: bloc ${offset + 1}-${offset + bloc.length} no parsejat. Retry sencer...`);
           try {
             const retryRes = await generarEscaletaBloc(bloc, offset, USER_CONFIG);
-            const retryParsed = parseJsonRobust(retryRes.response);
-            if (retryParsed && retryParsed.escaletes) acumulat = acumulat.concat(retryParsed.escaletes);
+            const retryEscaletes = Parser.escaletaBloc(retryRes.response);
+            if (retryEscaletes) acumulat = acumulat.concat(retryEscaletes);
           } catch (retryErr) {
             console.warn('Retry escaleta sencer: ' + retryErr.message);
           }
@@ -16151,7 +16258,6 @@ async function generarEscaletaBloc(capitols, offset, userConfig) {
   const capsText = capitols.map((c, i) => `Cap. ${offset + i + 1}: ${c.titol || ''} — ${c.resum || ''}`).join('\n');
   const corbaTensio = ESTAT._corbaTensio || [];
 
-  // Arc moral del protagonista (si existeix)
   const arcMoral = ESTAT._arcMoral;
   const arcMoralCtx = arcMoral ? (() => {
     const capsBloc = capitols.map((_, i) => offset + i + 1);
@@ -16165,71 +16271,11 @@ async function generarEscaletaBloc(capitols, offset, userConfig) {
     if (arcMoral.primera_fissura && capsBloc.includes(arcMoral.primera_fissura.capitol)) {
       punts.push(`PRIMERA FISSURA (cap. ${arcMoral.primera_fissura.capitol}): El moment on els principis del protagonista fallen per primera vegada. Descripció: ${arcMoral.primera_fissura.descripcio}`);
     }
-    return punts.length > 0 ? '\n\nVERIFICACIÓ D\'ARC MORAL DEL PROTAGONISTA:\n' + punts.join('\n') : '';
+    return punts.length > 0 ? "\n\nVERIFICACIÓ D'ARC MORAL DEL PROTAGONISTA:\n" + punts.join('\n') : '';
   })() : '';
-  const prompt = `Ets un dramaturg expert. Genera una escaleta detallada per escenes per als capítols següents de la novel·la.
 
-BRIEF:
-${brief}
-
-CAPÍTOLS A ESCALETEJAR:
-${capsText}
-
-ESCENES PER CAPÍTOL (adapta al ritme del capítol):
-- Genera entre 5 i 8 escenes per a aquest capítol. (No menys de 5).
-- Capítols d'exposició/respiració (nivell tensió ≤4): 5-6 escenes (~650 paraules/escena). Aprofita per desplegar el món, explorar relacions i construir subtexte emocional.
-- Capítols de desenvolupament (nivell tensió 5-7): 6-7 escenes (~700 paraules/escena). Alterna acció i respiració; cada escena ha de capgirar o complicar la situació anterior.
-- Capítols de clímax/acció (nivell tensió ≥8): 7-8 escenes (~550 paraules/escena, ritme ràpid). REGLA CRÍTICA: En els clímaxs, crea SEMPRE una escena de beat "introspecció" per a la PRESA DE DECISIÓ (mostrant el cost físic/mental), separada i prèvia a l'escena d'"acció" posterior.
-- Capítol final/resolució: 5-6 escenes (~750 paraules/escena, ritme pausat). Dóna espai per tancar fils secundaris i deixar una ressonància emocional duradora.
-
-TOTAL OBJECTIU: ~3.500-5.000 paraules per capítol. La novel·la completa ha de fer entre 60.000 i 100.000 paraules (12-22 capítols × ~4.000 paraules).
-
-CORBA DE TENSIÓ (per orientar el ritme de cada capítol):
-${corbaTensio.length > 0 ? corbaTensio.map(t => `Cap.${t.capitol}: nivell ${t.nivell} (${t.tipus})`).join(', ') : '(no disponible)'}${arcMoralCtx}
-
-Cada escena ha d'incloure (camps OBLIGATORIS, res més):
-- nom: títol breu (3-5 paraules)
-- paraules_objectiu: nombre enter
-- funcio_narrativa: 1 frase curta (màxim 10 paraules)
-- personatges: array de noms
-- beat_narratiu: "diàleg" | "acció" | "introspecció" | "descripció"
-- REGLA DE DIÀLEG: Com a mínim el 50% de les escenes d'un capítol han de tenir el "beat_narratiu" fixat a "diàleg". Prioritza sempre la interacció verbal.
-- Cada escena ha de tenir un objectiu físic (avançar en la trama) i un objectiu emocional o reflexiu (introspecció, record, subtrama).
-
-NO incloguis emocio_entrada, emocio_sortida ni punt_inflexio per estalviar espai.
-
-REGLA DE PROFUNDITAT DELS SECUNDARIS:
-- Cada personatge secundari ha de tenir almenys 1 escena cada 4 capítols on actuï per iniciativa pròpia (no com a reacció al protagonista).
-- En aquestes escenes, el secundari ha de mostrar un desig, por o contradicció que NO estigui directament relacionada amb la trama principal.
-- Indica al camp "funcio_narrativa" quan una escena és d'"autonomia del secundari" amb el tag [AUTONOMIA: Nom].
-
-Retorna EXCLUSIVAMENT JSON vàlid:
-{
-  "escaletes": [
-    {
-      "capitol": 1,
-      "titol": "títol del capítol",
-      "escenes": [
-        {
-          "nom": "nom breu",
-          "paraules_objectiu": 450,
-          "funcio_narrativa": "frase curta",
-          "personatges": ["nom1"],
-          "beat_narratiu": "diàleg"
-        }
-      ]
-    }
-  ]
-}`;
-  const msgs = [{ role: 'user', content: prompt }];
-  const models = getModelConfig(userConfig);
-  const response = await callLLMMulti(
-    msgs,
-    'Ets un dramaturg expert en narrativa i estructura d\'escenes.',
-    Object.assign({}, userConfig, { maxTokens: capsMaxTokens(models.modelArquitecte, 5000), model: models.modelArquitecte }),
-    'arquitectura'
-  );
-  return { response };
+  const prompt = PromptBuilder.buildEscaletaBlocPrompt({ brief, capsText, corbaTensio, arcMoralCtx });
+  return await ApiClient.requestEscaletaBloc({ prompt, userConfig });
 }
 
 async function cridaAPI_GenerarText(promptEscena, systemPrompt, userConfig, maxTokensOverride) {
