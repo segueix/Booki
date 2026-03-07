@@ -895,7 +895,7 @@
     <div id="analisi-resultat" class="hidden" style="font-size:.88rem;padding:12px;background:var(--bg2);border-radius:8px;margin-bottom:12px;line-height:1.6;"></div>
     <div id="mode-seleccio" class="hidden">
       <div class="btn-row">
-        <button class="btn btn-primary" onclick="iniciarModeAutomatic()">✍️ Crear novel·la →</button>
+        <button class="btn btn-primary" onclick="iniciarModeGuiat()">✍️ Crear novel·la →</button>
       </div>
     </div>
   </div>
@@ -1244,7 +1244,7 @@
   <div id="psicologia-result" class="hidden">
     <div id="psicologia-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
-      <button class="btn btn-secondary" onclick="hideCard('fase-10');showCard('fase-9');">← Tornar a Veus</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('fase-9')?.scrollIntoView({behavior:'smooth',block:'start'});">↑ Anar a Veus</button>
       <button class="btn btn-primary" onclick="iniciarFaseFeridaArc()">🩹 Definir Ferida + Arc</button>
     </div>
   </div>
@@ -1264,7 +1264,7 @@
   <div id="ferida-arc-result" class="hidden">
     <div id="ferida-arc-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
-      <button class="btn btn-secondary" onclick="hideCard('fase-11');showCard('fase-10');">← Tornar a Psicologia</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('fase-10')?.scrollIntoView({behavior:'smooth',block:'start'});">↑ Anar a Psicologia</button>
       <button class="btn btn-primary" onclick="iniciarFaseRelacions()">🧷 Matriu relacional</button>
     </div>
   </div>
@@ -1282,7 +1282,7 @@
   <div id="relacions-result" class="hidden">
     <div id="relacions-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
-      <button class="btn btn-secondary" onclick="hideCard('fase-12');showCard('fase-11');">← Tornar a Ferida/Arc</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('fase-11')?.scrollIntoView({behavior:'smooth',block:'start'});">↑ Anar a Ferida/Arc</button>
       <button class="btn btn-primary" onclick="iniciarFaseBackstoryRelacions()">🧩 Backstory canònic</button>
     </div>
   </div>
@@ -1300,7 +1300,7 @@
   <div id="backstory-result" class="hidden">
     <div id="backstory-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
-      <button class="btn btn-secondary" onclick="hideCard('fase-13');showCard('fase-12');">← Tornar a Relacions</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('fase-12')?.scrollIntoView({behavior:'smooth',block:'start'});">↑ Anar a Relacions</button>
       <button class="btn btn-primary" onclick="iniciarFaseCompletarPersonatges()">🧬 Completar personatges</button>
     </div>
   </div>
@@ -1318,7 +1318,7 @@
   <div id="completar-personatges-result" class="hidden">
     <div id="completar-personatges-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
-      <button class="btn btn-secondary" onclick="hideCard('fase-14');showCard('fase-13');">← Tornar a Backstory</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('fase-13')?.scrollIntoView({behavior:'smooth',block:'start'});">↑ Anar a Backstory</button>
       <button class="btn btn-primary" onclick="iniciarFaseObjectiusSecrets()">🎯 Objectius i secrets</button>
     </div>
   </div>
@@ -1336,7 +1336,7 @@
   <div id="objectius-secrets-result" class="hidden">
     <div id="objectius-secrets-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
-      <button class="btn btn-secondary" onclick="hideCard('fase-15');showCard('fase-14');">← Tornar a Completar Personatges</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('fase-14')?.scrollIntoView({behavior:'smooth',block:'start'});">↑ Anar a Completar Personatges</button>
       <button class="btn btn-primary" onclick="iniciarFaseObjectesNarratius()">📦 Objectes narratius</button>
     </div>
   </div>
@@ -1354,7 +1354,7 @@
   <div id="objectes-result" class="hidden">
     <div id="objectes-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
-      <button class="btn btn-secondary" onclick="hideCard('fase-16');showCard('fase-15');">← Tornar a Objectius/Secrets</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('fase-15')?.scrollIntoView({behavior:'smooth',block:'start'});">↑ Anar a Objectius/Secrets</button>
       <button class="btn btn-primary" onclick="iniciarFaseMapaEspacialRegles()">🗺️ Mapa espacial i regles</button>
     </div>
   </div>
@@ -1375,7 +1375,7 @@
       ⚠️ El mapa de llocs és insuficient (mínim 3 llocs). Prem "Ampliar mapa" per generar més llocs.
     </div>
     <div class="btn-row" style="margin-top:24px;">
-      <button class="btn btn-secondary" onclick="hideCard('fase-17');showCard('fase-16');">← Tornar a Objectes</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('fase-16')?.scrollIntoView({behavior:'smooth',block:'start'});">↑ Anar a Objectes</button>
       <button class="btn btn-ghost" onclick="iniciarFaseMapaEspacialRegles()">🔄 Regenerar mapa</button>
       <button class="btn btn-ghost hidden" id="btn-ampliar-mapa" onclick="ampliarMapaEspacial()">🗺️ Ampliar mapa</button>
       <button class="btn btn-primary" onclick="iniciarFaseTrames()">🕸️ Dissenyar Trames Opus</button>
@@ -1434,7 +1434,7 @@
     <div id="perspectiva-crono-cos" class="veu-result"></div>
   </div>
   <div class="btn-row" style="margin-top:24px;">
-    <button class="btn btn-secondary" onclick="hideCard('fase-21');showCard('fase-20');">← Tornar a Escaleta</button>
+    <button class="btn btn-secondary" onclick="document.getElementById('fase-20')?.scrollIntoView({behavior:'smooth',block:'start'});">↑ Anar a Escaleta</button>
     <button class="btn btn-ghost" onclick="iniciarFasePerspectivaCronologia()">🔄 Regenerar POV/Cronologia</button>
     <button class="btn btn-primary hidden" id="btn-fase22" onclick="iniciarFaseVeuExemples()">Continuar → Veu i Exemples</button>
   </div>
@@ -1451,7 +1451,7 @@
     <div id="veu-exemples-cos" class="veu-result"></div>
     <div id="nkg-faltants-cos" class="veu-result" style="margin-top:14px;"></div>
     <div class="btn-row" style="margin-top:24px;">
-      <button class="btn btn-secondary" onclick="hideCard('fase-22');showCard('fase-21');">← Tornar a POV/Cronologia</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('fase-21')?.scrollIntoView({behavior:'smooth',block:'start'});">↑ Anar a POV/Cronologia</button>
       <button class="btn btn-ghost" onclick="iniciarFasePerspectivaCronologia()">🧭 Regenerar POV/Cronologia</button>
       <button class="btn btn-ghost" id="btn-autocompletar-nkg" onclick="autocompletarNKGFaltantsManual()">🧩 Completar dades faltants</button>
       <button class="btn btn-ghost" onclick="descarregarNKGiBiblia()">⬇ NKG + Bíblia</button>
@@ -3089,6 +3089,7 @@ function iniciarModeGuiat() {
   ESTAT.fase = 'b1';
   ESTAT._modeCreacio = 'guiat';
   showCard('fase-b1');
+  setTimeout(() => document.getElementById('fase-b1')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   showLoader('b1');
   nouFlux_finals(ESTAT.configuracio.perfil_autor, ESTAT.tematica, ESTAT.estil.to, USER_CONFIG)
     .then(text => renderFinalsNou(text))
@@ -3439,6 +3440,7 @@ async function confirmarFinalNou() {
   };
 
   showCard('fase-b2');
+  setTimeout(() => document.getElementById('fase-b2')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   showLoader('b2');
   try {
     const endingText = `${final.titol || ''}\nEmoció: ${final.emocio || ''}\nProtagonista: ${final.protagonista || ''}\nImatge: ${final.imatge || ''}\nVeritat: ${final.veritat || ''}\nTipus: ${final.tipus || ''}`;
@@ -3613,6 +3615,7 @@ async function confirmarTemaNou() {
   }
 
   showCard('fase-b3');
+  setTimeout(() => document.getElementById('fase-b3')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   showLoader('b3');
   try {
     const personatgesText = (ESTAT._prefetchNouFlux && ESTAT._prefetchNouFlux.personatgesText)
@@ -3792,6 +3795,7 @@ async function confirmarPersonatgesNou() {
   ESTAT._arcsResumitNou = arcsResumit;
 
   showCard('fase-b4');
+  setTimeout(() => document.getElementById('fase-b4')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   showLoader('b4');
   try {
     const monText = (ESTAT._prefetchNouFlux && ESTAT._prefetchNouFlux.monText)
@@ -3938,6 +3942,7 @@ async function confirmarMonNou() {
   }
 
   showCard('fase-b5');
+  setTimeout(() => document.getElementById('fase-b5')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   showLoader('b5');
   try {
     const estructuraText = (ESTAT._prefetchNouFlux && ESTAT._prefetchNouFlux.estructuraText)
@@ -4116,6 +4121,7 @@ async function confirmarEstructuraNou() {
   nkgInicialitzar();
 
   showCard('fase-b6');
+  setTimeout(() => document.getElementById('fase-b6')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   showLoader('b6');
   await iniciarEscaletaSeqNou();
 }
@@ -4295,11 +4301,9 @@ async function generarFaltantNKG(itemId, btnEl = null) {
       const d = await generarObjectesNarratius(USER_CONFIG);
       injectarObjectesNarratius(d);
     } else if (itemId === 'llocs_regles') {
-      hideCard('fase-22');
       iniciarFaseMapaEspacialRegles();
       return;
     } else if (itemId === 'perspectiva_cronologia') {
-      hideCard('fase-22');
       iniciarFasePerspectivaCronologia();
       return;
     } else if (itemId === 'veu_exemples') {
@@ -4355,12 +4359,6 @@ function mostrarResumNKGiTransicio(nkg, capitolsEscaleta, validacio, modeCreacio
     errDiv.textContent = `❌ Errors bloquejants: ${validacio.errors.join(' | ')}`;
     botonsDiv.parentNode.insertBefore(errDiv, botonsDiv);
     document.getElementById('btn-fase23-nou')?.classList.remove('hidden');
-  } else if (modeCreacio === 'automatic') {
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-primary';
-    btn.textContent = '▶ Generar novel·la automàticament';
-    btn.onclick = () => modeRedaccioAutomatic();
-    botonsDiv.appendChild(btn);
   } else {
     const btn1 = document.createElement('button');
     btn1.className = 'btn btn-primary';
@@ -4809,6 +4807,7 @@ async function iniciarFase7() {
   ESTAT.fase = 7;
   updateProgress(7);
   showCard('fase-7');
+  setTimeout(() => document.getElementById('fase-7')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('world-selector').classList.add('hidden');
   document.getElementById('world-result-wrap').classList.add('hidden');
   showLoader(7);
@@ -4932,6 +4931,7 @@ async function iniciarFase8() {
   ESTAT.fase = 8;
   updateProgress(8);
   showCard('fase-8');
+  setTimeout(() => document.getElementById('fase-8')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('elenc-selector').classList.add('hidden');
   showLoader(8);
   document.getElementById('loader-8-text').textContent = 'Proposant el cast de personatges…';
@@ -5083,6 +5083,7 @@ async function generarEstilsParla() {
   ESTAT.fase = 9;
   updateProgress(9);
   showCard('fase-9');
+  setTimeout(() => document.getElementById('fase-9')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('estils-result').classList.add('hidden');
   showLoader(9);
 
@@ -5470,8 +5471,8 @@ Retorna EXCLUSIVAMENT JSON vàlid:
 async function iniciarFasePsicologia() {
   ESTAT.fase = 10;
   updateProgress(10);
-  hideCard('fase-9');
   showCard('fase-10');
+  setTimeout(() => document.getElementById('fase-10')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('psicologia-result').classList.add('hidden');
   showLoader('10');
 
@@ -5614,8 +5615,8 @@ function mostrarFeridaArc(dades) {
 async function iniciarFaseFeridaArc() {
   ESTAT.fase = 11;
   updateProgress(11);
-  hideCard('fase-10');
   showCard('fase-11');
+  setTimeout(() => document.getElementById('fase-11')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('ferida-arc-result').classList.add('hidden');
   showLoader('11');
   try {
@@ -5727,8 +5728,8 @@ function mostrarMatriuRelacional(matriu) {
 async function iniciarFaseRelacions() {
   ESTAT.fase = 12;
   updateProgress(12);
-  hideCard('fase-11');
   showCard('fase-12');
+  setTimeout(() => document.getElementById('fase-12')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('relacions-result').classList.add('hidden');
   showLoader('12');
   try {
@@ -6036,8 +6037,8 @@ function construirBackstoryMinimalSenseRelacions() {
 async function iniciarFaseBackstoryRelacions() {
   ESTAT.fase = 13;
   updateProgress(13);
-  hideCard('fase-12');
   showCard('fase-13');
+  setTimeout(() => document.getElementById('fase-13')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('backstory-result').classList.add('hidden');
   showLoader('13');
   document.getElementById('loader-13-text').textContent = 'Generant backstory canònic i graf de relacions...';
@@ -6265,8 +6266,8 @@ async function generarCompletarPersonatges(userConfig, onProgress) {
 async function iniciarFaseCompletarPersonatges() {
   ESTAT.fase = 14;
   updateProgress(14);
-  hideCard('fase-13');
   showCard('fase-14');
+  setTimeout(() => document.getElementById('fase-14')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('completar-personatges-result').classList.add('hidden');
   showLoader('14');
   const loaderText = document.getElementById('loader-14-text');
@@ -6577,8 +6578,8 @@ Retorna EXCLUSIVAMENT un array JSON de waypoints.`;
 async function iniciarFaseObjectiusSecrets() {
   ESTAT.fase = 15;
   updateProgress(15);
-  hideCard('fase-14');
   showCard('fase-15');
+  setTimeout(() => document.getElementById('fase-15')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('objectius-secrets-result').classList.add('hidden');
   showLoader('15');
   const loaderText = document.getElementById('loader-15-text');
@@ -6703,8 +6704,8 @@ function injectarObjectesNarratius(data = {}) {
 async function iniciarFaseObjectesNarratius() {
   ESTAT.fase = 16;
   updateProgress(16);
-  hideCard('fase-15');
   showCard('fase-16');
+  setTimeout(() => document.getElementById('fase-16')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('objectes-result').classList.add('hidden');
   showLoader('16');
   try {
@@ -6816,8 +6817,8 @@ function injectarMapaEspacialRegles(data = {}) {
 async function iniciarFaseMapaEspacialRegles() {
   ESTAT.fase = 17;
   updateProgress(17);
-  hideCard('fase-16');
   showCard('fase-17');
+  setTimeout(() => document.getElementById('fase-17')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('mapa-regles-result').classList.add('hidden');
   showLoader('17');
   try {
@@ -7464,8 +7465,8 @@ async function assegurarPerspectivaCronologiaPipeline(setStatus = null) {
 async function iniciarFasePerspectivaCronologia() {
   ESTAT.fase = 21;
   updateProgress(21);
-  hideCard('fase-20');
   showCard('fase-21');
+  setTimeout(() => document.getElementById('fase-21')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('perspectiva-crono-result').classList.add('hidden');
   showLoader('21');
   try {
@@ -7641,8 +7642,8 @@ function injectarVeuExemples(data = {}) {
 async function iniciarFaseVeuExemples() {
   ESTAT.fase = 22;
   updateProgress(22);
-  hideCard('fase-21');
   showCard('fase-22');
+  setTimeout(() => document.getElementById('fase-22')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('veu-exemples-result').classList.add('hidden');
   showLoader('22');
   const loaderText = document.getElementById('loader-22-text');
@@ -7652,8 +7653,8 @@ async function iniciarFaseVeuExemples() {
     if (!tePerspectivaCronologiaPreparada()) {
       hideLoader('22');
       toast('Cal completar primer el pas de POV/Cronologia (pas 21) abans de continuar.');
-      hideCard('fase-22');
       showCard('fase-21');
+      setTimeout(() => document.getElementById('fase-21')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
       return;
     }
     const data = await generarVeuExemples(USER_CONFIG, onProgress);
@@ -7852,6 +7853,7 @@ async function iniciarFase10() {
   ESTAT.fase = 19;
   updateProgress(19);
   showCard('fase-19');
+  setTimeout(() => document.getElementById('fase-19')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('estructura-wrap').classList.add('hidden');
   showLoader(19);
   document.getElementById('loader-19-text').textContent = '🔵 Opus creant la bíblia narrativa…';
@@ -8097,7 +8099,10 @@ function mostrarEstructura(text) {
 //  FASE 20: Escaleta per Escenes (Opus)
 // ═══════════════════════════════════════════════════════════
 async function iniciarFaseEscaleta() {
+  ESTAT.fase = 20;
+  updateProgress(20);
   showCard('fase-20');
+  setTimeout(() => document.getElementById('fase-20')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   showLoader('20');
   document.getElementById('loader-20-text').textContent = 'Opus generant escaleta per escenes…';
   try {
@@ -8248,6 +8253,7 @@ async function iniciarFase11() {
 
   updateProgress(23);
   showCard('fase-23');
+  setTimeout(() => document.getElementById('fase-23')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
 
   if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
     document.getElementById('btn-pausa-flux').classList.remove('hidden');
@@ -10924,6 +10930,7 @@ async function iniciarFase12() {
   ESTAT.fase = 24;
   updateProgress(24);
   showCard('fase-24');
+  setTimeout(() => document.getElementById('fase-24')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('arcs-result').classList.add('hidden');
   document.getElementById('epileg-loader-wrap').classList.add('hidden');
   document.getElementById('epileg-cos').classList.add('hidden');
@@ -11426,8 +11433,10 @@ function aplicarCanvisBiblia(canvis) {
 
 // ─── SISTEMA 2: Fase de Trames ────────────────────────────────────────────────
 async function iniciarFaseTrames() {
+  ESTAT.fase = 18;
   showCard('fase-18');
   updateProgress(18);
+  setTimeout(() => document.getElementById('fase-18')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   showLoader('18');
   document.getElementById('trames-result').classList.add('hidden');
   try {
