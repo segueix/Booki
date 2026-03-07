@@ -649,7 +649,7 @@
 <div id="diag-panel" class="hidden" aria-live="polite">
   <div class="diag-title">
     <span>Traça de generació</span>
-    <button class="btn btn-ghost" style="padding:4px 8px;font-size:.72rem;" onclick="renderDiagnosticPanel(true)">↻</button>
+    <button class="btn btn-ghost" style="padding:4px 8px;font-size:.72rem;" onclick="Renderer.renderDiagnosticPanel(true)">↻</button>
   </div>
   <div class="diag-grid">
     <div class="diag-k">Stage actual</div><div id="diag-current-stage" class="diag-v">-</div>
@@ -808,7 +808,6 @@
     <button id="btn-reprendre" class="btn btn-secondary hidden" onclick="reprendreProjecteLocal()">📂 Reprendre projecte anterior</button>
     <button class="btn btn-ghost" onclick="exportarCopiaSeguretat()">💾 Exportar còpia (.json)</button>
     <button class="btn btn-ghost" onclick="obrirImportarCopiaSeguretat()">📥 Importar còpia</button>
-    <button class="btn btn-ghost" onclick="exportarDiagnosticResums()">🔍 Diagnòstic resums</button>
     <input type="file" id="input-copia-seguretat" accept="application/json,.json" class="hidden" onchange="importarCopiaSeguretat(event)">
   </div>
 </div>
@@ -1641,7 +1640,9 @@ const MAX_SNAPSHOTS = 6;
 const CHECKPOINT_STAGE_KEYS = ['premise', 'structure', 'characters', 'world', 'chapterOutline', 'nkg', 'bible'];
 
 
-// --- RENDERER (UI only) ---
+// ═══════════════════════════════════════════════════════════
+//  REGION: RENDERER (UI només)
+// ═══════════════════════════════════════════════════════════
 const Renderer = {
   show(id) {
     const el = document.getElementById(id);
@@ -2732,6 +2733,9 @@ function validarOutputBibliaNarrativa(biblia) {
 }
 
 
+// ═══════════════════════════════════════════════════════════
+//  REGION: STAGE MACHINE + TRACE
+// ═══════════════════════════════════════════════════════════
 function stageInferModelUsed(stageKey) {
   const models = (USER_CONFIG && USER_CONFIG.models) || {};
   const modelArquitecte = (USER_CONFIG && (USER_CONFIG.modelArquitecte || USER_CONFIG.modelArquitectura)) || models.arquitecte || '';
@@ -2773,10 +2777,6 @@ function formatElapsed(ms) {
   if (!Number.isFinite(ms)) return 'n/d';
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(1)}s`;
-}
-
-function renderDiagnosticPanel(force = false) {
-  Renderer.renderDiagnosticPanel(force);
 }
 
 function toggleDiagnosticPanel() {
@@ -4968,6 +4968,10 @@ async function generarFaltantNKG(itemId, btnEl = null) {
   }
 }
 
+function mostrarBotoExportNKGBiblia() {
+  document.getElementById('btn-fase23-nou')?.classList.remove('hidden');
+}
+
 function mostrarFaltantsNKG() {
   const cos = document.getElementById('nkg-faltants-cos');
   if (!cos) return;
@@ -4991,7 +4995,7 @@ function mostrarResumNKGiTransicio(nkg, capitolsEscaleta, validacio, modeCreacio
   const resumDiv = document.getElementById('nkg-resum-text');
   const botonsDiv = document.getElementById('nkg-mode-botons');
   if (!wrap || !resumDiv || !botonsDiv) {
-    document.getElementById('btn-fase23-nou')?.classList.remove('hidden');
+    mostrarBotoExportNKGBiblia();
     return;
   }
   const validacioInputNkg = validarInputStage('nkg', {
@@ -5018,7 +5022,7 @@ function mostrarResumNKGiTransicio(nkg, capitolsEscaleta, validacio, modeCreacio
     errDiv.style.cssText = 'color:#e55;font-size:.88rem;margin-bottom:8px;';
     errDiv.textContent = `❌ Errors bloquejants: ${validacio.errors.join(' | ')}`;
     botonsDiv.parentNode.insertBefore(errDiv, botonsDiv);
-    document.getElementById('btn-fase23-nou')?.classList.remove('hidden');
+    mostrarBotoExportNKGBiblia();
   } else {
     const validacioSortidaNkg = validarOutputNkgDossier(nkg);
     if (!validacioSortidaNkg.ok) {
@@ -5027,7 +5031,7 @@ function mostrarResumNKGiTransicio(nkg, capitolsEscaleta, validacio, modeCreacio
       errDiv.style.cssText = 'color:#e55;font-size:.88rem;margin-bottom:8px;';
       errDiv.textContent = `❌ NKG incomplet: ${validacioSortidaNkg.errors.join(' | ')}`;
       botonsDiv.parentNode.insertBefore(errDiv, botonsDiv);
-      document.getElementById('btn-fase23-nou')?.classList.remove('hidden');
+      mostrarBotoExportNKGBiblia();
       wrap.classList.remove('hidden');
       return;
     }
@@ -8822,7 +8826,7 @@ function mostrarEscaleta(escaletes) {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 23: Escriptura de capítols (Sonnet + Registre)
+//  FASE 23 (legacy desactivat): Escriptura de capítols
 // ═══════════════════════════════════════════════════════════
 async function iniciarFase11() {
   if (!PRODUCT_SCOPE.bookWritingEnabled) {
