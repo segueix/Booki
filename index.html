@@ -598,6 +598,42 @@
 
   /* ── Camps de config per proveïdor ── */
   .config-section { margin-top: 4px; }
+
+  /* ── Panell diagnòstic de generació (lleuger) ── */
+  #diag-toggle {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 1200;
+    opacity: .92;
+  }
+  #diag-panel {
+    position: fixed;
+    right: 18px;
+    bottom: 64px;
+    width: min(420px, calc(100vw - 24px));
+    max-height: 52vh;
+    overflow: auto;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    padding: 10px 12px;
+    z-index: 1199;
+    font-size: .79rem;
+  }
+  .diag-title { display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-weight:700;color:var(--accent2); }
+  .diag-grid { display:grid;grid-template-columns: 1fr 1fr; gap:6px 10px; }
+  .diag-k { color: var(--text2); }
+  .diag-v { color: var(--text1); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-word; }
+  .diag-list {
+    margin-top: 8px;
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+  }
+  .diag-list ul { margin:6px 0 0 16px; padding:0; }
+  .diag-list li { margin-bottom:4px; color:var(--text2); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
 </style>
 </head>
 <body>
@@ -607,6 +643,31 @@
   <button class="btn btn-ghost" onclick="obrirImportarCopiaSeguretat()">📥 Importar projecte</button>
   <button class="btn btn-ghost" onclick="exportarDiagnosticResums()">🔍 Diagnòstic resums</button>
 </div>
+
+
+<button id="diag-toggle" class="btn btn-ghost" onclick="toggleDiagnosticPanel()">🧪 Diagnòstic</button>
+<div id="diag-panel" class="hidden" aria-live="polite">
+  <div class="diag-title">
+    <span>Traça de generació</span>
+    <button class="btn btn-ghost" style="padding:4px 8px;font-size:.72rem;" onclick="renderDiagnosticPanel(true)">↻</button>
+  </div>
+  <div class="diag-grid">
+    <div class="diag-k">Stage actual</div><div id="diag-current-stage" class="diag-v">-</div>
+    <div class="diag-k">Últim OK</div><div id="diag-last-ok" class="diag-v">-</div>
+    <div class="diag-k">RequestId</div><div id="diag-request-id" class="diag-v">-</div>
+    <div class="diag-k">Model</div><div id="diag-model" class="diag-v">-</div>
+    <div class="diag-k">Elapsed</div><div id="diag-elapsed" class="diag-v">-</div>
+    <div class="diag-k">Retries</div><div id="diag-retries" class="diag-v">0</div>
+    <div class="diag-k">Error codi</div><div id="diag-error-code" class="diag-v">-</div>
+    <div class="diag-k">Error missatge</div><div id="diag-error-message" class="diag-v">-</div>
+    <div class="diag-k">Checkpoint</div><div id="diag-checkpoint" class="diag-v">-</div>
+  </div>
+  <div class="diag-list">
+    <strong style="font-size:.75rem;">Trace recent</strong>
+    <ul id="diag-trace-log"></ul>
+  </div>
+</div>
+
 
 <header>
   <h1>🧭 Booki · Generador de Projecte Narratiu</h1>
@@ -1687,6 +1748,7 @@ function checkpointSaveStage(stageKey, reason = '') {
   current.history.push({ stageKey, savedAtISO: nowISO, fase: checkpoint.fase, reason: checkpoint.reason });
   if (current.history.length > 40) current.history = current.history.slice(-40);
   checkpointWriteStore(current);
+  stagePushTrace('checkpoint', stageKey, { requestId: null, message: `saved ${stageKey}` });
   return true;
 }
 
@@ -2432,6 +2494,7 @@ const AppState = {
       currentStage: 'idea',
       lastSuccessfulStage: null,
       requestSeq: 0,
+      traceLog: [],
       stages: {}
     }
   },
@@ -2588,6 +2651,90 @@ function validarOutputBibliaNarrativa(biblia) {
   return { ok: errors.length === 0, errors };
 }
 
+
+function stageInferModelUsed(stageKey) {
+  const models = (USER_CONFIG && USER_CONFIG.models) || {};
+  const modelArquitecte = (USER_CONFIG && (USER_CONFIG.modelArquitecte || USER_CONFIG.modelArquitectura)) || models.arquitecte || '';
+  const modelGeneracio = (USER_CONFIG && USER_CONFIG.modelGeneracio) || models.generacio || '';
+  if (stageKey === 'structure' || stageKey === 'chapterOutline' || stageKey === 'nkg' || stageKey === 'bible') return modelArquitecte || modelGeneracio || '(no definit)';
+  if (stageKey === 'premise' || stageKey === 'characters' || stageKey === 'world') return modelGeneracio || modelArquitecte || '(no definit)';
+  return modelGeneracio || modelArquitecte || '(no definit)';
+}
+
+function stagePushTrace(eventType, stageKey, payload = {}) {
+  const sm = stageEnsureRegistry();
+  const entry = {
+    atISO: new Date().toISOString(),
+    eventType,
+    stageKey,
+    requestId: payload.requestId || null,
+    modelUsed: payload.modelUsed || null,
+    retries: Number(payload.retries || 0),
+    errorCode: payload.errorCode || null,
+    message: payload.message || ''
+  };
+  sm.traceLog = Array.isArray(sm.traceLog) ? sm.traceLog : [];
+  sm.traceLog.push(entry);
+  if (sm.traceLog.length > 60) sm.traceLog = sm.traceLog.slice(-60);
+  appStateSet('runtime.stageMachine', sm, `stageTrace:${eventType}:${stageKey}`);
+  renderDiagnosticPanel();
+}
+
+function stageElapsedMs(stageState) {
+  if (!stageState || !stageState.startedAt) return null;
+  const started = Date.parse(stageState.startedAt);
+  if (!Number.isFinite(started)) return null;
+  const ended = stageState.finishedAt ? Date.parse(stageState.finishedAt) : Date.now();
+  if (!Number.isFinite(ended)) return null;
+  return Math.max(0, ended - started);
+}
+
+function formatElapsed(ms) {
+  if (!Number.isFinite(ms)) return 'n/d';
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+function updateDiagField(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value == null || value === '' ? '-' : String(value);
+}
+
+function renderDiagnosticPanel(force = false) {
+  const panel = document.getElementById('diag-panel');
+  if (!panel) return;
+  if (!force && panel.classList.contains('hidden')) return;
+  const sm = stageEnsureRegistry();
+  const currentStageKey = sm.currentStage || 'idea';
+  const currentStageState = (sm.stages && sm.stages[currentStageKey]) || {};
+  const latestCheckpoint = checkpointGetLatestValid();
+  updateDiagField('diag-current-stage', currentStageKey);
+  updateDiagField('diag-last-ok', sm.lastSuccessfulStage || '-');
+  updateDiagField('diag-request-id', currentStageState.requestId || '-');
+  updateDiagField('diag-model', currentStageState.modelUsed || stageInferModelUsed(currentStageKey));
+  updateDiagField('diag-elapsed', formatElapsed(stageElapsedMs(currentStageState)));
+  updateDiagField('diag-retries', Number(currentStageState.retries || 0));
+  updateDiagField('diag-error-code', currentStageState.errorCode || '-');
+  updateDiagField('diag-error-message', currentStageState.errorMessage || '-');
+  updateDiagField('diag-checkpoint', latestCheckpoint ? `${latestCheckpoint.stageKey} @ ${latestCheckpoint.savedAtISO}` : 'cap');
+
+  const ul = document.getElementById('diag-trace-log');
+  if (ul) {
+    const log = Array.isArray(sm.traceLog) ? sm.traceLog.slice(-8).reverse() : [];
+    ul.innerHTML = log.map(it => {
+      const msg = [it.atISO, it.eventType, it.stageKey, it.requestId || '-', it.errorCode || '-', it.message || ''].filter(Boolean).join(' · ');
+      return `<li>${escHtml(msg)}</li>`;
+    }).join('') || '<li>(sense events encara)</li>';
+  }
+}
+
+function toggleDiagnosticPanel() {
+  const panel = document.getElementById('diag-panel');
+  if (!panel) return;
+  panel.classList.toggle('hidden');
+  if (!panel.classList.contains('hidden')) renderDiagnosticPanel(true);
+}
+
 function stageEnsureRegistry() {
   const sm = AppState.runtime.stageMachine || {};
   if (!sm.stages || typeof sm.stages !== 'object') sm.stages = {};
@@ -2597,6 +2744,7 @@ function stageEnsureRegistry() {
   if (!sm.currentStage) sm.currentStage = 'idea';
   if (!('lastSuccessfulStage' in sm)) sm.lastSuccessfulStage = null;
   if (!Number.isFinite(sm.requestSeq)) sm.requestSeq = 0;
+  if (!Array.isArray(sm.traceLog)) sm.traceLog = [];
   AppState.runtime.stageMachine = sm;
   return sm;
 }
@@ -2614,12 +2762,14 @@ function stageStart(stageKey, meta = {}) {
     startedAt: now,
     finishedAt: null,
     requestId,
+    modelUsed: meta.modelUsed || stageInferModelUsed(stageKey),
     errorCode: null,
     errorMessage: null,
     retries
   };
   sm.currentStage = stageKey;
   appStateSet('runtime.stageMachine', sm, `stageStart:${stageKey}`);
+  stagePushTrace('start', stageKey, { requestId, modelUsed: sm.stages[stageKey].modelUsed, retries, message: meta.reason || '' });
   return requestId;
 }
 
@@ -2632,6 +2782,7 @@ function stageOk(stageKey, meta = {}) {
     status: 'ok',
     finishedAt: now,
     requestId: meta.requestId || prev.requestId || null,
+    modelUsed: meta.modelUsed || prev.modelUsed || stageInferModelUsed(stageKey),
     errorCode: null,
     errorMessage: null
   });
@@ -2639,6 +2790,12 @@ function stageOk(stageKey, meta = {}) {
   sm.lastSuccessfulStage = stageKey;
   appStateSet('runtime.stageMachine', sm, `stageOk:${stageKey}`);
   checkpointSaveStage(stageKey, meta.reason || 'stageOk');
+  stagePushTrace('ok', stageKey, {
+    requestId: sm.stages[stageKey].requestId,
+    modelUsed: sm.stages[stageKey].modelUsed,
+    retries: sm.stages[stageKey].retries,
+    message: `elapsed=${formatElapsed(stageElapsedMs(sm.stages[stageKey]))}`
+  });
 }
 
 function stageError(stageKey, err, meta = {}) {
@@ -2650,15 +2807,23 @@ function stageError(stageKey, err, meta = {}) {
     status: 'error',
     finishedAt: now,
     requestId: meta.requestId || prev.requestId || null,
+    modelUsed: meta.modelUsed || prev.modelUsed || stageInferModelUsed(stageKey),
     errorCode: meta.errorCode || err?.code || 'STAGE_ERROR',
     errorMessage: String(meta.errorMessage || err?.message || 'Error desconegut')
   });
   sm.currentStage = stageKey;
   appStateSet('runtime.stageMachine', sm, `stageError:${stageKey}`);
+  stagePushTrace('error', stageKey, {
+    requestId: sm.stages[stageKey].requestId,
+    modelUsed: sm.stages[stageKey].modelUsed,
+    retries: sm.stages[stageKey].retries,
+    errorCode: sm.stages[stageKey].errorCode,
+    message: sm.stages[stageKey].errorMessage
+  });
 }
 
 async function runStage(stageKey, fn, options = {}) {
-  const requestId = stageStart(stageKey);
+  const requestId = stageStart(stageKey, { modelUsed: options.modelUsed || stageInferModelUsed(stageKey) });
   try {
     if (typeof options.validateInput === 'function') {
       const vin = options.validateInput();
@@ -19893,6 +20058,8 @@ document.addEventListener('DOMContentLoaded', function() {
   comprovarProjecteGuardat();
   // Actualitzar visibilitat dels botons de config segons si hi ha projecte actiu
   actualitzarVisibilitatBotonsConfig();
+  renderDiagnosticPanel(true);
+  setInterval(() => renderDiagnosticPanel(), 1200);
 });
 
 </script>
