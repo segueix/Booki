@@ -1617,7 +1617,7 @@ function aplicarSnapshotProjecte(dades) {
   ESTAT._intervalLocks = (ESTAT._intervalLocks && typeof ESTAT._intervalLocks === 'object') ? ESTAT._intervalLocks : {};
   ESTAT._chapterLocks = (ESTAT._chapterLocks && typeof ESTAT._chapterLocks === 'object') ? ESTAT._chapterLocks : {};
   ESTAT._blockCanons = (ESTAT._blockCanons && typeof ESTAT._blockCanons === 'object') ? ESTAT._blockCanons : {};
-  USER_CONFIG = dades.config || USER_CONFIG;
+  setUserConfig(dades.config || USER_CONFIG);
 
   if (ESTAT._anthropicApiKey) document.getElementById('anthropicApiKey').value = ESTAT._anthropicApiKey;
   if (ESTAT._openaiApiKey) document.getElementById('openaiApiKey').value = ESTAT._openaiApiKey;
@@ -2099,119 +2099,185 @@ function netejarTabulacionsInicials(text = '') {
 
 
 // ═══════════════════════════════════════════════════════════
-//  ESTAT GLOBAL
+//  APP STATE (font única de veritat)
 // ═══════════════════════════════════════════════════════════
-let USER_CONFIG = null;
-const PRODUCT_SCOPE = Object.freeze({ stopAt: "nkg_biblia", bookWritingEnabled: false });
+function crearLegacyStateInicial() {
+  return {
+    fase:             0,
+    tematica:         '',
+    history:          [],
+    premissaTriada:   '',
+    _premissaLista:   [],
+    _premissaIdx:     undefined,
+    estil: {
+      to:          '',
+      perspectiva: '',
+      paraules:    1500,
+      desc:        ''
+    },
+    _llistaProtagonistes:  [],
+    _idxProtagonista:      null,
+    protagonistaTriat:     '',
+    _llistaLocalitzacions: [],
+    _idxLocalitzacio:      null,
+    localitzacioTriada:    '',
+    _llistaFinals:         [],
+    _idxFinal:             null,
+    finalTriat:            '',
+    // Conte base i ideació
+    _historyBeforeEscriptura: [],
+    _totalParts:              1,
+    _partActual:              1,
+    _partsTexts:              [],
+    conteText:                '',
+    // Món, personatges i estructura
+    worldbuilding:            null,
+    _elencPersonatges:        [],
+    _personatgesSeleccionats: [],
+    estilsParla:              null,
+    _perfilsPersonatges:      {},
+    _matriuRelacional:        [],
+    _matriuRelacionalHistorial: [],
+    _arcTransitionWarnings:   [],
+    estructuraNovella:        null,
+    _estructuraCapitols:      [],
+    _arcGlobal:               '',
+    _arcMoral:                null,
+    _temesCentrals:           [],
+    _prefiguracions:          [],
+    _corbaTensio:             [],
+    titol_novella:            '',
+    // Outputs finals
+    bibliaNarrativa: {
+      regles_mon:         [],
+      llocs_importants:   [],
+      objectes_clau:      [],
+      fitxes_personatges: [],
+      fets_canonics:      []
+    },
+    trames: {
+      trama_principal: null,
+      subtrames:        [],
+      mapa_entrellacat: []
+    },
+    llibreRegistre: {
+      capitols:          [],
+      estat_personatges: [],
+      fils_oberts:       [],
+      fils_tancats:      []
+    },
+    _escaletes: [],
+    _memoriasComprimides: [],
+    _resumsBlocs: {},
+    _snapshotsFinals: {},
+    _traitsImmutablesInicialitzats: false,
+    _registreEstil: { frequencies: {}, alertes: [], verbs_atribucio: {}, tancaments: [] },
+    // Config i NKG
+    configuracio: { perfil_autor: '' },
+    _nombreCapitolsConfig: 13,
+    _nkg: null,
+    _resumCompacte: '',
+    _escenes_generades: {},
+    _veuSemilla: null,
+    _manualEstil: null,
+    _nombreCapitols: 12,
+    _justificacioCapitols: '',
+    _modelDraft:      'claude-haiku-4-5-20251001',
+    _modelGeneracio:  'claude-sonnet-4-6',
+    _modelArquitecte: 'claude-sonnet-4-6',
+    _anthropicApiKey: '',
+    _geminiApiKey:    '',
+    _openaiApiKey:    '',
+    _revisionsCodiSistema: [],
+    _revisioFinalApp: null,
+    _clausPromptSeguent: [],
+    _alertaArquitecte: null,
+    _accionsIrreversibles: [],
+    _intervalsCongelats:      [],
+    _capitolsLocked:          {},
+    _intervalLocks:           {},
+    _chapterLocks:            {},
+    _blockCanons:             {},
+  };
+}
 
-const ESTAT = {
-  fase:             0,
-  tematica:         '',
-  history:          [],
-  premissaTriada:   '',
-  _premissaLista:   [],
-  _premissaIdx:     undefined,
-  estil: {
-    to:          '',
-    perspectiva: '',
-    paraules:    1500,
-    desc:        ''
+const AppState = {
+  product: {
+    flow: ['idea_tema', 'premissa', 'estructura', 'personatges', 'mon', 'escaleta', 'nkg', 'biblia', 'exportacio'],
+    scope: Object.freeze({ stopAt: 'nkg_biblia', bookWritingEnabled: false })
   },
-  _llistaProtagonistes:  [],
-  _idxProtagonista:      null,
-  protagonistaTriat:     '',
-  _llistaLocalitzacions: [],
-  _idxLocalitzacio:      null,
-  localitzacioTriada:    '',
-  _llistaFinals:         [],
-  _idxFinal:             null,
-  finalTriat:            '',
-  // Escriptura per parts
-  _historyBeforeEscriptura: [],
-  _totalParts:              1,
-  _partActual:              1,
-  _partsTexts:              [],
-  conteText:                '',
-  // Worldbuilding
-  worldbuilding:            null,
-  // Elenc de personatges (fase 8)
-  _elencPersonatges:        [],
-  // Estils de parla (fase 9)
-  _personatgesSeleccionats: [],
-  estilsParla:              null,
-  _perfilsPersonatges:      {},
-  _matriuRelacional:        [],
-  _matriuRelacionalHistorial: [],
-  _arcTransitionWarnings:   [],
-  _plaReescripturaPsicologica: null,
-  // Estructura narrativa fins NKG + Bíblia
-  estructuraNovella:        null,
-  _estructuraCapitols:      [],
-  // Novel·la: dades de l'estructura JSON
-  _arcGlobal:               '',
-  _arcMoral:                null,
-  _temesCentrals:           [],
-  _prefiguracions:          [],
-  _corbaTensio:             [],
-  titol_novella:            '',
-  // Bíblia Narrativa Persistent (sistema 1)
-  bibliaNarrativa: {
-    regles_mon:         [],
-    llocs_importants:   [],
-    objectes_clau:      [],
-    fitxes_personatges: [],
-    fets_canonics:      []
+  runtime: {
+    userConfig: null,
+    startedAtISO: new Date().toISOString()
   },
-  // Trames i subtrames (sistema 2)
-  trames: {
-    trama_principal: null,
-    subtrames:        [],
-    mapa_entrellacat: []
+  data: {
+    ideaTheme: '',
+    premise: null,
+    structure: null,
+    characters: null,
+    world: null,
+    chapterOutline: null,
+    nkg: null,
+    bible: null,
+    exportMeta: {
+      lastExportAtISO: null,
+      exportCount: 0,
+      lastFormat: null
+    }
   },
-  llibreRegistre: {
-    capitols:          [],
-    estat_personatges: [],
-    fils_oberts:       [],
-    fils_tancats:      []
+  debug: {
+    lastMutation: null,
+    mutationLog: []
   },
-  _escaletes: [],
-  _memoriasComprimides: [],
-  _resumsBlocs: {},
-  _snapshotsFinals: {},
-  _traitsImmutablesInicialitzats: false,
-  _registreEstil: { frequencies: {}, alertes: [], verbs_atribucio: {}, tancaments: [] },
-  // Nova creació (flux B)
-  configuracio: { perfil_autor: '' },
-  _nombreCapitolsConfig: 13,
-  // NKG (Narrative Knowledge Graph) — v4
-  _nkg: null,
-  _resumCompacte: '',
-  _escenes_generades: {},
-  // Veu Semilla — v4 (fase 6)
-  _veuSemilla: null,
-  _manualEstil: null,
-  // Capítols adaptatius (v5)
-  _nombreCapitols: 12,
-  _justificacioCapitols: '',
-  // Models per rol (v5.1 — selector flexible)
-  _modelDraft:      'claude-haiku-4-5-20251001',
-  _modelGeneracio:  'claude-sonnet-4-6',
-  _modelArquitecte: 'claude-sonnet-4-6',
-  // Claus API per proveïdor (v5.1)
-  _anthropicApiKey: '',
-  _geminiApiKey:    '',
-  _openaiApiKey:    '',
-  _revisionsCodiSistema: [],
-  _revisioFinalApp: null,
-  _clausPromptSeguent: [],
-  _alertaArquitecte: null,
-  _accionsIrreversibles: [],
-  _intervalsCongelats:      [],
-  _capitolsLocked:          {},
-  _intervalLocks:           {},
-  _chapterLocks:            {},
-  _blockCanons:             {},
+  legacy: crearLegacyStateInicial()
 };
+
+function appStateSet(path, value, reason = '') {
+  const keys = String(path || '').split('.').filter(Boolean);
+  if (keys.length === 0) return;
+  let ref = AppState;
+  for (let i = 0; i < keys.length - 1; i++) {
+    const k = keys[i];
+    if (!ref[k] || typeof ref[k] !== 'object') ref[k] = {};
+    ref = ref[k];
+  }
+  ref[keys[keys.length - 1]] = value;
+  AppState.debug.lastMutation = {
+    path,
+    reason,
+    atISO: new Date().toISOString()
+  };
+  AppState.debug.mutationLog.push(AppState.debug.lastMutation);
+  if (AppState.debug.mutationLog.length > 200) AppState.debug.mutationLog.shift();
+}
+
+function appStateMerge(path, patch, reason = '') {
+  const current = path.split('.').reduce((acc, k) => acc && acc[k], AppState) || {};
+  appStateSet(path, Object.assign({}, current, patch || {}), reason);
+}
+
+let USER_CONFIG = AppState.runtime.userConfig;
+const PRODUCT_SCOPE = AppState.product.scope;
+const ESTAT = AppState.legacy;
+
+function setUserConfig(config, reason = '') {
+  USER_CONFIG = config;
+  appStateSet('runtime.userConfig', config, reason || 'setUserConfig');
+}
+
+function setFase(fase, reason = '') {
+  appStateSet('legacy.fase', fase, reason || 'setFase');
+}
+
+function setNkg(nkg, reason = '') {
+  appStateSet('legacy._nkg', nkg, reason || 'setNkg');
+  appStateSet('data.nkg', nkg, reason || 'setNkg:data');
+}
+
+function setBibliaNarrativa(biblia, reason = '') {
+  appStateSet('legacy.bibliaNarrativa', biblia, reason || 'setBibliaNarrativa');
+  appStateSet('data.bible', biblia, reason || 'setBibliaNarrativa:data');
+}
 
 // ═══════════════════════════════════════════════════════════
 //  CONFIGURACIÓ
@@ -2474,7 +2540,7 @@ function guardarIComencar() {
     const focusClimax = document.getElementById('config-focus-climax') ? document.getElementById('config-focus-climax').value : '';
     ESTAT.configProjecte = { genere, autor_referencia: autor, focus_climax: focusClimax };
 
-    USER_CONFIG = {
+    setUserConfig({
       provider,
       providerGeneracio,
       providerArquitectura,
@@ -2491,7 +2557,7 @@ function guardarIComencar() {
       fluxAutomatic,
       targetQualitat,
       delayEntreCapitolsMs
-    };
+    });
 
     if (typeof poblarSelectorsModels === 'function') {
       poblarSelectorsModels();
@@ -2573,13 +2639,13 @@ function actualitzarConfiguracioActiva() {
     const focusClimax = document.getElementById('config-focus-climax')?.value || '';
     ESTAT.configProjecte = { genere, autor_referencia: autor, focus_climax: focusClimax };
 
-    USER_CONFIG = {
+    setUserConfig({
       provider, providerGeneracio, providerArquitectura, apiKey,
       modelGeneracio, modelArquitectura, modelDraft,
       modelArquitecte: modelArquitectura,
       models: { draft: modelDraft, generacio: modelGeneracio, arquitecte: modelArquitectura },
       fluxAutomatic, targetQualitat, delayEntreCapitolsMs
-    };
+    });
 
     if (typeof poblarSelectorsModels === 'function') poblarSelectorsModels();
     if (typeof actualitzarModelsDisponibles === 'function') actualitzarModelsDisponibles();
@@ -2621,7 +2687,7 @@ async function iniciarFase1() {
 
   ESTAT.tematica = sel;
   ESTAT.history  = [];
-  ESTAT.fase     = 1;
+  setFase(1);
   updateProgress(1);
   showCard('fase-1');
   showLoader(1);
@@ -2696,7 +2762,7 @@ function iniciarFase2() {
   const idx = ESTAT._premissaIdx;
   if (idx === undefined || idx === null) { toast('Tria una premissa primer.'); return; }
   ESTAT.premissaTriada = ESTAT._premissaLista[idx];
-  ESTAT.fase = 2;
+  setFase(2);
   updateProgress(2);
   showCard('fase-2');
 }
@@ -2809,7 +2875,7 @@ async function iniciarNovaCreacio() {
   ESTAT._nombreCapitolsConfig = parseInt(caps);
   ESTAT.estil.paraules = 3000;
   ESTAT.history = [];
-  ESTAT._nkg = crearNKG();
+  setNkg(crearNKG());
   ESTAT._modeCreacio = 'guiat';
   ESTAT._autoRedaccioMode = false;
 
@@ -2880,7 +2946,7 @@ Retorna un perfil curt i accionable (màxim 220 paraules) amb:
 // ─── PART 2 — Mode guiat / Automàtic ─────────────────────────────────────────
 
 function iniciarModeGuiat() {
-  ESTAT.fase = 'b1';
+  setFase('b1');
   ESTAT._modeCreacio = 'guiat';
   showCard('fase-b1');
   setTimeout(() => document.getElementById('fase-b1')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -2891,7 +2957,7 @@ function iniciarModeGuiat() {
 }
 
 function iniciarModeAutomatic() {
-  ESTAT.fase = 'b1';
+  setFase('b1');
   ESTAT._modeCreacio = 'automatic';
   modeCreacioAutomatic().catch(err => { hideLoader('b1'); toast('Error preparant el flux: ' + err.message); });
 }
@@ -4367,7 +4433,7 @@ async function iniciarFase3() {
   ESTAT.estil.to  = to;
   ESTAT.estil.desc = `to "${to}", ${perspectiva}, ${paraules} paraules aproximades`;
 
-  ESTAT.fase = 3;
+  setFase(3);
   updateProgress(3);
   showCard('fase-3');
   showLoader(3);
@@ -4399,7 +4465,7 @@ async function iniciarFase4() {
     return;
   }
   ESTAT.protagonistaTriat = ESTAT._llistaProtagonistes[idx];
-  ESTAT.fase = 4;
+  setFase(4);
   updateProgress(4);
   showCard('fase-4');
   showLoader(4);
@@ -4425,7 +4491,7 @@ async function iniciarFase5() {
     return;
   }
   ESTAT.localitzacioTriada = ESTAT._llistaLocalitzacions[idx];
-  ESTAT.fase = 5;
+  setFase(5);
   updateProgress(5);
   showCard('fase-5');
   showLoader(5);
@@ -4458,7 +4524,7 @@ function iniciarEscriptura() {
   ESTAT._partsTexts  = [];
   ESTAT._historyBeforeEscriptura = [...ESTAT.history];
 
-  ESTAT.fase = 6;
+  setFase(6);
   updateProgress(6);
   showCard('fase-6');
   hideCard('conte-wrap');
@@ -4578,7 +4644,7 @@ async function exportarDoc() {
 async function iniciarFase7() {
   if (!ESTAT.conteText) { toast('Primer genera el conte.'); return; }
 
-  ESTAT.fase = 7;
+  setFase(7);
   updateProgress(7);
   showCard('fase-7');
   setTimeout(() => document.getElementById('fase-7')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -4702,7 +4768,7 @@ function tornarASeleccioWorld() {
 //  FASE 7 → FASE 8: Elenc de personatges
 // ═══════════════════════════════════════════════════════════
 async function iniciarFase8() {
-  ESTAT.fase = 8;
+  setFase(8);
   updateProgress(8);
   showCard('fase-8');
   setTimeout(() => document.getElementById('fase-8')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -4854,7 +4920,7 @@ async function generarEstilsParla() {
       estat_animic_actual: prev.estat_animic_actual || inferirEstatAnimicDesDeVeu(prev.estil_veu, prev.perfil_psicologic)
     });
   });
-  ESTAT.fase = 9;
+  setFase(9);
   updateProgress(9);
   showCard('fase-9');
   setTimeout(() => document.getElementById('fase-9')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -5243,7 +5309,7 @@ Retorna EXCLUSIVAMENT JSON vàlid:
 }
 
 async function iniciarFasePsicologia() {
-  ESTAT.fase = 10;
+  setFase(10);
   updateProgress(10);
   showCard('fase-10');
   setTimeout(() => document.getElementById('fase-10')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -5387,7 +5453,7 @@ function mostrarFeridaArc(dades) {
 }
 
 async function iniciarFaseFeridaArc() {
-  ESTAT.fase = 11;
+  setFase(11);
   updateProgress(11);
   showCard('fase-11');
   setTimeout(() => document.getElementById('fase-11')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -5500,7 +5566,7 @@ function mostrarMatriuRelacional(matriu) {
 }
 
 async function iniciarFaseRelacions() {
-  ESTAT.fase = 12;
+  setFase(12);
   updateProgress(12);
   showCard('fase-12');
   setTimeout(() => document.getElementById('fase-12')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -5809,7 +5875,7 @@ function construirBackstoryMinimalSenseRelacions() {
 }
 
 async function iniciarFaseBackstoryRelacions() {
-  ESTAT.fase = 13;
+  setFase(13);
   updateProgress(13);
   showCard('fase-13');
   setTimeout(() => document.getElementById('fase-13')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -6038,7 +6104,7 @@ async function generarCompletarPersonatges(userConfig, onProgress) {
 }
 
 async function iniciarFaseCompletarPersonatges() {
-  ESTAT.fase = 14;
+  setFase(14);
   updateProgress(14);
   showCard('fase-14');
   setTimeout(() => document.getElementById('fase-14')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -6350,7 +6416,7 @@ Retorna EXCLUSIVAMENT un array JSON de waypoints.`;
 }
 
 async function iniciarFaseObjectiusSecrets() {
-  ESTAT.fase = 15;
+  setFase(15);
   updateProgress(15);
   showCard('fase-15');
   setTimeout(() => document.getElementById('fase-15')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -6476,7 +6542,7 @@ function injectarObjectesNarratius(data = {}) {
 }
 
 async function iniciarFaseObjectesNarratius() {
-  ESTAT.fase = 16;
+  setFase(16);
   updateProgress(16);
   showCard('fase-16');
   setTimeout(() => document.getElementById('fase-16')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -6589,7 +6655,7 @@ function injectarMapaEspacialRegles(data = {}) {
 }
 
 async function iniciarFaseMapaEspacialRegles() {
-  ESTAT.fase = 17;
+  setFase(17);
   updateProgress(17);
   showCard('fase-17');
   setTimeout(() => document.getElementById('fase-17')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -7199,7 +7265,7 @@ REGLES:
 }
 
 function injectarPerspectivaCronologia(data = {}) {
-  if (!ESTAT._nkg) ESTAT._nkg = crearNKG();
+  if (!ESTAT._nkg) setNkg(crearNKG());
   if (!ESTAT._nkg.context_creacio || typeof ESTAT._nkg.context_creacio !== 'object') ESTAT._nkg.context_creacio = {};
   if (!ESTAT._nkg.context_creacio.estil || typeof ESTAT._nkg.context_creacio.estil !== 'object') ESTAT._nkg.context_creacio.estil = {};
   const perspectiva = normalitzarPerspectivaNarrativa(data.perspectiva || {});
@@ -7237,7 +7303,7 @@ async function assegurarPerspectivaCronologiaPipeline(setStatus = null) {
 }
 
 async function iniciarFasePerspectivaCronologia() {
-  ESTAT.fase = 21;
+  setFase(21);
   updateProgress(21);
   showCard('fase-21');
   setTimeout(() => document.getElementById('fase-21')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -7414,7 +7480,7 @@ function injectarVeuExemples(data = {}) {
 }
 
 async function iniciarFaseVeuExemples() {
-  ESTAT.fase = 22;
+  setFase(22);
   updateProgress(22);
   showCard('fase-22');
   setTimeout(() => document.getElementById('fase-22')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -7624,7 +7690,7 @@ function tornarAElenc() {
 //  FASE 19: Estructura de la novel·la (Opus)
 // ═══════════════════════════════════════════════════════════
 async function iniciarFase10() {
-  ESTAT.fase = 19;
+  setFase(19);
   updateProgress(19);
   showCard('fase-19');
   setTimeout(() => document.getElementById('fase-19')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -7873,7 +7939,7 @@ function mostrarEstructura(text) {
 //  FASE 20: Escaleta per Escenes (Opus)
 // ═══════════════════════════════════════════════════════════
 async function iniciarFaseEscaleta() {
-  ESTAT.fase = 20;
+  setFase(20);
   updateProgress(20);
   showCard('fase-20');
   setTimeout(() => document.getElementById('fase-20')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -7977,7 +8043,7 @@ async function iniciarFase11() {
   if (!chkNKG.ok) {
     toast('Falten dades al NKG. Et porto a la fase de compleció perquè puguis autogenerar-les o descarregar NKG + Bíblia.');
     console.error('NKG incomplet abans del capítol 1:', chkNKG.errors);
-    ESTAT.fase = 22;
+    setFase(22);
     updateProgress(22);
     showCard('fase-22');
     document.getElementById('veu-exemples-result').classList.remove('hidden');
@@ -7997,11 +8063,11 @@ async function iniciarFase11() {
       );
       if (reprendre) {
         ESTAT._capitols_generats = sessioExistent.capitolsGenerats || [];
-        if (sessioExistent.nkg)    ESTAT._nkg = sessioExistent.nkg;
-        if (sessioExistent.biblia) ESTAT.bibliaNarrativa = sessioExistent.biblia;
+        if (sessioExistent.nkg)    setNkg(sessioExistent.nkg);
+        if (sessioExistent.biblia) setBibliaNarrativa(sessioExistent.biblia);
         if (sessioExistent.capitolsEscaleta) ESTAT._escaletes = sessioExistent.capitolsEscaleta;
         // Configura la fase i mostra la UI
-        ESTAT.fase = 23;
+        setFase(23);
         updateProgress(23);
         showCard('fase-23');
         // Reprèn des del capítol on es va aturar (capitolActual és 1-indexed, generarCapitol és 0-indexed)
@@ -8012,7 +8078,7 @@ async function iniciarFase11() {
     eliminarEstatSessio();
   }
 
-  ESTAT.fase                = 23;
+  setFase(23);
   ESTAT._capitolActual      = 0;
   ESTAT._capitols_generats  = [];
   ESTAT._revisioInstruccions= {};
@@ -10669,7 +10735,7 @@ async function iniciarFase12() {
     return;
   }
 
-  ESTAT.fase = 24;
+  setFase(24);
   updateProgress(24);
   showCard('fase-24');
   setTimeout(() => document.getElementById('fase-24')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -11180,7 +11246,7 @@ function aplicarCanvisBiblia(canvis) {
 
 // ─── SISTEMA 2: Fase de Trames ────────────────────────────────────────────────
 async function iniciarFaseTrames() {
-  ESTAT.fase = 18;
+  setFase(18);
   showCard('fase-18');
   updateProgress(18);
   setTimeout(() => document.getElementById('fase-18')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -17250,7 +17316,7 @@ function nkgInicialitzar() {
   const prevContextCreacio = ESTAT._nkg?.context_creacio;
   const prevTimelineAccions = ESTAT._nkg?.timeline_accions;
 
-  ESTAT._nkg = crearNKG();
+  setNkg(crearNKG());
   const nkg = ESTAT._nkg;
 
   // Restaurar macronarrativa si tenia dades
