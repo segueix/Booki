@@ -1575,7 +1575,221 @@ function iniciarSeguentCapitolManual() {
 // --- SISTEMA DE PERSISTÈNCIA ---
 const CLAU_PROJECTE_ACTUAL = 'booki_projecte_actual';
 const CLAU_HISTORIAL = 'booki_projecte_historial';
+const CLAU_STAGE_CHECKPOINTS = 'booki_stage_checkpoints_v1';
 const MAX_SNAPSHOTS = 6;
+const CHECKPOINT_STAGE_KEYS = ['premise', 'structure', 'characters', 'world', 'chapterOutline', 'nkg', 'bible'];
+
+function checkpointDeepClone(value) {
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (_) {
+    return null;
+  }
+}
+
+function checkpointReadStore() {
+  try {
+    const raw = localStorage.getItem(CLAU_STAGE_CHECKPOINTS);
+    const parsed = raw ? JSON.parse(raw) : {};
+    if (!parsed || typeof parsed !== 'object') return {};
+    parsed.checkpoints = (parsed.checkpoints && typeof parsed.checkpoints === 'object') ? parsed.checkpoints : {};
+    parsed.history = Array.isArray(parsed.history) ? parsed.history : [];
+    return parsed;
+  } catch (_) {
+    return {};
+  }
+}
+
+function checkpointWriteStore(store) {
+  try {
+    localStorage.setItem(CLAU_STAGE_CHECKPOINTS, JSON.stringify(store));
+  } catch (e) {
+    console.warn('No s\'ha pogut guardar checkpoint de stages:', e);
+  }
+}
+
+function checkpointBuildStageData(stageKey) {
+  if (stageKey === 'premise') {
+    return {
+      ideaTheme: ESTAT.tematica || AppState.data.ideaTheme || '',
+      selectedPremise: ESTAT.premissaTriada || null,
+      premiseOptions: Array.isArray(ESTAT._premissaLista) ? ESTAT._premissaLista.slice() : []
+    };
+  }
+  if (stageKey === 'structure') {
+    return {
+      chapterStructure: Array.isArray(ESTAT._estructuraCapitols) ? ESTAT._estructuraCapitols : [],
+      arcGlobal: ESTAT._arcGlobal || '',
+      centralThemes: Array.isArray(ESTAT._temesCentrals) ? ESTAT._temesCentrals : []
+    };
+  }
+  if (stageKey === 'characters') {
+    return {
+      characters: checkpointDeepClone((ESTAT._nkg && ESTAT._nkg.personatges) || AppState.data.characters || {}) || {}
+    };
+  }
+  if (stageKey === 'world') {
+    return {
+      worldText: String(ESTAT.monTriat || (AppState.data.world && AppState.data.world.text) || ''),
+      worldRules: checkpointDeepClone((ESTAT.bibliaNarrativa && ESTAT.bibliaNarrativa.regles_mon) || []) || []
+    };
+  }
+  if (stageKey === 'chapterOutline') {
+    return {
+      chapterOutline: checkpointDeepClone(ESTAT._escaletes || AppState.data.chapterOutline?.escaletes || []) || []
+    };
+  }
+  if (stageKey === 'nkg') {
+    return {
+      nkg: checkpointDeepClone(ESTAT._nkg || AppState.data.nkg || {}) || {}
+    };
+  }
+  if (stageKey === 'bible') {
+    return {
+      bible: checkpointDeepClone(ESTAT.bibliaNarrativa || AppState.data.bible || {}) || {}
+    };
+  }
+  return null;
+}
+
+function checkpointHasUsefulData(stageKey, data) {
+  if (!data || typeof data !== 'object') return false;
+  if (stageKey === 'premise') return !!String(data.selectedPremise || '').trim();
+  if (stageKey === 'structure') return Array.isArray(data.chapterStructure) && data.chapterStructure.length > 0;
+  if (stageKey === 'characters') return data.characters && Object.keys(data.characters).length > 0;
+  if (stageKey === 'world') return !!String(data.worldText || '').trim();
+  if (stageKey === 'chapterOutline') return Array.isArray(data.chapterOutline) && data.chapterOutline.length > 0;
+  if (stageKey === 'nkg') return data.nkg && Object.keys(data.nkg).length > 0;
+  if (stageKey === 'bible') return data.bible && Object.keys(data.bible).length > 0;
+  return false;
+}
+
+function checkpointSaveStage(stageKey, reason = '') {
+  if (!CHECKPOINT_STAGE_KEYS.includes(stageKey)) return false;
+  const stageData = checkpointBuildStageData(stageKey);
+  if (!checkpointHasUsefulData(stageKey, stageData)) return false;
+  const nowISO = new Date().toISOString();
+  const sm = AppState.runtime?.stageMachine || {};
+  const current = checkpointReadStore();
+  if (!current.createdAtISO) current.createdAtISO = nowISO;
+  const checkpoint = {
+    version: 1,
+    stageKey,
+    savedAtISO: nowISO,
+    fase: Number(ESTAT.fase || 0),
+    lastSuccessfulStage: sm.lastSuccessfulStage || stageKey,
+    reason: reason || 'stage-ok',
+    data: stageData
+  };
+  current.updatedAtISO = nowISO;
+  current.latestStage = stageKey;
+  current.checkpoints[stageKey] = checkpoint;
+  current.history.push({ stageKey, savedAtISO: nowISO, fase: checkpoint.fase, reason: checkpoint.reason });
+  if (current.history.length > 40) current.history = current.history.slice(-40);
+  checkpointWriteStore(current);
+  return true;
+}
+
+function checkpointGetLatestValid() {
+  const store = checkpointReadStore();
+  const pool = Object.values(store.checkpoints || {})
+    .filter(cp => cp && CHECKPOINT_STAGE_KEYS.includes(cp.stageKey) && cp.data && typeof cp.data === 'object' && cp.savedAtISO)
+    .sort((a, b) => String(a.savedAtISO).localeCompare(String(b.savedAtISO)));
+  return pool.length ? pool[pool.length - 1] : null;
+}
+
+function checkpointApplyToState(checkpoint) {
+  if (!checkpoint || !checkpoint.data) return false;
+  const stageKey = checkpoint.stageKey;
+  const data = checkpoint.data;
+
+  if (stageKey === 'premise') {
+    ESTAT.tematica = data.ideaTheme || ESTAT.tematica;
+    ESTAT.premissaTriada = data.selectedPremise || ESTAT.premissaTriada;
+    ESTAT._premissaLista = Array.isArray(data.premiseOptions) ? data.premiseOptions : ESTAT._premissaLista;
+    appStateSet('data.ideaTheme', ESTAT.tematica || '', 'checkpointRestore:premise');
+    appStateSet('data.premise', { selected: ESTAT.premissaTriada || null, options: ESTAT._premissaLista || [] }, 'checkpointRestore:premise:data');
+  }
+  if (stageKey === 'structure') {
+    ESTAT._estructuraCapitols = Array.isArray(data.chapterStructure) ? data.chapterStructure : [];
+    ESTAT._arcGlobal = data.arcGlobal || ESTAT._arcGlobal;
+    ESTAT._temesCentrals = Array.isArray(data.centralThemes) ? data.centralThemes : ESTAT._temesCentrals;
+    appStateSet('data.structure', { chapterCount: ESTAT._estructuraCapitols.length, chapters: ESTAT._estructuraCapitols }, 'checkpointRestore:structure:data');
+  }
+  if (stageKey === 'characters') {
+    if (!ESTAT._nkg) setNkg(crearNKG(), 'checkpointRestore:characters:initNkg');
+    ESTAT._nkg.personatges = checkpointDeepClone(data.characters) || {};
+    appStateSet('data.characters', { total: Object.keys(ESTAT._nkg.personatges || {}).length, byKey: ESTAT._nkg.personatges }, 'checkpointRestore:characters:data');
+  }
+  if (stageKey === 'world') {
+    ESTAT.monTriat = data.worldText || ESTAT.monTriat;
+    if (ESTAT.bibliaNarrativa && Array.isArray(data.worldRules)) ESTAT.bibliaNarrativa.regles_mon = data.worldRules;
+    appStateSet('data.world', { text: ESTAT.monTriat || '' }, 'checkpointRestore:world:data');
+  }
+  if (stageKey === 'chapterOutline') {
+    ESTAT._escaletes = checkpointDeepClone(data.chapterOutline) || [];
+    appStateSet('data.chapterOutline', { total: ESTAT._escaletes.length, escaletes: ESTAT._escaletes }, 'checkpointRestore:outline:data');
+  }
+  if (stageKey === 'nkg') {
+    setNkg(checkpointDeepClone(data.nkg) || {}, 'checkpointRestore:nkg');
+  }
+  if (stageKey === 'bible') {
+    setBibliaNarrativa(checkpointDeepClone(data.bible) || {}, 'checkpointRestore:bible');
+  }
+
+  if (Number.isFinite(Number(checkpoint.fase))) setFase(Number(checkpoint.fase), 'checkpointRestore:fase');
+  stageOk(stageKey, { requestId: `checkpoint-restore-${stageKey}-${Date.now()}` });
+  return true;
+}
+
+function recuperarUltimCheckpointLocal() {
+  const latest = checkpointGetLatestValid();
+  if (!latest) return false;
+  try {
+    const ok = checkpointApplyToState(latest);
+    if (!ok) return false;
+    restaurarInterficieDesDeEstat();
+    toast(`Recuperat checkpoint de l'etapa: ${latest.stageKey}`);
+    return true;
+  } catch (err) {
+    console.warn('Error restaurant checkpoint local:', err);
+    return false;
+  }
+}
+
+function construirDiagnosticSessioJSON() {
+  const sm = stageEnsureRegistry();
+  const store = checkpointReadStore();
+  const checkpoints = store.checkpoints || {};
+  return {
+    generatedAtISO: new Date().toISOString(),
+    faseActual: ESTAT.fase,
+    stageMachine: {
+      currentStage: sm.currentStage,
+      lastSuccessfulStage: sm.lastSuccessfulStage,
+      stages: sm.stages
+    },
+    checkpoints: Object.keys(checkpoints).sort().map(stageKey => ({
+      stageKey,
+      savedAtISO: checkpoints[stageKey].savedAtISO,
+      fase: checkpoints[stageKey].fase,
+      keys: Object.keys(checkpoints[stageKey].data || {})
+    })),
+    latestCheckpoint: checkpointGetLatestValid() ? {
+      stageKey: checkpointGetLatestValid().stageKey,
+      savedAtISO: checkpointGetLatestValid().savedAtISO,
+      fase: checkpointGetLatestValid().fase
+    } : null
+  };
+}
+
+function exportarDiagnosticSessioJSON() {
+  const data = construirDiagnosticSessioJSON();
+  const nom = `booki_session_diagnostic_${new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19)}.json`;
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
+  descarregarBlobFitxer(blob, nom);
+  toast('Diagnòstic de sessió exportat: ' + nom);
+}
 
 function construirSnapshotProjecte() {
   return {
@@ -1603,7 +1817,8 @@ function guardarProjecteLocal() {
 
 function comprovarProjecteGuardat() {
   const guardat = localStorage.getItem(CLAU_PROJECTE_ACTUAL);
-  if (guardat) {
+  const checkpoint = checkpointGetLatestValid();
+  if (guardat || checkpoint) {
     document.getElementById('btn-reprendre').classList.remove('hidden');
   }
 }
@@ -1641,14 +1856,18 @@ function aplicarSnapshotProjecte(dades) {
 
 function reprendreProjecteLocal() {
   const guardat = localStorage.getItem(CLAU_PROJECTE_ACTUAL);
-  if (!guardat) return;
-  try {
-    const dades = JSON.parse(guardat);
-    aplicarSnapshotProjecte(dades);
-    toast('Projecte recuperat amb èxit.');
-  } catch (e) {
-    toast('Error en recuperar el projecte: ' + e.message);
+  if (guardat) {
+    try {
+      const dades = JSON.parse(guardat);
+      aplicarSnapshotProjecte(dades);
+      toast('Projecte recuperat amb èxit.');
+      return;
+    } catch (e) {
+      toast('Error en recuperar el projecte complet: ' + e.message);
+    }
   }
+  const recuperat = recuperarUltimCheckpointLocal();
+  if (!recuperat) toast('No hi ha cap checkpoint vàlid per recuperar.');
 }
 
 function exportarCopiaSeguretat() {
@@ -2419,6 +2638,7 @@ function stageOk(stageKey, meta = {}) {
   sm.currentStage = stageKey;
   sm.lastSuccessfulStage = stageKey;
   appStateSet('runtime.stageMachine', sm, `stageOk:${stageKey}`);
+  checkpointSaveStage(stageKey, meta.reason || 'stageOk');
 }
 
 function stageError(stageKey, err, meta = {}) {
@@ -8374,6 +8594,7 @@ async function iniciarFaseEscaleta() {
       total: totsResultats.length,
       escaletes: totsResultats
     }, 'iniciarFaseEscaleta');
+    checkpointSaveStage('chapterOutline', 'iniciarFaseEscaleta:postData');
     if (ESTAT._nkg) stageOk('nkg', { requestId: `nkg-ready-${Date.now()}` });
   } catch (e) {
     hideLoader('20');
