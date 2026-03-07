@@ -3064,7 +3064,6 @@ function setupChipsBarOrdering() {
 
         button.dataset.cat = chip.value;
         button.textContent = chip.label;
-        button.draggable = true;
         button.dataset.fixed = 'false';
         const isActive = chip.value === activeValue;
         button.classList.toggle('is-active', isActive);
@@ -3090,7 +3089,6 @@ function setupChipsBarOrdering() {
         fixedChip.className = 'chip';
         fixedChip.dataset.cat = chipName;
         fixedChip.textContent = chipName;
-        fixedChip.draggable = false;
         fixedChip.dataset.fixed = 'true';
         const isActive = chipName === activeValue;
         fixedChip.classList.toggle('is-active', isActive);
@@ -3102,18 +3100,29 @@ function setupChipsBarOrdering() {
     addButton.className = 'chip chip-add';
     addButton.setAttribute('aria-label', 'Afegir una categoria personalitzada');
     addButton.textContent = '+';
-    addButton.draggable = false;
     addButton.dataset.fixed = 'true';
     chipsBar.appendChild(addButton);
 
     saveChipOrder(getChipOrderFromDom());
 
-    if (chipsBar.dataset.dragBound !== 'true') {
+    if (chipsBar.dataset.dragBound !== 'true' && typeof Sortable !== 'undefined') {
         chipsBar.dataset.dragBound = 'true';
-        chipsBar.addEventListener('dragstart', handleChipDragStart);
-        chipsBar.addEventListener('dragover', handleChipDragOver);
-        chipsBar.addEventListener('dragend', handleChipDragEnd);
-        chipsBar.addEventListener('drop', handleChipDrop);
+        new Sortable(chipsBar, {
+            animation: 150,
+            delay: 250,
+            delayOnTouchOnly: true,
+            draggable: '.chip',
+            filter: '.chip[data-fixed="true"], .chip-add',
+            onMove: (event) => {
+                if (isFixedChip(event.related)) {
+                    return false;
+                }
+                return true;
+            },
+            onEnd: () => {
+                saveChipOrder(getChipOrderFromDom());
+            }
+        });
     }
 }
 
@@ -3180,66 +3189,6 @@ function setActiveNavItem(page) {
 }
 
 
-let draggedChip = null;
-
-function handleChipDragStart(event) {
-    const chip = event.target.closest('.chip');
-    if (!chip || chip.dataset.fixed === 'true' || chip.classList.contains('chip-add')) {
-        return;
-    }
-    draggedChip = chip;
-    chip.classList.add('is-dragging');
-    if (event.dataTransfer) {
-        event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/plain', chip.dataset.cat || '');
-    }
-}
-
-function handleChipDragOver(event) {
-    event.preventDefault();
-    if (!chipsBar || !draggedChip) {
-        return;
-    }
-    const afterElement = getChipDragAfterElement(chipsBar, event.clientX);
-    const fixedAnchor = chipsBar.querySelector('.chip[data-fixed="true"]') || chipsBar.querySelector('.chip-add');
-    if (!afterElement) {
-        if (fixedAnchor) {
-            chipsBar.insertBefore(draggedChip, fixedAnchor);
-        } else {
-            chipsBar.appendChild(draggedChip);
-        }
-    } else if (afterElement !== draggedChip) {
-        chipsBar.insertBefore(draggedChip, afterElement);
-    }
-}
-
-function handleChipDrop(event) {
-    event.preventDefault();
-    if (!chipsBar) {
-        return;
-    }
-    saveChipOrder(getChipOrderFromDom());
-}
-
-function handleChipDragEnd() {
-    if (draggedChip) {
-        draggedChip.classList.remove('is-dragging');
-        draggedChip = null;
-    }
-    saveChipOrder(getChipOrderFromDom());
-}
-
-function getChipDragAfterElement(container, x) {
-    const draggableElements = [...container.querySelectorAll('.chip:not(.is-dragging)')].filter(chip => !isFixedChip(chip));
-    return draggableElements.reduce((closest, child) => {
-        const box = child.getBoundingClientRect();
-        const offset = x - box.left - box.width / 2;
-        if (offset < 0 && offset > closest.offset) {
-            return { offset, element: child };
-        }
-        return closest;
-    }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
-}
 
 // ==================== CARREGAR VÍDEOS AMB API ====================
 
