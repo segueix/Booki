@@ -4266,7 +4266,11 @@ function obtenirAccioGeneracioPerFaltant(faltant = '') {
 
 async function generarFaltantNKG(itemId, btnEl = null) {
   const btn = btnEl || null;
-  if (btn) btn.disabled = true;
+  const originalText = btn ? btn.textContent : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Generant…';
+  }
   const nkg = ESTAT._nkg || {};
   try {
     if (itemId === 'backstory_relacions') {
@@ -4294,11 +4298,15 @@ async function generarFaltantNKG(itemId, btnEl = null) {
     } else if (itemId === 'veu_exemples') {
       await generarVeuExemples(USER_CONFIG);
     }
+    toast('Element generat correctament.');
     mostrarVeuExemples((ESTAT._nkg && ESTAT._nkg.personatges) || {});
     mostrarFaltantsNKG();
   } catch (err) {
     toast("No s'ha pogut generar aquest element: " + err.message);
-    if (btn) btn.disabled = false;
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = originalText || 'Generar';
+    }
   }
 }
 
@@ -4363,7 +4371,78 @@ function mostrarResumNKGiTransicio(nkg, capitolsEscaleta, validacio, modeCreacio
 
 async function modeRedaccioAutomatic() {
   ESTAT._autoRedaccioMode = true;
+  // Auto-completar NKG si falten dades abans de començar la redacció
+  const faltants = detectarFaltantsNKG(ESTAT._nkg || {}, ESTAT.bibliaNarrativa || {});
+  if (faltants.length > 0) {
+    toast(`Completant ${faltants.length} element(s) NKG faltants…`);
+    try {
+      await autocompletarNKGSilent(msg => toast(msg));
+    } catch (err) {
+      console.warn('Error auto-completant NKG:', err.message);
+    }
+  }
   await iniciarFase11();
+}
+
+async function autocompletarNKGSilent(setStatus = () => {}) {
+  const nkg = ESTAT._nkg || {};
+  const biblia = ESTAT.bibliaNarrativa || {};
+  const passos = [
+    {
+      etiqueta: 'Backstory i relacions',
+      detecta: txt => txt.includes('backstory') || txt.includes('relacions'),
+      executar: async () => {
+        try {
+          await assegurarMinimPersonatgesPerRelacions(2, USER_CONFIG);
+          const d = await generarBackstoryIRelacions(USER_CONFIG);
+          if (d && d.backstory_canonic) nkg.macronarrativa.backstory_canonic = d.backstory_canonic;
+          if (Array.isArray(d && d.relacions)) nkg.relacions = d.relacions;
+        } catch (e) {
+          const minimal = construirBackstoryMinimalSenseRelacions();
+          nkg.macronarrativa.backstory_canonic = minimal.backstory_canonic;
+          nkg.relacions = minimal.relacions;
+        }
+      }
+    },
+    {
+      etiqueta: 'Trets immutables',
+      detecta: txt => txt.includes('trets immutables'),
+      executar: async () => { await generarCompletarPersonatges(USER_CONFIG); }
+    },
+    {
+      etiqueta: 'Objectes narratius',
+      detecta: txt => txt.includes('objectes narratius'),
+      executar: async () => { const d = await generarObjectesNarratius(USER_CONFIG); injectarObjectesNarratius(d); }
+    },
+    {
+      etiqueta: 'Mapa espacial i regles',
+      detecta: txt => txt.includes('mapa de llocs') || txt.includes('regles del món'),
+      executar: async () => { const d = await generarMapaEspacialRegles(USER_CONFIG); injectarMapaEspacialRegles(d); }
+    },
+    {
+      etiqueta: 'Perspectiva i cronologia',
+      detecta: txt => txt.includes('pov per capítol') || txt.includes('cronologia') || txt.includes('tipus de perspectiva'),
+      executar: async () => { const d = await generarPerspectivaCronologia(USER_CONFIG); injectarPerspectivaCronologia(d); }
+    },
+    {
+      etiqueta: 'Veu i exemples narratius',
+      detecta: txt => txt.includes('exemples narratius de veu') || txt.includes('vocabulari recurrent'),
+      executar: async () => { await generarVeuExemples(USER_CONFIG); }
+    }
+  ];
+
+  for (let intent = 0; intent < 3; intent++) {
+    const faltantsLlista = detectarFaltantsNKG(nkg, biblia);
+    if (faltantsLlista.length === 0) break;
+    const faltantsText = faltantsLlista.join(' | ').toLowerCase();
+    const pendents = passos.filter(p => p.detecta(faltantsText));
+    if (pendents.length === 0) break;
+    for (let i = 0; i < pendents.length; i++) {
+      const pas = pendents[i];
+      setStatus(`[${i + 1}/${pendents.length}] ${pas.etiqueta}...`);
+      try { await pas.executar(); } catch (e) { console.warn(`Error auto-completant ${pas.etiqueta}:`, e.message); }
+    }
+  }
 }
 
 async function iniciarEscaletaSeqNou() {
@@ -11645,7 +11724,9 @@ function analitzarRespostaGenerica(respostaJSON, proveidor) {
       throw new Error('Gemini ha bloquejat la resposta per filtres de seguretat extrems. Prova amb un fragment menys sensible.');
     }
     const parts = firstCandidate && firstCandidate.content ? firstCandidate.content.parts : [];
-    text = Array.isArray(parts) ? parts.map(p => (p && p.text) ? p.text : '').join('\n') : '';
+    // Filtrar parts de "thinking" (Gemini 2.5+ models) — només agafar contingut real
+    const contentParts = Array.isArray(parts) ? parts.filter(p => p && p.text && !p.thought) : [];
+    text = contentParts.map(p => p.text).join('\n');
     textIncomplet = !!(firstCandidate && firstCandidate.finishReason === 'MAX_TOKENS');
 
   } else {
@@ -12077,7 +12158,12 @@ async function callGemini(messages, systemPrompt, apiKey, model, maxTokens, extr
     encodeURIComponent(finalModel) + ':generateContent?key=' + encodeURIComponent(apiKey);
 
   const genConfig = { maxOutputTokens: maxTokens };
-  if (extraConfig && extraConfig.responseMimeType) genConfig.responseMimeType = extraConfig.responseMimeType;
+  // Forçar JSON output si el system prompt ho demana o si s'ha especificat explícitament
+  if (extraConfig && extraConfig.responseMimeType) {
+    genConfig.responseMimeType = extraConfig.responseMimeType;
+  } else if (systemPrompt && /respon\s+(exclusivament|només|únicament)\s+(amb\s+)?json|retorna\s+(només|exclusivament)\s+json/i.test(systemPrompt)) {
+    genConfig.responseMimeType = 'application/json';
+  }
 
   const payload = {
     contents:         buildGeminiContents(messages),
@@ -12117,9 +12203,15 @@ async function callGeminiWithFinishReason(messages, systemPrompt, apiKey, model,
   const endpoint   = PROVIDER_DEFAULTS.gemini.apiUrlBase + '/' +
     encodeURIComponent(finalModel) + ':generateContent?key=' + encodeURIComponent(apiKey);
 
+  const genConfig = { maxOutputTokens: maxTokens };
+  // Forçar JSON output si el system prompt ho demana
+  if (systemPrompt && /respon\s+(exclusivament|només|únicament)\s+(amb\s+)?json|retorna\s+(només|exclusivament)\s+json/i.test(systemPrompt)) {
+    genConfig.responseMimeType = 'application/json';
+  }
+
   const payload = {
     contents:         buildGeminiContents(messages),
-    generationConfig: { maxOutputTokens: maxTokens },
+    generationConfig: genConfig,
     safetySettings: [
       { category: "HARM_CATEGORY_HARASSMENT",        threshold: "BLOCK_NONE" },
       { category: "HARM_CATEGORY_HATE_SPEECH",        threshold: "BLOCK_NONE" },
