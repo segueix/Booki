@@ -2300,6 +2300,75 @@ function crearEstatStageBase() {
   };
 }
 
+function crearErrorValidacioStage(code, errors) {
+  const err = new Error((errors || []).join(' | ') || 'Validació de stage fallida');
+  err.code = code || 'STAGE_VALIDATION_ERROR';
+  err.validationErrors = Array.isArray(errors) ? errors : [String(errors || '')];
+  return err;
+}
+
+function validarInputStage(stageKey, ctx = {}) {
+  const errors = [];
+  if (stageKey === 'premise') {
+    if (!ctx.ideaTheme || !String(ctx.ideaTheme).trim()) errors.push('Cal una idea/tema abans de generar premisses.');
+  }
+  if (stageKey === 'chapterOutline') {
+    const estructura = Array.isArray(ctx.structure) ? ctx.structure : [];
+    if (estructura.length === 0) errors.push('No es pot generar escaleta: falta estructura de capítols.');
+  }
+  if (stageKey === 'nkg') {
+    const estructura = Array.isArray(ctx.structure) ? ctx.structure : [];
+    const escaleta = Array.isArray(ctx.chapterOutline) ? ctx.chapterOutline : [];
+    if (estructura.length === 0) errors.push('NKG bloquejat: falta estructura.');
+    if (escaleta.length === 0) errors.push('NKG bloquejat: falta escaleta de capítols.');
+  }
+  if (stageKey === 'bible') {
+    const nkg = ctx.nkg || {};
+    const check = validarOutputNkgDossier(nkg);
+    if (!check.ok) errors.push('Bíblia bloquejada: NKG absent o incomplet. ' + check.errors.join(' | '));
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+function validarOutputChapterOutline(escaletes, expectedCount = null) {
+  const errors = [];
+  const arr = Array.isArray(escaletes) ? escaletes : [];
+  if (arr.length === 0) errors.push("L'escaleta generada és buida.");
+  if (Number.isFinite(expectedCount) && expectedCount > 0 && arr.length < expectedCount) {
+    errors.push(`Escaleta incompleta (${arr.length}/${expectedCount} capítols).`);
+  }
+  arr.forEach((cap, i) => {
+    if (!cap || typeof cap !== 'object') { errors.push(`Capítol ${i+1}: element invàlid.`); return; }
+    if (!Number.isFinite(Number(cap.capitol))) errors.push(`Capítol ${i+1}: falta 'capitol'.`);
+    if (!String(cap.titol || '').trim()) errors.push(`Capítol ${i+1}: falta 'titol'.`);
+    if (!Array.isArray(cap.escenes) || cap.escenes.length === 0) errors.push(`Capítol ${i+1}: falta llista d'escenes.`);
+  });
+  return { ok: errors.length === 0, errors };
+}
+
+function validarOutputNkgDossier(nkg) {
+  const errors = [];
+  if (!nkg || typeof nkg !== 'object') return { ok: false, errors: ['NKG buit o invàlid.'] };
+  if (!nkg.macronarrativa || typeof nkg.macronarrativa !== 'object') errors.push('Falta bloc macronarrativa.');
+  if (!nkg.personatges || typeof nkg.personatges !== 'object' || Object.keys(nkg.personatges).length === 0) errors.push('Falten personatges al NKG.');
+  if (!nkg.threads || typeof nkg.threads !== 'object') errors.push('Falta bloc de fils narratius (threads).');
+  if (!nkg.context_creacio || typeof nkg.context_creacio !== 'object') errors.push('Falta context_creacio al NKG.');
+  return { ok: errors.length === 0, errors };
+}
+
+function validarOutputBibliaNarrativa(biblia) {
+  const errors = [];
+  const b = biblia || {};
+  const must = ['regles_mon', 'llocs_importants', 'objectes_clau', 'fitxes_personatges', 'fets_canonics'];
+  must.forEach(k => {
+    if (!Array.isArray(b[k])) errors.push(`La bíblia no conté '${k}' com a llista.`);
+  });
+  if (Array.isArray(b.fitxes_personatges) && b.fitxes_personatges.length === 0) {
+    errors.push('La bíblia no conté fitxes de personatge.');
+  }
+  return { ok: errors.length === 0, errors };
+}
+
 function stageEnsureRegistry() {
   const sm = AppState.runtime.stageMachine || {};
   if (!sm.stages || typeof sm.stages !== 'object') sm.stages = {};
@@ -2368,10 +2437,25 @@ function stageError(stageKey, err, meta = {}) {
   appStateSet('runtime.stageMachine', sm, `stageError:${stageKey}`);
 }
 
-async function runStage(stageKey, fn) {
+async function runStage(stageKey, fn, options = {}) {
   const requestId = stageStart(stageKey);
   try {
+    if (typeof options.validateInput === 'function') {
+      const vin = options.validateInput();
+      if (!vin || vin.ok !== true) {
+        throw crearErrorValidacioStage('STAGE_INPUT_INVALID', (vin && vin.errors) || ['Entrada invàlida.']);
+      }
+    }
+
     const result = await fn(requestId);
+
+    if (typeof options.validateOutput === 'function') {
+      const vout = options.validateOutput(result);
+      if (!vout || vout.ok !== true) {
+        throw crearErrorValidacioStage('STAGE_OUTPUT_INVALID', (vout && vout.errors) || ['Sortida invàlida.']);
+      }
+    }
+
     stageOk(stageKey, { requestId });
     return result;
   } catch (err) {
@@ -2807,6 +2891,8 @@ async function iniciarFase1() {
         selected: ESTAT.premissaTriada || null,
         options: Array.isArray(ESTAT._premissaLista) ? ESTAT._premissaLista.slice() : []
       }, 'iniciarFase1:premise');
+    }, {
+      validateInput: () => validarInputStage('premise', { ideaTheme: ESTAT.tematica })
     });
   } catch (err) {
     hideLoader(1);
@@ -4126,6 +4212,8 @@ async function confirmarEstructuraNou() {
         chapters: ESTAT._estructuraCapitols.map(c => ({ numero: c.numero, titol: c.titol, intensity_level: c.intensity_level })),
         chapterCount: ESTAT._estructuraCapitols.length
       }, 'confirmarEstructuraNou');
+    }, {
+      validateInput: () => ({ ok: Array.isArray(caps) && caps.length > 0, errors: ["No hi ha capítols d'estructura per confirmar."] })
     });
   } catch (err) {
     toast('Error confirmant estructura: ' + err.message);
@@ -4353,6 +4441,18 @@ function mostrarResumNKGiTransicio(nkg, capitolsEscaleta, validacio, modeCreacio
     document.getElementById('btn-fase23-nou')?.classList.remove('hidden');
     return;
   }
+  const validacioInputNkg = validarInputStage('nkg', {
+    structure: capitolsEscaleta || [],
+    chapterOutline: ESTAT._escaletes || []
+  });
+  if (!validacioInputNkg.ok) {
+    stageError('nkg', { message: validacioInputNkg.errors.join(' | '), code: 'NKG_INPUT_INVALID' });
+    resumDiv.textContent = 'NKG bloquejat: ' + validacioInputNkg.errors.join(' | ');
+    botonsDiv.innerHTML = '';
+    wrap.classList.remove('hidden');
+    return;
+  }
+
   const personatgesNoms = Object.values(nkg.personatges || {}).map(p => p.nom).join(', ');
   const intensitats = (capitolsEscaleta || []).map(c => c.intensity_level || '?').join('-');
   const filsOberts = (nkg.threads?.oberts || []).join(', ') || 'cap';
@@ -4367,6 +4467,18 @@ function mostrarResumNKGiTransicio(nkg, capitolsEscaleta, validacio, modeCreacio
     botonsDiv.parentNode.insertBefore(errDiv, botonsDiv);
     document.getElementById('btn-fase23-nou')?.classList.remove('hidden');
   } else {
+    const validacioSortidaNkg = validarOutputNkgDossier(nkg);
+    if (!validacioSortidaNkg.ok) {
+      stageError('nkg', { message: validacioSortidaNkg.errors.join(' | '), code: 'NKG_OUTPUT_INVALID' });
+      const errDiv = document.createElement('div');
+      errDiv.style.cssText = 'color:#e55;font-size:.88rem;margin-bottom:8px;';
+      errDiv.textContent = `❌ NKG incomplet: ${validacioSortidaNkg.errors.join(' | ')}`;
+      botonsDiv.parentNode.insertBefore(errDiv, botonsDiv);
+      document.getElementById('btn-fase23-nou')?.classList.remove('hidden');
+      wrap.classList.remove('hidden');
+      return;
+    }
+
     stageOk('nkg', { requestId: `nkg-valid-${Date.now()}` });
     const btnExport = document.createElement('button');
     btnExport.className = 'btn btn-primary';
@@ -8094,60 +8206,59 @@ async function iniciarFaseEscaleta() {
   showLoader('20');
   document.getElementById('loader-20-text').textContent = 'Opus generant escaleta per escenes…';
   try {
-    await runStage('chapterOutline', async () => {
-    const caps = ESTAT._estructuraCapitols;
-    const BLOC = 4; // Reduït de 5 a 4 per donar més marge
-    let totsResultats = [];
-    for (let offset = 0; offset < caps.length; offset += BLOC) {
-      const bloc = caps.slice(offset, offset + BLOC);
-      const capsInfo = `${offset + 1}-${Math.min(offset + BLOC, caps.length)} de ${caps.length}`;
-      document.getElementById('loader-20-text').textContent =
-        `Generant escaleta: capítols ${capsInfo}…`;
-
-      // Pausa entre blocs (no el primer) per no saturar el rate limit de Gemini
-      if (offset > 0) {
-        document.getElementById('loader-20-text').textContent =
-          `⏳ Esperant per al rate limit de Gemini… (caps. ${capsInfo})`;
-        await new Promise(r => setTimeout(r, 8000));
+    const totsResultats = await runStage('chapterOutline', async () => {
+      const caps = ESTAT._estructuraCapitols;
+      const BLOC = 4; // Reduït de 5 a 4 per donar més marge
+      let acumulat = [];
+      for (let offset = 0; offset < caps.length; offset += BLOC) {
+        const bloc = caps.slice(offset, offset + BLOC);
+        const capsInfo = `${offset + 1}-${Math.min(offset + BLOC, caps.length)} de ${caps.length}`;
         document.getElementById('loader-20-text').textContent =
           `Generant escaleta: capítols ${capsInfo}…`;
-      }
 
-      const res = await generarEscaletaBloc(bloc, offset, USER_CONFIG);
-      const parsed = parseJsonRobust(res.response);
+        if (offset > 0) {
+          document.getElementById('loader-20-text').textContent =
+            `⏳ Esperant per al rate limit de Gemini… (caps. ${capsInfo})`;
+          await new Promise(r => setTimeout(r, 8000));
+          document.getElementById('loader-20-text').textContent =
+            `Generant escaleta: capítols ${capsInfo}…`;
+        }
 
-      if (parsed && parsed.escaletes) {
-        totsResultats = totsResultats.concat(parsed.escaletes);
+        const res = await generarEscaletaBloc(bloc, offset, USER_CONFIG);
+        const parsed = parseJsonRobust(res.response);
 
-        // Retry: si falten escaletes d'aquest bloc
-        const esperats = bloc.length;
-        const rebuts = parsed.escaletes.length;
-        if (rebuts < esperats) {
-          console.warn(`Escaleta bloc incomplet: ${rebuts}/${esperats}. Completant capítols que falten...`);
-          const capsFaltants = bloc.slice(rebuts);
-          try {
-            const retryRes = await generarEscaletaBloc(capsFaltants, offset + rebuts, USER_CONFIG);
-            const retryParsed = parseJsonRobust(retryRes.response);
-            if (retryParsed && retryParsed.escaletes) {
-              totsResultats = totsResultats.concat(retryParsed.escaletes);
+        if (parsed && parsed.escaletes) {
+          acumulat = acumulat.concat(parsed.escaletes);
+          const esperats = bloc.length;
+          const rebuts = parsed.escaletes.length;
+          if (rebuts < esperats) {
+            console.warn(`Escaleta bloc incomplet: ${rebuts}/${esperats}. Completant capítols que falten...`);
+            const capsFaltants = bloc.slice(rebuts);
+            try {
+              const retryRes = await generarEscaletaBloc(capsFaltants, offset + rebuts, USER_CONFIG);
+              const retryParsed = parseJsonRobust(retryRes.response);
+              if (retryParsed && retryParsed.escaletes) acumulat = acumulat.concat(retryParsed.escaletes);
+            } catch (retryErr) {
+              console.warn('Retry escaleta: ' + retryErr.message);
             }
+          }
+        } else {
+          console.warn(`Escaleta: bloc ${offset + 1}-${offset + bloc.length} no parsejat. Retry sencer...`);
+          try {
+            const retryRes = await generarEscaletaBloc(bloc, offset, USER_CONFIG);
+            const retryParsed = parseJsonRobust(retryRes.response);
+            if (retryParsed && retryParsed.escaletes) acumulat = acumulat.concat(retryParsed.escaletes);
           } catch (retryErr) {
-            console.warn('Retry escaleta: ' + retryErr.message);
+            console.warn('Retry escaleta sencer: ' + retryErr.message);
           }
-        }
-      } else {
-        console.warn(`Escaleta: bloc ${offset + 1}-${offset + bloc.length} no parsejat. Retry sencer...`);
-        try {
-          const retryRes = await generarEscaletaBloc(bloc, offset, USER_CONFIG);
-          const retryParsed = parseJsonRobust(retryRes.response);
-          if (retryParsed && retryParsed.escaletes) {
-            totsResultats = totsResultats.concat(retryParsed.escaletes);
-          }
-        } catch (retryErr) {
-          console.warn('Retry escaleta sencer: ' + retryErr.message);
         }
       }
-    }
+      return acumulat;
+    }, {
+      validateInput: () => validarInputStage('chapterOutline', { structure: ESTAT._estructuraCapitols }),
+      validateOutput: (resultat) => validarOutputChapterOutline(resultat, (ESTAT._estructuraCapitols || []).length)
+    });
+
     ESTAT._escaletes = totsResultats;
     hideLoader('20');
     mostrarEscaleta(totsResultats);
@@ -8157,7 +8268,6 @@ async function iniciarFaseEscaleta() {
       escaletes: totsResultats
     }, 'iniciarFaseEscaleta');
     if (ESTAT._nkg) stageOk('nkg', { requestId: `nkg-ready-${Date.now()}` });
-  });
   } catch (e) {
     hideLoader('20');
     toast('Error generant escaleta: ' + e.message);
@@ -11361,6 +11471,10 @@ async function regenerarBibliaNarrativa() {
       await inicialitzarBiblia(USER_CONFIG);
       await completarBibliaPersonatges(USER_CONFIG);
       appStateSet('data.bible', ESTAT.bibliaNarrativa || null, 'regenerarBibliaNarrativa');
+      return ESTAT.bibliaNarrativa || null;
+    }, {
+      validateInput: () => validarInputStage('bible', { nkg: ESTAT._nkg }),
+      validateOutput: (resultat) => validarOutputBibliaNarrativa(resultat)
     });
     obrirBiblia();
     toast('✓ Bíblia Narrativa regenerada.');
