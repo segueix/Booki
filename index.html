@@ -775,35 +775,35 @@
     <div class="step-arrow">›</div>
     <div class="step-pill" data-step="9">Veus</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="9.2">Psicologia</div>
+    <div class="step-pill" data-step="10">Psicologia</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="9.3">Ferida/Arc</div>
+    <div class="step-pill" data-step="11">Ferida/Arc</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="9.4">Relacions</div>
+    <div class="step-pill" data-step="12">Relacions</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="9.45">Backstory</div>
+    <div class="step-pill" data-step="13">Backstory</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="9.46">Completar personatges</div>
+    <div class="step-pill" data-step="14">Completar personatges</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="9.47">Objectius/Secrets</div>
+    <div class="step-pill" data-step="15">Objectius/Secrets</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="9.48">Objectes</div>
+    <div class="step-pill" data-step="16">Objectes</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="9.49">Mapa/Regles</div>
+    <div class="step-pill" data-step="17">Mapa/Regles</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="9.5">Trames</div>
+    <div class="step-pill" data-step="18">Trames</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="10">Estructura</div>
+    <div class="step-pill" data-step="19">Estructura</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="10.5">Escaleta</div>
+    <div class="step-pill" data-step="20">Escaleta</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="10.7">POV/Cronologia</div>
+    <div class="step-pill" data-step="21">POV/Cronologia</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="10.8">Veu/Exemples</div>
+    <div class="step-pill" data-step="22">Veu/Exemples</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="11">Capítols</div>
+    <div class="step-pill" data-step="23">Capítols</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="12">Control d'Arcs</div>
+    <div class="step-pill" data-step="24">Control d'Arcs</div>
   </div>
 </div>
 
@@ -895,7 +895,7 @@
     <div id="analisi-resultat" class="hidden" style="font-size:.88rem;padding:12px;background:var(--bg2);border-radius:8px;margin-bottom:12px;line-height:1.6;"></div>
     <div id="mode-seleccio" class="hidden">
       <div class="btn-row">
-        <button class="btn btn-primary" onclick="iniciarModeAutomatic()">✍️ Crear novel·la →</button>
+        <button class="btn btn-primary" onclick="iniciarModeGuiat()">✍️ Crear novel·la →</button>
       </div>
     </div>
   </div>
@@ -1025,7 +1025,7 @@
     <div id="nkg-mode-botons" class="btn-row"></div>
   </div>
   <div class="btn-row">
-    <button class="btn btn-primary hidden" id="btn-fase11-nou" onclick="iniciarFase11()">✍️ Iniciar escriptura de capítols</button>
+    <button class="btn btn-primary hidden" id="btn-fase23-nou" onclick="iniciarFase11()">✍️ Iniciar escriptura de capítols</button>
   </div>
 </div>
 
@@ -1232,11 +1232,11 @@
   </div>
 </div>
 
-<!-- FASE 9.2: Perfils Psicològics -->
-<div class="card hidden" id="fase-9-2">
+<!-- FASE 10: Perfils Psicològics -->
+<div class="card hidden" id="fase-10">
   <h2><span class="icon">🧠</span> Perfils Psicològics</h2>
   <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Anàlisi de personalitat i estat d'ànim base del protagonista i de l'elenc que has seleccionat a la fase 8.</p>
-  <div class="loader-wrap" id="loader-9-2">
+  <div class="loader-wrap" id="loader-10">
     <div class="spinner"></div>
     <span>Analitzant la psicologia dels personatges...</span>
   </div>
@@ -1244,7 +1244,7 @@
   <div id="psicologia-result" class="hidden">
     <div id="psicologia-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
-      <button class="btn btn-secondary" onclick="hideCard('fase-9-2');showCard('fase-9');">← Tornar a Veus</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('fase-9')?.scrollIntoView({behavior:'smooth',block:'start'});">↑ Anar a Veus</button>
       <button class="btn btn-primary" onclick="iniciarFaseFeridaArc()">🩹 Definir Ferida + Arc</button>
     </div>
   </div>
@@ -1252,11 +1252,11 @@
 
 
 
-<!-- FASE 9.3: Ferida nuclear + màscara + arc intern -->
-<div class="card hidden" id="fase-9-3">
+<!-- FASE 11: Ferida nuclear + màscara + arc intern -->
+<div class="card hidden" id="fase-11">
   <h2><span class="icon">🩹</span> Ferida Nuclear i Arc Intern</h2>
   <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Consolidem la psicologia profunda: ferida nuclear, màscara social i etapa de l'arc intern (5 etapes).</p>
-  <div class="loader-wrap" id="loader-9-3">
+  <div class="loader-wrap" id="loader-11">
     <div class="spinner"></div>
     <span>Definint ferides i arcs interns...</span>
   </div>
@@ -1264,17 +1264,17 @@
   <div id="ferida-arc-result" class="hidden">
     <div id="ferida-arc-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
-      <button class="btn btn-secondary" onclick="hideCard('fase-9-3');showCard('fase-9-2');">← Tornar a Psicologia</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('fase-10')?.scrollIntoView({behavior:'smooth',block:'start'});">↑ Anar a Psicologia</button>
       <button class="btn btn-primary" onclick="iniciarFaseRelacions()">🧷 Matriu relacional</button>
     </div>
   </div>
 </div>
 
-<!-- FASE 9.4: Matriu relacional emocional -->
-<div class="card hidden" id="fase-9-4">
+<!-- FASE 12: Matriu relacional emocional -->
+<div class="card hidden" id="fase-12">
   <h2><span class="icon">🧷</span> Matriu Relacional Emocional</h2>
   <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Definim la tensió emocional entre parelles de personatges per reforçar conflicte i subtext.</p>
-  <div class="loader-wrap" id="loader-9-4">
+  <div class="loader-wrap" id="loader-12">
     <div class="spinner"></div>
     <span>Calculant dinàmiques de relació...</span>
   </div>
@@ -1282,109 +1282,114 @@
   <div id="relacions-result" class="hidden">
     <div id="relacions-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
-      <button class="btn btn-secondary" onclick="hideCard('fase-9-4');showCard('fase-9-3');">← Tornar a Ferida/Arc</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('fase-11')?.scrollIntoView({behavior:'smooth',block:'start'});">↑ Anar a Ferida/Arc</button>
       <button class="btn btn-primary" onclick="iniciarFaseBackstoryRelacions()">🧩 Backstory canònic</button>
     </div>
   </div>
 </div>
 
-<!-- FASE 9.45: Backstory i Relacions Canòniques -->
-<div class="card hidden" id="fase-9-45">
+<!-- FASE 13: Backstory i Relacions Canòniques -->
+<div class="card hidden" id="fase-13">
   <h2><span class="icon">🧩</span> Backstory i Relacions Canòniques</h2>
   <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Construïm el passat canònic i el graf complet de relacions abans de dissenyar les trames.</p>
-  <div class="loader-wrap" id="loader-9-45">
+  <div class="loader-wrap" id="loader-13">
     <div class="spinner"></div>
-    <span id="loader-9-45-text">Generant backstory canònic i relacions...</span>
+    <span id="loader-13-text">Generant backstory canònic i relacions...</span>
   </div>
 
   <div id="backstory-result" class="hidden">
     <div id="backstory-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
-      <button class="btn btn-secondary" onclick="hideCard('fase-9-45');showCard('fase-9-4');">← Tornar a Relacions</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('fase-12')?.scrollIntoView({behavior:'smooth',block:'start'});">↑ Anar a Relacions</button>
       <button class="btn btn-primary" onclick="iniciarFaseCompletarPersonatges()">🧬 Completar personatges</button>
     </div>
   </div>
 </div>
 
-<!-- FASE 9.46: Completar Personatges -->
-<div class="card hidden" id="fase-9-46">
+<!-- FASE 14: Completar Personatges -->
+<div class="card hidden" id="fase-14">
   <h2><span class="icon">🧬</span> Completar Personatges</h2>
   <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Omplim trets immutables i estats inicials perquè les fitxes quedin completes abans de trames.</p>
-  <div class="loader-wrap" id="loader-9-46">
+  <div class="loader-wrap" id="loader-14">
     <div class="spinner"></div>
-    <span id="loader-9-46-text">Completant fitxes de personatge...</span>
+    <span id="loader-14-text">Completant fitxes de personatge...</span>
   </div>
 
   <div id="completar-personatges-result" class="hidden">
     <div id="completar-personatges-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
-      <button class="btn btn-secondary" onclick="hideCard('fase-9-46');showCard('fase-9-45');">← Tornar a Backstory</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('fase-13')?.scrollIntoView({behavior:'smooth',block:'start'});">↑ Anar a Backstory</button>
       <button class="btn btn-primary" onclick="iniciarFaseObjectiusSecrets()">🎯 Objectius i secrets</button>
     </div>
   </div>
 </div>
 
-<!-- FASE 9.47: Objectius i Secrets -->
-<div class="card hidden" id="fase-9-47">
+<!-- FASE 15: Objectius i Secrets -->
+<div class="card hidden" id="fase-15">
   <h2><span class="icon">🎯</span> Objectius i Secrets</h2>
   <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Definim objectius accionables i secrets dramàtics per personatge abans de trames.</p>
-  <div class="loader-wrap" id="loader-9-47">
+  <div class="loader-wrap" id="loader-15">
     <div class="spinner"></div>
-    <span id="loader-9-47-text">Generant objectius i secrets...</span>
+    <span id="loader-15-text">Generant objectius i secrets...</span>
   </div>
 
   <div id="objectius-secrets-result" class="hidden">
     <div id="objectius-secrets-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
-      <button class="btn btn-secondary" onclick="hideCard('fase-9-47');showCard('fase-9-46');">← Tornar a Completar Personatges</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('fase-14')?.scrollIntoView({behavior:'smooth',block:'start'});">↑ Anar a Completar Personatges</button>
       <button class="btn btn-primary" onclick="iniciarFaseObjectesNarratius()">📦 Objectes narratius</button>
     </div>
   </div>
 </div>
 
-<!-- FASE 9.48: Objectes Narratius -->
-<div class="card hidden" id="fase-9-48">
+<!-- FASE 16: Objectes Narratius -->
+<div class="card hidden" id="fase-16">
   <h2><span class="icon">📦</span> Objectes Narratius</h2>
   <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Definim l'attrezzo central de la novel·la i el seu historial de moviment.</p>
-  <div class="loader-wrap" id="loader-9-48">
+  <div class="loader-wrap" id="loader-16">
     <div class="spinner"></div>
-    <span id="loader-9-48-text">Generant objectes narratius...</span>
+    <span id="loader-16-text">Generant objectes narratius...</span>
   </div>
 
   <div id="objectes-result" class="hidden">
     <div id="objectes-cos" class="veu-result"></div>
     <div class="btn-row" style="margin-top:24px;">
-      <button class="btn btn-secondary" onclick="hideCard('fase-9-48');showCard('fase-9-47');">← Tornar a Objectius/Secrets</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('fase-15')?.scrollIntoView({behavior:'smooth',block:'start'});">↑ Anar a Objectius/Secrets</button>
       <button class="btn btn-primary" onclick="iniciarFaseMapaEspacialRegles()">🗺️ Mapa espacial i regles</button>
     </div>
   </div>
 </div>
 
-<!-- FASE 9.49: Mapa Espacial i Regles -->
-<div class="card hidden" id="fase-9-49">
+<!-- FASE 17: Mapa Espacial i Regles -->
+<div class="card hidden" id="fase-17">
   <h2><span class="icon">🗺️</span> Mapa Espacial i Regles</h2>
   <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Construïm el graf d'espais de la finca i regles operatives verificables.</p>
-  <div class="loader-wrap" id="loader-9-49">
+  <div class="loader-wrap" id="loader-17">
     <div class="spinner"></div>
-    <span id="loader-9-49-text">Generant mapa espacial i regles del món...</span>
+    <span id="loader-17-text">Generant mapa espacial i regles del món...</span>
   </div>
 
   <div id="mapa-regles-result" class="hidden">
     <div id="mapa-regles-cos" class="veu-result"></div>
+    <div id="mapa-insuficient-avis" class="hidden" style="background:var(--warning-bg, #fff3cd);border:1px solid var(--warning, #ffc107);border-radius:8px;padding:12px 16px;margin:12px 0;color:var(--warning-text, #856404);font-size:.9rem;">
+      ⚠️ El mapa de llocs és insuficient (mínim 3 llocs). Prem "Ampliar mapa" per generar més llocs.
+    </div>
     <div class="btn-row" style="margin-top:24px;">
-      <button class="btn btn-secondary" onclick="hideCard('fase-9-49');showCard('fase-9-48');">← Tornar a Objectes</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('fase-16')?.scrollIntoView({behavior:'smooth',block:'start'});">↑ Anar a Objectes</button>
+      <button class="btn btn-ghost" onclick="iniciarFaseMapaEspacialRegles()">🔄 Regenerar mapa</button>
+      <button class="btn btn-ghost hidden" id="btn-ampliar-mapa" onclick="ampliarMapaEspacial()">🗺️ Ampliar mapa</button>
       <button class="btn btn-primary" onclick="iniciarFaseTrames()">🕸️ Dissenyar Trames Opus</button>
     </div>
   </div>
 </div>
 
-<!-- FASE 9.5: Disseny de Trames (Opus) -->
-<div class="card hidden" id="fase-9-5">
+<!-- FASE 18: Disseny de Trames (Opus) -->
+<div class="card hidden" id="fase-18">
   <h2><span class="icon">🕸️</span> Disseny de Trames <span class="badge-model badge-opus">Opus</span></h2>
   <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Opus dissenya la trama principal i les subtrames abans d'estructurar els capítols.</p>
-  <div class="loader-wrap" id="loader-9-5">
+  <div class="loader-wrap" id="loader-18">
     <div class="spinner" style="border-top-color:#60a5fa;"></div>
-    <span id="loader-9-5-text">🔵 Opus dissenyant les trames…</span>
+    <span id="loader-18-text">🔵 Opus dissenyant les trames…</span>
   </div>
   <div id="trames-result" class="hidden">
     <div id="trames-cos"></div>
@@ -1394,13 +1399,13 @@
   </div>
 </div>
 
-<!-- FASE 10: Estructura de la novel·la (Opus) -->
-<div class="card hidden" id="fase-10">
+<!-- FASE 19: Estructura de la novel·la (Opus) -->
+<div class="card hidden" id="fase-19">
   <h2><span class="icon">📐</span> Estructura de la novel·la <span class="badge-model badge-opus">Opus</span></h2>
   <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Opus dissenya l'arquitectura narrativa completa — capítols, arcs i fils — a partir de tot el material generat.</p>
-  <div class="loader-wrap" id="loader-10">
+  <div class="loader-wrap" id="loader-19">
     <div class="spinner" style="border-top-color:#60a5fa;"></div>
-    <span id="loader-10-text">🔵 Opus dissenyant l'estructura…</span>
+    <span id="loader-19-text">🔵 Opus dissenyant l'estructura…</span>
   </div>
   <div id="estructura-wrap" class="hidden">
     <div id="estructura-cos"></div>
@@ -1411,51 +1416,51 @@
   </div>
 </div>
 
-<!-- FASE 10.5: Escaleta per Escenes (Opus) -->
-<div class="card hidden" id="fase-10-5">
-  <h2>📋 Fase 10.5 — Escaleta per Escenes</h2>
+<!-- FASE 20: Escaleta per Escenes (Opus) -->
+<div class="card hidden" id="fase-20">
+  <h2>📋 Fase 20 — Escaleta per Escenes</h2>
   <p>Opus genera l'escaleta detallada per escenes de tots els capítols, incloent objectiu de paraules i funció narrativa de cada escena.</p>
-  <div class="loader-wrap" id="loader-10-5"><span class="spinner"></span><span id="loader-10-5-text">Generant escaleta…</span></div>
+  <div class="loader-wrap" id="loader-20"><span class="spinner"></span><span id="loader-20-text">Generant escaleta…</span></div>
   <div id="escaleta-result"></div>
-  <button class="btn hidden" id="btn-fase10-7" onclick="iniciarFasePerspectivaCronologia()">Continuar → Perspectiva i Cronologia</button>
+  <button class="btn hidden" id="btn-fase21" onclick="iniciarFasePerspectivaCronologia()">Continuar → Perspectiva i Cronologia</button>
 </div>
 
-<!-- FASE 10.7: Perspectiva i Cronologia -->
-<div class="card hidden" id="fase-10-7">
-  <h2>🧭 Fase 10.7 — Perspectiva i Cronologia</h2>
+<!-- FASE 21: Perspectiva i Cronologia -->
+<div class="card hidden" id="fase-21">
+  <h2>🧭 Fase 21 — Perspectiva i Cronologia</h2>
   <p>Definim el POV per capítol, la cronologia interna i la timeline d'accions perquè l'escriptura sigui consistent.</p>
-  <div class="loader-wrap" id="loader-10-7"><span class="spinner"></span><span id="loader-10-7-text">Analitzant perspectiva i cronologia…</span></div>
+  <div class="loader-wrap" id="loader-21"><span class="spinner"></span><span id="loader-21-text">Analitzant perspectiva i cronologia…</span></div>
   <div id="perspectiva-crono-result" class="hidden">
     <div id="perspectiva-crono-cos" class="veu-result"></div>
   </div>
   <div class="btn-row" style="margin-top:24px;">
-    <button class="btn btn-secondary" onclick="hideCard('fase-10-7');showCard('fase-10-5');">← Tornar a Escaleta</button>
+    <button class="btn btn-secondary" onclick="document.getElementById('fase-20')?.scrollIntoView({behavior:'smooth',block:'start'});">↑ Anar a Escaleta</button>
     <button class="btn btn-ghost" onclick="iniciarFasePerspectivaCronologia()">🔄 Regenerar POV/Cronologia</button>
-    <button class="btn btn-primary hidden" id="btn-fase10-8" onclick="iniciarFaseVeuExemples()">Continuar → Veu i Exemples</button>
+    <button class="btn btn-primary hidden" id="btn-fase22" onclick="iniciarFaseVeuExemples()">Continuar → Veu i Exemples</button>
   </div>
 </div>
 
 
 
-<!-- FASE 10.8: Veu i Exemples -->
-<div class="card hidden" id="fase-10-8">
-  <h2>🎙️ Fase 10.8 — Veu i Exemples</h2>
+<!-- FASE 22: Veu i Exemples -->
+<div class="card hidden" id="fase-22">
+  <h2>🎙️ Fase 22 — Veu i Exemples</h2>
   <p>Completem la veu de cada personatge amb exemples narratius i vocabulari abans de començar a escriure.</p>
-  <div class="loader-wrap" id="loader-10-8"><span class="spinner"></span><span id="loader-10-8-text">Generant exemples de veu…</span></div>
+  <div class="loader-wrap" id="loader-22"><span class="spinner"></span><span id="loader-22-text">Generant exemples de veu…</span></div>
   <div id="veu-exemples-result" class="hidden">
     <div id="veu-exemples-cos" class="veu-result"></div>
     <div id="nkg-faltants-cos" class="veu-result" style="margin-top:14px;"></div>
     <div class="btn-row" style="margin-top:24px;">
-      <button class="btn btn-secondary" onclick="hideCard('fase-10-8');showCard('fase-10-7');">← Tornar a POV/Cronologia</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('fase-21')?.scrollIntoView({behavior:'smooth',block:'start'});">↑ Anar a POV/Cronologia</button>
       <button class="btn btn-ghost" onclick="iniciarFasePerspectivaCronologia()">🧭 Regenerar POV/Cronologia</button>
       <button class="btn btn-ghost" id="btn-autocompletar-nkg" onclick="autocompletarNKGFaltantsManual()">🧩 Completar dades faltants</button>
       <button class="btn btn-ghost" onclick="descarregarNKGiBiblia()">⬇ NKG + Bíblia</button>
-      <button class="btn btn-primary" id="btn-fase11" onclick="iniciarFase11()">Continuar → Escriptura</button>
+      <button class="btn btn-primary" id="btn-fase23" onclick="iniciarFase11()">Continuar → Escriptura</button>
     </div>
   </div>
 </div>
-<!-- FASE 11: Escriptura de capítols (Sonnet + registre) -->
-<div class="card hidden" id="fase-11">
+<!-- FASE 23: Escriptura de capítols (Sonnet + registre) -->
+<div class="card hidden" id="fase-23">
   <h2><span class="icon">📖</span> Escriptura de capítols</h2>
 
   <div id="btn-iniciar-escriptura-wrap" class="hidden" style="margin-bottom:20px;text-align:center;">
@@ -1493,9 +1498,9 @@
   <!-- Historial persistent de checkpoints de coherència -->
   <div id="checkpoints-historia" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;"></div>
 
-  <div class="loader-wrap" id="loader-11">
+  <div class="loader-wrap" id="loader-23">
     <div class="spinner"></div>
-    <span id="loader-11-text">🟣 Sonnet escrivint el capítol…</span>
+    <span id="loader-23-text">🟣 Sonnet escrivint el capítol…</span>
   </div>
 
   <div id="capitol-actual-wrap" class="hidden">
@@ -1547,11 +1552,11 @@
   </div>
 </div>
 
-<!-- FASE 12: Control d'Arcs Narratius (Opus - light) -->
-<div class="card hidden" id="fase-12">
+<!-- FASE 24: Control d'Arcs Narratius (Opus - light) -->
+<div class="card hidden" id="fase-24">
   <h2><span class="icon">📋</span> Control d'Arcs Narratius <span class="badge-model badge-opus">Opus</span></h2>
   <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Opus avalua la novel·la a partir dels resums — sense llegir el cos íntegre — per estalviar tokens.</p>
-  <div class="loader-wrap" id="loader-12">
+  <div class="loader-wrap" id="loader-24">
     <div class="spinner" style="border-top-color:#60a5fa;"></div>
     <span>🔵 Opus analitzant els arcs narratius…</span>
   </div>
@@ -2150,9 +2155,9 @@ function restaurarInterficieDesDeEstat() {
   // i re-treballar des de qualsevol punt del pipeline.
   document.querySelectorAll('.card').forEach(c => {
     if (c.id === 'card-config') return;
-    const idMatch = c.id.match(/^fase-(\d+)(?:-(\d+))?$/);
+    const idMatch = c.id.match(/^fase-(\d+)$/);
     if (!idMatch) return;
-    const faseCard = parseFloat(idMatch[1] + (idMatch[2] ? '.' + idMatch[2] : ''));
+    const faseCard = parseInt(idMatch[1], 10);
     if (faseCard <= fase) c.classList.remove('hidden');
     else c.classList.add('hidden');
   });
@@ -2165,34 +2170,34 @@ function restaurarInterficieDesDeEstat() {
   if (fase >= 6 && ESTAT.conteText) mostrarConte(ESTAT.conteText);
   if (fase >= 7 && ESTAT.worldbuilding) mostrarResultatWorldbuilding(ESTAT.worldbuilding);
   if (fase >= 9 && ESTAT.estilsParla) mostrarEstilsParla(ESTAT.estilsParla);
-  if (fase >= 9.2 && ESTAT._perfilsPersonatges && Object.keys(ESTAT._perfilsPersonatges).length > 0) mostrarPerfilsPsicologics({ personatges: Object.values(ESTAT._perfilsPersonatges) });
-  if (fase >= 9.3 && ESTAT._perfilsPersonatges && Object.keys(ESTAT._perfilsPersonatges).length > 0) mostrarFeridaArc({ personatges: Object.values(ESTAT._perfilsPersonatges) });
-  if (fase >= 9.4 && ESTAT._matriuRelacional && ESTAT._matriuRelacional.length > 0) mostrarMatriuRelacional(ESTAT._matriuRelacional);
-  if (fase >= 9.45 && ESTAT._nkg && ESTAT._nkg.macronarrativa && ESTAT._nkg.macronarrativa.backstory_canonic) mostrarBackstoryCanonic(ESTAT._nkg.macronarrativa.backstory_canonic, ESTAT._nkg.relacions || []);
-  if (fase >= 9.46 && ESTAT._nkg && ESTAT._nkg.personatges && Object.keys(ESTAT._nkg.personatges).length > 0) mostrarCompletarPersonatges(Object.assign({}, ESTAT._nkg.personatges));
-  if (fase >= 9.47 && ESTAT._nkg && ESTAT._nkg.personatges && Object.keys(ESTAT._nkg.personatges).length > 0) mostrarObjectiusSecrets(ESTAT._nkg.personatges);
-  if (fase >= 9.48 && ESTAT._nkg && ESTAT._nkg.objectes) mostrarObjectesNarratius(ESTAT._nkg.objectes);
-  if (fase >= 9.49 && ESTAT._nkg && ESTAT._nkg.llocs) mostrarMapaRegles(ESTAT._nkg.llocs, ESTAT._nkg.mapa_adjacencies || [], (ESTAT.bibliaNarrativa && ESTAT.bibliaNarrativa.regles_mon) || []);
-  if (fase >= 10 && ESTAT._estructuraCapitols.length > 0) mostrarEstructura('Reconstruït des de memòria (dades en JSON actiu)');
-  if (fase >= 10.5 && ESTAT._escaletes.length > 0) {
+  if (fase >= 10 && ESTAT._perfilsPersonatges && Object.keys(ESTAT._perfilsPersonatges).length > 0) mostrarPerfilsPsicologics({ personatges: Object.values(ESTAT._perfilsPersonatges) });
+  if (fase >= 11 && ESTAT._perfilsPersonatges && Object.keys(ESTAT._perfilsPersonatges).length > 0) mostrarFeridaArc({ personatges: Object.values(ESTAT._perfilsPersonatges) });
+  if (fase >= 12 && ESTAT._matriuRelacional && ESTAT._matriuRelacional.length > 0) mostrarMatriuRelacional(ESTAT._matriuRelacional);
+  if (fase >= 13 && ESTAT._nkg && ESTAT._nkg.macronarrativa && ESTAT._nkg.macronarrativa.backstory_canonic) mostrarBackstoryCanonic(ESTAT._nkg.macronarrativa.backstory_canonic, ESTAT._nkg.relacions || []);
+  if (fase >= 14 && ESTAT._nkg && ESTAT._nkg.personatges && Object.keys(ESTAT._nkg.personatges).length > 0) mostrarCompletarPersonatges(Object.assign({}, ESTAT._nkg.personatges));
+  if (fase >= 15 && ESTAT._nkg && ESTAT._nkg.personatges && Object.keys(ESTAT._nkg.personatges).length > 0) mostrarObjectiusSecrets(ESTAT._nkg.personatges);
+  if (fase >= 16 && ESTAT._nkg && ESTAT._nkg.objectes) mostrarObjectesNarratius(ESTAT._nkg.objectes);
+  if (fase >= 17 && ESTAT._nkg && ESTAT._nkg.llocs) mostrarMapaRegles(ESTAT._nkg.llocs, ESTAT._nkg.mapa_adjacencies || [], (ESTAT.bibliaNarrativa && ESTAT.bibliaNarrativa.regles_mon) || []);
+  if (fase >= 19 && ESTAT._estructuraCapitols.length > 0) mostrarEstructura('Reconstruït des de memòria (dades en JSON actiu)');
+  if (fase >= 20 && ESTAT._escaletes.length > 0) {
     mostrarEscaleta(ESTAT._escaletes);
-    document.getElementById('btn-fase10-7').classList.remove('hidden');
+    document.getElementById('btn-fase21').classList.remove('hidden');
   }
-  if (fase >= 10.7 && ESTAT._nkg && ESTAT._nkg.context_creacio && ESTAT._nkg.context_creacio.cronologia) {
+  if (fase >= 21 && ESTAT._nkg && ESTAT._nkg.context_creacio && ESTAT._nkg.context_creacio.cronologia) {
     mostrarPerspectivaCronologia(
       (ESTAT._nkg.context_creacio.estil && ESTAT._nkg.context_creacio.estil.perspectiva) || {},
       ESTAT._nkg.context_creacio.cronologia || {},
       ESTAT._nkg.timeline_accions || []
     );
     document.getElementById('perspectiva-crono-result').classList.remove('hidden');
-    document.getElementById('btn-fase10-8').classList.remove('hidden');
+    document.getElementById('btn-fase22').classList.remove('hidden');
   }
-  if (fase >= 10.8 && ESTAT._nkg && ESTAT._nkg.personatges) {
+  if (fase >= 22 && ESTAT._nkg && ESTAT._nkg.personatges) {
     mostrarVeuExemples(Object.assign({}, ESTAT._nkg.personatges));
     mostrarFaltantsNKG();
     document.getElementById('veu-exemples-result').classList.remove('hidden');
   }
-  if (fase >= 11) {
+  if (fase >= 23) {
     renderLlistaCapitols();
     if (ESTAT._nkg) nkgInicialitzar(); // Re-assigna objectes de memòria
     ESTAT._nkg = ESTAT._nkg; // Manté el reference si ja hi era
@@ -3084,6 +3089,7 @@ function iniciarModeGuiat() {
   ESTAT.fase = 'b1';
   ESTAT._modeCreacio = 'guiat';
   showCard('fase-b1');
+  setTimeout(() => document.getElementById('fase-b1')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   showLoader('b1');
   nouFlux_finals(ESTAT.configuracio.perfil_autor, ESTAT.tematica, ESTAT.estil.to, USER_CONFIG)
     .then(text => renderFinalsNou(text))
@@ -3434,6 +3440,7 @@ async function confirmarFinalNou() {
   };
 
   showCard('fase-b2');
+  setTimeout(() => document.getElementById('fase-b2')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   showLoader('b2');
   try {
     const endingText = `${final.titol || ''}\nEmoció: ${final.emocio || ''}\nProtagonista: ${final.protagonista || ''}\nImatge: ${final.imatge || ''}\nVeritat: ${final.veritat || ''}\nTipus: ${final.tipus || ''}`;
@@ -3608,6 +3615,7 @@ async function confirmarTemaNou() {
   }
 
   showCard('fase-b3');
+  setTimeout(() => document.getElementById('fase-b3')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   showLoader('b3');
   try {
     const personatgesText = (ESTAT._prefetchNouFlux && ESTAT._prefetchNouFlux.personatgesText)
@@ -3787,6 +3795,7 @@ async function confirmarPersonatgesNou() {
   ESTAT._arcsResumitNou = arcsResumit;
 
   showCard('fase-b4');
+  setTimeout(() => document.getElementById('fase-b4')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   showLoader('b4');
   try {
     const monText = (ESTAT._prefetchNouFlux && ESTAT._prefetchNouFlux.monText)
@@ -3933,6 +3942,7 @@ async function confirmarMonNou() {
   }
 
   showCard('fase-b5');
+  setTimeout(() => document.getElementById('fase-b5')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   showLoader('b5');
   try {
     const estructuraText = (ESTAT._prefetchNouFlux && ESTAT._prefetchNouFlux.estructuraText)
@@ -4111,6 +4121,7 @@ async function confirmarEstructuraNou() {
   nkgInicialitzar();
 
   showCard('fase-b6');
+  setTimeout(() => document.getElementById('fase-b6')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   showLoader('b6');
   await iniciarEscaletaSeqNou();
 }
@@ -4258,8 +4269,8 @@ function obtenirAccioGeneracioPerFaltant(faltant = '') {
   if (f.includes('backstory') || f.includes('graf de relacions')) return { id: 'backstory_relacions', label: 'Generar' };
   if (f.includes('trets immutables')) return { id: 'trets_immutables', label: 'Generar' };
   if (f.includes('objectes narratius')) return { id: 'objectes_narratius', label: 'Generar' };
-  if (f.includes('mapa de llocs') || f.includes('regles del món')) return { id: 'llocs_regles', label: 'Generar' };
-  if (f.includes('tipus de perspectiva') || f.includes('pov per capítol') || f.includes('cronologia per capítol')) return { id: 'perspectiva_cronologia', label: 'Generar' };
+  if (f.includes('mapa de llocs') || f.includes('regles del món')) return { id: 'llocs_regles', label: 'Anar al pas 17' };
+  if (f.includes('tipus de perspectiva') || f.includes('pov per capítol') || f.includes('cronologia per capítol')) return { id: 'perspectiva_cronologia', label: 'Anar al pas 21' };
   if (f.includes('exemples narratius de veu') || f.includes('vocabulari recurrent')) return { id: 'veu_exemples', label: 'Generar' };
   return null;
 }
@@ -4290,11 +4301,11 @@ async function generarFaltantNKG(itemId, btnEl = null) {
       const d = await generarObjectesNarratius(USER_CONFIG);
       injectarObjectesNarratius(d);
     } else if (itemId === 'llocs_regles') {
-      const d = await generarMapaEspacialRegles(USER_CONFIG);
-      injectarMapaEspacialRegles(d);
+      iniciarFaseMapaEspacialRegles();
+      return;
     } else if (itemId === 'perspectiva_cronologia') {
-      const d = await generarPerspectivaCronologia(USER_CONFIG);
-      injectarPerspectivaCronologia(d);
+      iniciarFasePerspectivaCronologia();
+      return;
     } else if (itemId === 'veu_exemples') {
       await generarVeuExemples(USER_CONFIG);
     }
@@ -4333,7 +4344,7 @@ function mostrarResumNKGiTransicio(nkg, capitolsEscaleta, validacio, modeCreacio
   const resumDiv = document.getElementById('nkg-resum-text');
   const botonsDiv = document.getElementById('nkg-mode-botons');
   if (!wrap || !resumDiv || !botonsDiv) {
-    document.getElementById('btn-fase11-nou')?.classList.remove('hidden');
+    document.getElementById('btn-fase23-nou')?.classList.remove('hidden');
     return;
   }
   const personatgesNoms = Object.values(nkg.personatges || {}).map(p => p.nom).join(', ');
@@ -4347,13 +4358,7 @@ function mostrarResumNKGiTransicio(nkg, capitolsEscaleta, validacio, modeCreacio
     errDiv.style.cssText = 'color:#e55;font-size:.88rem;margin-bottom:8px;';
     errDiv.textContent = `❌ Errors bloquejants: ${validacio.errors.join(' | ')}`;
     botonsDiv.parentNode.insertBefore(errDiv, botonsDiv);
-    document.getElementById('btn-fase11-nou')?.classList.remove('hidden');
-  } else if (modeCreacio === 'automatic') {
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-primary';
-    btn.textContent = '▶ Generar novel·la automàticament';
-    btn.onclick = () => modeRedaccioAutomatic();
-    botonsDiv.appendChild(btn);
+    document.getElementById('btn-fase23-nou')?.classList.remove('hidden');
   } else {
     const btn1 = document.createElement('button');
     btn1.className = 'btn btn-primary';
@@ -4802,6 +4807,7 @@ async function iniciarFase7() {
   ESTAT.fase = 7;
   updateProgress(7);
   showCard('fase-7');
+  setTimeout(() => document.getElementById('fase-7')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('world-selector').classList.add('hidden');
   document.getElementById('world-result-wrap').classList.add('hidden');
   showLoader(7);
@@ -4925,6 +4931,7 @@ async function iniciarFase8() {
   ESTAT.fase = 8;
   updateProgress(8);
   showCard('fase-8');
+  setTimeout(() => document.getElementById('fase-8')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('elenc-selector').classList.add('hidden');
   showLoader(8);
   document.getElementById('loader-8-text').textContent = 'Proposant el cast de personatges…';
@@ -5076,6 +5083,7 @@ async function generarEstilsParla() {
   ESTAT.fase = 9;
   updateProgress(9);
   showCard('fase-9');
+  setTimeout(() => document.getElementById('fase-9')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('estils-result').classList.add('hidden');
   showLoader(9);
 
@@ -5461,16 +5469,16 @@ Retorna EXCLUSIVAMENT JSON vàlid:
 }
 
 async function iniciarFasePsicologia() {
-  ESTAT.fase = 9.2;
-  updateProgress(9.2);
-  hideCard('fase-9');
-  showCard('fase-9-2');
+  ESTAT.fase = 10;
+  updateProgress(10);
+  showCard('fase-10');
+  setTimeout(() => document.getElementById('fase-10')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('psicologia-result').classList.add('hidden');
-  showLoader('9-2');
+  showLoader('10');
 
   try {
     const dades = await generarPerfilsPsicologics(USER_CONFIG);
-    hideLoader('9-2');
+    hideLoader('10');
     mostrarPerfilsPsicologics(dades);
 
     // Reportar faltants de psicologia
@@ -5485,7 +5493,7 @@ async function iniciarFasePsicologia() {
       toast(`Avís: ${faltantsPsico.length} camp(s) psicològics pendents. ${faltantsPsico.slice(0, 3).join('; ')}${faltantsPsico.length > 3 ? '...' : ''}`);
     }
   } catch (err) {
-    hideLoader('9-2');
+    hideLoader('10');
     toast("Error en l'anàlisi psicològica: " + err.message);
   }
 }
@@ -5510,7 +5518,7 @@ function mostrarPerfilsPsicologics(dades) {
   }).join('\n');
 
   document.getElementById('psicologia-result').classList.remove('hidden');
-  setTimeout(() => document.getElementById('fase-9-2').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+  setTimeout(() => document.getElementById('fase-10').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
 }
 
 function normalitzarEtapaArcIntern(v) {
@@ -5605,18 +5613,18 @@ function mostrarFeridaArc(dades) {
 }
 
 async function iniciarFaseFeridaArc() {
-  ESTAT.fase = 9.3;
-  updateProgress(9.3);
-  hideCard('fase-9-2');
-  showCard('fase-9-3');
+  ESTAT.fase = 11;
+  updateProgress(11);
+  showCard('fase-11');
+  setTimeout(() => document.getElementById('fase-11')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('ferida-arc-result').classList.add('hidden');
-  showLoader('9-3');
+  showLoader('11');
   try {
     const dades = await generarPerfilsPsicologics(USER_CONFIG);
-    hideLoader('9-3');
+    hideLoader('11');
     mostrarFeridaArc(dades);
   } catch (err) {
-    hideLoader('9-3');
+    hideLoader('11');
     toast('Error en definir ferida/arc: ' + err.message);
   }
 }
@@ -5718,19 +5726,19 @@ function mostrarMatriuRelacional(matriu) {
 }
 
 async function iniciarFaseRelacions() {
-  ESTAT.fase = 9.4;
-  updateProgress(9.4);
-  hideCard('fase-9-3');
-  showCard('fase-9-4');
+  ESTAT.fase = 12;
+  updateProgress(12);
+  showCard('fase-12');
+  setTimeout(() => document.getElementById('fase-12')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('relacions-result').classList.add('hidden');
-  showLoader('9-4');
+  showLoader('12');
   try {
     ESTAT._matriuRelacional = generarMatriuRelacionalLocal();
-    hideLoader('9-4');
+    hideLoader('12');
     mostrarMatriuRelacional(ESTAT._matriuRelacional);
     toast('Matriu relacional actualitzada amb memòria de capítols.');
   } catch (err) {
-    hideLoader('9-4');
+    hideLoader('12');
     toast('Error en matriu relacional: ' + err.message);
   }
 }
@@ -6027,13 +6035,13 @@ function construirBackstoryMinimalSenseRelacions() {
 }
 
 async function iniciarFaseBackstoryRelacions() {
-  ESTAT.fase = 9.45;
-  updateProgress(9.45);
-  hideCard('fase-9-4');
-  showCard('fase-9-45');
+  ESTAT.fase = 13;
+  updateProgress(13);
+  showCard('fase-13');
+  setTimeout(() => document.getElementById('fase-13')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('backstory-result').classList.add('hidden');
-  showLoader('9-45');
-  document.getElementById('loader-9-45-text').textContent = 'Generant backstory canònic i graf de relacions...';
+  showLoader('13');
+  document.getElementById('loader-13-text').textContent = 'Generant backstory canònic i graf de relacions...';
 
   try {
     if (!ESTAT._nkg) nkgInicialitzar();
@@ -6046,7 +6054,7 @@ async function iniciarFaseBackstoryRelacions() {
         const minimal = construirBackstoryMinimalSenseRelacions();
         ESTAT._nkg.macronarrativa.backstory_canonic = minimal.backstory_canonic;
         ESTAT._nkg.relacions = minimal.relacions;
-        hideLoader('9-45');
+        hideLoader('13');
         mostrarBackstoryCanonic(minimal.backstory_canonic, minimal.relacions);
         toast('Backstory mínim generat amb graf de relacions bàsic. Pots refinar-lo més endavant.');
         return;
@@ -6055,7 +6063,7 @@ async function iniciarFaseBackstoryRelacions() {
     const data = await generarBackstoryIRelacions(USER_CONFIG);
     ESTAT._nkg.macronarrativa.backstory_canonic = data.backstory_canonic;
     ESTAT._nkg.relacions = data.relacions;
-    hideLoader('9-45');
+    hideLoader('13');
     mostrarBackstoryCanonic(data.backstory_canonic, data.relacions);
 
     // Reportar faltants immediats
@@ -6071,7 +6079,7 @@ async function iniciarFaseBackstoryRelacions() {
       toast('Backstory canònic i relacions injectats al NKG.');
     }
   } catch (err) {
-    hideLoader('9-45');
+    hideLoader('13');
     toast('Error fase Backstory/Relacions: ' + err.message);
   }
 }
@@ -6256,20 +6264,20 @@ async function generarCompletarPersonatges(userConfig, onProgress) {
 }
 
 async function iniciarFaseCompletarPersonatges() {
-  ESTAT.fase = 9.46;
-  updateProgress(9.46);
-  hideCard('fase-9-45');
-  showCard('fase-9-46');
+  ESTAT.fase = 14;
+  updateProgress(14);
+  showCard('fase-14');
+  setTimeout(() => document.getElementById('fase-14')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('completar-personatges-result').classList.add('hidden');
-  showLoader('9-46');
-  const loaderText = document.getElementById('loader-9-46-text');
+  showLoader('14');
+  const loaderText = document.getElementById('loader-14-text');
   loaderText.textContent = 'Completant trets immutables i estats inicials...';
 
   const onProgress = msg => { if (loaderText) loaderText.textContent = msg; };
 
   try {
     const data = await generarCompletarPersonatges(USER_CONFIG, onProgress);
-    hideLoader('9-46');
+    hideLoader('14');
     mostrarCompletarPersonatges(ESTAT._nkg.personatges || {});
 
     // Mostrar faltants immediatament
@@ -6286,7 +6294,7 @@ async function iniciarFaseCompletarPersonatges() {
       toast('Fitxes de personatge completades i sincronitzades per al capítol 1.');
     }
   } catch (err) {
-    hideLoader('9-46');
+    hideLoader('14');
     // Mostrar igualment el que s'ha generat fins ara
     if (ESTAT._nkg && ESTAT._nkg.personatges && Object.keys(ESTAT._nkg.personatges).length > 0) {
       mostrarCompletarPersonatges(ESTAT._nkg.personatges);
@@ -6568,19 +6576,19 @@ Retorna EXCLUSIVAMENT un array JSON de waypoints.`;
 }
 
 async function iniciarFaseObjectiusSecrets() {
-  ESTAT.fase = 9.47;
-  updateProgress(9.47);
-  hideCard('fase-9-46');
-  showCard('fase-9-47');
+  ESTAT.fase = 15;
+  updateProgress(15);
+  showCard('fase-15');
+  setTimeout(() => document.getElementById('fase-15')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('objectius-secrets-result').classList.add('hidden');
-  showLoader('9-47');
-  const loaderText = document.getElementById('loader-9-47-text');
+  showLoader('15');
+  const loaderText = document.getElementById('loader-15-text');
   const onProgress = msg => { if (loaderText) loaderText.textContent = msg; };
   try {
     const data = await generarObjectiusSecrets(USER_CONFIG, onProgress);
     await generarWaypointsArcPersonatges(USER_CONFIG, onProgress);
     const vista = getActiveObjectives(1);
-    hideLoader('9-47');
+    hideLoader('15');
     mostrarObjectiusSecrets(ESTAT._nkg.personatges || {});
 
     // Reportar faltants
@@ -6595,7 +6603,7 @@ async function iniciarFaseObjectiusSecrets() {
       toast('Objectius i secrets injectats al NKG.');
     }
   } catch (err) {
-    hideLoader('9-47');
+    hideLoader('15');
     // Mostrar el que s'hagi generat
     if (ESTAT._nkg && ESTAT._nkg.personatges) {
       mostrarObjectiusSecrets(ESTAT._nkg.personatges);
@@ -6694,18 +6702,18 @@ function injectarObjectesNarratius(data = {}) {
 }
 
 async function iniciarFaseObjectesNarratius() {
-  ESTAT.fase = 9.48;
-  updateProgress(9.48);
-  hideCard('fase-9-47');
-  showCard('fase-9-48');
+  ESTAT.fase = 16;
+  updateProgress(16);
+  showCard('fase-16');
+  setTimeout(() => document.getElementById('fase-16')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('objectes-result').classList.add('hidden');
-  showLoader('9-48');
+  showLoader('16');
   try {
     const data = await generarObjectesNarratius(USER_CONFIG);
     injectarObjectesNarratius(data);
     const snap = getObjectState(1);
     if (!snap || Object.keys(snap).length === 0) throw new Error('No s\'ha pogut construir l\'estat d\'objectes.');
-    hideLoader('9-48');
+    hideLoader('16');
     mostrarObjectesNarratius(ESTAT._nkg.objectes || {});
 
     const nObj = Object.keys(ESTAT._nkg.objectes || {}).length;
@@ -6715,7 +6723,7 @@ async function iniciarFaseObjectesNarratius() {
       toast('Objectes narratius injectats al NKG.');
     }
   } catch (err) {
-    hideLoader('9-48');
+    hideLoader('16');
     toast('Error fase Objectes Narratius: ' + err.message);
   }
 }
@@ -6807,31 +6815,86 @@ function injectarMapaEspacialRegles(data = {}) {
 }
 
 async function iniciarFaseMapaEspacialRegles() {
-  ESTAT.fase = 9.49;
-  updateProgress(9.49);
-  hideCard('fase-9-48');
-  showCard('fase-9-49');
+  ESTAT.fase = 17;
+  updateProgress(17);
+  showCard('fase-17');
+  setTimeout(() => document.getElementById('fase-17')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('mapa-regles-result').classList.add('hidden');
-  showLoader('9-49');
+  showLoader('17');
   try {
     const data = await generarMapaEspacialRegles(USER_CONFIG);
     injectarMapaEspacialRegles(data);
     const llocsIds = Object.keys((ESTAT._nkg && ESTAT._nkg.llocs) || {});
     if (llocsIds.length === 0) throw new Error('No s\'han injectat llocs al NKG.');
-    hideLoader('9-49');
+    hideLoader('17');
     mostrarMapaRegles(ESTAT._nkg.llocs || {}, ESTAT._nkg.mapa_adjacencies || [], ESTAT.bibliaNarrativa.regles_mon || []);
 
     const faltantsMapa = [];
     if (llocsIds.length < 3) faltantsMapa.push(`Només ${llocsIds.length} llocs (mínim: 3)`);
     if (!Array.isArray(ESTAT.bibliaNarrativa.regles_mon) || ESTAT.bibliaNarrativa.regles_mon.length === 0) faltantsMapa.push('Falten regles del món');
+    // Mostrar avís i botó d'ampliació si el mapa és insuficient
+    const avisEl = document.getElementById('mapa-insuficient-avis');
+    const btnAmpliar = document.getElementById('btn-ampliar-mapa');
+    if (llocsIds.length < 3) {
+      if (avisEl) avisEl.classList.remove('hidden');
+      if (btnAmpliar) btnAmpliar.classList.remove('hidden');
+    } else {
+      if (avisEl) avisEl.classList.add('hidden');
+      if (btnAmpliar) btnAmpliar.classList.add('hidden');
+    }
     if (faltantsMapa.length > 0) {
       toast(`Avís mapa: ${faltantsMapa.join('; ')}`);
     } else {
       toast('Mapa espacial i regles injectats al NKG.');
     }
   } catch (err) {
-    hideLoader('9-49');
+    hideLoader('17');
     toast('Error fase Mapa Espacial i Regles: ' + err.message);
+  }
+}
+
+async function ampliarMapaEspacial() {
+  const btn = document.getElementById('btn-ampliar-mapa');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Ampliant mapa…'; }
+  showLoader('17');
+  document.getElementById('loader-17-text').textContent = 'Ampliant mapa espacial amb nous llocs…';
+  try {
+    const parsed = await generarMapaEspacialRegles(USER_CONFIG);
+    const nkg = ESTAT._nkg || {};
+    const llocsExistents = nkg.llocs || {};
+    if (parsed && parsed.llocs) {
+      // Fusionar nous llocs amb els existents
+      Object.entries(parsed.llocs).forEach(([id, loc]) => {
+        if (!llocsExistents[id]) llocsExistents[id] = loc;
+      });
+      nkg.llocs = llocsExistents;
+      if (Array.isArray(parsed.mapa_adjacencies)) {
+        const existents = new Set((nkg.mapa_adjacencies || []).map(e => `${e.de}->${e.a}`));
+        const noves = parsed.mapa_adjacencies.filter(e => !existents.has(`${e.de}->${e.a}`));
+        nkg.mapa_adjacencies = [...(nkg.mapa_adjacencies || []), ...noves];
+      }
+      if (Array.isArray(parsed.regles_mon)) {
+        ESTAT.bibliaNarrativa.regles_mon = [...(ESTAT.bibliaNarrativa.regles_mon || []), ...parsed.regles_mon];
+      }
+    } else {
+      injectarMapaEspacialRegles(parsed);
+    }
+    hideLoader('17');
+    const llocsIds = Object.keys(nkg.llocs || {});
+    mostrarMapaRegles(nkg.llocs || {}, nkg.mapa_adjacencies || [], (ESTAT.bibliaNarrativa && ESTAT.bibliaNarrativa.regles_mon) || []);
+    const avisEl = document.getElementById('mapa-insuficient-avis');
+    if (llocsIds.length >= 3) {
+      if (avisEl) avisEl.classList.add('hidden');
+      if (btn) btn.classList.add('hidden');
+      toast(`Mapa ampliat: ${llocsIds.length} llocs. Mapa suficient.`);
+    } else {
+      toast(`Mapa ampliat a ${llocsIds.length} llocs, però encara insuficient (mínim: 3).`);
+    }
+  } catch (err) {
+    hideLoader('17');
+    toast('Error ampliant mapa: ' + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🗺️ Ampliar mapa'; }
   }
 }
 
@@ -7400,24 +7463,24 @@ async function assegurarPerspectivaCronologiaPipeline(setStatus = null) {
 }
 
 async function iniciarFasePerspectivaCronologia() {
-  ESTAT.fase = 10.7;
-  updateProgress(10.7);
-  hideCard('fase-10-5');
-  showCard('fase-10-7');
+  ESTAT.fase = 21;
+  updateProgress(21);
+  showCard('fase-21');
+  setTimeout(() => document.getElementById('fase-21')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('perspectiva-crono-result').classList.add('hidden');
-  showLoader('10-7');
+  showLoader('21');
   try {
     const data = await generarPerspectivaCronologia(USER_CONFIG);
     injectarPerspectivaCronologia(data);
     await assegurarTemperaturaEmocionalCapitols(USER_CONFIG);
-    hideLoader('10-7');
+    hideLoader('21');
     mostrarPerspectivaCronologia(
       ESTAT._nkg.context_creacio.estil.perspectiva,
       ESTAT._nkg.context_creacio.cronologia,
       ESTAT._nkg.timeline_accions || []
     );
     document.getElementById('perspectiva-crono-result').classList.remove('hidden');
-    document.getElementById('btn-fase10-8').classList.remove('hidden');
+    document.getElementById('btn-fase22').classList.remove('hidden');
 
     const faltantsPersp = [];
     const persp = ((ESTAT._nkg.context_creacio || {}).estil || {}).perspectiva || {};
@@ -7431,7 +7494,7 @@ async function iniciarFasePerspectivaCronologia() {
       toast('Perspectiva i cronologia injectades al NKG.');
     }
   } catch (err) {
-    hideLoader('10-7');
+    hideLoader('21');
     toast('Error fase Perspectiva i Cronologia: ' + err.message);
   }
 }
@@ -7577,18 +7640,25 @@ function injectarVeuExemples(data = {}) {
 }
 
 async function iniciarFaseVeuExemples() {
-  ESTAT.fase = 10.8;
-  updateProgress(10.8);
-  hideCard('fase-10-7');
-  showCard('fase-10-8');
+  ESTAT.fase = 22;
+  updateProgress(22);
+  showCard('fase-22');
+  setTimeout(() => document.getElementById('fase-22')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('veu-exemples-result').classList.add('hidden');
-  showLoader('10-8');
-  const loaderText = document.getElementById('loader-10-8-text');
+  showLoader('22');
+  const loaderText = document.getElementById('loader-22-text');
   const onProgress = msg => { if (loaderText) loaderText.textContent = msg; };
   try {
-    await assegurarPerspectivaCronologiaPipeline(onProgress);
+    // Validar que POV/Cronologia s'han generat manualment al pas 21
+    if (!tePerspectivaCronologiaPreparada()) {
+      hideLoader('22');
+      toast('Cal completar primer el pas de POV/Cronologia (pas 21) abans de continuar.');
+      showCard('fase-21');
+      setTimeout(() => document.getElementById('fase-21')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+      return;
+    }
     const data = await generarVeuExemples(USER_CONFIG, onProgress);
-    hideLoader('10-8');
+    hideLoader('22');
     mostrarVeuExemples(ESTAT._nkg.personatges || {});
     mostrarFaltantsNKG();
     document.getElementById('veu-exemples-result').classList.remove('hidden');
@@ -7606,7 +7676,7 @@ async function iniciarFaseVeuExemples() {
       toast('Veu i exemples completats.');
     }
   } catch (err) {
-    hideLoader('10-8');
+    hideLoader('22');
     // Mostrar igualment el que s'ha generat fins ara
     if (ESTAT._nkg && ESTAT._nkg.personatges) {
       mostrarVeuExemples(ESTAT._nkg.personatges);
@@ -7622,8 +7692,8 @@ async function iniciarFaseVeuExemples() {
 async function autocompletarNKGFaltantsManual() {
   const btn = document.getElementById('btn-autocompletar-nkg');
   if (btn) btn.disabled = true;
-  showLoader('10-8');
-  const loaderText = document.getElementById('loader-10-8-text');
+  showLoader('22');
+  const loaderText = document.getElementById('loader-22-text');
   const setStatus = msg => { if (loaderText) loaderText.textContent = msg; };
 
   const passos = [
@@ -7663,16 +7733,14 @@ async function autocompletarNKGFaltantsManual() {
       etiqueta: 'Mapa espacial i regles del món',
       detecta: txt => txt.includes('mapa de llocs') || txt.includes('regles del món'),
       executar: async () => {
-        const d = await generarMapaEspacialRegles(USER_CONFIG);
-        injectarMapaEspacialRegles(d);
+        toast('El mapa de llocs s\'ha de generar al pas 17 (Mapa/Regles). Torna a aquest pas per generar-lo.');
       }
     },
     {
       etiqueta: 'Perspectiva i cronologia per capítol',
       detecta: txt => txt.includes('pov per capítol') || txt.includes('cronologia') || txt.includes('tipus de perspectiva'),
       executar: async () => {
-        const d = await generarPerspectivaCronologia(USER_CONFIG);
-        injectarPerspectivaCronologia(d);
+        toast('El POV i la cronologia s\'han de generar al pas 21 (POV/Cronologia). Torna a aquest pas per generar-los.');
       }
     },
     {
@@ -7723,7 +7791,7 @@ async function autocompletarNKGFaltantsManual() {
     mostrarFaltantsNKG();
     toast('Error autocompletant NKG: ' + err.message);
   } finally {
-    hideLoader('10-8');
+    hideLoader('22');
     if (btn) btn.disabled = false;
   }
 }
@@ -7779,15 +7847,16 @@ function tornarAElenc() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 10: Estructura de la novel·la (Opus)
+//  FASE 19: Estructura de la novel·la (Opus)
 // ═══════════════════════════════════════════════════════════
 async function iniciarFase10() {
-  ESTAT.fase = 10;
-  updateProgress(10);
-  showCard('fase-10');
+  ESTAT.fase = 19;
+  updateProgress(19);
+  showCard('fase-19');
+  setTimeout(() => document.getElementById('fase-19')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('estructura-wrap').classList.add('hidden');
-  showLoader(10);
-  document.getElementById('loader-10-text').textContent = '🔵 Opus creant la bíblia narrativa…';
+  showLoader(19);
+  document.getElementById('loader-19-text').textContent = '🔵 Opus creant la bíblia narrativa…';
 
   try {
     // Primer: crear la bíblia narrativa inicial
@@ -7798,7 +7867,7 @@ async function iniciarFase10() {
     const persRebuts = (ESTAT.bibliaNarrativa.fitxes_personatges || []).length;
     if (persEsperats > 0 && persRebuts < persEsperats) {
       console.warn(`Bíblia incompleta: ${persRebuts}/${persEsperats} personatges. Completant...`);
-      document.getElementById('loader-10-text').textContent = '🔵 Completant fitxes de personatges…';
+      document.getElementById('loader-19-text').textContent = '🔵 Completant fitxes de personatges…';
       try {
         await completarBibliaPersonatges(USER_CONFIG);
       } catch (retryErr) {
@@ -7807,7 +7876,7 @@ async function iniciarFase10() {
     }
 
     // Després: generar l'estructura
-    document.getElementById('loader-10-text').textContent = '🔵 Opus dissenyant l\'estructura…';
+    document.getElementById('loader-19-text').textContent = '🔵 Opus dissenyant l\'estructura…';
     const res = await generarEstructuraNovella(USER_CONFIG);
     ESTAT.estructuraNovella   = res.response;
     ESTAT._estructuraCapitols = parseEstructura(res.response);
@@ -7816,7 +7885,7 @@ async function iniciarFase10() {
     const capsEsperats = ESTAT._nombreCapitolsConfig || ESTAT._nombreCapitols || 13;
     if (ESTAT._estructuraCapitols.length > 0 && ESTAT._estructuraCapitols.length < capsEsperats) {
       console.warn(`Estructura incompleta: ${ESTAT._estructuraCapitols.length}/${capsEsperats} capítols. Completant...`);
-      document.getElementById('loader-10-text').textContent = `🔵 Completant capítols ${ESTAT._estructuraCapitols.length + 1}-${capsEsperats}…`;
+      document.getElementById('loader-19-text').textContent = `🔵 Completant capítols ${ESTAT._estructuraCapitols.length + 1}-${capsEsperats}…`;
       try {
         const completRes = await completarEstructuraCapitols(ESTAT._estructuraCapitols, capsEsperats, USER_CONFIG);
         const completDades = parseJsonRobust(completRes.response);
@@ -7843,7 +7912,7 @@ async function iniciarFase10() {
       }
     }
 
-    hideLoader(10);
+    hideLoader(19);
     mostrarEstructura(res.response);
     // Mostrar estimació de cost a la consola i al toast
     try {
@@ -7853,7 +7922,7 @@ async function iniciarFase10() {
       if (costEl) costEl.textContent = estimacio;
     } catch (e) { /* no bloquejant */ }
   } catch (err) {
-    hideLoader(10);
+    hideLoader(19);
     toast('Error Opus: ' + err.message);
   }
 }
@@ -8023,16 +8092,19 @@ function mostrarEstructura(text) {
   }
   // Inicialitzar NKG amb les dades de l'estructura
   nkgInicialitzar();
-  setTimeout(() => document.getElementById('fase-10').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+  setTimeout(() => document.getElementById('fase-19').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
 }
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 10.5: Escaleta per Escenes (Opus)
+//  FASE 20: Escaleta per Escenes (Opus)
 // ═══════════════════════════════════════════════════════════
 async function iniciarFaseEscaleta() {
-  showCard('fase-10-5');
-  showLoader('10-5');
-  document.getElementById('loader-10-5-text').textContent = 'Opus generant escaleta per escenes…';
+  ESTAT.fase = 20;
+  updateProgress(20);
+  showCard('fase-20');
+  setTimeout(() => document.getElementById('fase-20')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+  showLoader('20');
+  document.getElementById('loader-20-text').textContent = 'Opus generant escaleta per escenes…';
   try {
     const caps = ESTAT._estructuraCapitols;
     const BLOC = 4; // Reduït de 5 a 4 per donar més marge
@@ -8040,15 +8112,15 @@ async function iniciarFaseEscaleta() {
     for (let offset = 0; offset < caps.length; offset += BLOC) {
       const bloc = caps.slice(offset, offset + BLOC);
       const capsInfo = `${offset + 1}-${Math.min(offset + BLOC, caps.length)} de ${caps.length}`;
-      document.getElementById('loader-10-5-text').textContent =
+      document.getElementById('loader-20-text').textContent =
         `Generant escaleta: capítols ${capsInfo}…`;
 
       // Pausa entre blocs (no el primer) per no saturar el rate limit de Gemini
       if (offset > 0) {
-        document.getElementById('loader-10-5-text').textContent =
+        document.getElementById('loader-20-text').textContent =
           `⏳ Esperant per al rate limit de Gemini… (caps. ${capsInfo})`;
         await new Promise(r => setTimeout(r, 8000));
-        document.getElementById('loader-10-5-text').textContent =
+        document.getElementById('loader-20-text').textContent =
           `Generant escaleta: capítols ${capsInfo}…`;
       }
 
@@ -8088,11 +8160,11 @@ async function iniciarFaseEscaleta() {
       }
     }
     ESTAT._escaletes = totsResultats;
-    hideLoader('10-5');
+    hideLoader('20');
     mostrarEscaleta(totsResultats);
-    document.getElementById('btn-fase10-7').classList.remove('hidden');
+    document.getElementById('btn-fase21').classList.remove('hidden');
   } catch (e) {
-    hideLoader('10-5');
+    hideLoader('20');
     toast('Error generant escaleta: ' + e.message);
   }
 }
@@ -8113,7 +8185,7 @@ function mostrarEscaleta(escaletes) {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 11: Escriptura de capítols (Sonnet + Registre)
+//  FASE 23: Escriptura de capítols (Sonnet + Registre)
 // ═══════════════════════════════════════════════════════════
 async function iniciarFase11() {
   if (!ESTAT.estil.paraules || ESTAT.estil.paraules === 0) ESTAT.estil.paraules = 3000;
@@ -8126,9 +8198,9 @@ async function iniciarFase11() {
   if (!chkNKG.ok) {
     toast('Falten dades al NKG. Et porto a la fase de compleció perquè puguis autogenerar-les o descarregar NKG + Bíblia.');
     console.error('NKG incomplet abans del capítol 1:', chkNKG.errors);
-    ESTAT.fase = 10.8;
-    updateProgress(10.8);
-    showCard('fase-10-8');
+    ESTAT.fase = 22;
+    updateProgress(22);
+    showCard('fase-22');
     document.getElementById('veu-exemples-result').classList.remove('hidden');
     mostrarVeuExemples((ESTAT._nkg && ESTAT._nkg.personatges) || {});
     mostrarFaltantsNKG();
@@ -8150,9 +8222,9 @@ async function iniciarFase11() {
         if (sessioExistent.biblia) ESTAT.bibliaNarrativa = sessioExistent.biblia;
         if (sessioExistent.capitolsEscaleta) ESTAT._escaletes = sessioExistent.capitolsEscaleta;
         // Configura la fase i mostra la UI
-        ESTAT.fase = 11;
-        updateProgress(11);
-        showCard('fase-11');
+        ESTAT.fase = 23;
+        updateProgress(23);
+        showCard('fase-23');
         // Reprèn des del capítol on es va aturar (capitolActual és 1-indexed, generarCapitol és 0-indexed)
         generarCapitol(sessioExistent.capitolActual - 1);
         return;
@@ -8161,7 +8233,7 @@ async function iniciarFase11() {
     eliminarEstatSessio();
   }
 
-  ESTAT.fase                = 11;
+  ESTAT.fase                = 23;
   ESTAT._capitolActual      = 0;
   ESTAT._capitols_generats  = [];
   ESTAT._revisioInstruccions= {};
@@ -8179,8 +8251,9 @@ async function iniciarFase11() {
     promptForcat: ''
   };
 
-  updateProgress(11);
-  showCard('fase-11');
+  updateProgress(23);
+  showCard('fase-23');
+  setTimeout(() => document.getElementById('fase-23')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
 
   if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
     document.getElementById('btn-pausa-flux').classList.remove('hidden');
@@ -8540,8 +8613,8 @@ async function executarSegonaRevisioOpusCapitol() {
   if (!capFinal) { toast('No hi ha capítol final per revisar.'); return; }
 
   try {
-    showLoader(11);
-    document.getElementById('loader-11-text').textContent = '🔵 Opus fent segona revisió de reescriptura...';
+    showLoader(23);
+    document.getElementById('loader-23-text').textContent = '🔵 Opus fent segona revisió de reescriptura...';
     const msgs = [{ role: 'user', content: `Avalua la reescriptura final del capítol amb tota la informació disponible.
 
 INFORMACIÓ INJECTADA PER ESBÒS:
@@ -8573,7 +8646,7 @@ Retorna NOMÉS JSON:
   } catch (err) {
     toast('Error segona revisió Opus: ' + err.message);
   } finally {
-    hideLoader(11);
+    hideLoader(23);
   }
 }
 
@@ -9318,8 +9391,8 @@ async function generarCapitol(idx, intents = 0) {
     return;
   }
 
-  showLoader(11);
-  document.getElementById('loader-11-text').textContent = `🟣 Escrivint el Capítol ${capitolNum} — "${titol}"…`;
+  showLoader(23);
+  document.getElementById('loader-23-text').textContent = `🟣 Escrivint el Capítol ${capitolNum} — "${titol}"…`;
 
   try {
     // Preparació
@@ -9365,7 +9438,7 @@ async function generarCapitol(idx, intents = 0) {
     const objectiuChars = ((ESTAT.estil && ESTAT.estil.paraules) || 3000) * 5;
     const val = validacioBasica(textNet, objectiuChars);
     if (!val.valid && val.motiu === 'curt') {
-      document.getElementById('loader-11-text').textContent = `⚡ Reintentant capítol ${capitolNum} (massa curt)…`;
+      document.getElementById('loader-23-text').textContent = `⚡ Reintentant capítol ${capitolNum} (massa curt)…`;
       const retryPayload = JSON.parse(JSON.stringify(payload));
       const retryMsgs = retryPayload.messages;
       const lastMsg = retryMsgs[retryMsgs.length - 1];
@@ -9419,7 +9492,7 @@ async function generarCapitol(idx, intents = 0) {
 
     // UI
     renderLlistaCapitols();
-    hideLoader(11);
+    hideLoader(23);
     mostrarCapitol(idx, textNet);
     actualitzarEstatCapitol(idx, 'fet');
     if (capitolNum % 6 === 0) mostrarCheckpointIntermedi(idx);
@@ -9430,11 +9503,11 @@ async function generarCapitol(idx, intents = 0) {
 
   } catch (err) {
     if (USER_CONFIG && USER_CONFIG.fluxAutomatic && intents < 3) {
-      document.getElementById('loader-11-text').textContent = `⚠️ Error. Reintentant cap. ${capitolNum} en 5s (Intent ${intents + 1}/3)...`;
+      document.getElementById('loader-23-text').textContent = `⚠️ Error. Reintentant cap. ${capitolNum} en 5s (Intent ${intents + 1}/3)...`;
       setTimeout(() => generarCapitol(idx, intents + 1), 5000);
       return;
     }
-    hideLoader(11);
+    hideLoader(23);
     console.error(`Error en capítol ${capitolNum}:`, err.message);
     toast(`Error capítol ${capitolNum}: ${err.message}`);
   }
@@ -9499,9 +9572,7 @@ function normalitzarSynopsisPerNKG(text) {
   s = s.replace(/(?:^|\n)\s*The user was unsatisfied[\s\S]*$/i, ' ');
   s = s.replace(/(?:^|\n)\s*Sentence\s*\d+\s*\(Completion\):/gi, ' ');
   s = s.replace(/\s+/g, ' ').trim();
-  // Talla a 4 frases màxim per mantenir el contracte de sinopsi nuclear
-  const frases = s.match(/[^.!?…]+[.!?…]/g) || [];
-  if (frases.length >= 4) return frases.slice(0, 4).join(' ').trim();
+  // Retorna la sinopsi completa sense tallar — el prompt ja demana 4 frases
   return s;
 }
 
@@ -10011,7 +10082,7 @@ function mostrarCapitol(idx, text) {
   document.getElementById('capitol-actual-wordcount').textContent = `${wc.toLocaleString('ca')} paraules`;
   document.getElementById('capitol-actual-wrap').classList.remove('hidden');
 
-  setTimeout(() => document.getElementById('fase-11').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+  setTimeout(() => document.getElementById('fase-23').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
 
   // Executar efecte d'escriptura
   efecteEscripturaHTML('capitol-actual-cos', html, 3);
@@ -10288,8 +10359,8 @@ async function reescriureCapitol(idx, intents = 0) {
   }
   document.getElementById('capitol-actual-wrap').classList.add('hidden');
   document.getElementById('revisio-panel').classList.add('hidden');
-  showLoader(11);
-  document.getElementById('loader-11-text').textContent = '🟣 Sonnet aplicant les correccions…';
+  showLoader(23);
+  document.getElementById('loader-23-text').textContent = '🟣 Sonnet aplicant les correccions…';
 
   try {
     const res = await reescriureCapitolAmbInstruccions(idx, instruccions, USER_CONFIG);
@@ -10302,19 +10373,19 @@ async function reescriureCapitol(idx, intents = 0) {
     ESTAT._metaCapitols = ESTAT._metaCapitols || {};
     ESTAT._metaCapitols[idx] = Object.assign({}, ESTAT._metaCapitols[idx] || {}, { textFinal: textNet });
     renderLlistaCapitols();
-    hideLoader(11);
+    hideLoader(23);
     mostrarCapitol(idx, textNet);
     const isLast = idx >= ESTAT._estructuraCapitols.length - 1;
     mostrarAccionsCapitolSimple(idx, isLast);
     toast('Capítol reescrit.');
   } catch (err) {
     if (USER_CONFIG && USER_CONFIG.fluxAutomatic && intents < 3) {
-      document.getElementById('loader-11-text').textContent = `⚠️ Error detectat. Reintentant capítol en 5 segons (Intent ${intents + 1}/3)...`;
+      document.getElementById('loader-23-text').textContent = `⚠️ Error detectat. Reintentant capítol en 5 segons (Intent ${intents + 1}/3)...`;
       setTimeout(() => reescriureCapitol(idx, intents + 1), 5000);
       return;
     }
 
-    hideLoader(11);
+    hideLoader(23);
     document.getElementById('capitol-actual-wrap').classList.remove('hidden');
 
     if (USER_CONFIG && USER_CONFIG.fluxAutomatic) {
@@ -10756,7 +10827,7 @@ async function recalcularDerivatsDespresJutge(capitolsIdx, userConfig) {
 
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 12: Control d'Arcs (Opus) + Epíleg (Sonnet)
+//  FASE 24: Control d'Arcs (Opus) + Epíleg (Sonnet)
 // ═══════════════════════════════════════════════════════════
 function extreureEvidenciesTermometre(capitols = []) {
   const senyals = [
@@ -10856,18 +10927,19 @@ function renderTermometreVeritatEmocional() {
 
 
 async function iniciarFase12() {
-  ESTAT.fase = 12;
-  updateProgress(12);
-  showCard('fase-12');
+  ESTAT.fase = 24;
+  updateProgress(24);
+  showCard('fase-24');
+  setTimeout(() => document.getElementById('fase-24')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   document.getElementById('arcs-result').classList.add('hidden');
   document.getElementById('epileg-loader-wrap').classList.add('hidden');
   document.getElementById('epileg-cos').classList.add('hidden');
-  showLoader(12);
+  showLoader(24);
 
   try {
     const res = await controlArcsNovella(USER_CONFIG);
     ESTAT._controlArcs = res.response;
-    hideLoader(12);
+    hideLoader(24);
 
     const arcosCos = document.getElementById('arcs-cos');
     const blocs = res.response.split(/\n\n+/).filter(b => b.trim().length > 0);
@@ -10892,9 +10964,9 @@ async function iniciarFase12() {
     }
     renderTermometreVeritatEmocional();
     document.getElementById('arcs-result').classList.remove('hidden');
-    setTimeout(() => document.getElementById('fase-12').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+    setTimeout(() => document.getElementById('fase-24').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   } catch (err) {
-    hideLoader(12);
+    hideLoader(24);
     toast('Error Opus: ' + err.message);
   }
 }
@@ -11219,8 +11291,8 @@ async function reescriureCapitolGlobal(idx) {
   document.getElementById('btn-control-arcs-wrap').classList.add('hidden');
   document.getElementById('capitol-actual-wrap').classList.add('hidden');
   document.getElementById('revisio-panel').classList.add('hidden');
-  showLoader(11);
-  document.getElementById('loader-11-text').textContent = `🟣 Sonnet reescrivint el Capítol ${idx + 1}…`;
+  showLoader(23);
+  document.getElementById('loader-23-text').textContent = `🟣 Sonnet reescrivint el Capítol ${idx + 1}…`;
 
   try {
     const res = await reescriureCapitolAmbInstruccions(idx, instruccions, USER_CONFIG);
@@ -11231,7 +11303,7 @@ async function reescriureCapitolGlobal(idx) {
     }
     ESTAT._capitols_generats[idx] = textNet;
     renderLlistaCapitols();
-    hideLoader(11);
+    hideLoader(23);
     mostrarCapitol(idx, textNet);
 
     // Tornem a mostrar el panell de revisió global amb el capítol reescrit marcat i botó per re-avaluar
@@ -11257,7 +11329,7 @@ async function reescriureCapitolGlobal(idx) {
     }
     toast(`✓ Capítol ${idx + 1} reescrit amb millores literàries.`);
   } catch (err) {
-    hideLoader(11);
+    hideLoader(23);
     document.getElementById('btn-control-arcs-wrap').classList.remove('hidden');
     document.getElementById('capitol-actual-wrap').classList.remove('hidden');
     if (btn) { btn.disabled = false; btn.textContent = `✏️ Reeditar Cap. ${idx + 1}`; }
@@ -11361,9 +11433,11 @@ function aplicarCanvisBiblia(canvis) {
 
 // ─── SISTEMA 2: Fase de Trames ────────────────────────────────────────────────
 async function iniciarFaseTrames() {
-  showCard('fase-9-5');
-  updateProgress(9.5);
-  showLoader('9-5');
+  ESTAT.fase = 18;
+  showCard('fase-18');
+  updateProgress(18);
+  setTimeout(() => document.getElementById('fase-18')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+  showLoader('18');
   document.getElementById('trames-result').classList.add('hidden');
   try {
     const res   = await generarTrames(USER_CONFIG);
@@ -11385,7 +11459,7 @@ async function iniciarFaseTrames() {
       if (Number.isFinite(capsModel) && capsModel >= 12 && capsModel <= 14) ESTAT._nombreCapitols = Math.round(capsModel);
       if (!dades.mapa_entrellacat || dades.mapa_entrellacat.length < capsEsperats) {
         console.warn(`Mapa entrellaçat incomplet: ${(dades.mapa_entrellacat||[]).length}/${capsEsperats}. Regenerant...`);
-        document.getElementById('loader-9-5-text').textContent = '🔵 Completant mapa de trames…';
+        document.getElementById('loader-18-text').textContent = '🔵 Completant mapa de trames…';
         try {
           const mapaRes = await completarMapaTrames(dades, capsEsperats, USER_CONFIG);
           const mapaDades = parseJsonRobust(mapaRes.response);
@@ -11400,7 +11474,7 @@ async function iniciarFaseTrames() {
     }
     mostrarTrames(res.response, dades);
   } catch (err) {
-    hideLoader('9-5');
+    hideLoader('18');
     alert('Error generant les trames: ' + err.message);
   }
 }
@@ -11431,7 +11505,7 @@ ${text.substring(0, 12000)}`
 }
 
 function mostrarTrames(textOriginal, dades) {
-  hideLoader('9-5');
+  hideLoader('18');
   const result = document.getElementById('trames-result');
   const cos    = document.getElementById('trames-cos');
   if (!dades) {
@@ -14530,7 +14604,7 @@ function buildContextCapitol(idx) {
 
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 10: Estructura de la novel·la (Opus) — JSON
+//  FASE 19: Estructura de la novel·la (Opus) — JSON
 // ═══════════════════════════════════════════════════════════
 async function generarEstructuraNovella(userConfig) {
   const personatgesCtx = ESTAT._personatgesSeleccionats && ESTAT._personatgesSeleccionats.length > 0
@@ -14757,7 +14831,7 @@ CRÍTIC: Han de ser EXACTAMENT ${capsQueFalten} capítols. L'últim (${capsEsper
 }
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 11: Escriure capítol (Sonnet) — FASE 3: Concos íntegre
+//  FASE 23: Escriure capítol (Sonnet) — FASE 3: Concos íntegre
 // ═══════════════════════════════════════════════════════════
 function generarInstruccionsGanxoFinalCapitol(idx) {
   const esUltimCapitol = idx >= ((ESTAT._estructuraCapitols && ESTAT._estructuraCapitols.length) ? ESTAT._estructuraCapitols.length - 1 : 0);
@@ -15109,7 +15183,7 @@ Reescriu el capítol complet incorporant les correccions. Mantén la mateixa veu
 }
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 12: Control d'Arcs Narratius (Opus) — FASE 9: concos íntegre
+//  FASE 24: Control d'Arcs Narratius (Opus) — FASE 9: concos íntegre
 // ═══════════════════════════════════════════════════════════
 async function controlArcsNovella(userConfig) {
   const reg = ESTAT.llibreRegistre;
@@ -15655,7 +15729,7 @@ async function executarLoopCoherenciaFinal(userConfig) {
   const maxIteracions = 3;
 
   for (let iter = 1; iter <= maxIteracions; iter++) {
-    const loaderEl = document.getElementById('loader-11-text');
+    const loaderEl = document.getElementById('loader-23-text');
     if (loaderEl) loaderEl.textContent = `🔍 Revisió final de coherència (${iter}/${maxIteracions})…`;
 
     let dades = null;
@@ -16018,7 +16092,7 @@ async function executarJutgeInterval(fromIdx, toIdx, userConfig) {
 
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 10.5: Generar Escaleta per Bloc de Capítols (Opus)
+//  FASE 20: Generar Escaleta per Bloc de Capítols (Opus)
 // ═══════════════════════════════════════════════════════════
 async function generarEscaletaBloc(capitols, offset, userConfig) {
   const brief = buildBriefNarratiu();
@@ -16620,13 +16694,12 @@ Respon directament amb les 4 frases, sense numeració ni etiquetes.`;
   let text = await nouFluxCall(
     msgs,
     'Ets un editor literari. Escrius sinopsis nuclears precises i potents. Respon en català.',
-    Object.assign({}, config || USER_CONFIG || {}, { maxTokens: 800, model: models.modelGeneracio }),
+    Object.assign({}, config || USER_CONFIG || {}, { maxTokens: 1200, model: models.modelGeneracio }),
     'generacio',
     2
   );
 
-  const frases = String(text || '').trim().match(/[^.!?…]+[.!?…]/g) || [];
-  if (frases.length >= 4 && !textSemblaIncomplet(text)) return normalitzarSynopsisPerNKG(text);
+  if (!textSemblaIncomplet(text)) return normalitzarSynopsisPerNKG(text);
 
   const msgsRepair = [{
     role: 'user',
@@ -16641,7 +16714,7 @@ Reescriu-la bé en EXACTAMENT 4 frases completes.`
   const repaired = await nouFluxCall(
     msgsRepair,
     'Ets un editor literari. Retorna una sinopsi nuclear completa de 4 frases en català.',
-    Object.assign({}, config || USER_CONFIG || {}, { maxTokens: 1000, model: models.modelGeneracio }),
+    Object.assign({}, config || USER_CONFIG || {}, { maxTokens: 1200, model: models.modelGeneracio }),
     'generacio',
     3
   );
@@ -18616,7 +18689,7 @@ Retorna EXCLUSIVAMENT JSON amb aquesta estructura:
 
 async function generarCapitolNKG(idx, userConfig) {
   const capitol = idx + 1;
-  const loaderEl = document.getElementById('loader-11-text');
+  const loaderEl = document.getElementById('loader-23-text');
   const contextCapitol = buildContextCapitol(idx);
 
   if (loaderEl) loaderEl.textContent = `✍️ Escrivint directament el capítol ${capitol}...`;
