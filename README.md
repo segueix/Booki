@@ -8,3 +8,4 @@ Encara més canals
 Idem
 Juliana
 Nous canals
+Arreglar acccions
