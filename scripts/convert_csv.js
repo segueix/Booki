@@ -7,7 +7,7 @@ const API_KEY = process.env.YOUTUBE_API_KEY; // O posa la teva clau aquí tempor
 // Format: "Nom del canal (@Handle)"
 const HANDLES_TO_CONVERT = [ 
   "@alesportesdetroia",
-  "@historiaencatala"
+  "@historiaencatala",
   "@deusisimis"
 ];
 const fetchYouTubeData = async (url) => {
