@@ -609,8 +609,8 @@
 </div>
 
 <header>
-  <h1>📖 Conte IA</h1>
-  <p>Crea el teu conte pas a pas amb intel·ligència artificial</p>
+  <h1>🧭 Booki · Generador de Projecte Narratiu</h1>
+  <p>Flux oficial: idea/tema → premissa → estructura → personatges → món → escaleta de capítols → NKG → Bíblia narrativa → exportació</p>
 </header>
 
 <!-- CONFIGURACIÓ INICIAL -->
@@ -627,7 +627,7 @@
   <!-- Camps específics Anthropic (model dual) -->
   <div id="config-anthropic-fields" class="config-section">
     <label class="field-label" for="config-model-generacio">
-      Model de generació <span style="color:var(--text2);font-size:.78rem;">— escriptura creativa</span>
+      Model de generació <span style="color:var(--text2);font-size:.78rem;">— creació de contingut estructurat</span>
     </label>
     <input type="text" id="config-model-generacio" value="claude-sonnet-4-6" placeholder="claude-sonnet-4-6">
 
@@ -658,8 +658,8 @@
     <div class="checkbox-row" onclick="document.getElementById('config-flux-automatic').click()">
       <input type="checkbox" id="config-flux-automatic" onclick="event.stopPropagation()">
       <label for="config-flux-automatic">
-        <strong>Flux automàtic</strong> — Opus revisa cada capítol i Sonnet el corregeix si cal
-        <small style="display:block;color:var(--text2);font-size:.78rem;margin-top:2px;">Si està desactivat, la revisió és manual (botons per capítol)</small>
+        <strong>Flux seqüencial automàtic</strong> — executa les fases de generació de forma continuada
+        <small style="display:block;color:var(--text2);font-size:.78rem;margin-top:2px;">Si està desactivat, avances manualment entre fases</small>
       </label>
     </div>
 
@@ -667,7 +667,7 @@
     <input type="number" id="config-target-qualitat" min="60" max="98" step="1" value="85" placeholder="85">
     <small style="display:block;color:var(--text2);font-size:.78rem;margin-top:4px;">El generador iterarà fins assolir aquest llindar (amb límit de seguretat d'intents).</small>
 
-    <label class="field-label" for="config-delay-capitols" style="margin-top:10px;">Pausa entre capítols (segons, mode semi-automàtic)</label>
+    <label class="field-label" for="config-delay-capitols" style="margin-top:10px;">Pausa entre fases (segons, mode semi-automàtic)</label>
     <input type="number" id="config-delay-capitols" min="0" max="300" step="5" value="30" placeholder="30">
     <small style="display:block;color:var(--text2);font-size:.78rem;margin-top:4px;">Controla el ritme de crides: 20–60s ajuda a evitar pics de TPM i errors 429.</small>
 
@@ -754,63 +754,31 @@
 
 <!-- Progress -->
 <div id="progress-wrap" class="hidden">
-  <div class="progress-steps" id="steps-bar">
-    <div class="step-pill active" data-step="0">Gènere</div>
+  <div class="progress-steps" id="steps-bar" aria-label="Flux oficial del producte">
+    <div class="step-pill active" data-stage="0">Idea / tema</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="1">Premissa</div>
+    <div class="step-pill" data-stage="1">Premissa</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="2">Estil</div>
+    <div class="step-pill" data-stage="2">Estructura</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="3">Protagonista</div>
+    <div class="step-pill" data-stage="3">Personatges</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="4">Localització</div>
+    <div class="step-pill" data-stage="4">Món</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="5">Final</div>
+    <div class="step-pill" data-stage="5">Escaleta de capítols</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="6">Escriptura</div>
+    <div class="step-pill" data-stage="6">NKG</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="7">Món</div>
+    <div class="step-pill" data-stage="7">Bíblia narrativa</div>
     <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="8">Personatges</div>
-    <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="9">Veus</div>
-    <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="10">Psicologia</div>
-    <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="11">Ferida/Arc</div>
-    <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="12">Relacions</div>
-    <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="13">Backstory</div>
-    <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="14">Completar personatges</div>
-    <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="15">Objectius/Secrets</div>
-    <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="16">Objectes</div>
-    <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="17">Mapa/Regles</div>
-    <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="18">Trames</div>
-    <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="19">Estructura</div>
-    <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="20">Escaleta</div>
-    <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="21">POV/Cronologia</div>
-    <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="22">Veu/Exemples</div>
-    <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="23">Capítols</div>
-    <div class="step-arrow">›</div>
-    <div class="step-pill" data-step="24">Control d'Arcs</div>
+    <div class="step-pill" data-stage="8">Exportació</div>
   </div>
 </div>
 
-<!-- FASE 0: Selecció de gènere -->
+<!-- FASE 0: Idea/tema inicial -->
 <div class="card hidden" id="fase-0">
-  <h2><span class="icon">🖊️</span> Crear nova novel·la</h2>
-  <p style="color:var(--text2);font-size:.9rem;margin-bottom:20px;">Escriu una novel·la amb IA partint del final: el sistema construirà tot l'arc narratiu de forma coherent.</p>
+  <h2><span class="icon">🖊️</span> Crear nou projecte narratiu</h2>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:20px;">Defineix la idea/tema i genera un projecte narratiu complet fins a NKG + Bíblia, preparat per exportació.</p>
 
   <!-- Botons d'entrada (visibles inicialment) -->
   <div class="btn-row" id="fase-0-botons">
@@ -895,7 +863,7 @@
     <div id="analisi-resultat" class="hidden" style="font-size:.88rem;padding:12px;background:var(--bg2);border-radius:8px;margin-bottom:12px;line-height:1.6;"></div>
     <div id="mode-seleccio" class="hidden">
       <div class="btn-row">
-        <button class="btn btn-primary" onclick="iniciarModeGuiat()">✍️ Crear novel·la →</button>
+        <button class="btn btn-primary" onclick="iniciarModeGuiat()">🚀 Iniciar flux oficial →</button>
       </div>
     </div>
   </div>
@@ -945,7 +913,7 @@
 <!-- FASE B2: Tema -->
 <div class="card hidden" id="fase-b2">
   <h2><span class="icon">🌊</span> Defineix el tema</h2>
-  <p style="color:var(--text2);font-size:.9rem;margin-bottom:4px;">El tema és la pregunta que la novel·la farà al lector.</p>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:4px;">El tema és la pregunta central que guiarà el projecte narratiu.</p>
   <div class="loader-wrap" id="loader-b2">
     <div class="spinner"></div>
     <span id="loader-b2-text">Generant temes…</span>
@@ -995,7 +963,7 @@
 <!-- FASE B5: Estructura -->
 <div class="card hidden" id="fase-b5">
   <h2><span class="icon">🏗️</span> Estructura de capítols</h2>
-  <p style="color:var(--text2);font-size:.9rem;margin-bottom:4px;">Dues estructures alternatives per a la teva novel·la.</p>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:4px;">Dues estructures alternatives per al teu projecte narratiu.</p>
   <div class="loader-wrap" id="loader-b5">
     <div class="spinner"></div>
     <span>Generant estructures…</span>
@@ -1145,7 +1113,7 @@
   </div>
 </div>
 
-<!-- FASE 6: Escriptura -->
+<!-- FASE 6: Conte base -->
 <div class="card hidden" id="fase-6">
   <h2><span class="icon">✍️</span> El teu conte</h2>
   <div class="loader-wrap" id="loader-6">
@@ -1165,7 +1133,7 @@
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="regenerarConte()">🔄 Regenerar</button>
       <button class="btn btn-secondary" onclick="exportarDoc()">📄 Exportar TXT + Google Docs</button>
-      <button class="btn btn-primary"   onclick="iniciarFase7()">🌍 Expandir a novel·la</button>
+      <button class="btn btn-primary"   onclick="iniciarFase7()">🧭 Continuar cap a NKG + Bíblia</button>
     </div>
     <div id="export-link-wrap" class="hidden" style="margin-top:14px;"></div>
   </div>
@@ -1206,7 +1174,7 @@
   </div>
 
   <div id="elenc-selector" class="hidden">
-    <p style="color:var(--text2);font-size:.9rem;margin-bottom:16px;">Selecciona els personatges que formaran part de la novel·la. Els <span style="color:var(--accent2);font-weight:600;">Recomanats</span> ja estan marcats:</p>
+    <p style="color:var(--text2);font-size:.9rem;margin-bottom:16px;">Selecciona els personatges clau del projecte. Els <span style="color:var(--accent2);font-weight:600;">Recomanats</span> ja estan marcats:</p>
     <div id="llista-elenc" class="premise-list"></div>
     <div class="btn-row">
       <button class="btn btn-primary" onclick="generarEstilsParla()">🗣️ Definir estils de parla</button>
@@ -1345,7 +1313,7 @@
 <!-- FASE 16: Objectes Narratius -->
 <div class="card hidden" id="fase-16">
   <h2><span class="icon">📦</span> Objectes Narratius</h2>
-  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Definim l'attrezzo central de la novel·la i el seu historial de moviment.</p>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Definim l'attrezzo central del projecte i el seu historial de moviment.</p>
   <div class="loader-wrap" id="loader-16">
     <div class="spinner"></div>
     <span id="loader-16-text">Generant objectes narratius...</span>
@@ -1399,10 +1367,10 @@
   </div>
 </div>
 
-<!-- FASE 19: Estructura de la novel·la (Opus) -->
+<!-- FASE 19: Estructura del projecte narratiu (Opus) -->
 <div class="card hidden" id="fase-19">
-  <h2><span class="icon">📐</span> Estructura de la novel·la <span class="badge-model badge-opus">Opus</span></h2>
-  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Opus dissenya l'arquitectura narrativa completa — capítols, arcs i fils — a partir de tot el material generat.</p>
+  <h2><span class="icon">📐</span> Estructura del projecte narratiu <span class="badge-model badge-opus">Opus</span></h2>
+  <p style="color:var(--text2);font-size:.9rem;margin-bottom:18px;">Opus dissenya l'arquitectura narrativa (capítols, arcs i fils) a partir de tot el material generat.</p>
   <div class="loader-wrap" id="loader-19">
     <div class="spinner" style="border-top-color:#60a5fa;"></div>
     <span id="loader-19-text">🔵 Opus dissenyant l'estructura…</span>
@@ -1411,7 +1379,7 @@
     <div id="estructura-cos"></div>
     <div id="estimacio-cost" style="white-space:pre;font-family:monospace;font-size:.82rem;color:var(--text2);background:var(--surface2);border-radius:8px;padding:12px 16px;margin:16px 0;border-left:3px solid var(--accent2);display:block;"></div>
     <div class="btn-row" style="margin-top:24px;">
-      <button class="btn btn-primary" onclick="iniciarFaseEscaleta()">📖 Escriure capítols <span class="badge-model badge-sonnet">Sonnet</span></button>
+      <button class="btn btn-primary" onclick="iniciarFaseEscaleta()">📋 Generar escaleta final <span class="badge-model badge-sonnet">Sonnet</span></button>
     </div>
   </div>
 </div>
@@ -2098,12 +2066,23 @@ function toast(msg) {
   setTimeout(() => t.classList.remove('show'), 3200);
 }
 
+function obtenirEtapaFluxOficialPerFase(fase) {
+  const f = Number(fase || 0);
+  if (f <= 0) return 0;        // idea / tema
+  if (f <= 6) return 1;        // premissa
+  if (f <= 19) return 2;       // estructura
+  if (f <= 20) return 5;       // escaleta de capítols
+  if (f <= 22) return 7;       // NKG + Bíblia narrativa (fase final de generació)
+  return 8;                    // exportació
+}
+
 function updateProgress(fase) {
+  const etapa = obtenirEtapaFluxOficialPerFase(fase);
   document.querySelectorAll('.step-pill').forEach(el => {
-    const s = parseFloat(el.dataset.step);
+    const s = parseFloat(el.dataset.stage);
     el.classList.remove('active', 'done');
-    if (s < fase)  el.classList.add('done');
-    if (s === fase) el.classList.add('active');
+    if (s < etapa) el.classList.add('done');
+    if (s === etapa) el.classList.add('active');
   });
 }
 
@@ -2123,6 +2102,7 @@ function netejarTabulacionsInicials(text = '') {
 //  ESTAT GLOBAL
 // ═══════════════════════════════════════════════════════════
 let USER_CONFIG = null;
+const PRODUCT_SCOPE = Object.freeze({ stopAt: "nkg_biblia", bookWritingEnabled: false });
 
 const ESTAT = {
   fase:             0,
@@ -4462,7 +4442,7 @@ async function iniciarFase5() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  FASE 5 → FASE 6: Escriptura per parts
+//  FASE 5 → FASE 6: Conte base (input del pipeline NKG/Bíblia)
 // ═══════════════════════════════════════════════════════════
 function iniciarEscriptura() {
   const idx = ESTAT._idxFinal;
@@ -7982,6 +7962,11 @@ function mostrarEscaleta(escaletes) {
 //  FASE 23: Escriptura de capítols (Sonnet + Registre)
 // ═══════════════════════════════════════════════════════════
 async function iniciarFase11() {
+  if (!PRODUCT_SCOPE.bookWritingEnabled) {
+    toast("Aquest producte finalitza a NKG + Bíblia. Usa l'exportació final.");
+    return;
+  }
+
   if (!ESTAT.estil.paraules || ESTAT.estil.paraules === 0) ESTAT.estil.paraules = 3000;
   if (ESTAT._estructuraCapitols.length === 0) {
     toast('No hi ha capítols a l\'estructura. Torna a generar-la.');
@@ -8067,6 +8052,11 @@ async function iniciarFase11() {
 }
 
 function iniciarEscripturaCapitols() {
+  if (!PRODUCT_SCOPE.bookWritingEnabled) {
+    toast("Aquest producte finalitza a NKG + Bíblia. Usa l'exportació final.");
+    return;
+  }
+
   document.getElementById('btn-iniciar-escriptura-wrap').classList.add('hidden');
   generarCapitol(0);
 }
@@ -10674,6 +10664,11 @@ function renderTermometreVeritatEmocional() {
 
 
 async function iniciarFase12() {
+  if (!PRODUCT_SCOPE.bookWritingEnabled) {
+    toast("Aquest producte finalitza a NKG + Bíblia. Usa l'exportació final.");
+    return;
+  }
+
   ESTAT.fase = 24;
   updateProgress(24);
   showCard('fase-24');
@@ -10719,6 +10714,11 @@ async function iniciarFase12() {
 }
 
 async function escriureEpileg() {
+  if (!PRODUCT_SCOPE.bookWritingEnabled) {
+    toast("Aquest producte finalitza a NKG + Bíblia. Usa l'exportació final.");
+    return;
+  }
+
   document.getElementById('btn-epileg').disabled = true;
   document.getElementById('epileg-loader-wrap').classList.remove('hidden');
 
