@@ -8031,6 +8031,22 @@ function decodeCategoryId(code) {
     return isNaN(num) ? null : num;
 }
 
+function getSecurityCooldownMessage(message) {
+    const fallback = typeof message === 'string' ? message : 'Error desconegut.';
+    const normalized = fallback.toLowerCase();
+    const isRateLimited = normalized.includes('massa sol·licituds')
+        || normalized.includes('too many requests')
+        || normalized.includes('rate limit')
+        || normalized.includes('429')
+        || (normalized.includes('minut') && normalized.includes('espera'));
+
+    if (isRateLimited) {
+        return 'Per motius de seguretat, has d\'esperar un minut abans de tornar a enviar una compartició.';
+    }
+
+    return fallback;
+}
+
 async function shareCategoryWithYoutubers(categoryName, channelIds) {
     const loadingModal = document.createElement('div');
     loadingModal.className = 'modal-overlay active share-modal-overlay';
@@ -8098,13 +8114,13 @@ async function shareCategoryWithYoutubers(categoryName, channelIds) {
             } catch (err) {
                 loadingModal.remove();
                 console.error(err);
-                alert('Error de seguretat o connexió: ' + err.message);
+                alert(getSecurityCooldownMessage(err.message));
             }
         });
 
     } catch (err) {
         loadingModal.remove();
-        alert('Error: ' + err.message);
+        alert(getSecurityCooldownMessage(err.message));
     }
 }
 
@@ -8190,13 +8206,13 @@ async function shareSegueixPlaylist(playlistName, videoIds) {
             } catch (err) {
                 loadingModal.remove();
                 console.error(err);
-                alert('Error de seguretat o connexió: ' + err.message);
+                alert(getSecurityCooldownMessage(err.message));
             }
         });
 
     } catch (err) {
         loadingModal.remove();
-        alert('Error: ' + err.message);
+        alert(getSecurityCooldownMessage(err.message));
     }
 }
 
