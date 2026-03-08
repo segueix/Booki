@@ -24,7 +24,7 @@ jobs:
 
       - name: Executar script de neteja
         env:
-          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY_SERVER }}
         run: node scripts/netejar_feed.js
 
       - name: Guardar els canvis (Commit)
