@@ -1,13 +1,17 @@
 name: 🧹 Neteja de Vídeos del Feed
 
 on:
-  workflow_dispatch: # Això crearà un botó a GitHub per executar-ho quan vulguis
+  workflow_dispatch:
   schedule:
-    - cron: '0 3 * * 0' # Automàtic: Cada diumenge a les 3:00 de la matinada
+    - cron: '0 3 * * 0'
 
 jobs:
   netejar_feed:
     runs-on: ubuntu-latest
+    
+    # PERMETRE AL BOT GUARDAR ELS CANVIS (Soluciona l'error 403)
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout del repositori
