@@ -3557,6 +3557,7 @@ function openManageCategoryYoutubersModal(categoryName) {
     const existingModal = document.getElementById('manageCategoryYoutubersModal');
     if (existingModal) existingModal.remove();
 
+    const previousBodyOverflow = document.body.style.overflow;
     const feedChannelMap = new Map((Array.isArray(YouTubeAPI?.getAllChannels?.()) ? YouTubeAPI.getAllChannels() : []).map(ch => [String(ch.id), ch]));
 
     const renderChannelRows = () => {
@@ -3566,7 +3567,7 @@ function openManageCategoryYoutubersModal(categoryName) {
         }
 
         return `
-            <div class="smart-cat-channels-list" data-role="channels-list">
+            <div class="smart-cat-channels-list" data-role="channels-list" style="display:flex; flex-direction:column; gap:8px; max-height:min(52vh, 420px); overflow-y:auto; overflow-x:hidden; padding-right:2px;">
                 ${channelIds.map(channelId => {
                     const feedCh = feedChannelMap.get(String(channelId));
                     const cachedChannel = cachedChannels?.[channelId] || {};
@@ -3576,15 +3577,16 @@ function openManageCategoryYoutubersModal(categoryName) {
                     const name = feedCh?.name || cachedChannel?.name || channelId;
 
                     return `
-                        <div class="smart-cat-channel-row" data-channel-id="${escapeHtml(channelId)}">
+                        <div class="smart-cat-channel-row" data-channel-id="${escapeHtml(channelId)}" style="display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:8px; min-width:0; width:100%;">
                             <img class="smart-cat-channel-avatar" src="${escapeHtml(avatar)}" alt="${escapeHtml(name)}" loading="lazy">
-                            <span class="smart-cat-channel-name">${escapeHtml(name)}</span>
+                            <span class="smart-cat-channel-name" style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(name)}</span>
                             <button class="smart-cat-channel-remove"
                                     type="button"
                                     data-action="remove-category-channel"
                                     data-channel-id="${escapeHtml(channelId)}"
                                     title="Eliminar ${escapeHtml(name)} d'aquesta categoria"
-                                    aria-label="Eliminar ${escapeHtml(name)}">
+                                    aria-label="Eliminar ${escapeHtml(name)}"
+                                    style="display:inline-flex; align-items:center; justify-content:center; flex:0 0 32px; width:32px; height:32px;">
                                 <i data-lucide="minus"></i>
                             </button>
                         </div>
@@ -3597,17 +3599,21 @@ function openManageCategoryYoutubersModal(categoryName) {
     const modal = document.createElement('div');
     modal.id = 'manageCategoryYoutubersModal';
     modal.className = 'modal-overlay active';
+    modal.style.position = 'fixed';
+    modal.style.inset = '0';
+    modal.style.zIndex = '12000';
+    modal.style.padding = '12px';
     modal.innerHTML = `
-        <div class="modal modal-small">
-            <div class="modal-header">
+        <div class="modal modal-small" style="width:min(100%, 560px); max-height:calc(100vh - 24px); overflow:hidden; display:flex; flex-direction:column;">
+            <div class="modal-header" style="position:sticky; top:0; z-index:1;">
                 <h2 class="modal-title">YouTubers de ${escapeHtml(normalizedCategory)}</h2>
                 <button class="modal-close" type="button" data-action="close-modal" aria-label="Tancar">
                     <i data-lucide="x"></i>
                 </button>
             </div>
-            <div class="modal-body" style="display:flex; flex-direction:column; gap:12px;">
+            <div class="modal-body" style="display:flex; flex-direction:column; gap:12px; overflow:hidden;">
                 ${renderChannelRows()}
-                <button class="hero-button" type="button" data-action="assign-category" style="display:inline-flex; align-items:center; justify-content:center; gap:8px;">
+                <button class="hero-button" type="button" data-action="assign-category" style="display:inline-flex; align-items:center; justify-content:center; gap:8px; width:100%; white-space:normal;">
                     <i data-lucide="plus-circle"></i>
                     <span>Assigna aquesta categoria a Youtubers</span>
                 </button>
@@ -3616,6 +3622,12 @@ function openManageCategoryYoutubersModal(categoryName) {
     `;
 
     document.body.appendChild(modal);
+    document.body.style.overflow = 'hidden';
+
+    const closeModal = () => {
+        modal.remove();
+        document.body.style.overflow = previousBodyOverflow;
+    };
 
     const rerenderChannels = () => {
         const body = modal.querySelector('.modal-body');
@@ -3641,7 +3653,7 @@ function openManageCategoryYoutubersModal(categoryName) {
     modal.addEventListener('click', (event) => {
         const overlayTarget = event.target;
         if (overlayTarget === modal) {
-            modal.remove();
+            closeModal();
             return;
         }
 
@@ -3652,7 +3664,7 @@ function openManageCategoryYoutubersModal(categoryName) {
 
         const action = actionTarget.dataset.action;
         if (action === 'close-modal') {
-            modal.remove();
+            closeModal();
             return;
         }
 
@@ -3668,7 +3680,7 @@ function openManageCategoryYoutubersModal(categoryName) {
         }
 
         if (action === 'assign-category') {
-            modal.remove();
+            closeModal();
             setActiveNavItem('follow');
             showFollow('all');
         }
