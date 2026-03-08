@@ -1018,14 +1018,14 @@ async function getShareImageFile() {
 }
 
 function buildShareText(type, label, url) {
-    return `Segueix! Els nostres Youtubers.\n${type}: ${label}\n${url}`;
+    return `Segueix! Els nostres YouTubers.\n${type}: ${label}\n${url}`;
 }
 
 async function buildShareData(type, label, url, title = 'Segueix!') {
     const text = buildShareText(type, label, url);
     const data = {
         title,
-        text: `Segueix! Els nostres Youtubers.\n${type}: ${label}`,
+        text: `Segueix! Els nostres YouTubers.\n${type}: ${label}`,
         url
     };
     const shareImage = await getShareImageFile();
@@ -2916,7 +2916,7 @@ function renderFeed() {
                 videosGrid.innerHTML = `
                     <div class="empty-state empty-state-custom">
                         <button class="empty-state-action" type="button" data-follow-cta>
-                            Afegeix aquesta categoria als teus Youtubers preferits
+                            Afegeix aquesta categoria als teus YouTubers preferits
                         </button>
                         <button class="empty-state-plus" type="button" data-follow-cta aria-label="Afegir categoria a Segueix!">+</button>
                     </div>
@@ -3614,7 +3614,7 @@ function openManageCategoryYoutubersModal(categoryName) {
                 ${renderChannelRows()}
                 <button class="hero-button" type="button" data-action="assign-category" style="display:inline-flex; align-items:center; justify-content:center; gap:8px; width:100%; white-space:normal;">
                     <i data-lucide="plus-circle"></i>
-                    <span>Assigna aquesta categoria a Youtubers</span>
+                    <span>Assigna aquesta categoria a YouTubers</span>
                 </button>
             </div>
         </div>
