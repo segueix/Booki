@@ -989,7 +989,6 @@ function initDefaultSmartCategories() {
     localStorage.setItem('catube_defaults_v1', '1');
 }
 
-const SHARE_INTRO_TEXT = 'Descobreix els nostres Youtubers:';
 const SHARE_IMAGE_NAME = 'icon-512.png';
 const SHARE_BASE_URL = 'https://segueix.github.io/Segueix/';
 
@@ -1018,15 +1017,15 @@ async function getShareImageFile() {
     }
 }
 
-function buildShareText(label, url) {
-    return `${SHARE_INTRO_TEXT} ${label} ${url}`;
+function buildShareText(type, label, url) {
+    return `Segueix! Els nostres YouTubers.\n${type}: ${label}\n${url}`;
 }
 
-async function buildShareData(label, url, title = 'CaTube - Seguint!') {
-    const text = buildShareText(label, url);
+async function buildShareData(type, label, url, title = 'Segueix!') {
+    const text = buildShareText(type, label, url);
     const data = {
         title,
-        text,
+        text: `Segueix! Els nostres YouTubers.\n${type}: ${label}`,
         url
     };
     const shareImage = await getShareImageFile();
@@ -1041,15 +1040,12 @@ async function buildShareData(label, url, title = 'CaTube - Seguint!') {
 
 // Function to handle custom sharing logic
 async function shareVideo(videoData) {
-    // Construct the URL with the video ID parameter
     const shareUrl = buildAppShareUrl(`v=${videoData.id}`);
-    const { data: shareData, text: shareText } = await buildShareData(videoData.title, shareUrl);
+    const { data: shareData, text: shareText } = await buildShareData('Vídeo', videoData.title, shareUrl);
 
-    // Use native sharing API if available (Mobile/Modern browsers)
     if (navigator.share) {
         navigator.share(shareData).catch((err) => console.log('Share dismissed', err));
     } else {
-        // Fallback: Custom Modal for Desktop
         const existingModal = document.querySelector('.share-modal-overlay');
         if (existingModal) existingModal.remove();
 
@@ -1058,10 +1054,7 @@ async function shareVideo(videoData) {
         modal.innerHTML = `
             <div class="modal modal-small">
                 <div class="modal-header">
-                    <h2 class="modal-title" style="display:flex; align-items:center; gap:10px;">
-                        <img src="img/icon-192.png" width="32" height="32" alt="CaTube Logo"> 
-                        Seguint!
-                    </h2>
+                    <h2 class="modal-title" style="display:flex; align-items:center; gap:10px;"><img src="img/icon-192.png" width="32" height="32" alt="Segueix Logo"> Segueix!</h2>
                     <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">
                         <i data-lucide="x"></i>
                     </button>
@@ -1072,7 +1065,7 @@ async function shareVideo(videoData) {
                     </p>
                     <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
                         <button class="hero-button" onclick="window.open('https://wa.me/?text=${encodeURIComponent(shareText)}', '_blank')">
-                            <i data-lucide="message-circle" style="width:18px; display:inline-block; vertical-align:middle;"></i> Compartir
+                            <i data-lucide="message-circle" style="width:18px; display:inline-block; vertical-align:middle;"></i> WhatsApp
                         </button>
                         <button class="hero-button" style="background:#333; color:white;" onclick="navigator.clipboard.writeText('${shareUrl}'); alert('Enllaç copiat!'); this.closest('.modal-overlay').remove();">
                             <i data-lucide="link" style="width:18px; display:inline-block; vertical-align:middle;"></i> Copiar Link
@@ -1111,7 +1104,7 @@ function resolveShareChannelData(channelId, fallback = {}) {
 async function shareChannelProfile(channelId, fallback = {}) {
     const channelData = resolveShareChannelData(channelId, fallback);
     const shareUrl = buildAppShareUrl(`channel=${encodeURIComponent(channelData.id)}`, 'follow');
-    const { data: shareData, text: shareText } = await buildShareData(channelData.name, shareUrl);
+    const { data: shareData, text: shareText } = await buildShareData('YouTuber', channelData.name, shareUrl);
 
     if (navigator.share) {
         navigator.share(shareData).catch((err) => console.log('Share dismissed', err));
@@ -1124,10 +1117,7 @@ async function shareChannelProfile(channelId, fallback = {}) {
         modal.innerHTML = `
             <div class="modal modal-small">
                 <div class="modal-header">
-                    <h2 class="modal-title" style="display:flex; align-items:center; gap:10px;">
-                        <img src="img/icon-192.png" width="32" height="32" alt="CaTube Logo"> 
-                        Seguint!
-                    </h2>
+                    <h2 class="modal-title" style="display:flex; align-items:center; gap:10px;"><img src="img/icon-192.png" width="32" height="32" alt="Segueix Logo"> Segueix!</h2>
                     <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">
                         <i data-lucide="x"></i>
                     </button>
@@ -1139,7 +1129,7 @@ async function shareChannelProfile(channelId, fallback = {}) {
                     </p>
                     <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
                         <button class="hero-button" onclick="window.open('https://wa.me/?text=${encodeURIComponent(shareText)}', '_blank')">
-                            <i data-lucide="message-circle" style="width:18px; display:inline-block; vertical-align:middle;"></i> Compartir
+                            <i data-lucide="message-circle" style="width:18px; display:inline-block; vertical-align:middle;"></i> WhatsApp
                         </button>
                         <button class="hero-button" style="background:#333; color:white;" onclick="navigator.clipboard.writeText('${shareUrl}'); alert('Enllaç copiat!'); this.closest('.modal-overlay').remove();">
                             <i data-lucide="link" style="width:18px; display:inline-block; vertical-align:middle;"></i> Copiar Link
@@ -2926,7 +2916,7 @@ function renderFeed() {
                 videosGrid.innerHTML = `
                     <div class="empty-state empty-state-custom">
                         <button class="empty-state-action" type="button" data-follow-cta>
-                            Afegeix aquesta categoria als teus Youtubers preferits
+                            Afegeix aquesta categoria als teus YouTubers preferits
                         </button>
                         <button class="empty-state-plus" type="button" data-follow-cta aria-label="Afegir categoria a Segueix!">+</button>
                     </div>
@@ -3539,7 +3529,7 @@ async function handleCategoryShare(categoryName) {
         await shareCategoryWithYoutubers(categoryName, channelIds);
     } else {
         const shareUrl = buildAppShareUrl(`add_tag=${encodeURIComponent(categoryName)}`);
-        const { data: shareData, text: shareText } = await buildShareData(categoryName, shareUrl, 'CaTube - Categoria');
+        const { data: shareData, text: shareText } = await buildShareData('Categoria', categoryName, shareUrl, 'Segueix!');
         if (navigator.share) {
             try {
                 await navigator.share(shareData);
@@ -3624,7 +3614,7 @@ function openManageCategoryYoutubersModal(categoryName) {
                 ${renderChannelRows()}
                 <button class="hero-button" type="button" data-action="assign-category" style="display:inline-flex; align-items:center; justify-content:center; gap:8px; width:100%; white-space:normal;">
                     <i data-lucide="plus-circle"></i>
-                    <span>Assigna aquesta categoria a Youtubers</span>
+                    <span>Assigna aquesta categoria a YouTubers</span>
                 </button>
             </div>
         </div>
@@ -8077,19 +8067,16 @@ async function shareCategoryWithYoutubers(categoryName, channelIds) {
                 if (data.status === 'success') {
                     const encodedId = encodeCategoryId(data.id);
                     const shareUrl = buildAppShareUrl(`cat=${encodedId}`);
+                    const { data: shareData, text: shareText } = await buildShareData('Categoria', categoryName, shareUrl, 'Segueix!');
 
                     if (navigator.share) {
                         try {
-                            await navigator.share({
-                                title: `Categoria: ${categoryName}`,
-                                text: `Mira la categoria "${categoryName}" amb ${channelIds.length} YouTubers a CaTube!`,
-                                url: shareUrl
-                            });
+                            await navigator.share(shareData);
                         } catch (err) {
                             console.log('User cancelled share');
                         }
                     } else {
-                        showManualShareModal(categoryName, shareUrl, 'Comparteix la categoria');
+                        showManualShareModal(shareText, shareUrl, 'Comparteix la categoria');
                     }
                 } else {
                     throw new Error(data.message || 'Error desconegut al servidor');
@@ -8108,12 +8095,16 @@ async function shareCategoryWithYoutubers(categoryName, channelIds) {
 }
 
 // 1. Funció per ENVIAR (Adaptada a la teva estructura de playlists)
-async function shareSegueixPlaylist(playlistName) {
+async function shareSegueixPlaylist(playlistName, videoIds) {
     const stored = localStorage.getItem('catube_playlists');
     const allPlaylists = stored ? JSON.parse(stored) : [];
     const targetPlaylist = allPlaylists.find(p => p.name === playlistName);
 
-    if (!targetPlaylist || !targetPlaylist.videos || targetPlaylist.videos.length === 0) {
+    const playlistVideos = Array.isArray(videoIds) && videoIds.length > 0
+        ? videoIds
+        : targetPlaylist?.videos;
+
+    if (!targetPlaylist || !Array.isArray(playlistVideos) || playlistVideos.length === 0) {
         return alert('Aquesta llista és buida o no existeix.');
     }
 
@@ -8137,7 +8128,7 @@ async function shareSegueixPlaylist(playlistName) {
     document.body.appendChild(loadingModal);
 
     try {
-        const urls = targetPlaylist.videos.map(v => `https://www.youtube.com/watch?v=${v.id}`);
+        const urls = playlistVideos.map(v => `https://www.youtube.com/watch?v=${v.id || v}`);
         const siteKey = '6LfJHl4sAAAAAHIgz-uIlDp1AQvQknLIVz-YTJnh';
 
         // Check if library loaded
@@ -8167,20 +8158,16 @@ async function shareSegueixPlaylist(playlistName) {
                 if (data.status === 'success') {
                     const encodedId = encodePlaylistId(data.id);
                     const shareUrl = buildAppShareUrl(`list=${encodedId}`);
+                    const { data: shareData, text: shareText } = await buildShareData('Llista', playlistName, shareUrl, 'Segueix!');
                     
-                    // Native Share or Fallback
                     if (navigator.share) {
                         try {
-                            await navigator.share({
-                                title: `Llista: ${playlistName}`,
-                                text: `Mira aquesta llista de reproducció "${playlistName}" a CaTube!`,
-                                url: shareUrl
-                            });
+                            await navigator.share(shareData);
                         } catch (err) {
                             console.log('User cancelled share');
                         }
                     } else {
-                        showManualShareModal(playlistName, shareUrl);
+                        showManualShareModal(shareText, shareUrl);
                     }
                 } else {
                     throw new Error(data.message || 'Error desconegut al servidor');
