@@ -4,7 +4,7 @@
  * Compara el Google Sheets amb feed.json i detecta per a cada canal
  * qualsevol problema que pugui impedir o degradar la seva indexació.
  *
- * Ús: node scripts/diagnosticar_canals.js
+ * Ús: GOOGLE_SHEET_CSV_URL="https://.../pub?..." node scripts/diagnosticar_canals.js
  * No consumeix quota de YouTube API.
  */
 
@@ -15,7 +15,12 @@ const https = require('https');
 const path  = require('path');
 
 // ── Configuració ────────────────────────────────────────────────────────────
-const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSlB5oWUFyPtQu6U21l2sWRlnWPndhsVA-YvcB_3c9Eby80XKVgmnPdWNpwzcxSqMutkqV6RyJLjsMe/pub?gid=0&single=true&output=csv';
+const SHEET_CSV_URL = process.env.GOOGLE_SHEET_CSV_URL;
+
+if (!SHEET_CSV_URL) {
+    console.error("🚫 Error: Falta la URL de Google Sheets (GOOGLE_SHEET_CSV_URL).");
+    process.exit(1);
+}
 const PATH_FEED_JSON = path.join(__dirname, '../data/feed.json');
 const OLD_CONTENT_DAYS = 60;   // Dies sense vídeo nou → avís
 const FEW_VIDEOS_THRESHOLD = 5; // Vídeos totals (inclosos shorts) per sota → avís
