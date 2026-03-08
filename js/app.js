@@ -3548,6 +3548,137 @@ async function handleCategoryShare(categoryName) {
     }
 }
 
+function openManageCategoryYoutubersModal(categoryName) {
+    const normalizedCategory = normalizeCustomTag(categoryName);
+    if (!normalizedCategory) {
+        return;
+    }
+
+    const existingModal = document.getElementById('manageCategoryYoutubersModal');
+    if (existingModal) existingModal.remove();
+
+    const feedChannelMap = new Map((Array.isArray(YouTubeAPI?.getAllChannels?.()) ? YouTubeAPI.getAllChannels() : []).map(ch => [String(ch.id), ch]));
+
+    const renderChannelRows = () => {
+        const channelIds = getChannelsForCategory(normalizedCategory);
+        if (channelIds.length === 0) {
+            return '<div class="playlist-empty" data-role="empty-state">Aquesta categoria no té YouTubers assignats.</div>';
+        }
+
+        return `
+            <div class="smart-cat-channels-list" data-role="channels-list">
+                ${channelIds.map(channelId => {
+                    const feedCh = feedChannelMap.get(String(channelId));
+                    const cachedChannel = cachedChannels?.[channelId] || {};
+                    const avatar = feedCh?.avatar || feedCh?.thumbnail
+                        || resolveChannelAvatar(channelId, cachedChannel)
+                        || 'img/icon-192.png';
+                    const name = feedCh?.name || cachedChannel?.name || channelId;
+
+                    return `
+                        <div class="smart-cat-channel-row" data-channel-id="${escapeHtml(channelId)}">
+                            <img class="smart-cat-channel-avatar" src="${escapeHtml(avatar)}" alt="${escapeHtml(name)}" loading="lazy">
+                            <span class="smart-cat-channel-name">${escapeHtml(name)}</span>
+                            <button class="smart-cat-channel-remove"
+                                    type="button"
+                                    data-action="remove-category-channel"
+                                    data-channel-id="${escapeHtml(channelId)}"
+                                    title="Eliminar ${escapeHtml(name)} d'aquesta categoria"
+                                    aria-label="Eliminar ${escapeHtml(name)}">
+                                <i data-lucide="minus"></i>
+                            </button>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    };
+
+    const modal = document.createElement('div');
+    modal.id = 'manageCategoryYoutubersModal';
+    modal.className = 'modal-overlay active';
+    modal.innerHTML = `
+        <div class="modal modal-small">
+            <div class="modal-header">
+                <h2 class="modal-title">YouTubers de ${escapeHtml(normalizedCategory)}</h2>
+                <button class="modal-close" type="button" data-action="close-modal" aria-label="Tancar">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="display:flex; flex-direction:column; gap:12px;">
+                ${renderChannelRows()}
+                <button class="hero-button" type="button" data-action="assign-category" style="display:inline-flex; align-items:center; justify-content:center; gap:8px;">
+                    <i data-lucide="plus-circle"></i>
+                    <span>Assigna aquesta categoria a Youtubers</span>
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const rerenderChannels = () => {
+        const body = modal.querySelector('.modal-body');
+        const assignButton = body?.querySelector('[data-action="assign-category"]');
+        const oldList = body?.querySelector('[data-role="channels-list"], [data-role="empty-state"]');
+        if (!body || !assignButton || !oldList) {
+            return;
+        }
+
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = renderChannelRows();
+        const nextList = wrapper.firstElementChild;
+        if (!nextList) {
+            return;
+        }
+
+        oldList.replaceWith(nextList);
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    };
+
+    modal.addEventListener('click', (event) => {
+        const overlayTarget = event.target;
+        if (overlayTarget === modal) {
+            modal.remove();
+            return;
+        }
+
+        const actionTarget = event.target.closest('[data-action]');
+        if (!actionTarget) {
+            return;
+        }
+
+        const action = actionTarget.dataset.action;
+        if (action === 'close-modal') {
+            modal.remove();
+            return;
+        }
+
+        if (action === 'remove-category-channel') {
+            const channelId = actionTarget.dataset.channelId;
+            if (!channelId) {
+                return;
+            }
+            removeCategoryFromChannel(channelId, normalizedCategory);
+            rerenderChannels();
+            updateFeed();
+            return;
+        }
+
+        if (action === 'assign-category') {
+            modal.remove();
+            setActiveNavItem('follow');
+            showFollow('all');
+        }
+    });
+
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+}
+
 function renderSearchCategoryActions(query) {
     if (!pageTitle) {
         return;
@@ -3567,12 +3698,20 @@ function renderSearchCategoryActions(query) {
                 <i data-lucide="plus"></i>
             </button>
         `;
+    const manageYoutubersHtml = isSaved
+        ? `
+            <button class="hero-button" type="button" data-action="manage-category-youtubers" style="padding: 6px 14px; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px; background-color: var(--color-surface-button); color: var(--color-text);">
+                <i data-lucide="users" style="width: 16px; height: 16px;"></i> YouTubers
+            </button>
+        `
+        : '';
 
     pageTitle.innerHTML = `
         <span class="page-title__label">Resultats per:</span>
         <span class="page-title__query">"${escapeHtml(normalizedQuery)}"</span>
         <span class="page-title__actions">
             ${toggleButtonHtml}
+            ${manageYoutubersHtml}
             <button class="btn-round-icon search-category-share" type="button" data-action="share-search" aria-label="Compartir">
                 <i data-lucide="share-2"></i>
             </button>
@@ -3580,6 +3719,7 @@ function renderSearchCategoryActions(query) {
     `;
 
     const toggleButton = pageTitle.querySelector('[data-action="toggle-search-category"]');
+    const manageYoutubersButton = pageTitle.querySelector('[data-action="manage-category-youtubers"]');
     const shareButton = pageTitle.querySelector('[data-action="share-search"]');
 
     toggleButton?.addEventListener('click', () => {
@@ -3593,6 +3733,10 @@ function renderSearchCategoryActions(query) {
 
     shareButton?.addEventListener('click', async () => {
         await handleCategoryShare(normalizedQuery);
+    });
+
+    manageYoutubersButton?.addEventListener('click', () => {
+        openManageCategoryYoutubersModal(normalizedQuery);
     });
 
     if (typeof lucide !== 'undefined') {
@@ -3622,12 +3766,20 @@ function renderCategoryActions(category) {
                 <i data-lucide="plus"></i>
             </button>
         `;
+    const manageYoutubersHtml = isSaved
+        ? `
+            <button class="hero-button" type="button" data-action="manage-category-youtubers" style="padding: 6px 14px; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px; background-color: var(--color-surface-button); color: var(--color-text);">
+                <i data-lucide="users" style="width: 16px; height: 16px;"></i> YouTubers
+            </button>
+        `
+        : '';
     pageTitle.classList.add('page-title--with-actions');
     pageTitle.dataset.title = normalizedCategory;
     pageTitle.innerHTML = `
         <span class="page-title__query">${escapeHtml(normalizedCategory)}</span>
         <span class="page-title__actions">
             ${toggleButtonHtml}
+            ${manageYoutubersHtml}
             <button class="btn-round-icon search-category-share" type="button" data-action="share-category" aria-label="Compartir">
                 <i data-lucide="share-2"></i>
             </button>
@@ -3635,6 +3787,7 @@ function renderCategoryActions(category) {
     `;
 
     const toggleButton = pageTitle.querySelector('[data-action="toggle-category"]');
+    const manageYoutubersButton = pageTitle.querySelector('[data-action="manage-category-youtubers"]');
     const shareButton = pageTitle.querySelector('[data-action="share-category"]');
 
     toggleButton?.addEventListener('click', () => {
@@ -3648,6 +3801,10 @@ function renderCategoryActions(category) {
 
     shareButton?.addEventListener('click', async () => {
         await handleCategoryShare(normalizedCategory);
+    });
+
+    manageYoutubersButton?.addEventListener('click', () => {
+        openManageCategoryYoutubersModal(normalizedCategory);
     });
 
     if (typeof lucide !== 'undefined') {
