@@ -379,24 +379,36 @@ async function main() {
         }
 
         const detailsById = new Map(detailedVideos.map(video => [video.id, video]));
-        const finalVideos = baseVideos.map(video => {
+        
+        // Utilitzem reduce en comptes de map per poder descartar els vídeos no vàlids
+        const finalVideos = baseVideos.reduce((acc, video) => {
             const details = detailsById.get(video.id);
+            
+            // 1. Si NO tenim detalls, el vídeo és privat, ocult o eliminat. El descartem.
             if (!details) {
-                const durationSeconds = Number(video.durationSeconds || 0);
-                return {
-                    ...video,
-                    isShort: durationSeconds > 0 && durationSeconds <= 120
-                };
+                console.log(`🚫 Vídeo ignorat (Privat/Eliminat): ${video.id}`);
+                return acc;
             }
+            
             const durationSeconds = Number(details.durationSeconds || 0);
-            return {
+            
+            // 2. Si la durada és 0 (00:00), és una estrena no començada o vídeo trencat. El descartem.
+            if (durationSeconds === 0) {
+                console.log(`🚫 Vídeo ignorat (Durada 00:00): ${video.id} - ${details.title}`);
+                return acc;
+            }
+            
+            // Si és vàlid, l'afegim a la llista final
+            acc.push({
                 ...video,
                 ...details,
                 categories: video.categories,
                 sourceChannelId: video.sourceChannelId,
                 isShort: durationSeconds > 0 && durationSeconds <= 120
-            };
-        });
+            });
+            
+            return acc;
+        }, []);
 
         const videosByChannel = new Map();
         finalVideos.forEach((video) => {

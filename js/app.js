@@ -2947,7 +2947,16 @@ function renderFeed() {
         }
         return;
     }
-
+    // Afegeix aquest bloc just abans de: lastRenderedFeedList = filtered;
+    filtered = filtered.filter(video => {
+        // Els shorts tenen la seva pròpia lògica, els mantenim
+        if (video.isShort) return true; 
+        
+        // Calculem els segons. Si és 0 (estrena/error) o null (privat/eliminat), el descartem
+        const seconds = getVideoDurationSeconds(video);
+        return seconds !== null && seconds > 0;
+    });
+    
     lastRenderedFeedList = filtered;
     currentFeedRenderer(filtered);
 }
