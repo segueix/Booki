@@ -1,5 +1,9 @@
-// Configuració: La teva URL de Google Sheets (Publicat com a CSV)
-const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSlB5oWUFyPtQu6U21l2sWRlnWPndhsVA-YvcB_3c9Eby80XKVgmnPdWNpwzcxSqMutkqV6RyJLjsMe/pub?gid=0&single=true&output=csv';
+const SHEET_CSV_URL = process.env.GOOGLE_SHEET_CSV_URL;
+
+if (!SHEET_CSV_URL) {
+    console.error('🚫 Error: Falta la URL de Google Sheets (GOOGLE_SHEET_CSV_URL) als Secrets.');
+    process.exit(1);
+}
 
 const fs = require('fs');
 const https = require('https');

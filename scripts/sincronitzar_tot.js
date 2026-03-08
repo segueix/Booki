@@ -3,7 +3,12 @@ const https = require('https');
 const path = require('path');
 
 // --- CONFIGURACIÓ ---
-const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSlB5oWUFyPtQu6U21l2sWRlnWPndhsVA-YvcB_3c9Eby80XKVgmnPdWNpwzcxSqMutkqV6RyJLjsMe/pub?gid=0&single=true&output=csv';
+const SHEET_CSV_URL = process.env.GOOGLE_SHEET_CSV_URL;
+
+if (!SHEET_CSV_URL) {
+    console.error('🚫 Error: Falta la URL de Google Sheets (GOOGLE_SHEET_CSV_URL).');
+    process.exit(1);
+}
 const PATH_CHANNELS_JSON = path.join(__dirname, '../js/channels-ca.json');
 const PATH_FEED_JSON = path.join(__dirname, '../data/feed.json');
 const PATH_SW = path.join(__dirname, '../sw.js'); // Per forçar actualització de cache
