@@ -62,6 +62,12 @@ let videoPlayer, videoPlaceholder, placeholderImage;
 let channelPage, channelVideosGrid;
 let channelBackBtn, channelProfileAvatar, channelProfileName, channelProfileSubscribers;
 let channelProfileHandle, channelProfileDescription, channelProfileTags, channelProfileFollowBtn, channelProfileShareBtn;
+let channelSearchInputDesktop, channelSearchInputMobile;
+let currentChannelVideos = [];
+let currentChannelShorts = [];
+let currentChannelLongVideos = [];
+let currentChannelId = '';
+let currentChannelName = '';
 let searchForm, searchInput, searchDropdown;
 let extraVideosGrid;
 let currentVideoId = null;
@@ -1455,6 +1461,8 @@ function initElements() {
     channelProfileTags = document.getElementById('channelProfileTags');
     channelProfileFollowBtn = document.getElementById('channelProfileFollowBtn');
     channelProfileShareBtn = document.getElementById('channelProfileShareBtn');
+    channelSearchInputDesktop = document.getElementById('channelSearchInputDesktop');
+    channelSearchInputMobile = document.getElementById('channelSearchInputMobile');
     searchForm = document.querySelector('.search');
     searchInput = searchForm?.querySelector('.search-input') || null;
 }
@@ -1565,6 +1573,18 @@ function initEventListeners() {
             showFollow();
         });
     }
+
+    const bindChannelSearchInput = (input) => {
+        if (!input) return;
+        input.addEventListener('input', (event) => {
+            const query = event.target.value || '';
+            if (channelSearchInputDesktop && channelSearchInputDesktop !== input) channelSearchInputDesktop.value = query;
+            if (channelSearchInputMobile && channelSearchInputMobile !== input) channelSearchInputMobile.value = query;
+            renderChannelVideos(query);
+        });
+    };
+    bindChannelSearchInput(channelSearchInputDesktop);
+    bindChannelSearchInput(channelSearchInputMobile);
 
     // Cerca
     if (searchForm && searchInput) {
@@ -7947,36 +7967,73 @@ async function openChannelProfile(channelId) {
     bindFollowButtons(channelPage);
 
     const channelVideos = await YouTubeAPI.getChannelVideosWithHistory(normalizedId);
-    if (channelVideos.length === 0) {
-        channelVideosGrid.innerHTML = '<div class="empty-state">Encara no hi ha vídeos d\'aquest canal.</div>';
-        return;
+    currentChannelId = normalizedId;
+    currentChannelName = channelName;
+    currentChannelVideos = Array.isArray(channelVideos) ? channelVideos : [];
+    currentChannelShorts = currentChannelVideos.filter(video => video.isShort);
+    currentChannelLongVideos = currentChannelVideos.filter(video => !video.isShort);
+
+    if (channelSearchInputDesktop) {
+        channelSearchInputDesktop.value = '';
+    }
+    if (channelSearchInputMobile) {
+        channelSearchInputMobile.value = '';
     }
 
-    channelVideos.forEach(video => {
+    currentChannelVideos.forEach(video => {
         if (!cachedAPIVideos.find(v => String(v.id) === String(video.id))) {
             cachedAPIVideos.push(video);
         }
     });
 
-    const isMobile = window.matchMedia("(max-width: 768px)").matches;
-    const channelShorts = channelVideos.filter(video => video.isShort);
-    const channelLongVideos = channelVideos.filter(video => !video.isShort);
+    renderChannelVideos('');
+    window.scrollTo(0, 0);
+    if (window.location.hash === '#follow') {
+        setTimeout(scrollToChannelFollow, 150);
+    }
+}
 
-    if (!isMobile && channelLongVideos.length === 0) {
-        channelVideosGrid.innerHTML = '<div class="empty-state">Aquest canal només té shorts disponibles ara mateix.</div>';
+function renderChannelVideos(query = '') {
+    if (!channelVideosGrid) return;
+
+    if (!Array.isArray(currentChannelVideos) || currentChannelVideos.length === 0) {
+        channelVideosGrid.innerHTML = '<div class="empty-state">Encara no hi ha vídeos d\'aquest canal.</div>';
         return;
     }
 
-    const shortsSection = isMobile && channelShorts.length > 0 ? `
+    const normalizedQuery = String(query || '').trim().toLowerCase();
+    const filterByQuery = (video) => {
+        if (!normalizedQuery) return true;
+        return String(video?.title || '').toLowerCase().includes(normalizedQuery)
+            || String(video?.description || '').toLowerCase().includes(normalizedQuery);
+    };
+
+    const filteredShorts = currentChannelShorts.filter(filterByQuery);
+    const filteredLongVideos = currentChannelLongVideos.filter(filterByQuery);
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+
+    if (normalizedQuery && filteredShorts.length === 0 && filteredLongVideos.length === 0) {
+        channelVideosGrid.innerHTML = '<div class="empty-state">No s\'han trobat resultats dins d\'aquest canal.</div>';
+        return;
+    }
+
+    if (!isMobile && filteredLongVideos.length === 0) {
+        channelVideosGrid.innerHTML = normalizedQuery
+            ? '<div class="empty-state">Aquesta cerca només retorna shorts en aquest canal.</div>'
+            : '<div class="empty-state">Aquest canal només té shorts disponibles ara mateix.</div>';
+        return;
+    }
+
+    const shortsSection = isMobile && filteredShorts.length > 0 ? `
         <div class="shorts-section">
             <h2 class="shorts-title">Shorts</h2>
             <div class="shorts-row">
-                ${channelShorts.map(video => `
-                    <button class="short-card" type="button" data-video-id="${video.id}" data-channel-id="${normalizedId}">
+                ${filteredShorts.map(video => `
+                    <button class="short-card" type="button" data-video-id="${video.id}" data-channel-id="${currentChannelId}">
                         <img class="short-thumb" src="${video.thumbnail}" alt="${escapeHtml(video.title)}" loading="lazy">
                         <div class="short-meta">
                             <div class="short-title">${escapeHtml(video.title)}</div>
-                            <div class="short-channel">${escapeHtml(video.channelTitle || channelName)}</div>
+                            <div class="short-channel">${escapeHtml(video.channelTitle || currentChannelName)}</div>
                         </div>
                     </button>
                 `).join('')}
@@ -7986,7 +8043,7 @@ async function openChannelProfile(channelId) {
 
     channelVideosGrid.innerHTML = `
         ${shortsSection}
-        ${channelLongVideos.map(video => createVideoCardAPI(video)).join('')}
+        ${filteredLongVideos.map(video => createVideoCardAPI(video)).join('')}
     `;
 
     channelVideosGrid.querySelectorAll('.short-card').forEach(card => {
@@ -8007,10 +8064,6 @@ async function openChannelProfile(channelId) {
         lucide.createIcons();
     }
     setupVideoCardActionButtons();
-    window.scrollTo(0, 0);
-    if (window.location.hash === '#follow') {
-        setTimeout(scrollToChannelFollow, 150);
-    }
 }
 
 function mapStaticVideoToCardData(video) {

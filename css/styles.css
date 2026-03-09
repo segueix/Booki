@@ -2529,6 +2529,48 @@ button:disabled,
     font-size: 0.875rem;
 }
 
+
+.channel-search-wrap {
+    display: none;
+}
+
+.channel-search-input {
+    width: min(320px, 58vw);
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--color-text);
+    border-radius: 999px;
+    padding: 10px 14px;
+    font-size: 0.85rem;
+}
+
+.channel-search-input::placeholder {
+    color: var(--color-text-secondary);
+}
+
+.channel-search-input:focus {
+    outline: none;
+    border-color: var(--color-button-accent);
+    box-shadow: 0 0 0 2px rgba(155, 114, 207, 0.25);
+}
+
+@media (min-width: 769px) {
+    .channel-search-wrap--desktop {
+        display: block;
+    }
+}
+
+@media (max-width: 768px) {
+    .channel-search-wrap--mobile {
+        display: block;
+        margin: 8px 0 12px;
+    }
+
+    .channel-search-input {
+        width: 100%;
+    }
+}
+
 .channel-profile-share-btn.btn-round-icon {
     width: 40px;
     height: 40px;
