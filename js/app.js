@@ -4702,6 +4702,103 @@ function savePlaylists(playlists) {
     localStorage.setItem(PLAYLIST_STORAGE_KEY, JSON.stringify(playlists));
 }
 
+function mergePlaylistVideoSnapshot(baseVideo, resolvedVideo) {
+    if (!baseVideo && !resolvedVideo) return null;
+    if (!baseVideo) return getPlaylistVideoData(resolvedVideo);
+    if (!resolvedVideo) return baseVideo;
+
+    const normalizedResolved = getPlaylistVideoData(resolvedVideo);
+    return {
+        ...baseVideo,
+        ...normalizedResolved,
+        id: baseVideo.id || normalizedResolved.id,
+        source: baseVideo.source || normalizedResolved.source || 'api'
+    };
+}
+
+async function hydratePlaylistVideos(videos) {
+    if (!Array.isArray(videos) || videos.length === 0) {
+        return [];
+    }
+
+    const dedupedVideos = [];
+    const seenIds = new Set();
+    videos.forEach((video) => {
+        const videoId = String(video?.id || '').trim();
+        if (!videoId || seenIds.has(videoId)) {
+            return;
+        }
+        seenIds.add(videoId);
+        dedupedVideos.push(video);
+    });
+
+    const resolvedById = new Map();
+    const cachedSources = [
+        ...(Array.isArray(YouTubeAPI?.feedVideos) ? YouTubeAPI.feedVideos : []),
+        ...(Array.isArray(cachedAPIVideos) ? cachedAPIVideos : []),
+        ...(Array.isArray(window.cachedAPIVideos) ? window.cachedAPIVideos : []),
+        ...(Array.isArray(window.VIDEOS) ? window.VIDEOS : [])
+    ];
+
+    cachedSources.forEach((video) => {
+        if (!video?.id) return;
+        resolvedById.set(String(video.id), video);
+    });
+
+    const channelIds = new Set();
+    dedupedVideos.forEach((video) => {
+        const id = String(video?.id || '');
+        const resolved = resolvedById.get(id);
+        const knownChannelId = video?.channelId || resolved?.channelId || resolved?.snippet?.channelId;
+        if (knownChannelId) {
+            channelIds.add(String(knownChannelId));
+        }
+    });
+
+    if (channelIds.size > 0 && typeof YouTubeAPI?.getChannelVideosWithHistory === 'function') {
+        await Promise.all(Array.from(channelIds).map(async (channelId) => {
+            const historyVideos = await YouTubeAPI.getChannelVideosWithHistory(channelId);
+            historyVideos.forEach((video) => {
+                if (!video?.id) return;
+                const key = String(video.id);
+                if (!resolvedById.has(key)) {
+                    resolvedById.set(key, video);
+                }
+            });
+        }));
+    }
+
+    return dedupedVideos.map((video) => {
+        const resolvedVideo = resolvedById.get(String(video.id));
+        return mergePlaylistVideoSnapshot(video, resolvedVideo);
+    }).filter(Boolean);
+}
+
+async function hydrateStoredPlaylist(playlistId) {
+    if (!playlistId) return null;
+
+    const playlists = getPlaylists();
+    const playlistIndex = playlists.findIndex(item => item.id === playlistId);
+    if (playlistIndex === -1) {
+        return null;
+    }
+
+    const playlist = playlists[playlistIndex];
+    const hydratedVideos = await hydratePlaylistVideos(playlist.videos || []);
+    const changed = JSON.stringify(playlist.videos || []) !== JSON.stringify(hydratedVideos);
+    const hydratedPlaylist = {
+        ...playlist,
+        videos: hydratedVideos
+    };
+
+    if (changed) {
+        playlists[playlistIndex] = hydratedPlaylist;
+        savePlaylists(playlists);
+    }
+
+    return hydratedPlaylist;
+}
+
 function createPlaylist(name, video) {
     const trimmedName = name.trim();
     if (!trimmedName) return;
@@ -4797,9 +4894,14 @@ function removePlaylist(playlistId) {
     }
 }
 
-function renderPlaylistsPage() {
+async function renderPlaylistsPage() {
     if (!playlistsList) return;
-    const playlists = getPlaylists();
+    const storedPlaylists = getPlaylists();
+    const playlists = await Promise.all(storedPlaylists.map(async (playlist) => {
+        const hydrated = await hydrateStoredPlaylist(playlist.id);
+        return hydrated || playlist;
+    }));
+
     if (playlists.length === 0) {
         playlistsList.innerHTML = `<div class="playlist-empty">Encara no tens cap llista creada.</div>`;
         return;
@@ -4970,9 +5072,8 @@ function playPlaylist(playlistId) {
     startPlaylistPlayback(playlistId);
 }
 
-function startPlaylistPlayback(playlistId) {
-    const playlists = getPlaylists();
-    const playlist = playlists.find(item => item.id === playlistId);
+async function startPlaylistPlayback(playlistId) {
+    const playlist = await hydrateStoredPlaylist(playlistId);
     if (!playlist || !Array.isArray(playlist.videos) || playlist.videos.length === 0) {
         return;
     }
@@ -8345,6 +8446,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                                 title: item.snippet.title,
                                                 thumbnail: item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url || 'img/icon-192.png',
                                                 channelTitle: item.snippet.channelTitle,
+                                                channelId: item.snippet.channelId || '',
                                                 source: 'api'
                                             }));
 
