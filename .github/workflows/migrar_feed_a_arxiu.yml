@@ -1,0 +1,45 @@
+name: Migrar overflow del feed a arxiu mensual
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep_per_channel:
+        description: "Vídeos màxims per canal que es mantenen al feed.json"
+        required: false
+        default: "20"
+
+jobs:
+  migrar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Migrar overflow cap a arxiu mensual
+        env:
+          FEED_KEEP_PER_CHANNEL: ${{ github.event.inputs.keep_per_channel }}
+        run: node scripts/migrate_feed_archive.js
+
+      - name: Commit i push si hi ha canvis
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -f data/feed.json
+          git add -f data/archive/*.json 2>/dev/null || true
+
+          if git diff --cached --quiet; then
+            echo "No hi ha canvis per pujar"
+            exit 0
+          fi
+
+          git commit -m "chore: migrate feed overflow to monthly archive"
+          git push

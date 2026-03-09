@@ -12,9 +12,17 @@ const path = require('path');
 // La clau API es llegeix dels Secrets de GitHub per seguretat
 const API_KEY = process.env.YOUTUBE_API_KEY;
 const OUTPUT_FEED_JSON = path.join(process.cwd(), 'data', 'feed.json');
+const OUTPUT_RECENT_FEED_JSON = path.join(process.cwd(), 'data', 'recent-feed.json');
+const OUTPUT_ARCHIVE_DIR = path.join(process.cwd(), 'data', 'archive');
 const OUTPUT_FEED_JS = 'feed_updates.js';
 const VIDEOS_PER_CHANNEL = Number.parseInt(process.env.VIDEOS_PER_CHANNEL ?? '50', 10);
-const FETCH_PER_CHANNEL = 50; // Maximum allowed by YouTube API per request
+const FETCH_PER_CHANNEL = Math.min(
+    50,
+    Math.max(1, Number.parseInt(process.env.YOUTUBE_FETCH_PER_CHANNEL ?? `${VIDEOS_PER_CHANNEL}`, 10))
+);
+const RECENT_FEED_LIMIT = Math.max(1, Number.parseInt(process.env.RECENT_FEED_LIMIT ?? '3000', 10));
+const SAFETY_LIMIT_PER_CHANNEL = Math.max(1, Number.parseInt(process.env.SAFETY_LIMIT_PER_CHANNEL ?? '500', 10));
+const FEED_KEEP_PER_CHANNEL = Math.max(1, Number.parseInt(process.env.FEED_KEEP_PER_CHANNEL ?? '20', 10));
 const BATCH_SIZE = 5;      // Process 5 channels at a time
 const BATCH_DELAY = 2000;  // Wait 2 seconds between batches
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -142,6 +150,62 @@ function truncateText(text, maxLength = 300) {
     return `${text.slice(0, maxLength).trim()}...`;
 }
 
+function archiveBucketKeyFromDate(isoDate) {
+    if (!isoDate) return '';
+    const date = new Date(isoDate);
+    if (Number.isNaN(date.getTime())) return '';
+
+    const year = date.getUTCFullYear();
+    const currentYear = new Date().getUTCFullYear();
+
+    // Històric antic compactat per any (2025.json, 2024.json, ...)
+    if (year < currentYear) {
+        return `${year}`;
+    }
+
+    // Any actual i futur: granularitat mensual (2026-01.json, 2026-02.json, ...)
+    return `${year}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+function mergeVideosById(existingVideos, incomingVideos) {
+    const merged = new Map();
+    if (Array.isArray(existingVideos)) {
+        existingVideos.forEach((video) => {
+            if (video?.id) merged.set(video.id, video);
+        });
+    }
+    incomingVideos.forEach((video) => {
+        if (video?.id) merged.set(video.id, video);
+    });
+    return Array.from(merged.values()).sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+}
+
+function splitVideosForFeedAndArchive(videos, keepPerChannel) {
+    const videosByChannel = new Map();
+    videos.forEach((video) => {
+        const key = video.sourceChannelId || video.channelId || '';
+        if (!key) {
+            return;
+        }
+        if (!videosByChannel.has(key)) {
+            videosByChannel.set(key, []);
+        }
+        videosByChannel.get(key).push(video);
+    });
+
+    const feedVideos = [];
+    const archiveOverflowVideos = [];
+
+    videosByChannel.forEach((entries) => {
+        const sorted = entries.slice().sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+        feedVideos.push(...sorted.slice(0, keepPerChannel));
+        archiveOverflowVideos.push(...sorted.slice(keepPerChannel));
+    });
+
+    feedVideos.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+    return { feedVideos, archiveOverflowVideos };
+}
+
 function countMarkerMatches(text, markers) {
     const markerSet = new Set(markers);
     return text
@@ -203,10 +267,12 @@ async function main() {
         console.log("--- Iniciant actualització des de Google Sheets ---");
 
         const masterVideosById = new Map();
+        let existingFeedVideosForArchive = [];
         if (fs.existsSync(OUTPUT_FEED_JSON)) {
             const existingFeedRaw = fs.readFileSync(OUTPUT_FEED_JSON, 'utf8');
             const existingFeed = JSON.parse(existingFeedRaw);
             if (Array.isArray(existingFeed.videos)) {
+                existingFeedVideosForArchive = existingFeed.videos;
                 existingFeed.videos.forEach(video => {
                     if (video?.id) {
                         masterVideosById.set(video.id, video);
@@ -423,8 +489,6 @@ async function main() {
             videosByChannel.get(key).push(video);
         });
 
-        const SAFETY_LIMIT_PER_CHANNEL = 500;
-
         channels.forEach((channel) => {
             const channelVideos = videosByChannel.get(channel.id) || [];
             console.log(`📺 Canal ${channel.name || channel.id}: ${channelVideos.length} vídeos nous.`);
@@ -473,8 +537,13 @@ async function main() {
             console.log(`✅ Canal ${channel.name || channel.id}: ${Math.min(channelEntries.length, SAFETY_LIMIT_PER_CHANNEL)} vídeos totals.`);
         });
 
-        const feedPayload = Array.from(masterVideosById.values())
+        const mergedFeedPayload = Array.from(masterVideosById.values())
             .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+        const { feedVideos: feedPayload, archiveOverflowVideos } = splitVideosForFeedAndArchive(
+            mergedFeedPayload,
+            FEED_KEEP_PER_CHANNEL
+        );
+        const recentFeedPayload = feedPayload.slice(0, RECENT_FEED_LIMIT);
         const videosWithViews = feedPayload.filter(video => (video.viewCount || 0) > 0);
         console.log(`📊 Vídeos amb viewCount > 0: ${videosWithViews.length}/${feedPayload.length}`);
         videosWithViews.slice(0, 3).forEach(video => {
@@ -599,19 +668,73 @@ async function main() {
 
         const dataDir = path.join(process.cwd(), 'data');
         fs.mkdirSync(dataDir, { recursive: true });
+        fs.mkdirSync(OUTPUT_ARCHIVE_DIR, { recursive: true });
         const feedOutput = {
             generatedAt: new Date().toISOString(),
             channels: channelMetadata,
             videos: feedPayload
         };
+        const recentFeedOutput = {
+            generatedAt: feedOutput.generatedAt,
+            channels: channelMetadata,
+            videos: recentFeedPayload
+        };
         fs.writeFileSync(OUTPUT_FEED_JSON, JSON.stringify(feedOutput, null, 2));
+        fs.writeFileSync(OUTPUT_RECENT_FEED_JSON, JSON.stringify(recentFeedOutput, null, 2));
         fs.writeFileSync(
             OUTPUT_FEED_JS,
-            `// Auto-generated by scripts/update_feed.js\nwindow.FEED_UPDATES = ${JSON.stringify(feedPayload, null, 2)};\n`
+            `// Auto-generated by scripts/update_feed.js\nwindow.FEED_UPDATES = ${JSON.stringify(recentFeedPayload, null, 2)};\n`
         );
+
+        const monthlyVideos = new Map();
+        const archiveSeedVideos = mergeVideosById(
+            existingFeedVideosForArchive,
+            mergeVideosById(feedPayload, archiveOverflowVideos)
+        );
+        archiveSeedVideos.forEach((video) => {
+            const bucketKey = archiveBucketKeyFromDate(video.publishedAt);
+            if (!bucketKey) return;
+            if (!monthlyVideos.has(bucketKey)) {
+                monthlyVideos.set(bucketKey, []);
+            }
+            monthlyVideos.get(bucketKey).push(video);
+        });
+
+        for (const [bucketKey, videos] of monthlyVideos.entries()) {
+            const archivePath = path.join(OUTPUT_ARCHIVE_DIR, `${bucketKey}.json`);
+            let existingVideos = [];
+            if (fs.existsSync(archivePath)) {
+                try {
+                    const archiveRaw = fs.readFileSync(archivePath, 'utf8');
+                    const parsed = JSON.parse(archiveRaw);
+                    existingVideos = Array.isArray(parsed.videos) ? parsed.videos : [];
+                } catch (err) {
+                    console.warn(`⚠️ Arxiu mensual invàlid (${archivePath}), es recrea.`, err.message);
+                }
+            }
+
+            const mergedVideos = mergeVideosById(existingVideos, videos);
+            fs.writeFileSync(
+                archivePath,
+                JSON.stringify(
+                    {
+                        bucket: bucketKey,
+                        generatedAt: feedOutput.generatedAt,
+                        videos: mergedVideos
+                    },
+                    null,
+                    2
+                )
+            );
+        }
+
         console.log("Feed escrit a:", OUTPUT_FEED_JSON);
+        console.log("Recent feed escrit a:", OUTPUT_RECENT_FEED_JSON);
         console.log("Existeix:", fs.existsSync(OUTPUT_FEED_JSON));
         console.log("Mida:", fs.statSync(OUTPUT_FEED_JSON).size);
+        console.log(`📦 Recent feed limitat a ${recentFeedPayload.length}/${feedPayload.length} vídeos.`);
+        console.log(`🧱 Feed principal limitat a ${FEED_KEEP_PER_CHANNEL} vídeos per canal (${feedPayload.length} vídeos totals).`);
+        console.log(`🗂️ Arxius mensuals/anuals actualitzats a ${OUTPUT_ARCHIVE_DIR} (inclouen l'overflow per canal).`);
         console.log(`🚀 Feed actualitzat correctament amb ${feedPayload.length} vídeos.`);
 
     } catch (error) {
