@@ -150,11 +150,21 @@ function truncateText(text, maxLength = 300) {
     return `${text.slice(0, maxLength).trim()}...`;
 }
 
-function monthKeyFromDate(isoDate) {
+function archiveBucketKeyFromDate(isoDate) {
     if (!isoDate) return '';
     const date = new Date(isoDate);
     if (Number.isNaN(date.getTime())) return '';
-    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+
+    const year = date.getUTCFullYear();
+    const currentYear = new Date().getUTCFullYear();
+
+    // Històric antic compactat per any (2025.json, 2024.json, ...)
+    if (year < currentYear) {
+        return `${year}`;
+    }
+
+    // Any actual i futur: granularitat mensual (2026-01.json, 2026-02.json, ...)
+    return `${year}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 function mergeVideosById(existingVideos, incomingVideos) {
@@ -682,16 +692,16 @@ async function main() {
             mergeVideosById(feedPayload, archiveOverflowVideos)
         );
         archiveSeedVideos.forEach((video) => {
-            const monthKey = monthKeyFromDate(video.publishedAt);
-            if (!monthKey) return;
-            if (!monthlyVideos.has(monthKey)) {
-                monthlyVideos.set(monthKey, []);
+            const bucketKey = archiveBucketKeyFromDate(video.publishedAt);
+            if (!bucketKey) return;
+            if (!monthlyVideos.has(bucketKey)) {
+                monthlyVideos.set(bucketKey, []);
             }
-            monthlyVideos.get(monthKey).push(video);
+            monthlyVideos.get(bucketKey).push(video);
         });
 
-        for (const [monthKey, videos] of monthlyVideos.entries()) {
-            const archivePath = path.join(OUTPUT_ARCHIVE_DIR, `${monthKey}.json`);
+        for (const [bucketKey, videos] of monthlyVideos.entries()) {
+            const archivePath = path.join(OUTPUT_ARCHIVE_DIR, `${bucketKey}.json`);
             let existingVideos = [];
             if (fs.existsSync(archivePath)) {
                 try {
@@ -708,7 +718,7 @@ async function main() {
                 archivePath,
                 JSON.stringify(
                     {
-                        month: monthKey,
+                        bucket: bucketKey,
                         generatedAt: feedOutput.generatedAt,
                         videos: mergedVideos
                     },
@@ -724,7 +734,7 @@ async function main() {
         console.log("Mida:", fs.statSync(OUTPUT_FEED_JSON).size);
         console.log(`📦 Recent feed limitat a ${recentFeedPayload.length}/${feedPayload.length} vídeos.`);
         console.log(`🧱 Feed principal limitat a ${FEED_KEEP_PER_CHANNEL} vídeos per canal (${feedPayload.length} vídeos totals).`);
-        console.log(`🗂️ Arxius mensuals actualitzats a ${OUTPUT_ARCHIVE_DIR} (inclouen l'overflow per canal).`);
+        console.log(`🗂️ Arxius mensuals/anuals actualitzats a ${OUTPUT_ARCHIVE_DIR} (inclouen l'overflow per canal).`);
         console.log(`🚀 Feed actualitzat correctament amb ${feedPayload.length} vídeos.`);
 
     } catch (error) {

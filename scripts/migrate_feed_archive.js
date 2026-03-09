@@ -5,11 +5,19 @@ const FEED_KEEP_PER_CHANNEL = Math.max(1, Number.parseInt(process.env.FEED_KEEP_
 const FEED_PATH = path.join(process.cwd(), 'data', 'feed.json');
 const ARCHIVE_DIR = path.join(process.cwd(), 'data', 'archive');
 
-function monthKeyFromDate(isoDate) {
+function archiveBucketKeyFromDate(isoDate) {
     if (!isoDate) return '';
     const date = new Date(isoDate);
     if (Number.isNaN(date.getTime())) return '';
-    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+
+    const year = date.getUTCFullYear();
+    const currentYear = new Date().getUTCFullYear();
+
+    if (year < currentYear) {
+        return `${year}`;
+    }
+
+    return `${year}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 function mergeVideosById(existingVideos, incomingVideos) {
@@ -61,14 +69,14 @@ function main() {
 
     const monthlyOverflow = new Map();
     archiveOverflowVideos.forEach((video) => {
-        const monthKey = monthKeyFromDate(video.publishedAt);
-        if (!monthKey) return;
-        if (!monthlyOverflow.has(monthKey)) monthlyOverflow.set(monthKey, []);
-        monthlyOverflow.get(monthKey).push(video);
+        const bucketKey = archiveBucketKeyFromDate(video.publishedAt);
+        if (!bucketKey) return;
+        if (!monthlyOverflow.has(bucketKey)) monthlyOverflow.set(bucketKey, []);
+        monthlyOverflow.get(bucketKey).push(video);
     });
 
-    for (const [monthKey, vids] of monthlyOverflow.entries()) {
-        const archivePath = path.join(ARCHIVE_DIR, `${monthKey}.json`);
+    for (const [bucketKey, vids] of monthlyOverflow.entries()) {
+        const archivePath = path.join(ARCHIVE_DIR, `${bucketKey}.json`);
         let existingVideos = [];
         if (fs.existsSync(archivePath)) {
             const existing = JSON.parse(fs.readFileSync(archivePath, 'utf8'));
@@ -76,7 +84,7 @@ function main() {
         }
 
         const mergedVideos = mergeVideosById(existingVideos, vids);
-        fs.writeFileSync(archivePath, JSON.stringify({ month: monthKey, generatedAt: new Date().toISOString(), videos: mergedVideos }, null, 2));
+        fs.writeFileSync(archivePath, JSON.stringify({ bucket: bucketKey, generatedAt: new Date().toISOString(), videos: mergedVideos }, null, 2));
     }
 
     const updatedFeed = {
