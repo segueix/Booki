@@ -28,6 +28,8 @@ const YouTubeAPI = {
     feedChannels: [],
     feedVideos: [],
     feedLoaded: false,
+    channelArchiveCache: {},
+    legacyArchiveCache: null,
 
     // Paraules clau per detectar contingut català
     catalanKeywords: [
@@ -121,6 +123,88 @@ const YouTubeAPI = {
         }
     },
 
+
+
+    async loadChannelArchiveVideos(channelId) {
+        if (!channelId) return [];
+        if (Object.prototype.hasOwnProperty.call(this.channelArchiveCache, channelId)) {
+            return this.channelArchiveCache[channelId];
+        }
+
+        try {
+            const response = await fetch(`data/archive/channels/${encodeURIComponent(channelId)}.json?t=${Date.now()}`, { cache: 'no-store' });
+            if (!response.ok) {
+                this.channelArchiveCache[channelId] = [];
+                return [];
+            }
+            const data = await response.json();
+            const videos = Array.isArray(data?.videos) ? data.videos : [];
+            this.channelArchiveCache[channelId] = videos;
+            return videos;
+        } catch (error) {
+            console.log('iuTube: Error carregant arxiu per canal:', error.message);
+            this.channelArchiveCache[channelId] = [];
+            return [];
+        }
+    },
+
+    async loadLegacyArchiveVideosByChannel(channelId) {
+        if (!channelId) return [];
+        if (this.legacyArchiveCache === null) {
+            this.legacyArchiveCache = {};
+            try {
+                const indexResponse = await fetch(`data/archive/index.json?t=${Date.now()}`, { cache: 'no-store' });
+                if (!indexResponse.ok) {
+                    return [];
+                }
+                const indexData = await indexResponse.json();
+                const buckets = Array.isArray(indexData?.buckets) ? indexData.buckets : [];
+                for (const bucket of buckets) {
+                    const fileName = typeof bucket === 'string' ? bucket : bucket?.file;
+                    if (!fileName) continue;
+                    const bucketRes = await fetch(`data/archive/${fileName}?t=${Date.now()}`, { cache: 'no-store' });
+                    if (!bucketRes.ok) continue;
+                    const bucketData = await bucketRes.json();
+                    const videos = Array.isArray(bucketData?.videos) ? bucketData.videos : [];
+                    videos.forEach((video) => {
+                        const key = String(video.channelId || video.sourceChannelId || '');
+                        if (!key) return;
+                        if (!Array.isArray(this.legacyArchiveCache[key])) {
+                            this.legacyArchiveCache[key] = [];
+                        }
+                        this.legacyArchiveCache[key].push(video);
+                    });
+                }
+            } catch (error) {
+                console.log('iuTube: Històric antic no disponible:', error.message);
+            }
+        }
+
+        return Array.isArray(this.legacyArchiveCache?.[channelId])
+            ? this.legacyArchiveCache[channelId]
+            : [];
+    },
+
+    async getChannelVideosWithHistory(channelId) {
+        const normalized = String(channelId || '');
+        if (!normalized) return [];
+
+        const feedVideos = Array.isArray(this.feedVideos)
+            ? this.feedVideos.filter((video) => String(video.channelId) === normalized)
+            : [];
+        const archiveVideos = await this.loadChannelArchiveVideos(normalized);
+        const legacyVideos = await this.loadLegacyArchiveVideosByChannel(normalized);
+
+        const mergedById = new Map();
+        [...feedVideos, ...archiveVideos, ...legacyVideos].forEach((video) => {
+            if (video?.id) {
+                mergedById.set(String(video.id), video);
+            }
+        });
+
+        return Array.from(mergedById.values())
+            .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+    },
     handleFeedGeneratedAt(feedGeneratedAt) {
         if (!feedGeneratedAt) {
             return;

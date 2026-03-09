@@ -7722,7 +7722,7 @@ async function submitYoutuber() {
     }
 }
 
-function openChannelProfile(channelId) {
+async function openChannelProfile(channelId) {
     if (!channelId) {
         return;
     }
@@ -7812,17 +7812,7 @@ function openChannelProfile(channelId) {
     }
     bindFollowButtons(channelPage);
 
-    const feedVideos = Array.isArray(YouTubeAPI?.feedVideos) ? YouTubeAPI.feedVideos : [];
-    const combinedVideos = [...feedVideos, ...cachedAPIVideos];
-    const videosById = new Map();
-    combinedVideos.forEach(video => {
-        if (String(video.channelId) !== normalizedId) {
-            return;
-        }
-        videosById.set(String(video.id), video);
-    });
-
-    const channelVideos = Array.from(videosById.values());
+    const channelVideos = await YouTubeAPI.getChannelVideosWithHistory(normalizedId);
     if (channelVideos.length === 0) {
         channelVideosGrid.innerHTML = '<div class="empty-state">Encara no hi ha vídeos d\'aquest canal.</div>';
         return;
