@@ -147,6 +147,18 @@ let activeFollowTab = 'all';
 let channelCategoryPickerCleanup = null;
 let suppressNextPopstateNavigation = false;
 
+
+const API_CLIENT_KEY_STORAGE_KEY = 'catube_api_client_key';
+
+function getOrCreateApiClientKey() {
+    let key = localStorage.getItem(API_CLIENT_KEY_STORAGE_KEY);
+    if (key) return key;
+    key = `ck_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(API_CLIENT_KEY_STORAGE_KEY, key);
+    return key;
+}
+
+
 function isAuxiliaryPageVisible() {
     return Boolean(
         historyPage && !historyPage.classList.contains('hidden')
@@ -7686,7 +7698,8 @@ async function submitYoutuber() {
                 type: 'add-youtuber',
                 id: id,
                 categoria: categorySelect.value,
-                recaptchaToken: recaptchaToken
+                recaptchaToken: recaptchaToken,
+                clientKey: getOrCreateApiClientKey()
             })
         });
 
@@ -8018,6 +8031,22 @@ function decodeCategoryId(code) {
     return isNaN(num) ? null : num;
 }
 
+function getSecurityCooldownMessage(message) {
+    const fallback = typeof message === 'string' ? message : 'Error desconegut.';
+    const normalized = fallback.toLowerCase();
+    const isRateLimited = normalized.includes('massa sol·licituds')
+        || normalized.includes('too many requests')
+        || normalized.includes('rate limit')
+        || normalized.includes('429')
+        || (normalized.includes('minut') && normalized.includes('espera'));
+
+    if (isRateLimited) {
+        return 'Per motius de seguretat, has d\'esperar un minut abans de tornar a enviar una compartició.';
+    }
+
+    return fallback;
+}
+
 async function shareCategoryWithYoutubers(categoryName, channelIds) {
     const loadingModal = document.createElement('div');
     loadingModal.className = 'modal-overlay active share-modal-overlay';
@@ -8057,7 +8086,8 @@ async function shareCategoryWithYoutubers(categoryName, channelIds) {
                         data: dateStr,
                         categoria: categoryName,
                         youtubers: channelIds.join(','),
-                        recaptchaToken: token
+                        recaptchaToken: token,
+                        clientKey: getOrCreateApiClientKey()
                     })
                 });
 
@@ -8084,13 +8114,13 @@ async function shareCategoryWithYoutubers(categoryName, channelIds) {
             } catch (err) {
                 loadingModal.remove();
                 console.error(err);
-                alert('Error de seguretat o connexió: ' + err.message);
+                alert(getSecurityCooldownMessage(err.message));
             }
         });
 
     } catch (err) {
         loadingModal.remove();
-        alert('Error: ' + err.message);
+        alert(getSecurityCooldownMessage(err.message));
     }
 }
 
@@ -8148,7 +8178,8 @@ async function shareSegueixPlaylist(playlistName, videoIds) {
                     body: JSON.stringify({ 
                         nom: playlistName, 
                         urls: urls,
-                        recaptchaToken: token 
+                        recaptchaToken: token,
+                        clientKey: getOrCreateApiClientKey() 
                     })
                 });
                 
@@ -8175,13 +8206,13 @@ async function shareSegueixPlaylist(playlistName, videoIds) {
             } catch (err) {
                 loadingModal.remove();
                 console.error(err);
-                alert('Error de seguretat o connexió: ' + err.message);
+                alert(getSecurityCooldownMessage(err.message));
             }
         });
 
     } catch (err) {
         loadingModal.remove();
-        alert('Error: ' + err.message);
+        alert(getSecurityCooldownMessage(err.message));
     }
 }
 
@@ -8587,7 +8618,8 @@ async function generateConfig() {
                     body: JSON.stringify({
                         type: 'config',
                         data: dataString,
-                        recaptchaToken: token
+                        recaptchaToken: token,
+                        clientKey: getOrCreateApiClientKey()
                     })
                 });
 
