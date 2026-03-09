@@ -87,6 +87,7 @@ let playlistDragState = null;
 let playlistQueueDragState = null;
 let currentShortIndex = 0;
 let currentShortsQueue = [];
+let forcedShortsQueue = null;
 let isNavigatingShort = false;
 let shortModalScrollY = 0;
 let shortScrollHintTimer = null;
@@ -4171,7 +4172,12 @@ function openShortModal(videoId) {
 
     shortModalScrollY = window.scrollY || 0;
 
-    if (isPlaylistMode && activePlaylistQueue.length > 0) {
+    if (Array.isArray(forcedShortsQueue) && forcedShortsQueue.length > 0) {
+        currentShortsQueue = [...forcedShortsQueue];
+        const forcedIndex = currentShortsQueue.findIndex(v => String(v.id) === String(videoId));
+        currentShortIndex = forcedIndex >= 0 ? forcedIndex : 0;
+        forcedShortsQueue = null;
+    } else if (isPlaylistMode && activePlaylistQueue.length > 0) {
         currentShortsQueue = activePlaylistQueue;
         currentShortIndex = currentPlaylistIndex;
     } else {
@@ -4238,6 +4244,33 @@ function openShortModal(videoId) {
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
     }
+}
+
+function openChannelShortModal(videoId, channelId) {
+    const normalizedChannelId = String(channelId || '');
+    if (!normalizedChannelId) {
+        openShortModal(videoId);
+        return;
+    }
+
+    const channelShorts = (Array.isArray(cachedAPIVideos) ? cachedAPIVideos : [])
+        .filter(video => String(video.channelId || video.snippet?.channelId || '') === normalizedChannelId && video.isShort);
+    const uniqueShortsMap = new Map();
+    channelShorts.forEach((video) => {
+        if (!video?.id) return;
+        uniqueShortsMap.set(String(video.id), video);
+    });
+
+    const clickedId = String(videoId || '');
+    if (clickedId && !uniqueShortsMap.has(clickedId)) {
+        const fallbackVideo = (Array.isArray(cachedAPIVideos) ? cachedAPIVideos : []).find(v => String(v.id) === clickedId)
+            || { id: videoId, isShort: true, channelId: normalizedChannelId, title: '', channelTitle: '' };
+        uniqueShortsMap.set(clickedId, fallbackVideo);
+    }
+
+    forcedShortsQueue = Array.from(uniqueShortsMap.values())
+        .sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
+    openShortModal(videoId);
 }
 
 function getLikedShorts() {
@@ -4702,6 +4735,103 @@ function savePlaylists(playlists) {
     localStorage.setItem(PLAYLIST_STORAGE_KEY, JSON.stringify(playlists));
 }
 
+function mergePlaylistVideoSnapshot(baseVideo, resolvedVideo) {
+    if (!baseVideo && !resolvedVideo) return null;
+    if (!baseVideo) return getPlaylistVideoData(resolvedVideo);
+    if (!resolvedVideo) return baseVideo;
+
+    const normalizedResolved = getPlaylistVideoData(resolvedVideo);
+    return {
+        ...baseVideo,
+        ...normalizedResolved,
+        id: baseVideo.id || normalizedResolved.id,
+        source: baseVideo.source || normalizedResolved.source || 'api'
+    };
+}
+
+async function hydratePlaylistVideos(videos) {
+    if (!Array.isArray(videos) || videos.length === 0) {
+        return [];
+    }
+
+    const dedupedVideos = [];
+    const seenIds = new Set();
+    videos.forEach((video) => {
+        const videoId = String(video?.id || '').trim();
+        if (!videoId || seenIds.has(videoId)) {
+            return;
+        }
+        seenIds.add(videoId);
+        dedupedVideos.push(video);
+    });
+
+    const resolvedById = new Map();
+    const cachedSources = [
+        ...(Array.isArray(YouTubeAPI?.feedVideos) ? YouTubeAPI.feedVideos : []),
+        ...(Array.isArray(cachedAPIVideos) ? cachedAPIVideos : []),
+        ...(Array.isArray(window.cachedAPIVideos) ? window.cachedAPIVideos : []),
+        ...(Array.isArray(window.VIDEOS) ? window.VIDEOS : [])
+    ];
+
+    cachedSources.forEach((video) => {
+        if (!video?.id) return;
+        resolvedById.set(String(video.id), video);
+    });
+
+    const channelIds = new Set();
+    dedupedVideos.forEach((video) => {
+        const id = String(video?.id || '');
+        const resolved = resolvedById.get(id);
+        const knownChannelId = video?.channelId || resolved?.channelId || resolved?.snippet?.channelId;
+        if (knownChannelId) {
+            channelIds.add(String(knownChannelId));
+        }
+    });
+
+    if (channelIds.size > 0 && typeof YouTubeAPI?.getChannelVideosWithHistory === 'function') {
+        await Promise.all(Array.from(channelIds).map(async (channelId) => {
+            const historyVideos = await YouTubeAPI.getChannelVideosWithHistory(channelId);
+            historyVideos.forEach((video) => {
+                if (!video?.id) return;
+                const key = String(video.id);
+                if (!resolvedById.has(key)) {
+                    resolvedById.set(key, video);
+                }
+            });
+        }));
+    }
+
+    return dedupedVideos.map((video) => {
+        const resolvedVideo = resolvedById.get(String(video.id));
+        return mergePlaylistVideoSnapshot(video, resolvedVideo);
+    }).filter(Boolean);
+}
+
+async function hydrateStoredPlaylist(playlistId) {
+    if (!playlistId) return null;
+
+    const playlists = getPlaylists();
+    const playlistIndex = playlists.findIndex(item => item.id === playlistId);
+    if (playlistIndex === -1) {
+        return null;
+    }
+
+    const playlist = playlists[playlistIndex];
+    const hydratedVideos = await hydratePlaylistVideos(playlist.videos || []);
+    const changed = JSON.stringify(playlist.videos || []) !== JSON.stringify(hydratedVideos);
+    const hydratedPlaylist = {
+        ...playlist,
+        videos: hydratedVideos
+    };
+
+    if (changed) {
+        playlists[playlistIndex] = hydratedPlaylist;
+        savePlaylists(playlists);
+    }
+
+    return hydratedPlaylist;
+}
+
 function createPlaylist(name, video) {
     const trimmedName = name.trim();
     if (!trimmedName) return;
@@ -4797,9 +4927,14 @@ function removePlaylist(playlistId) {
     }
 }
 
-function renderPlaylistsPage() {
+async function renderPlaylistsPage() {
     if (!playlistsList) return;
-    const playlists = getPlaylists();
+    const storedPlaylists = getPlaylists();
+    const playlists = await Promise.all(storedPlaylists.map(async (playlist) => {
+        const hydrated = await hydrateStoredPlaylist(playlist.id);
+        return hydrated || playlist;
+    }));
+
     if (playlists.length === 0) {
         playlistsList.innerHTML = `<div class="playlist-empty">Encara no tens cap llista creada.</div>`;
         return;
@@ -4970,9 +5105,8 @@ function playPlaylist(playlistId) {
     startPlaylistPlayback(playlistId);
 }
 
-function startPlaylistPlayback(playlistId) {
-    const playlists = getPlaylists();
-    const playlist = playlists.find(item => item.id === playlistId);
+async function startPlaylistPlayback(playlistId) {
+    const playlist = await hydrateStoredPlaylist(playlistId);
     if (!playlist || !Array.isArray(playlist.videos) || playlist.videos.length === 0) {
         return;
     }
@@ -7818,7 +7952,50 @@ async function openChannelProfile(channelId) {
         return;
     }
 
-    channelVideosGrid.innerHTML = channelVideos.map(video => createVideoCardAPI(video)).join('');
+    channelVideos.forEach(video => {
+        if (!cachedAPIVideos.find(v => String(v.id) === String(video.id))) {
+            cachedAPIVideos.push(video);
+        }
+    });
+
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+    const channelShorts = channelVideos.filter(video => video.isShort);
+    const channelLongVideos = channelVideos.filter(video => !video.isShort);
+
+    if (!isMobile && channelLongVideos.length === 0) {
+        channelVideosGrid.innerHTML = '<div class="empty-state">Aquest canal només té shorts disponibles ara mateix.</div>';
+        return;
+    }
+
+    const shortsSection = isMobile && channelShorts.length > 0 ? `
+        <div class="shorts-section">
+            <h2 class="shorts-title">Shorts</h2>
+            <div class="shorts-row">
+                ${channelShorts.map(video => `
+                    <button class="short-card" type="button" data-video-id="${video.id}" data-channel-id="${normalizedId}">
+                        <img class="short-thumb" src="${video.thumbnail}" alt="${escapeHtml(video.title)}" loading="lazy">
+                        <div class="short-meta">
+                            <div class="short-title">${escapeHtml(video.title)}</div>
+                            <div class="short-channel">${escapeHtml(video.channelTitle || channelName)}</div>
+                        </div>
+                    </button>
+                `).join('')}
+            </div>
+        </div>
+    ` : '';
+
+    channelVideosGrid.innerHTML = `
+        ${shortsSection}
+        ${channelLongVideos.map(video => createVideoCardAPI(video)).join('')}
+    `;
+
+    channelVideosGrid.querySelectorAll('.short-card').forEach(card => {
+        card.addEventListener('click', (event) => {
+            event.stopPropagation();
+            openChannelShortModal(card.dataset.videoId, card.dataset.channelId);
+        });
+    });
+
     channelVideosGrid.querySelectorAll('.video-card').forEach(card => {
         card.addEventListener('click', () => {
             playThenNavigate(card.dataset.videoId, 'api');
@@ -8345,6 +8522,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                                 title: item.snippet.title,
                                                 thumbnail: item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url || 'img/icon-192.png',
                                                 channelTitle: item.snippet.channelTitle,
+                                                channelId: item.snippet.channelId || '',
                                                 source: 'api'
                                             }));
 
