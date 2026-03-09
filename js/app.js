@@ -87,6 +87,7 @@ let playlistDragState = null;
 let playlistQueueDragState = null;
 let currentShortIndex = 0;
 let currentShortsQueue = [];
+let forcedShortsQueue = null;
 let isNavigatingShort = false;
 let shortModalScrollY = 0;
 let shortScrollHintTimer = null;
@@ -4171,7 +4172,12 @@ function openShortModal(videoId) {
 
     shortModalScrollY = window.scrollY || 0;
 
-    if (isPlaylistMode && activePlaylistQueue.length > 0) {
+    if (Array.isArray(forcedShortsQueue) && forcedShortsQueue.length > 0) {
+        currentShortsQueue = [...forcedShortsQueue];
+        const forcedIndex = currentShortsQueue.findIndex(v => String(v.id) === String(videoId));
+        currentShortIndex = forcedIndex >= 0 ? forcedIndex : 0;
+        forcedShortsQueue = null;
+    } else if (isPlaylistMode && activePlaylistQueue.length > 0) {
         currentShortsQueue = activePlaylistQueue;
         currentShortIndex = currentPlaylistIndex;
     } else {
@@ -4238,6 +4244,33 @@ function openShortModal(videoId) {
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
     }
+}
+
+function openChannelShortModal(videoId, channelId) {
+    const normalizedChannelId = String(channelId || '');
+    if (!normalizedChannelId) {
+        openShortModal(videoId);
+        return;
+    }
+
+    const channelShorts = (Array.isArray(cachedAPIVideos) ? cachedAPIVideos : [])
+        .filter(video => String(video.channelId || video.snippet?.channelId || '') === normalizedChannelId && video.isShort);
+    const uniqueShortsMap = new Map();
+    channelShorts.forEach((video) => {
+        if (!video?.id) return;
+        uniqueShortsMap.set(String(video.id), video);
+    });
+
+    const clickedId = String(videoId || '');
+    if (clickedId && !uniqueShortsMap.has(clickedId)) {
+        const fallbackVideo = (Array.isArray(cachedAPIVideos) ? cachedAPIVideos : []).find(v => String(v.id) === clickedId)
+            || { id: videoId, isShort: true, channelId: normalizedChannelId, title: '', channelTitle: '' };
+        uniqueShortsMap.set(clickedId, fallbackVideo);
+    }
+
+    forcedShortsQueue = Array.from(uniqueShortsMap.values())
+        .sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
+    openShortModal(videoId);
 }
 
 function getLikedShorts() {
@@ -7919,7 +7952,50 @@ async function openChannelProfile(channelId) {
         return;
     }
 
-    channelVideosGrid.innerHTML = channelVideos.map(video => createVideoCardAPI(video)).join('');
+    channelVideos.forEach(video => {
+        if (!cachedAPIVideos.find(v => String(v.id) === String(video.id))) {
+            cachedAPIVideos.push(video);
+        }
+    });
+
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+    const channelShorts = channelVideos.filter(video => video.isShort);
+    const channelLongVideos = channelVideos.filter(video => !video.isShort);
+
+    if (!isMobile && channelLongVideos.length === 0) {
+        channelVideosGrid.innerHTML = '<div class="empty-state">Aquest canal només té shorts disponibles ara mateix.</div>';
+        return;
+    }
+
+    const shortsSection = isMobile && channelShorts.length > 0 ? `
+        <div class="shorts-section">
+            <h2 class="shorts-title">Shorts</h2>
+            <div class="shorts-row">
+                ${channelShorts.map(video => `
+                    <button class="short-card" type="button" data-video-id="${video.id}" data-channel-id="${normalizedId}">
+                        <img class="short-thumb" src="${video.thumbnail}" alt="${escapeHtml(video.title)}" loading="lazy">
+                        <div class="short-meta">
+                            <div class="short-title">${escapeHtml(video.title)}</div>
+                            <div class="short-channel">${escapeHtml(video.channelTitle || channelName)}</div>
+                        </div>
+                    </button>
+                `).join('')}
+            </div>
+        </div>
+    ` : '';
+
+    channelVideosGrid.innerHTML = `
+        ${shortsSection}
+        ${channelLongVideos.map(video => createVideoCardAPI(video)).join('')}
+    `;
+
+    channelVideosGrid.querySelectorAll('.short-card').forEach(card => {
+        card.addEventListener('click', (event) => {
+            event.stopPropagation();
+            openChannelShortModal(card.dataset.videoId, card.dataset.channelId);
+        });
+    });
+
     channelVideosGrid.querySelectorAll('.video-card').forEach(card => {
         card.addEventListener('click', () => {
             playThenNavigate(card.dataset.videoId, 'api');
