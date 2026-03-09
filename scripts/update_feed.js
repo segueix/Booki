@@ -230,10 +230,12 @@ async function main() {
         console.log("--- Iniciant actualització des de Google Sheets ---");
 
         const masterVideosById = new Map();
+        let existingFeedVideosForArchive = [];
         if (fs.existsSync(OUTPUT_FEED_JSON)) {
             const existingFeedRaw = fs.readFileSync(OUTPUT_FEED_JSON, 'utf8');
             const existingFeed = JSON.parse(existingFeedRaw);
             if (Array.isArray(existingFeed.videos)) {
+                existingFeedVideosForArchive = existingFeed.videos;
                 existingFeed.videos.forEach(video => {
                     if (video?.id) {
                         masterVideosById.set(video.id, video);
@@ -644,7 +646,8 @@ async function main() {
         );
 
         const monthlyVideos = new Map();
-        feedPayload.forEach((video) => {
+        const archiveSeedVideos = mergeVideosById(existingFeedVideosForArchive, feedPayload);
+        archiveSeedVideos.forEach((video) => {
             const monthKey = monthKeyFromDate(video.publishedAt);
             if (!monthKey) return;
             if (!monthlyVideos.has(monthKey)) {
@@ -686,7 +689,7 @@ async function main() {
         console.log("Existeix:", fs.existsSync(OUTPUT_FEED_JSON));
         console.log("Mida:", fs.statSync(OUTPUT_FEED_JSON).size);
         console.log(`📦 Recent feed limitat a ${recentFeedPayload.length}/${feedPayload.length} vídeos.`);
-        console.log(`🗂️ Arxius mensuals actualitzats a ${OUTPUT_ARCHIVE_DIR}`);
+        console.log(`🗂️ Arxius mensuals actualitzats a ${OUTPUT_ARCHIVE_DIR} (conserven històric per mes).`);
         console.log(`🚀 Feed actualitzat correctament amb ${feedPayload.length} vídeos.`);
 
     } catch (error) {
