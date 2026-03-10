@@ -3953,11 +3953,14 @@ function renderSearchCategoryActions(query) {
     const manageYoutubersButton = pageTitle.querySelector('[data-action="manage-category-youtubers"]');
     const shareButton = pageTitle.querySelector('[data-action="share-search"]');
 
-    toggleButton?.addEventListener('click', () => {
+    toggleButton?.addEventListener('click', async () => {
         const savedTag = addCustomTag(normalizedQuery);
         if (!savedTag) {
             return;
         }
+        const dualResults = await performDualSearch(normalizedQuery);
+        const seedVideos = mergeUniqueVideos(dualResults?.videos || [], dualResults?.archiveVideos || []);
+        setCustomCategorySearchResults(normalizedQuery, seedVideos);
         setupChipsBarOrdering();
         renderSearchCategoryActions(normalizedQuery);
     });
@@ -6619,10 +6622,12 @@ function createVideoCardAPI(video) {
                     <div class="video-metadata">
                         <div class="channel-name channel-link" data-channel-id="${video.channelId}">${escapeHtml(video.channelTitle)}</div>
                         <div class="video-stats">
-                            <i data-lucide="eye" style="width: 12px; height: 12px;"></i>
+                            ${video.source === 'archive'
+                                ? `<span>${formatDate(video.publishedAt)}</span>`
+                                : `<i data-lucide="eye" style="width: 12px; height: 12px;"></i>
                             <span>${formatViews(video.viewCount || 0)} vis.</span>
                             <span>•</span>
-                            <span>${formatDate(video.publishedAt)}</span>
+                            <span>${formatDate(video.publishedAt)}</span>`}
                         </div>
                     </div>
                 </div>
