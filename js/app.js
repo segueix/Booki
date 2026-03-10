@@ -104,7 +104,6 @@ let searchDebounceTimeout = null;
 let searchArchiveIndexCache = null;
 let searchArchiveIndexPromise = null;
 let activeSearchRequestId = 0;
-const archiveSearchVideoMap = new Map();
 let installPromptEvent = null;
 let currentFontSize = null;
 let userGridPreference = '4';
@@ -3498,50 +3497,6 @@ function getChannelNameById(channelId) {
     return normalizedId;
 }
 
-
-function buildArchiveThumbnail(videoId) {
-    if (!videoId) {
-        return 'img/icon-192.png';
-    }
-    return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
-}
-
-function rememberArchiveSearchVideos(videos) {
-    if (!Array.isArray(videos)) {
-        return;
-    }
-    videos.forEach(video => {
-        if (!video?.id) {
-            return;
-        }
-        archiveSearchVideoMap.set(String(video.id), {
-            ...video,
-            source: 'archive'
-        });
-    });
-}
-
-function getArchiveVideosForChannel(channelId) {
-    const normalizedId = String(channelId || '');
-    if (!normalizedId || !Array.isArray(searchArchiveIndexCache)) {
-        return [];
-    }
-
-    return searchArchiveIndexCache
-        .filter(item => String(item?.c || '') === normalizedId)
-        .map(item => ({
-            id: item?.i,
-            title: item?.t || '',
-            channelId: normalizedId,
-            channelTitle: getChannelNameById(normalizedId),
-            thumbnail: buildArchiveThumbnail(item?.i),
-            publishedAt: item?.d || '',
-            viewCount: 0,
-            source: 'archive'
-        }))
-        .filter(video => video.id);
-}
-
 function searchArchiveVideos(query) {
     const normalizedQuery = String(query || '').trim().toLowerCase();
     if (!normalizedQuery || !Array.isArray(searchArchiveIndexCache)) {
@@ -3558,8 +3513,6 @@ function searchArchiveVideos(query) {
                 channelId: item?.c || '',
                 channelTitle: getChannelNameById(item?.c),
                 publishedAt: item?.d || '',
-                thumbnail: buildArchiveThumbnail(item?.i),
-                viewCount: 0,
                 source: 'archive',
                 score
             };
@@ -3582,7 +3535,6 @@ async function performDualSearch(query) {
 
     await loadSearchArchiveIndex();
     const archiveVideos = searchArchiveVideos(trimmedQuery);
-    rememberArchiveSearchVideos(archiveVideos);
     return { ...localResults, archiveVideos };
 }
 
@@ -3679,7 +3631,11 @@ function showSearchDropdown(results) {
                 ${archiveVideos.map(video => `
                     <button type="button" class="search-result-item search-result-item--archive" data-result-type="video" data-video-id="${video.id}" data-video-source="archive">
                         <span class="search-result-archive-icon" aria-hidden="true">
-                            <i data-lucide="history"></i>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 3v5h5"></path>
+                                <path d="M3 8a9 9 0 1 0 3-6.7"></path>
+                                <path d="M12 7v5l3 2"></path>
+                            </svg>
                         </span>
                         <div class="search-result-info">
                             <span class="title">${escapeHtml(video.title)}</span>
@@ -6585,7 +6541,11 @@ function createArchiveVideoCard(video) {
     return `
         <article class="archive-video-card" data-video-id="${video.id}">
             <div class="archive-video-icon" aria-hidden="true">
-                <i data-lucide="history"></i>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 3v5h5"></path>
+                    <path d="M3 8a9 9 0 1 0 3-6.7"></path>
+                    <path d="M12 7v5l3 2"></path>
+                </svg>
             </div>
             <div class="archive-video-info">
                 <h3 class="archive-video-title">${escapeHtml(video.title)}</h3>
