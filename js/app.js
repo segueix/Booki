@@ -101,6 +101,10 @@ let youtubeMessageListenerInitialized = false;
 let searchDropdownItems = [];
 let searchDropdownActiveIndex = -1;
 let searchDebounceTimeout = null;
+let searchArchiveIndexCache = null;
+let searchArchiveIndexPromise = null;
+let activeSearchRequestId = 0;
+const archiveSearchVideoMap = new Map();
 let installPromptEvent = null;
 let currentFontSize = null;
 let userGridPreference = '4';
@@ -1590,14 +1594,14 @@ function initEventListeners() {
     if (searchForm && searchInput) {
         ensureSearchDropdown();
 
-        searchForm.addEventListener('submit', (e) => {
+        searchForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const query = searchInput.value.trim();
             if (!query) {
                 hideSearchDropdown();
                 return;
             }
-            navigateToSearchResults(query);
+            await navigateToSearchResults(query);
         });
 
         searchInput.addEventListener('input', () => {
@@ -1609,8 +1613,12 @@ function initEventListeners() {
                 hideSearchDropdown();
                 return;
             }
-            searchDebounceTimeout = setTimeout(() => {
-                const results = performLocalSearch(query);
+            const requestId = ++activeSearchRequestId;
+            searchDebounceTimeout = setTimeout(async () => {
+                const results = await performDualSearch(query);
+                if (requestId !== activeSearchRequestId || searchInput.value.trim() !== query) {
+                    return;
+                }
                 showSearchDropdown(results);
             }, 300);
         });
@@ -3420,6 +3428,148 @@ function performLocalSearch(query) {
     return { channels: channelResults, videos: videoResults };
 }
 
+
+async function loadSearchArchiveIndex() {
+    if (Array.isArray(searchArchiveIndexCache)) {
+        return searchArchiveIndexCache;
+    }
+    if (searchArchiveIndexPromise) {
+        return searchArchiveIndexPromise;
+    }
+
+    searchArchiveIndexPromise = fetch('data/search_index.json', { cache: 'force-cache' })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`No s'ha pogut carregar data/search_index.json (${response.status})`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            const list = Array.isArray(data) ? data : [];
+            searchArchiveIndexCache = list;
+            return list;
+        })
+        .catch(error => {
+            console.warn("No s'ha pogut carregar l'índex de cerca de l'historial", error);
+            return [];
+        })
+        .finally(() => {
+            searchArchiveIndexPromise = null;
+        });
+
+    return searchArchiveIndexPromise;
+}
+
+function getChannelNameById(channelId) {
+    const normalizedId = String(channelId || '');
+    if (!normalizedId) {
+        return 'Canal';
+    }
+    const feedChannel = Array.isArray(YouTubeAPI?.feedChannels)
+        ? YouTubeAPI.feedChannels.find(channel => String(channel?.id) === normalizedId)
+        : null;
+    if (feedChannel?.name || feedChannel?.title) {
+        return feedChannel.name || feedChannel.title;
+    }
+    const cached = cachedChannels?.[normalizedId];
+    if (cached?.name || cached?.title) {
+        return cached.name || cached.title;
+    }
+    const staticChannel = typeof getChannelById === 'function' ? getChannelById(normalizedId) : null;
+    if (staticChannel?.name || staticChannel?.title) {
+        return staticChannel.name || staticChannel.title;
+    }
+    return normalizedId;
+}
+
+
+function buildArchiveThumbnail(videoId) {
+    if (!videoId) {
+        return 'img/icon-192.png';
+    }
+    return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+}
+
+function rememberArchiveSearchVideos(videos) {
+    if (!Array.isArray(videos)) {
+        return;
+    }
+    videos.forEach(video => {
+        if (!video?.id) {
+            return;
+        }
+        archiveSearchVideoMap.set(String(video.id), {
+            ...video,
+            source: 'archive'
+        });
+    });
+}
+
+function getArchiveVideosForChannel(channelId) {
+    const normalizedId = String(channelId || '');
+    if (!normalizedId || !Array.isArray(searchArchiveIndexCache)) {
+        return [];
+    }
+
+    return searchArchiveIndexCache
+        .filter(item => String(item?.c || '') === normalizedId)
+        .map(item => ({
+            id: item?.i,
+            title: item?.t || '',
+            channelId: normalizedId,
+            channelTitle: getChannelNameById(normalizedId),
+            thumbnail: buildArchiveThumbnail(item?.i),
+            publishedAt: item?.d || '',
+            viewCount: 0,
+            source: 'archive'
+        }))
+        .filter(video => video.id);
+}
+
+function searchArchiveVideos(query) {
+    const normalizedQuery = String(query || '').trim().toLowerCase();
+    if (!normalizedQuery || !Array.isArray(searchArchiveIndexCache)) {
+        return [];
+    }
+
+    return searchArchiveIndexCache
+        .map(item => {
+            const title = item?.t || '';
+            const score = getMatchScore(title, normalizedQuery);
+            return {
+                id: item?.i,
+                title,
+                channelId: item?.c || '',
+                channelTitle: getChannelNameById(item?.c),
+                publishedAt: item?.d || '',
+                thumbnail: buildArchiveThumbnail(item?.i),
+                viewCount: 0,
+                source: 'archive',
+                score
+            };
+        })
+        .filter(video => video.id && video.score > 0)
+        .sort((a, b) => {
+            if (b.score !== a.score) {
+                return b.score - a.score;
+            }
+            return new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime();
+        });
+}
+
+async function performDualSearch(query) {
+    const localResults = performLocalSearch(query);
+    const trimmedQuery = String(query || '').trim();
+    if (!trimmedQuery) {
+        return { ...localResults, archiveVideos: [] };
+    }
+
+    await loadSearchArchiveIndex();
+    const archiveVideos = searchArchiveVideos(trimmedQuery);
+    rememberArchiveSearchVideos(archiveVideos);
+    return { ...localResults, archiveVideos };
+}
+
 function resetSearchDropdownNavigation() {
     searchDropdownItems.forEach(item => {
         item.classList.remove('is-active');
@@ -3457,8 +3607,9 @@ function showSearchDropdown(results) {
     }
     const channels = Array.isArray(results?.channels) ? results.channels.slice(0, 5) : [];
     const videos = Array.isArray(results?.videos) ? results.videos.slice(0, 8) : [];
+    const archiveVideos = Array.isArray(results?.archiveVideos) ? results.archiveVideos.slice(0, 8) : [];
 
-    if (channels.length === 0 && videos.length === 0) {
+    if (channels.length === 0 && videos.length === 0 && archiveVideos.length === 0) {
         searchDropdown.innerHTML = `
             <div class="search-no-results" role="status">No s'han trobat resultats.</div>
         `;
@@ -3506,9 +3657,31 @@ function showSearchDropdown(results) {
             </div>
         ` : '';
 
+        const archiveMarkup = archiveVideos.length ? `
+            <div class="search-section" role="group" aria-label="Historial">
+                <h4>Historial</h4>
+                ${archiveVideos.map(video => `
+                    <button type="button" class="search-result-item search-result-item--archive" data-result-type="video" data-video-id="${video.id}" data-video-source="archive">
+                        <span class="search-result-archive-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 3v5h5"></path>
+                                <path d="M3 8a9 9 0 1 0 3-6.7"></path>
+                                <path d="M12 7v5l3 2"></path>
+                            </svg>
+                        </span>
+                        <div class="search-result-info">
+                            <span class="title">${escapeHtml(video.title)}</span>
+                            <span class="meta">${escapeHtml(video.channelTitle || 'Canal')} • ${formatDate(video.publishedAt)}</span>
+                        </div>
+                    </button>
+                `).join('')}
+            </div>
+        ` : '';
+
         searchDropdown.innerHTML = `
             ${channelMarkup}
             ${videoMarkup}
+            ${archiveMarkup}
         `;
     }
 
@@ -3856,7 +4029,7 @@ function renderCategoryActions(category) {
     }
 }
 
-function navigateToSearchResults(query) {
+async function navigateToSearchResults(query) {
     const trimmedQuery = query.trim();
     if (!trimmedQuery) {
         return;
@@ -3871,7 +4044,7 @@ function navigateToSearchResults(query) {
         return;
     }
 
-    const results = performLocalSearch(trimmedQuery);
+    const results = await performDualSearch(trimmedQuery);
     showHome();
     renderSearchCategoryActions(trimmedQuery);
     featuredVideoBySection.delete(getHeroSectionKey());
@@ -3881,7 +4054,7 @@ function navigateToSearchResults(query) {
         return;
     }
 
-    if (results.channels.length === 0 && results.videos.length === 0) {
+    if (results.channels.length === 0 && results.videos.length === 0 && (!Array.isArray(results.archiveVideos) || results.archiveVideos.length === 0)) {
         videosGrid.innerHTML = `
             <div class="search-error">
                 <i data-lucide="search-x"></i>
@@ -3932,9 +4105,20 @@ function navigateToSearchResults(query) {
         </section>
     ` : '';
 
+    const archiveVideos = Array.isArray(results.archiveVideos) ? results.archiveVideos.slice(0, 40) : [];
+    const archiveSection = archiveVideos.length ? `
+        <section class="search-results-section">
+            <h2 class="search-results-title">Historial</h2>
+            <div class="videos-grid archive-videos-grid">
+                ${archiveVideos.map(video => createArchiveVideoCard(video)).join('')}
+            </div>
+        </section>
+    ` : '';
+
     videosGrid.innerHTML = `
         ${channelSection}
         ${videoSection}
+        ${archiveSection}
     `;
     videosGrid.querySelectorAll('.search-channel-card').forEach(card => {
         card.addEventListener('click', (event) => {
@@ -3952,6 +4136,15 @@ function navigateToSearchResults(query) {
             if (video?.source === 'static') {
                 showVideo(videoId);
             } else {
+                showVideoFromAPI(videoId);
+            }
+        });
+    });
+
+    videosGrid.querySelectorAll('.archive-video-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const videoId = card.dataset.videoId;
+            if (videoId) {
                 showVideoFromAPI(videoId);
             }
         });
@@ -6370,6 +6563,24 @@ function renderSearchResults(videos) {
     setupVideoCardActionButtons();
 }
 
+function createArchiveVideoCard(video) {
+    return `
+        <article class="archive-video-card" data-video-id="${video.id}">
+            <div class="archive-video-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 3v5h5"></path>
+                    <path d="M3 8a9 9 0 1 0 3-6.7"></path>
+                    <path d="M12 7v5l3 2"></path>
+                </svg>
+            </div>
+            <div class="archive-video-info">
+                <h3 class="archive-video-title">${escapeHtml(video.title)}</h3>
+                <p class="archive-video-meta">${escapeHtml(video.channelTitle || 'Canal')} • ${formatDate(video.publishedAt)}</p>
+            </div>
+        </article>
+    `;
+}
+
 // Crear targeta de vídeo (API)
 function createVideoCardAPI(video) {
     const payload = encodeURIComponent(JSON.stringify(getPlaylistVideoData(video)));
@@ -6507,8 +6718,23 @@ function renderChannelSidebarFromApi(channelId, currentVideoId, channelResult, f
         || { id: channelId, title: fallbackTitle };
 
     const feedVideos = Array.isArray(YouTubeAPI?.feedVideos) ? YouTubeAPI.feedVideos : [];
-    const channelVideos = [...feedVideos, ...cachedAPIVideos]
+    const feedAndApiVideos = [...feedVideos, ...cachedAPIVideos]
         .filter(v => String(v.channelId) === String(channelId) && !v.isShort);
+
+    const archiveVideos = getArchiveVideosForChannel(channelId);
+    const mergedById = new Map();
+    [...feedAndApiVideos, ...archiveVideos].forEach(video => {
+        if (!video?.id) {
+            return;
+        }
+        const normalizedId = String(video.id);
+        if (!mergedById.has(normalizedId)) {
+            mergedById.set(normalizedId, video);
+        }
+    });
+
+    const channelVideos = Array.from(mergedById.values())
+        .sort((a, b) => new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime());
 
     renderDesktopSidebar(channelData, channelVideos, currentVideoId);
 }
@@ -6702,7 +6928,24 @@ async function showVideoFromAPI(videoId) {
     watchPage.classList.remove('hidden');
 
     // 1. Renderitzat immediat des del catxé si està disponible
-    const cachedVideo = cachedAPIVideos.find(video => video.id === videoId);
+    let cachedVideo = cachedAPIVideos.find(video => video.id === videoId);
+
+    if (!cachedVideo) {
+        const archiveVideo = archiveSearchVideoMap.get(String(videoId));
+        if (archiveVideo) {
+            cachedVideo = {
+                id: archiveVideo.id,
+                title: archiveVideo.title,
+                thumbnail: archiveVideo.thumbnail || buildArchiveThumbnail(archiveVideo.id),
+                channelId: archiveVideo.channelId || '',
+                channelTitle: archiveVideo.channelTitle || getChannelNameById(archiveVideo.channelId),
+                publishedAt: archiveVideo.publishedAt || '',
+                viewCount: 0,
+                source: 'archive'
+            };
+            cachedAPIVideos.push(cachedVideo);
+        }
+    }
     if (isAutoPlayNavigating) {
         // L'iframe ja s'està carregant, només posicionar el reproductor
         isAutoPlayNavigating = false;
