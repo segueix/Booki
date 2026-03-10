@@ -6590,11 +6590,7 @@ function createArchiveVideoCard(video) {
     return `
         <article class="archive-video-card" data-video-id="${video.id}">
             <div class="archive-video-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 3v5h5"></path>
-                    <path d="M3 8a9 9 0 1 0 3-6.7"></path>
-                    <path d="M12 7v5l3 2"></path>
-                </svg>
+                <i data-lucide="history" class="archive-video-icon-symbol"></i>
             </div>
             <div class="archive-video-info">
                 <h3 class="archive-video-title">${escapeHtml(video.title)}</h3>
