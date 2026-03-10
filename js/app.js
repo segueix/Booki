@@ -6997,7 +6997,7 @@ async function showVideoFromAPI(videoId) {
         document.getElementById('videoDate').textContent = cachedVideo.publishedAt
             ? formatDate(cachedVideo.publishedAt)
             : '';
-        setWatchVideoViewsText(`${formatViews(cachedVideo.viewCount || 0)} visualitzacions`, { hide: isArchivePlayback });
+        setWatchVideoViewsText(`${formatViews(cachedVideo.viewCount || 0)} visualitzacions`, { hide: isArchivePlayback && isDesktopView() });
 
         const channelInfo = document.getElementById('channelInfo');
         if (channelInfo) {
@@ -7113,7 +7113,7 @@ async function showVideoFromAPI(videoId) {
             // 1. Actualitzar estadístiques principals
             setVideoTitleText(video.title);
             document.getElementById('videoDate').textContent = formatDate(video.publishedAt);
-            setWatchVideoViewsText(`${formatViews(video.viewCount)} visualitzacions`, { hide: isArchivePlayback });
+            setWatchVideoViewsText(`${formatViews(video.viewCount)} visualitzacions`, { hide: isArchivePlayback && isDesktopView() });
 
             // Obtenir informació del canal
             channelResult = await YouTubeAPI.getChannelDetails(video.channelId);
