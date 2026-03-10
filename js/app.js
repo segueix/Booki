@@ -2333,6 +2333,16 @@ function setCustomCategorySearchResults(category, videos) {
     customCategorySearchCache.set(key, Array.isArray(videos) ? videos : []);
 }
 
+function setWatchVideoViewsText(viewsText = '', { hide = false } = {}) {
+    const viewsEl = document.getElementById('videoViews');
+    if (!viewsEl) {
+        return;
+    }
+    viewsEl.textContent = hide ? '' : (viewsText || '');
+    viewsEl.classList.toggle('hidden', hide);
+}
+
+
 function mergeUniqueVideos(primary, secondary) {
     const seen = new Set();
     const merged = [];
@@ -2406,15 +2416,19 @@ async function refreshCustomCategorySearch(category) {
         return customCategorySearchInFlight.get(key);
     }
     const task = (async () => {
-        let videos = [];
+        const dualResults = await performDualSearch(key);
+        const archiveVideos = Array.isArray(dualResults?.archiveVideos) ? dualResults.archiveVideos : [];
+
+        let videos = mergeUniqueVideos(dualResults?.videos || [], archiveVideos);
         if (useYouTubeAPI && typeof YouTubeAPI?.searchVideos === 'function') {
-            const result = await YouTubeAPI.searchVideos(key, CONFIG.layout.videosPerPage);
-            if (!result?.error && Array.isArray(result.items)) {
-                videos = result.items;
+            try {
+                const result = await YouTubeAPI.searchVideos(key, CONFIG.layout.videosPerPage);
+                if (!result?.error && Array.isArray(result.items)) {
+                    videos = mergeUniqueVideos(result.items, archiveVideos);
+                }
+            } catch (error) {
+                console.warn("No s'ha pogut refrescar la categoria amb API, es manté la cerca local/arxiu", error);
             }
-        } else {
-            const results = performLocalSearch(key);
-            videos = Array.isArray(results?.videos) ? results.videos : [];
         }
         setCustomCategorySearchResults(key, videos);
         return videos;
@@ -2443,7 +2457,9 @@ function filterVideosByCategory(videos, feed) {
 
         const matched = videos.filter(video => matchesCustomCategory(video, rawCategoryName));
         const searchResults = getCustomCategorySearchResults(categoryName);
-        return mergeUniqueVideos(searchResults, matched);
+        const archiveMatches = searchArchiveVideos(rawCategoryName);
+        rememberArchiveSearchVideos(archiveMatches);
+        return mergeUniqueVideos(searchResults, mergeUniqueVideos(archiveMatches, matched));
     }
     if (selectedCategory === 'Seguint') {
         const followedIds = new Set(getFollowedChannelIds().map(id => String(id)));
@@ -3641,6 +3657,9 @@ function showSearchDropdown(results) {
     searchDropdown.setAttribute('aria-hidden', 'false');
     searchDropdown.classList.add('is-visible');
     searchInput.setAttribute('aria-expanded', 'true');
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
     resetSearchDropdownNavigation();
 }
 
@@ -3891,11 +3910,14 @@ function renderSearchCategoryActions(query) {
     const manageYoutubersButton = pageTitle.querySelector('[data-action="manage-category-youtubers"]');
     const shareButton = pageTitle.querySelector('[data-action="share-search"]');
 
-    toggleButton?.addEventListener('click', () => {
+    toggleButton?.addEventListener('click', async () => {
         const savedTag = addCustomTag(normalizedQuery);
         if (!savedTag) {
             return;
         }
+        const dualResults = await performDualSearch(normalizedQuery);
+        const seedVideos = mergeUniqueVideos(dualResults?.videos || [], dualResults?.archiveVideos || []);
+        setCustomCategorySearchResults(normalizedQuery, seedVideos);
         setupChipsBarOrdering();
         renderSearchCategoryActions(normalizedQuery);
     });
@@ -6557,10 +6579,12 @@ function createVideoCardAPI(video) {
                     <div class="video-metadata">
                         <div class="channel-name channel-link" data-channel-id="${video.channelId}">${escapeHtml(video.channelTitle)}</div>
                         <div class="video-stats">
-                            <i data-lucide="eye" style="width: 12px; height: 12px;"></i>
+                            ${video.source === 'archive'
+                                ? `<span>${formatDate(video.publishedAt)}</span>`
+                                : `<i data-lucide="eye" style="width: 12px; height: 12px;"></i>
                             <span>${formatViews(video.viewCount || 0)} vis.</span>
                             <span>•</span>
-                            <span>${formatDate(video.publishedAt)}</span>
+                            <span>${formatDate(video.publishedAt)}</span>`}
                         </div>
                     </div>
                 </div>
@@ -6623,7 +6647,7 @@ function renderDesktopSidebar(channel, channelVideos, currentVideoId) {
                         <div class="sidebar-video-title">${escapeHtml(video.title)}</div>
                         <div class="sidebar-video-stats">
                             ${video.viewCount ? formatViews(video.viewCount) + ' vis.' : ''}
-                            ${video.publishedAt ? '• ' + formatDate(video.publishedAt) : ''}
+                            ${video.publishedAt ? (video.viewCount ? '• ' : '') + formatDate(video.publishedAt) : ''}
                         </div>
                     </div>
                 </div>
@@ -6670,8 +6694,24 @@ function renderChannelSidebarFromApi(channelId, currentVideoId, channelResult, f
         || { id: channelId, title: fallbackTitle };
 
     const feedVideos = Array.isArray(YouTubeAPI?.feedVideos) ? YouTubeAPI.feedVideos : [];
-    const channelVideos = [...feedVideos, ...cachedAPIVideos]
+    const feedAndApiVideos = [...feedVideos, ...cachedAPIVideos]
         .filter(v => String(v.channelId) === String(channelId) && !v.isShort);
+
+    const archiveVideos = getArchiveVideosForChannel(channelId);
+    rememberArchiveSearchVideos(archiveVideos);
+    const mergedById = new Map();
+    [...feedAndApiVideos, ...archiveVideos].forEach(video => {
+        if (!video?.id) {
+            return;
+        }
+        const normalizedId = String(video.id);
+        if (!mergedById.has(normalizedId)) {
+            mergedById.set(normalizedId, video);
+        }
+    });
+
+    const channelVideos = Array.from(mergedById.values())
+        .sort((a, b) => new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime());
 
     renderDesktopSidebar(channelData, channelVideos, currentVideoId);
 }
@@ -6865,7 +6905,26 @@ async function showVideoFromAPI(videoId) {
     watchPage.classList.remove('hidden');
 
     // 1. Renderitzat immediat des del catxé si està disponible
-    const cachedVideo = cachedAPIVideos.find(video => video.id === videoId);
+    let cachedVideo = cachedAPIVideos.find(video => video.id === videoId);
+    let isArchivePlayback = cachedVideo?.source === 'archive';
+
+    if (!cachedVideo) {
+        const archiveVideo = archiveSearchVideoMap.get(String(videoId));
+        if (archiveVideo) {
+            cachedVideo = {
+                id: archiveVideo.id,
+                title: archiveVideo.title,
+                thumbnail: archiveVideo.thumbnail || buildArchiveThumbnail(archiveVideo.id),
+                channelId: archiveVideo.channelId || '',
+                channelTitle: archiveVideo.channelTitle || getChannelNameById(archiveVideo.channelId),
+                publishedAt: archiveVideo.publishedAt || '',
+                viewCount: 0,
+                source: 'archive'
+            };
+            cachedAPIVideos.push(cachedVideo);
+            isArchivePlayback = true;
+        }
+    }
     if (isAutoPlayNavigating) {
         // L'iframe ja s'està carregant, només posicionar el reproductor
         isAutoPlayNavigating = false;
@@ -6898,7 +6957,7 @@ async function showVideoFromAPI(videoId) {
         document.getElementById('videoDate').textContent = cachedVideo.publishedAt
             ? formatDate(cachedVideo.publishedAt)
             : '';
-        document.getElementById('videoViews').textContent = `${formatViews(cachedVideo.viewCount || 0)} visualitzacions`;
+        setWatchVideoViewsText(`${formatViews(cachedVideo.viewCount || 0)} visualitzacions`, { hide: isArchivePlayback && isDesktopView() });
 
         const channelInfo = document.getElementById('channelInfo');
         if (channelInfo) {
@@ -7014,7 +7073,7 @@ async function showVideoFromAPI(videoId) {
             // 1. Actualitzar estadístiques principals
             setVideoTitleText(video.title);
             document.getElementById('videoDate').textContent = formatDate(video.publishedAt);
-            document.getElementById('videoViews').textContent = `${formatViews(video.viewCount)} visualitzacions`;
+            setWatchVideoViewsText(`${formatViews(video.viewCount)} visualitzacions`, { hide: isArchivePlayback && isDesktopView() });
 
             // Obtenir informació del canal
             channelResult = await YouTubeAPI.getChannelDetails(video.channelId);
@@ -7375,7 +7434,7 @@ function showVideo(videoId) {
     // 1. Actualitzar estadístiques principals
     setVideoTitleText(video.title);
     document.getElementById('videoDate').textContent = formatDate(video.uploadDate);
-    document.getElementById('videoViews').textContent = `${formatViews(video.views)} visualitzacions`;
+    setWatchVideoViewsText(`${formatViews(video.views)} visualitzacions`, { hide: false });
 
     // 2. Mostrar Likes
     const channelInfo = document.getElementById('channelInfo');
