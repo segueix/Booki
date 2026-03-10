@@ -3679,11 +3679,7 @@ function showSearchDropdown(results) {
                 ${archiveVideos.map(video => `
                     <button type="button" class="search-result-item search-result-item--archive" data-result-type="video" data-video-id="${video.id}" data-video-source="archive">
                         <span class="search-result-archive-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M3 3v5h5"></path>
-                                <path d="M3 8a9 9 0 1 0 3-6.7"></path>
-                                <path d="M12 7v5l3 2"></path>
-                            </svg>
+                            <i data-lucide="history"></i>
                         </span>
                         <div class="search-result-info">
                             <span class="title">${escapeHtml(video.title)}</span>
@@ -3705,6 +3701,9 @@ function showSearchDropdown(results) {
     searchDropdown.setAttribute('aria-hidden', 'false');
     searchDropdown.classList.add('is-visible');
     searchInput.setAttribute('aria-expanded', 'true');
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
     resetSearchDropdownNavigation();
 }
 
@@ -6586,11 +6585,7 @@ function createArchiveVideoCard(video) {
     return `
         <article class="archive-video-card" data-video-id="${video.id}">
             <div class="archive-video-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 3v5h5"></path>
-                    <path d="M3 8a9 9 0 1 0 3-6.7"></path>
-                    <path d="M12 7v5l3 2"></path>
-                </svg>
+                <i data-lucide="history"></i>
             </div>
             <div class="archive-video-info">
                 <h3 class="archive-video-title">${escapeHtml(video.title)}</h3>
