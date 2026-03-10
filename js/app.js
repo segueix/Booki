@@ -1396,6 +1396,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Carregar vídeo des de URL si hi ha paràmetre ?v=
     const videoParam = urlParams.get('v');
     if (videoParam) {
+        await loadSearchArchiveIndex();
         setTimeout(() => {
             if (useYouTubeAPI) {
                 showVideoFromAPI(videoParam);
@@ -6824,7 +6825,19 @@ function renderCategoryVideosBelow(currentChannelId, currentVideoId) {
         videos = listVideos;
     } else {
         // Comportament actual per categories estàndard
-        let allVideos = currentFeedVideos || [];
+        const feedVideos = Array.isArray(currentFeedVideos) ? currentFeedVideos : [];
+        const archiveChannelVideos = currentChannelId ? getArchiveVideosForChannel(currentChannelId) : [];
+        const mergedVideos = new Map();
+        [...feedVideos, ...cachedAPIVideos, ...archiveChannelVideos].forEach(video => {
+            if (!video?.id || video.isShort) {
+                return;
+            }
+            const normalizedId = String(video.id);
+            if (!mergedVideos.has(normalizedId)) {
+                mergedVideos.set(normalizedId, video);
+            }
+        });
+        let allVideos = Array.from(mergedVideos.values());
 
         let effectiveCategory = null;
         if (selectedCategory && selectedCategory !== 'Novetats' && selectedCategory !== 'Tot') {
@@ -6950,14 +6963,21 @@ async function showVideoFromAPI(videoId) {
     watchPage.classList.remove('hidden');
 
     // 1. Renderitzat immediat des del catxé si està disponible
-    let cachedVideo = cachedAPIVideos.find(video => video.id === videoId);
+    const normalizedVideoId = String(videoId || '');
+    let cachedVideo = cachedAPIVideos.find(video => String(video?.id) === normalizedVideoId);
     let isArchivePlayback = cachedVideo?.source === 'archive';
 
+    if (!cachedVideo && !Array.isArray(searchArchiveIndexCache)) {
+        await loadSearchArchiveIndex();
+    }
+
     if (!cachedVideo) {
-        const archiveVideo = archiveSearchVideoMap.get(String(videoId));
+        const archiveVideoFromMap = archiveSearchVideoMap.get(normalizedVideoId);
+        const archiveVideo = archiveVideoFromMap || getArchiveIndexVideoById(normalizedVideoId);
         if (archiveVideo) {
+            rememberArchiveSearchVideos([archiveVideo]);
             cachedVideo = {
-                id: archiveVideo.id,
+                id: String(archiveVideo.id),
                 title: archiveVideo.title,
                 thumbnail: archiveVideo.thumbnail || buildArchiveThumbnail(archiveVideo.id),
                 channelId: archiveVideo.channelId || '',
@@ -6968,6 +6988,21 @@ async function showVideoFromAPI(videoId) {
             };
             cachedAPIVideos.push(cachedVideo);
             isArchivePlayback = true;
+        }
+    }
+
+    if (!cachedVideo) {
+        const historyVideo = getHistoryVideoById(normalizedVideoId);
+        if (historyVideo) {
+            cachedVideo = {
+                ...historyVideo,
+                id: String(historyVideo.id),
+                thumbnail: historyVideo.thumbnail || buildArchiveThumbnail(historyVideo.id)
+            };
+            if (!cachedAPIVideos.find(video => String(video?.id) === normalizedVideoId)) {
+                cachedAPIVideos.push(cachedVideo);
+            }
+            isArchivePlayback = cachedVideo?.source === 'archive' || cachedVideo?.historySource === 'archive';
         }
     }
     if (isAutoPlayNavigating) {
@@ -7597,6 +7632,36 @@ function saveHistoryItems(items) {
 
 function getHistoryVideoIdSet() {
     return new Set(getHistoryItems().map(item => String(item.id)));
+}
+
+function getHistoryVideoById(videoId) {
+    const normalizedId = String(videoId || '');
+    if (!normalizedId) {
+        return null;
+    }
+    return getHistoryItems().find(item => String(item?.id) === normalizedId) || null;
+}
+
+function getArchiveIndexVideoById(videoId) {
+    const normalizedId = String(videoId || '');
+    if (!normalizedId || !Array.isArray(searchArchiveIndexCache)) {
+        return null;
+    }
+
+    const indexItem = searchArchiveIndexCache.find(item => String(item?.i || '') === normalizedId);
+    if (!indexItem) {
+        return null;
+    }
+
+    return {
+        id: normalizedId,
+        title: indexItem?.t || '',
+        channelId: indexItem?.c || '',
+        channelTitle: getChannelNameById(indexItem?.c),
+        publishedAt: indexItem?.d || '',
+        thumbnail: buildArchiveThumbnail(normalizedId),
+        source: 'archive'
+    };
 }
 
 function filterOutWatchedVideos(videos) {
