@@ -278,6 +278,16 @@ function deleteCustomCategoryGlobal(categoryName) {
         return;
     }
 
+    // Neteja resultats de cerca persistits per aquesta categoria
+    try {
+        const searchResults = JSON.parse(localStorage.getItem('catube_custom_category_search_results') || '{}');
+        const searchKey = normalized.toLowerCase();
+        if (searchResults[searchKey]) {
+            delete searchResults[searchKey];
+            localStorage.setItem('catube_custom_category_search_results', JSON.stringify(searchResults));
+        }
+    } catch (_) {}
+
     const storedChannels = localStorage.getItem('catube_channel_custom_categories');
     if (!storedChannels) {
         return;

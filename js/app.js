@@ -161,6 +161,7 @@ let miniPlayerTimer = null;
 const featuredVideoBySection = new Map();
 const customCategorySearchCache = new Map();
 const customCategorySearchInFlight = new Map();
+const CUSTOM_CATEGORY_SEARCH_RESULTS_KEY = 'catube_custom_category_search_results';
 const HYBRID_CATEGORY_SORT = new Set(['Cultura', 'Diversió', 'Actualitat', 'Vida', 'El Món', 'Gaming', 'Mitjans', 'Entitats', 'Digitals']);
 
 const BACKGROUND_STORAGE_KEY = 'catube_background_color';
@@ -2371,7 +2372,18 @@ function getCustomCategorySearchResults(category) {
         return [];
     }
     const cached = customCategorySearchCache.get(key);
-    return Array.isArray(cached) ? cached : [];
+    if (Array.isArray(cached) && cached.length > 0) {
+        return cached;
+    }
+    try {
+        const stored = JSON.parse(localStorage.getItem(CUSTOM_CATEGORY_SEARCH_RESULTS_KEY) || '{}');
+        const persisted = stored[key];
+        if (Array.isArray(persisted) && persisted.length > 0) {
+            customCategorySearchCache.set(key, persisted);
+            return persisted;
+        }
+    } catch (_) {}
+    return [];
 }
 
 function setCustomCategorySearchResults(category, videos) {
@@ -2379,7 +2391,13 @@ function setCustomCategorySearchResults(category, videos) {
     if (!key) {
         return;
     }
-    customCategorySearchCache.set(key, Array.isArray(videos) ? videos : []);
+    const list = Array.isArray(videos) ? videos : [];
+    customCategorySearchCache.set(key, list);
+    try {
+        const stored = JSON.parse(localStorage.getItem(CUSTOM_CATEGORY_SEARCH_RESULTS_KEY) || '{}');
+        stored[key] = list;
+        localStorage.setItem(CUSTOM_CATEGORY_SEARCH_RESULTS_KEY, JSON.stringify(stored));
+    } catch (_) {}
 }
 
 function setWatchVideoViewsText(viewsText = '', { hide = false } = {}) {
