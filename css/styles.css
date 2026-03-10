@@ -499,9 +499,9 @@ main,
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: color-mix(in srgb, var(--color-button-accent) 25%, transparent);
-    color: var(--color-button-accent);
-    border: 1px solid color-mix(in srgb, var(--color-button-accent) 55%, transparent);
+    background: var(--color-button-accent);
+    color: #ffffff;
+    border: 1px solid var(--color-button-accent);
     flex-shrink: 0;
 }
 
@@ -1516,9 +1516,9 @@ body.sidebar-collapsed .main-content {
     width: 44px;
     height: 44px;
     border-radius: 12px;
-    background: color-mix(in srgb, var(--color-button-accent) 24%, transparent);
-    color: var(--color-button-accent);
-    border: 1px solid color-mix(in srgb, var(--color-button-accent) 55%, transparent);
+    background: var(--color-button-accent);
+    color: #ffffff;
+    border: 1px solid var(--color-button-accent);
     display: flex;
     align-items: center;
     justify-content: center;
