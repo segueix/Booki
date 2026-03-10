@@ -1394,6 +1394,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadVideos();
     }
 
+    // Carregar índex d'arxiu per cerques i categories personalitzades
+    loadSearchArchiveIndex();
+
     // Carregar vídeo des de URL si hi ha paràmetre ?v=
     const videoParam = urlParams.get('v');
     if (videoParam) {
