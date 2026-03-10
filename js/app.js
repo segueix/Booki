@@ -2334,6 +2334,16 @@ function setCustomCategorySearchResults(category, videos) {
     customCategorySearchCache.set(key, Array.isArray(videos) ? videos : []);
 }
 
+function setWatchVideoViewsText(viewsText = '', { hide = false } = {}) {
+    const viewsEl = document.getElementById('videoViews');
+    if (!viewsEl) {
+        return;
+    }
+    viewsEl.textContent = hide ? '' : (viewsText || '');
+    viewsEl.classList.toggle('hidden', hide);
+}
+
+
 function mergeUniqueVideos(primary, secondary) {
     const seen = new Set();
     const merged = [];
@@ -2407,15 +2417,19 @@ async function refreshCustomCategorySearch(category) {
         return customCategorySearchInFlight.get(key);
     }
     const task = (async () => {
+        const dualResults = await performDualSearch(key);
+        const archiveVideos = Array.isArray(dualResults?.archiveVideos) ? dualResults.archiveVideos : [];
+
         let videos = [];
         if (useYouTubeAPI && typeof YouTubeAPI?.searchVideos === 'function') {
             const result = await YouTubeAPI.searchVideos(key, CONFIG.layout.videosPerPage);
             if (!result?.error && Array.isArray(result.items)) {
-                videos = result.items;
+                videos = mergeUniqueVideos(result.items, archiveVideos);
+            } else {
+                videos = mergeUniqueVideos(dualResults?.videos || [], archiveVideos);
             }
         } else {
-            const results = performLocalSearch(key);
-            videos = Array.isArray(results?.videos) ? results.videos : [];
+            videos = mergeUniqueVideos(dualResults?.videos || [], archiveVideos);
         }
         setCustomCategorySearchResults(key, videos);
         return videos;
@@ -6722,6 +6736,7 @@ function renderChannelSidebarFromApi(channelId, currentVideoId, channelResult, f
         .filter(v => String(v.channelId) === String(channelId) && !v.isShort);
 
     const archiveVideos = getArchiveVideosForChannel(channelId);
+    rememberArchiveSearchVideos(archiveVideos);
     const mergedById = new Map();
     [...feedAndApiVideos, ...archiveVideos].forEach(video => {
         if (!video?.id) {
@@ -6929,6 +6944,7 @@ async function showVideoFromAPI(videoId) {
 
     // 1. Renderitzat immediat des del catxé si està disponible
     let cachedVideo = cachedAPIVideos.find(video => video.id === videoId);
+    let isArchivePlayback = cachedVideo?.source === 'archive';
 
     if (!cachedVideo) {
         const archiveVideo = archiveSearchVideoMap.get(String(videoId));
@@ -6944,6 +6960,7 @@ async function showVideoFromAPI(videoId) {
                 source: 'archive'
             };
             cachedAPIVideos.push(cachedVideo);
+            isArchivePlayback = true;
         }
     }
     if (isAutoPlayNavigating) {
@@ -6978,7 +6995,7 @@ async function showVideoFromAPI(videoId) {
         document.getElementById('videoDate').textContent = cachedVideo.publishedAt
             ? formatDate(cachedVideo.publishedAt)
             : '';
-        document.getElementById('videoViews').textContent = `${formatViews(cachedVideo.viewCount || 0)} visualitzacions`;
+        setWatchVideoViewsText(`${formatViews(cachedVideo.viewCount || 0)} visualitzacions`, { hide: isArchivePlayback });
 
         const channelInfo = document.getElementById('channelInfo');
         if (channelInfo) {
@@ -7094,7 +7111,7 @@ async function showVideoFromAPI(videoId) {
             // 1. Actualitzar estadístiques principals
             setVideoTitleText(video.title);
             document.getElementById('videoDate').textContent = formatDate(video.publishedAt);
-            document.getElementById('videoViews').textContent = `${formatViews(video.viewCount)} visualitzacions`;
+            setWatchVideoViewsText(`${formatViews(video.viewCount)} visualitzacions`, { hide: isArchivePlayback });
 
             // Obtenir informació del canal
             channelResult = await YouTubeAPI.getChannelDetails(video.channelId);
@@ -7455,7 +7472,7 @@ function showVideo(videoId) {
     // 1. Actualitzar estadístiques principals
     setVideoTitleText(video.title);
     document.getElementById('videoDate').textContent = formatDate(video.uploadDate);
-    document.getElementById('videoViews').textContent = `${formatViews(video.views)} visualitzacions`;
+    setWatchVideoViewsText(`${formatViews(video.views)} visualitzacions`, { hide: false });
 
     // 2. Mostrar Likes
     const channelInfo = document.getElementById('channelInfo');
