@@ -42,6 +42,9 @@ self.addEventListener('activate', (event) => {
 // Fetch
 self.addEventListener('fetch', (event) => {
     const { request } = event;
+    if (!request?.url || !request.url.startsWith('http')) {
+        return;
+    }
     const url = new URL(request.url);
     const isHome = request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html';
     const isStaticAsset = url.pathname.endsWith('.js') || url.pathname.endsWith('.css');
@@ -58,7 +61,12 @@ self.addEventListener('fetch', (event) => {
 async function networkFirst(request) {
     try {
         const response = await fetch(request);
-        if (response && response.status === 200 && response.type === 'basic') {
+        if (
+            response
+            && response.status === 200
+            && response.type === 'basic'
+            && request.url.startsWith('http')
+        ) {
             const cache = await caches.open(CACHE_NAME);
             cache.put(request, response.clone());
         }
@@ -75,7 +83,12 @@ async function cacheFirst(request) {
         return cached;
     }
     const response = await fetch(request);
-    if (response && response.status === 200 && response.type === 'basic') {
+    if (
+        response
+        && response.status === 200
+        && response.type === 'basic'
+        && request.url.startsWith('http')
+    ) {
         const cache = await caches.open(CACHE_NAME);
         cache.put(request, response.clone());
     }

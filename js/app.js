@@ -103,6 +103,54 @@ let searchDropdownActiveIndex = -1;
 let searchDebounceTimeout = null;
 let searchArchiveIndexCache = null;
 let searchArchiveIndexPromise = null;
+const archiveSearchVideoMap = new Map();
+
+function buildArchiveThumbnail(videoId) {
+    const normalizedId = String(videoId || '').trim();
+    if (!normalizedId) {
+        return 'img/icon-192.png';
+    }
+    return `https://i.ytimg.com/vi/${encodeURIComponent(normalizedId)}/hqdefault.jpg`;
+}
+
+function rememberArchiveSearchVideos(videos) {
+    if (!Array.isArray(videos)) {
+        return;
+    }
+    videos.forEach(video => {
+        if (!video?.id) {
+            return;
+        }
+        const normalizedId = String(video.id);
+        const existing = archiveSearchVideoMap.get(normalizedId) || {};
+        archiveSearchVideoMap.set(normalizedId, {
+            ...existing,
+            ...video,
+            id: normalizedId,
+            thumbnail: video.thumbnail || existing.thumbnail || buildArchiveThumbnail(video.id)
+        });
+    });
+}
+
+function getArchiveVideosForChannel(channelId) {
+    const normalizedChannelId = String(channelId || '').trim();
+    if (!normalizedChannelId || !Array.isArray(searchArchiveIndexCache)) {
+        return [];
+    }
+
+    return searchArchiveIndexCache
+        .filter(item => String(item?.c || '') === normalizedChannelId)
+        .map(item => ({
+            id: item?.i,
+            title: item?.t || '',
+            channelId: normalizedChannelId,
+            channelTitle: getChannelNameById(normalizedChannelId),
+            publishedAt: item?.d || '',
+            thumbnail: buildArchiveThumbnail(item?.i),
+            source: 'archive'
+        }))
+        .filter(video => video.id);
+}
 let activeSearchRequestId = 0;
 let installPromptEvent = null;
 let currentFontSize = null;
@@ -3535,6 +3583,7 @@ async function performDualSearch(query) {
 
     await loadSearchArchiveIndex();
     const archiveVideos = searchArchiveVideos(trimmedQuery);
+    rememberArchiveSearchVideos(archiveVideos);
     return { ...localResults, archiveVideos };
 }
 
