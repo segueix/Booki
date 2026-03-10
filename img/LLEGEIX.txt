@@ -1,0 +1,15 @@
+ICONES PWA
+==========
+
+Per una PWA completa, afegeix aquestes icones:
+
+icon-192.png - 192x192 pixels
+icon-512.png - 512x512 pixels
+
+Pots crear-les amb:
+- https://realfavicongenerator.net/
+- https://www.favicon-generator.org/
+- Qualsevol editor d'imatges
+
+Mentrestant, l'aplicació funciona perfectament sense icones.
+Les icones són opcionals i només milloren l'experiència PWA.

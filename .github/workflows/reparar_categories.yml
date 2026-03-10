@@ -1,0 +1,29 @@
+name: Reparar Categories Manualment
+
+on:
+  workflow_dispatch: # Això permet executar-ho amb un botó manual
+
+permissions:
+  contents: write
+
+jobs:
+  fix-categories:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar codi
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Executar script de reparació
+        run: node scripts/sincronitzar_tot.js
+
+      - name: Guardar canvis al repositori
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "🔧 Reparació automàtica de categories i cache"
+          branch: main
+          file_pattern: 'js/channels-ca.json data/feed.json sw.js'

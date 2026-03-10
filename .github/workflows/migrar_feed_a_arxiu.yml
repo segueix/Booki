@@ -1,0 +1,41 @@
+name: Migrar feed compacte a arxiu per canal (lazy)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validar script de migració
+        run: node --check scripts/migrate_feed_archive.js
+
+      - name: Migrar overflow cap a arxiu per canal
+        run: node scripts/migrate_feed_archive.js
+
+      - name: Commit i push si hi ha canvis
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -f data/feed.json
+          git add -f data/archive/channels/*.json 2>/dev/null || true
+
+          if git diff --cached --quiet; then
+            echo "No hi ha canvis per pujar"
+            exit 0
+          fi
+
+          git commit -m "chore: migrate feed overflow to channel archive"
+          git push

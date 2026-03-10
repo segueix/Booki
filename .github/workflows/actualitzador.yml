@@ -1,0 +1,65 @@
+name: Actualitzador feed
+
+on:
+  schedule:
+    - cron: "0 0,7 * * *"
+  workflow_dispatch:
+
+jobs:
+  actualitza:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Genera feed
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY_SERVER }}
+          GOOGLE_SHEET_CSV_URL: ${{ secrets.GOOGLE_SHEET_CSV_URL }}
+          VIDEOS_PER_CHANNEL: "50"
+        run: node scripts/update_feed.js
+
+      - name: Genera índex de cerca
+        run: node scripts/generar_index_cerca.js
+
+      - name: Commit i push si hi ha canvis
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          echo "=== Debug: ls data ==="
+          ls -la data || true
+
+          echo "=== Debug: git check-ignore data/feed.json ==="
+          git check-ignore -v data/feed.json || true
+
+          echo "=== Debug: git status abans ==="
+          git status --ignored --porcelain || true
+
+          echo "=== Forca add del feed ==="
+          git add -f data/feed.json
+          git add -f data/search_index.json
+          git add -f data/channel_map.json 2>/dev/null || true
+
+          # Si feed_updates.js forma part del flux, afegeix-lo
+          git add -f feed_updates.js 2>/dev/null || true
+
+          echo "=== Debug: git status despres ==="
+          git status --porcelain || true
+
+          if git diff --cached --quiet; then
+            echo "No hi ha canvis staged (feed igual o encara ignorat)"
+            exit 0
+          fi
+
+          git commit -m "chore: update feed and search index"
+          git push

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="102" fill="#FF0000"/>
+
+  <!-- Play button triangle -->
+  <path d="M196 144 L196 368 L372 256 Z" fill="#FFFFFF"/>
+
+  <!-- Subtle shadow on play button -->
+  <path d="M196 144 L196 368 L372 256 Z" fill="#000000" opacity="0.1" transform="translate(4, 4)"/>
+</svg>

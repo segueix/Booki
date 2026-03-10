@@ -1,0 +1,36 @@
+name: 🧹 Neteja de Vídeos del Feed
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 0'
+
+jobs:
+  netejar_feed:
+    runs-on: ubuntu-latest
+    
+    # PERMETRE AL BOT GUARDAR ELS CANVIS (Soluciona l'error 403)
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout del repositori
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Executar script de neteja
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY_SERVER }}
+        run: node scripts/netejar_feed.js
+
+      - name: Guardar els canvis (Commit)
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com"
+          git add data/feed.json
+          git diff --staged --quiet || git commit -m "🧹 Neteja de vídeos privats, esborrats o amb durada 00:00 del feed"
+          git push
