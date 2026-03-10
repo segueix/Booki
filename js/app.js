@@ -2420,16 +2420,16 @@ async function refreshCustomCategorySearch(category) {
         const dualResults = await performDualSearch(key);
         const archiveVideos = Array.isArray(dualResults?.archiveVideos) ? dualResults.archiveVideos : [];
 
-        let videos = [];
+        let videos = mergeUniqueVideos(dualResults?.videos || [], archiveVideos);
         if (useYouTubeAPI && typeof YouTubeAPI?.searchVideos === 'function') {
-            const result = await YouTubeAPI.searchVideos(key, CONFIG.layout.videosPerPage);
-            if (!result?.error && Array.isArray(result.items)) {
-                videos = mergeUniqueVideos(result.items, archiveVideos);
-            } else {
-                videos = mergeUniqueVideos(dualResults?.videos || [], archiveVideos);
+            try {
+                const result = await YouTubeAPI.searchVideos(key, CONFIG.layout.videosPerPage);
+                if (!result?.error && Array.isArray(result.items)) {
+                    videos = mergeUniqueVideos(result.items, archiveVideos);
+                }
+            } catch (error) {
+                console.warn("No s'ha pogut refrescar la categoria amb API, es manté la cerca local/arxiu", error);
             }
-        } else {
-            videos = mergeUniqueVideos(dualResults?.videos || [], archiveVideos);
         }
         setCustomCategorySearchResults(key, videos);
         return videos;
@@ -2458,7 +2458,9 @@ function filterVideosByCategory(videos, feed) {
 
         const matched = videos.filter(video => matchesCustomCategory(video, rawCategoryName));
         const searchResults = getCustomCategorySearchResults(categoryName);
-        return mergeUniqueVideos(searchResults, matched);
+        const archiveMatches = searchArchiveVideos(rawCategoryName);
+        rememberArchiveSearchVideos(archiveMatches);
+        return mergeUniqueVideos(searchResults, mergeUniqueVideos(archiveMatches, matched));
     }
     if (selectedCategory === 'Seguint') {
         const followedIds = new Set(getFollowedChannelIds().map(id => String(id)));
@@ -6690,7 +6692,7 @@ function renderDesktopSidebar(channel, channelVideos, currentVideoId) {
                         <div class="sidebar-video-title">${escapeHtml(video.title)}</div>
                         <div class="sidebar-video-stats">
                             ${video.viewCount ? formatViews(video.viewCount) + ' vis.' : ''}
-                            ${video.publishedAt ? '• ' + formatDate(video.publishedAt) : ''}
+                            ${video.publishedAt ? (video.viewCount ? '• ' : '') + formatDate(video.publishedAt) : ''}
                         </div>
                     </div>
                 </div>
