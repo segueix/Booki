@@ -29,6 +29,7 @@ const YouTubeAPI = {
     feedVideos: [],
     feedLoaded: false,
     channelArchiveCache: {},
+    channelArchivePromises: {},
     legacyArchiveCache: null,
 
     // Paraules clau per detectar contingut català
@@ -130,22 +131,31 @@ const YouTubeAPI = {
         if (Object.prototype.hasOwnProperty.call(this.channelArchiveCache, channelId)) {
             return this.channelArchiveCache[channelId];
         }
+        if (this.channelArchivePromises[channelId]) {
+            return this.channelArchivePromises[channelId];
+        }
 
-        try {
-            const response = await fetch(`data/archive/channels/${encodeURIComponent(channelId)}.json?t=${Date.now()}`, { cache: 'no-store' });
-            if (!response.ok) {
+        this.channelArchivePromises[channelId] = (async () => {
+            try {
+                const response = await fetch(`data/archive/channels/${encodeURIComponent(channelId)}.json?t=${Date.now()}`, { cache: 'no-store' });
+                if (!response.ok) {
+                    this.channelArchiveCache[channelId] = [];
+                    return [];
+                }
+                const data = await response.json();
+                const videos = Array.isArray(data?.videos) ? data.videos : [];
+                this.channelArchiveCache[channelId] = videos;
+                return videos;
+            } catch (error) {
+                console.log('iuTube: Error carregant arxiu per canal:', error.message);
                 this.channelArchiveCache[channelId] = [];
                 return [];
+            } finally {
+                delete this.channelArchivePromises[channelId];
             }
-            const data = await response.json();
-            const videos = Array.isArray(data?.videos) ? data.videos : [];
-            this.channelArchiveCache[channelId] = videos;
-            return videos;
-        } catch (error) {
-            console.log('iuTube: Error carregant arxiu per canal:', error.message);
-            this.channelArchiveCache[channelId] = [];
-            return [];
-        }
+        })();
+
+        return this.channelArchivePromises[channelId];
     },
 
     async loadLegacyArchiveVideosByChannel(channelId) {

@@ -103,6 +103,54 @@ let searchDropdownActiveIndex = -1;
 let searchDebounceTimeout = null;
 let searchArchiveIndexCache = null;
 let searchArchiveIndexPromise = null;
+const archiveSearchVideoMap = new Map();
+
+function buildArchiveThumbnail(videoId) {
+    const normalizedId = String(videoId || '').trim();
+    if (!normalizedId) {
+        return 'img/icon-192.png';
+    }
+    return `https://i.ytimg.com/vi/${encodeURIComponent(normalizedId)}/hqdefault.jpg`;
+}
+
+function rememberArchiveSearchVideos(videos) {
+    if (!Array.isArray(videos)) {
+        return;
+    }
+    videos.forEach(video => {
+        if (!video?.id) {
+            return;
+        }
+        const normalizedId = String(video.id);
+        const existing = archiveSearchVideoMap.get(normalizedId) || {};
+        archiveSearchVideoMap.set(normalizedId, {
+            ...existing,
+            ...video,
+            id: normalizedId,
+            thumbnail: video.thumbnail || existing.thumbnail || buildArchiveThumbnail(video.id)
+        });
+    });
+}
+
+function getArchiveVideosForChannel(channelId) {
+    const normalizedChannelId = String(channelId || '').trim();
+    if (!normalizedChannelId || !Array.isArray(searchArchiveIndexCache)) {
+        return [];
+    }
+
+    return searchArchiveIndexCache
+        .filter(item => String(item?.c || '') === normalizedChannelId)
+        .map(item => ({
+            id: item?.i,
+            title: item?.t || '',
+            channelId: normalizedChannelId,
+            channelTitle: getChannelNameById(normalizedChannelId),
+            publishedAt: item?.d || '',
+            thumbnail: buildArchiveThumbnail(item?.i),
+            source: 'archive'
+        }))
+        .filter(video => video.id);
+}
 let activeSearchRequestId = 0;
 let installPromptEvent = null;
 let currentFontSize = null;
@@ -1348,6 +1396,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Carregar vídeo des de URL si hi ha paràmetre ?v=
     const videoParam = urlParams.get('v');
     if (videoParam) {
+        await loadSearchArchiveIndex();
         setTimeout(() => {
             if (useYouTubeAPI) {
                 showVideoFromAPI(videoParam);
@@ -3535,6 +3584,7 @@ async function performDualSearch(query) {
 
     await loadSearchArchiveIndex();
     const archiveVideos = searchArchiveVideos(trimmedQuery);
+    rememberArchiveSearchVideos(archiveVideos);
     return { ...localResults, archiveVideos };
 }
 
@@ -6541,11 +6591,7 @@ function createArchiveVideoCard(video) {
     return `
         <article class="archive-video-card" data-video-id="${video.id}">
             <div class="archive-video-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 3v5h5"></path>
-                    <path d="M3 8a9 9 0 1 0 3-6.7"></path>
-                    <path d="M12 7v5l3 2"></path>
-                </svg>
+                <i data-lucide="history" class="archive-video-icon-symbol"></i>
             </div>
             <div class="archive-video-info">
                 <h3 class="archive-video-title">${escapeHtml(video.title)}</h3>
@@ -6779,7 +6825,19 @@ function renderCategoryVideosBelow(currentChannelId, currentVideoId) {
         videos = listVideos;
     } else {
         // Comportament actual per categories estàndard
-        let allVideos = currentFeedVideos || [];
+        const feedVideos = Array.isArray(currentFeedVideos) ? currentFeedVideos : [];
+        const archiveChannelVideos = currentChannelId ? getArchiveVideosForChannel(currentChannelId) : [];
+        const mergedVideos = new Map();
+        [...feedVideos, ...cachedAPIVideos, ...archiveChannelVideos].forEach(video => {
+            if (!video?.id || video.isShort) {
+                return;
+            }
+            const normalizedId = String(video.id);
+            if (!mergedVideos.has(normalizedId)) {
+                mergedVideos.set(normalizedId, video);
+            }
+        });
+        let allVideos = Array.from(mergedVideos.values());
 
         let effectiveCategory = null;
         if (selectedCategory && selectedCategory !== 'Novetats' && selectedCategory !== 'Tot') {
@@ -6905,14 +6963,21 @@ async function showVideoFromAPI(videoId) {
     watchPage.classList.remove('hidden');
 
     // 1. Renderitzat immediat des del catxé si està disponible
-    let cachedVideo = cachedAPIVideos.find(video => video.id === videoId);
+    const normalizedVideoId = String(videoId || '');
+    let cachedVideo = cachedAPIVideos.find(video => String(video?.id) === normalizedVideoId);
     let isArchivePlayback = cachedVideo?.source === 'archive';
 
+    if (!cachedVideo && !Array.isArray(searchArchiveIndexCache)) {
+        await loadSearchArchiveIndex();
+    }
+
     if (!cachedVideo) {
-        const archiveVideo = archiveSearchVideoMap.get(String(videoId));
+        const archiveVideoFromMap = archiveSearchVideoMap.get(normalizedVideoId);
+        const archiveVideo = archiveVideoFromMap || getArchiveIndexVideoById(normalizedVideoId);
         if (archiveVideo) {
+            rememberArchiveSearchVideos([archiveVideo]);
             cachedVideo = {
-                id: archiveVideo.id,
+                id: String(archiveVideo.id),
                 title: archiveVideo.title,
                 thumbnail: archiveVideo.thumbnail || buildArchiveThumbnail(archiveVideo.id),
                 channelId: archiveVideo.channelId || '',
@@ -6923,6 +6988,21 @@ async function showVideoFromAPI(videoId) {
             };
             cachedAPIVideos.push(cachedVideo);
             isArchivePlayback = true;
+        }
+    }
+
+    if (!cachedVideo) {
+        const historyVideo = getHistoryVideoById(normalizedVideoId);
+        if (historyVideo) {
+            cachedVideo = {
+                ...historyVideo,
+                id: String(historyVideo.id),
+                thumbnail: historyVideo.thumbnail || buildArchiveThumbnail(historyVideo.id)
+            };
+            if (!cachedAPIVideos.find(video => String(video?.id) === normalizedVideoId)) {
+                cachedAPIVideos.push(cachedVideo);
+            }
+            isArchivePlayback = cachedVideo?.source === 'archive' || cachedVideo?.historySource === 'archive';
         }
     }
     if (isAutoPlayNavigating) {
@@ -7552,6 +7632,36 @@ function saveHistoryItems(items) {
 
 function getHistoryVideoIdSet() {
     return new Set(getHistoryItems().map(item => String(item.id)));
+}
+
+function getHistoryVideoById(videoId) {
+    const normalizedId = String(videoId || '');
+    if (!normalizedId) {
+        return null;
+    }
+    return getHistoryItems().find(item => String(item?.id) === normalizedId) || null;
+}
+
+function getArchiveIndexVideoById(videoId) {
+    const normalizedId = String(videoId || '');
+    if (!normalizedId || !Array.isArray(searchArchiveIndexCache)) {
+        return null;
+    }
+
+    const indexItem = searchArchiveIndexCache.find(item => String(item?.i || '') === normalizedId);
+    if (!indexItem) {
+        return null;
+    }
+
+    return {
+        id: normalizedId,
+        title: indexItem?.t || '',
+        channelId: indexItem?.c || '',
+        channelTitle: getChannelNameById(indexItem?.c),
+        publishedAt: indexItem?.d || '',
+        thumbnail: buildArchiveThumbnail(normalizedId),
+        source: 'archive'
+    };
 }
 
 function filterOutWatchedVideos(videos) {
